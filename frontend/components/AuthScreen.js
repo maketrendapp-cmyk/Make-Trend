@@ -1,8 +1,9 @@
 // frontend/components/AuthScreen.js
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
-export default function AuthScreen({ onLogin, onRegister }) {
+export default function AuthScreen({ onSuccess }) {
+  const { login, register, loading: authLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -10,15 +11,35 @@ export default function AuthScreen({ onLogin, onRegister }) {
   const [username, setUsername] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // For demo purposes - we'll connect Firebase later
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+
     if (isLogin) {
-      onLogin?.(email, password);
+      const result = await login(email, password);
+      if (result.success) {
+        onSuccess?.(); // Callback to parent
+      } else {
+        setError(result.error || 'Login failed');
+      }
     } else {
-      onRegister?.(email, password, fullname, username);
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        setIsSubmitting(false);
+        return;
+      }
+      const result = await register(email, password, fullname, username);
+      if (result.success) {
+        onSuccess?.();
+      } else {
+        setError(result.error || 'Registration failed');
+      }
     }
+    setIsSubmitting(false);
   };
 
   return (
@@ -33,13 +54,20 @@ export default function AuthScreen({ onLogin, onRegister }) {
           <p className="text-sm text-gray-400 mt-1">Viral campaign builder</p>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
           <button
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
               isLogin ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
-            onClick={() => setIsLogin(true)}
+            onClick={() => { setIsLogin(true); setError(''); }}
           >
             Log In
           </button>
@@ -47,7 +75,7 @@ export default function AuthScreen({ onLogin, onRegister }) {
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
               !isLogin ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
-            onClick={() => setIsLogin(false)}
+            onClick={() => { setIsLogin(false); setError(''); }}
           >
             Register
           </button>
@@ -68,6 +96,7 @@ export default function AuthScreen({ onLogin, onRegister }) {
                   placeholder="John Doe"
                   className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               <div>
@@ -81,8 +110,9 @@ export default function AuthScreen({ onLogin, onRegister }) {
                   placeholder="john_doe"
                   className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   required
+                  disabled={isSubmitting}
                 />
-                <p className="mt-1 text-xs text-gray-400">Letters, numbers, and underscore only.</p>
+                <p className="mt-1 text-xs text-gray-400">3-30 characters, letters, numbers, underscore.</p>
               </div>
             </>
           )}
@@ -98,6 +128,7 @@ export default function AuthScreen({ onLogin, onRegister }) {
               placeholder="you@example.com"
               className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               required
+              disabled={isSubmitting}
             />
           </div>
 
@@ -113,6 +144,8 @@ export default function AuthScreen({ onLogin, onRegister }) {
                 placeholder="••••••••"
                 className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary pr-10"
                 required
+                disabled={isSubmitting}
+                minLength={6}
               />
               <button
                 type="button"
@@ -126,7 +159,19 @@ export default function AuthScreen({ onLogin, onRegister }) {
               <button
                 type="button"
                 className="mt-1 text-xs text-primary hover:underline"
-                onClick={() => alert('Password reset will be implemented later')}
+                onClick={async () => {
+                  if (!email) {
+                    setError('Please enter your email address.');
+                    return;
+                  }
+                  const result = await useAuth().resetPassword(email);
+                  if (result.success) {
+                    setError('');
+                    alert('Password reset link sent to your email.');
+                  } else {
+                    setError(result.error || 'Failed to send reset email.');
+                  }
+                }}
               >
                 Forgot password?
               </button>
@@ -145,15 +190,17 @@ export default function AuthScreen({ onLogin, onRegister }) {
                 placeholder="••••••••"
                 className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 required
+                disabled={isSubmitting}
               />
             </div>
           )}
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition"
+            disabled={isSubmitting || authLoading}
+            className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLogin ? 'Log In' : 'Create Account'}
+            {isSubmitting ? 'Loading...' : isLogin ? 'Log In' : 'Create Account'}
           </button>
         </form>
 
@@ -167,7 +214,7 @@ export default function AuthScreen({ onLogin, onRegister }) {
           </div>
         </div>
 
-        {/* Social Buttons */}
+        {/* Social Buttons (Placeholder) */}
         <div className="flex gap-3">
           <button
             onClick={() => alert('Google login coming soon!')}
