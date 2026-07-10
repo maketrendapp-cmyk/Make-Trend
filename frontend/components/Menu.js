@@ -23,8 +23,8 @@ export default function Menu({ isOpen, onClose }) {
         onClick={onClose}
       />
       
-      {/* Left Side Drawer - NOW 55% of screen (reduced from 75%) */}
-      <div className="fixed left-0 top-0 z-50 h-full w-[55%] max-w-xs bg-white shadow-2xl animate-slide-in px-5 py-6">
+      {/* Left Side Drawer - 65% of screen */}
+      <div className="fixed left-0 top-0 z-50 h-full w-[65%] max-w-xs bg-white shadow-2xl animate-slide-in px-5 py-6">
         
         {/* Close Button (X) */}
         <button 
@@ -56,7 +56,7 @@ export default function Menu({ isOpen, onClose }) {
           <MenuItem href="/settings" label="⚙️ Settings" onClick={onClose} />
           
           <button 
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
             onClick={() => { alert('Logout clicked'); onClose(); }}
           >
             🚪 Logout
