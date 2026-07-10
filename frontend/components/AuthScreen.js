@@ -15,7 +15,7 @@ export default function AuthScreen({ onSuccess }) {
 
   // ===== STEP 1: EMAIL (for email/password flow) =====
   const [email, setEmail] = useState('');
-  const [emailExists, setEmailExists] = useState(null); // true / false / null
+  const [emailExists, setEmailExists] = useState(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [emailError, setEmailError] = useState('');
 
@@ -29,7 +29,7 @@ export default function AuthScreen({ onSuccess }) {
   const [avatarPreview, setAvatarPreview] = useState('');
 
   // ===== SOCIAL LOGIN COMPLETION STATE =====
-  const [socialUser, setSocialUser] = useState(null); // stores user data from social login
+  const [socialUser, setSocialUser] = useState(null);
   const [needsSocialCompletion, setNeedsSocialCompletion] = useState(false);
   const [socialFullname, setSocialFullname] = useState('');
   const [socialUsername, setSocialUsername] = useState('');
@@ -80,7 +80,7 @@ export default function AuthScreen({ onSuccess }) {
   }, [email, needsSocialCompletion]);
 
   // ============================================================
-  // CHECK USERNAME AVAILABILITY (for email registration & social completion)
+  // CHECK USERNAME AVAILABILITY
   // ============================================================
   const usernameToCheck = needsSocialCompletion ? socialUsername : username;
   const isRegisterMode = (emailExists === false && email.length > 3) || needsSocialCompletion;
@@ -112,14 +112,13 @@ export default function AuthScreen({ onSuccess }) {
   }, [isRegisterMode, usernameToCheck]);
 
   // ============================================================
-  // HANDLE SOCIAL LOGIN (Google / Facebook)
+  // HANDLE SOCIAL LOGIN
   // ============================================================
   const handleSocialLogin = async (provider) => {
     setError('');
     const result = await socialLogin(provider);
     if (result.success) {
       if (result.needsCompletion) {
-        // Show profile completion fields inside this same screen
         const user = result.user || {};
         setSocialUser(user);
         setSocialFullname(user.displayName || '');
@@ -142,7 +141,6 @@ export default function AuthScreen({ onSuccess }) {
     setError('');
     setIsSubmitting(true);
 
-    // Validation
     if (socialFullname.length < 2) {
       setError('Full name must be at least 2 characters.');
       setIsSubmitting(false);
@@ -180,7 +178,7 @@ export default function AuthScreen({ onSuccess }) {
   };
 
   // ============================================================
-  // HANDLE EMAIL/PASSWORD FORM SUBMISSION (Login or Register)
+  // HANDLE EMAIL/PASSWORD FORM SUBMISSION
   // ============================================================
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -188,7 +186,6 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(true);
 
     if (emailExists === true) {
-      // ===== LOGIN =====
       const result = await login(email, password);
       if (result.success) {
         onSuccess?.();
@@ -196,7 +193,6 @@ export default function AuthScreen({ onSuccess }) {
         setError(result.error || 'Login failed.');
       }
     } else {
-      // ===== REGISTER =====
       if (fullname.length < 2) {
         setError('Full name must be at least 2 characters.');
         setIsSubmitting(false);
@@ -224,13 +220,6 @@ export default function AuthScreen({ onSuccess }) {
       }
 
       let avatarUrl = '';
-      if (avatarFile) {
-        // We can't upload before registration because we need a token.
-        // User can add avatar later in profile. So skip for now.
-        // Or we could upload after registration in the background.
-        // For simplicity, we tell user they can add later.
-      }
-
       const result = await register(email, password, fullname, username, avatarUrl, referralCode);
       if (result.success) {
         onSuccess?.();
@@ -242,7 +231,7 @@ export default function AuthScreen({ onSuccess }) {
   };
 
   // ============================================================
-  // AVATAR UPLOAD HANDLERS (for both registration & social completion)
+  // AVATAR UPLOAD HANDLERS
   // ============================================================
   const handleAvatarChange = (e, type = 'register') => {
     const file = e.target.files[0];
@@ -279,10 +268,8 @@ export default function AuthScreen({ onSuccess }) {
   };
 
   // ============================================================
-  // RENDER
+  // RENDER - SOCIAL COMPLETION
   // ============================================================
-
-  // If social profile completion is needed, show that form
   if (needsSocialCompletion) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
@@ -299,7 +286,6 @@ export default function AuthScreen({ onSuccess }) {
           )}
 
           <form onSubmit={handleSocialCompletion} className="space-y-4">
-            {/* Avatar */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Profile Picture</label>
               <div className="flex items-center gap-4">
@@ -321,7 +307,6 @@ export default function AuthScreen({ onSuccess }) {
               </div>
             </div>
 
-            {/* Full Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
               <input
@@ -335,16 +320,13 @@ export default function AuthScreen({ onSuccess }) {
               />
             </div>
 
-            {/* Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
               <div className="relative">
                 <input
                   type="text"
                   value={socialUsername}
-                  onChange={(e) =>
-                    setSocialUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
-                  }
+                  onChange={(e) => setSocialUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                   placeholder="john_doe"
                   className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-1 ${
                     usernameAvailable === true && socialUsername.length >= 3
@@ -369,7 +351,6 @@ export default function AuthScreen({ onSuccess }) {
               <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
             </div>
 
-            {/* Email (readonly) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <div className="w-full rounded-lg border border-border bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
@@ -406,12 +387,11 @@ export default function AuthScreen({ onSuccess }) {
   }
 
   // ============================================================
-  // MAIN EMAIL/PASSWORD FLOW
+  // RENDER - MAIN EMAIL/PASSWORD FLOW
   // ============================================================
   return (
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border">
-        {/* Brand */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-primary">
             Make<span className="text-gray-900">Trend</span>
@@ -437,7 +417,6 @@ export default function AuthScreen({ onSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* EMAIL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
             <div className="relative">
@@ -485,7 +464,6 @@ export default function AuthScreen({ onSuccess }) {
             )}
           </div>
 
-          {/* LOGIN PASSWORD */}
           {emailExists === true && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -511,7 +489,6 @@ export default function AuthScreen({ onSuccess }) {
             </div>
           )}
 
-          {/* REGISTER FIELDS */}
           {emailExists === false && email.length > 3 && (
             <>
               <div>
@@ -630,7 +607,6 @@ export default function AuthScreen({ onSuccess }) {
             </>
           )}
 
-          {/* SUBMIT BUTTON */}
           {emailExists !== null && email.length > 3 && (
             <button
               type="submit"
@@ -656,7 +632,6 @@ export default function AuthScreen({ onSuccess }) {
           )}
         </form>
 
-        {/* DIVIDER */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-border" />
@@ -666,7 +641,6 @@ export default function AuthScreen({ onSuccess }) {
           </div>
         </div>
 
-        {/* SOCIAL BUTTONS */}
         <div className="flex gap-3">
           <button
             onClick={() => handleSocialLogin('google')}
@@ -693,7 +667,6 @@ export default function AuthScreen({ onSuccess }) {
           </button>
         </div>
 
-        {/* FOOTER LINKS */}
         {emailExists === false && email.length > 3 && (
           <p className="mt-4 text-center text-xs text-gray-400">
             Already have an account?{' '}
