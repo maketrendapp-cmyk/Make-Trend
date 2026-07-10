@@ -13,7 +13,7 @@ export default function AuthScreen({ onSuccess }) {
     resetPassword,
   } = useAuth();
 
-  // ===== STEP 1: EMAIL (for email/password flow) =====
+  // ===== STEP 1: EMAIL =====
   const [email, setEmail] = useState('');
   const [emailExists, setEmailExists] = useState(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -28,7 +28,7 @@ export default function AuthScreen({ onSuccess }) {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
 
-  // ===== SOCIAL LOGIN COMPLETION STATE =====
+  // ===== SOCIAL LOGIN COMPLETION =====
   const [socialUser, setSocialUser] = useState(null);
   const [needsSocialCompletion, setNeedsSocialCompletion] = useState(false);
   const [socialFullname, setSocialFullname] = useState('');
@@ -43,15 +43,33 @@ export default function AuthScreen({ onSuccess }) {
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState(true);
 
   const emailTimerRef = useRef(null);
   const usernameTimerRef = useRef(null);
 
   // ============================================================
+  // CHECK BACKEND IS AVAILABLE
+  // ============================================================
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/health`);
+        if (!res.ok) throw new Error('Backend down');
+        setBackendAvailable(true);
+      } catch {
+        setBackendAvailable(false);
+        setError('⚠️ Backend server is not responding. Please try again later.');
+      }
+    };
+    checkBackend();
+  }, []);
+
+  // ============================================================
   // CHECK EMAIL EXISTS (debounced)
   // ============================================================
   useEffect(() => {
-    if (email.length > 3 && email.includes('@') && !needsSocialCompletion) {
+    if (email.length > 3 && email.includes('@') && !needsSocialCompletion && backendAvailable) {
       clearTimeout(emailTimerRef.current);
       setIsCheckingEmail(true);
       setEmailError('');
@@ -62,11 +80,13 @@ export default function AuthScreen({ onSuccess }) {
           const res = await fetch(
             `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/check-email?email=${encodeURIComponent(email)}`
           );
+          if (!res.ok) throw new Error('Backend error');
           const data = await res.json();
           setEmailExists(data.exists);
-        } catch {
+        } catch (err) {
+          console.error('Email check error:', err);
           setEmailExists(null);
-          setEmailError('Could not verify email.');
+          setEmailError('Could not verify email. Backend may be down.');
         } finally {
           setIsCheckingEmail(false);
         }
@@ -77,7 +97,7 @@ export default function AuthScreen({ onSuccess }) {
       setEmailError('');
     }
     return () => clearTimeout(emailTimerRef.current);
-  }, [email, needsSocialCompletion]);
+  }, [email, needsSocialCompletion, backendAvailable]);
 
   // ============================================================
   // CHECK USERNAME AVAILABILITY
@@ -86,7 +106,7 @@ export default function AuthScreen({ onSuccess }) {
   const isRegisterMode = (emailExists === false && email.length > 3) || needsSocialCompletion;
 
   useEffect(() => {
-    if (isRegisterMode && usernameToCheck.length >= 3) {
+    if (isRegisterMode && usernameToCheck.length >= 3 && backendAvailable) {
       clearTimeout(usernameTimerRef.current);
       setIsCheckingUsername(true);
       setUsernameAvailable(null);
@@ -96,6 +116,7 @@ export default function AuthScreen({ onSuccess }) {
           const res = await fetch(
             `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/check-username?username=${encodeURIComponent(usernameToCheck)}`
           );
+          if (!res.ok) throw new Error('Backend error');
           const data = await res.json();
           setUsernameAvailable(data.available);
         } catch {
@@ -109,27 +130,38 @@ export default function AuthScreen({ onSuccess }) {
       setIsCheckingUsername(false);
     }
     return () => clearTimeout(usernameTimerRef.current);
-  }, [isRegisterMode, usernameToCheck]);
+  }, [isRegisterMode, usernameToCheck, backendAvailable]);
 
   // ============================================================
-  // HANDLE SOCIAL LOGIN
+  // HANDLE SOCIAL LOGIN (with popup fallback)
   // ============================================================
   const handleSocialLogin = async (provider) => {
     setError('');
-    const result = await socialLogin(provider);
-    if (result.success) {
-      if (result.needsCompletion) {
-        const user = result.user || {};
-        setSocialUser(user);
-        setSocialFullname(user.displayName || '');
-        setSocialAvatarPreview(user.photoURL || '');
-        setNeedsSocialCompletion(true);
-        setError('');
+    
+    try {
+      const result = await socialLogin(provider);
+      if (result.success) {
+        if (result.needsCompletion) {
+          const user = result.user || {};
+          setSocialUser(user);
+          setSocialFullname(user.displayName || '');
+          setSocialAvatarPreview(user.photoURL || '');
+          setNeedsSocialCompletion(true);
+          setError('');
+        } else {
+          onSuccess?.();
+        }
       } else {
-        onSuccess?.();
+        setError(result.error || `Failed to sign in with ${provider}.`);
       }
-    } else {
-      setError(result.error || `Failed to sign in with ${provider}.`);
+    } catch (err) {
+      console.error('Social login error:', err);
+      // If popup was blocked, show helpful message
+      if (err.message?.includes('popup')) {
+        setError('Popup was blocked. Please allow popups for this site and try again.');
+      } else {
+        setError('Unable to sign in. Please try again.');
+      }
     }
   };
 
@@ -186,6 +218,7 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(true);
 
     if (emailExists === true) {
+      // ===== LOGIN =====
       const result = await login(email, password);
       if (result.success) {
         onSuccess?.();
@@ -193,6 +226,7 @@ export default function AuthScreen({ onSuccess }) {
         setError(result.error || 'Login failed.');
       }
     } else {
+      // ===== REGISTER =====
       if (fullname.length < 2) {
         setError('Full name must be at least 2 characters.');
         setIsSubmitting(false);
@@ -219,9 +253,12 @@ export default function AuthScreen({ onSuccess }) {
         return;
       }
 
+      // Avatar upload skipped during registration (can be added later in profile)
       let avatarUrl = '';
+
       const result = await register(email, password, fullname, username, avatarUrl, referralCode);
       if (result.success) {
+        // If avatar was selected, we'll upload it after registration via the profile page
         onSuccess?.();
       } else {
         setError(result.error || 'Registration failed.');
@@ -266,6 +303,26 @@ export default function AuthScreen({ onSuccess }) {
       setError(result.error || 'Failed to send reset email.');
     }
   };
+
+  // ============================================================
+  // RENDER - BACKEND DOWN
+  // ============================================================
+  if (!backendAvailable) {
+    return (
+      <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Backend Unavailable</h2>
+          <p className="text-sm text-gray-500">
+            The backend server is not responding. Please try again later.
+          </p>
+          <p className="text-xs text-gray-400 mt-4">
+            Make sure your backend is deployed on Render and the URL is correct.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // ============================================================
   // RENDER - SOCIAL COMPLETION
@@ -417,6 +474,7 @@ export default function AuthScreen({ onSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* EMAIL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
             <div className="relative">
@@ -462,8 +520,14 @@ export default function AuthScreen({ onSuccess }) {
                 </button>
               </p>
             )}
+            {emailExists === false && email.length > 3 && (
+              <p className="mt-1 text-xs text-gray-400">
+                New account. Fill in your details below to create your account.
+              </p>
+            )}
           </div>
 
+          {/* LOGIN PASSWORD */}
           {emailExists === true && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -489,6 +553,7 @@ export default function AuthScreen({ onSuccess }) {
             </div>
           )}
 
+          {/* REGISTER FIELDS */}
           {emailExists === false && email.length > 3 && (
             <>
               <div>
@@ -602,11 +667,12 @@ export default function AuthScreen({ onSuccess }) {
                     </div>
                   )}
                 </div>
-                <p className="mt-1 text-xs text-gray-400">Max 5MB • JPEG, PNG, WEBP, GIF</p>
+                <p className="mt-1 text-xs text-gray-400">Max 5MB • JPEG, PNG, WEBP, GIF (You can add/change this later in profile)</p>
               </div>
             </>
           )}
 
+          {/* SUBMIT BUTTON - THIS IS THE REGISTRATION BUTTON */}
           {emailExists !== null && email.length > 3 && (
             <button
               type="submit"
@@ -667,6 +733,7 @@ export default function AuthScreen({ onSuccess }) {
           </button>
         </div>
 
+        {/* SWITCH BETWEEN LOGIN AND REGISTER */}
         {emailExists === false && email.length > 3 && (
           <p className="mt-4 text-center text-xs text-gray-400">
             Already have an account?{' '}
