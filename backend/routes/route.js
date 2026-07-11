@@ -351,27 +351,81 @@ async function isAdmin(uid) {
 }
 
 // 1. GET ALL TEMPLATES (Public) – with filters
+// routes/route.js – GET /templates (Robust Version)
+
 router.get('/templates', async (req, res) => {
   try {
     const { category, platform, highlight, limit = 50 } = req.query;
     
-    let query = db.collection('templates').where('isActive', '==', true);
+    console.log('📡 Fetching templates with filters:', { category, platform, highlight, limit });
     
-    if (category) query = query.where('category', '==', category);
-    if (platform) query = query.where('platform', '==', platform);
-    if (highlight === 'true') query = query.where('isHighlight', '==', true);
+    // Start with a simple query – don't filter by isActive to avoid missing field issues
+    let query = db.collection('templates');
     
-    const snapshot = await query.orderBy('createdAt', 'desc').limit(parseInt(limit)).get();
+    // Apply filters only if they exist
+    if (category) {
+      console.log('🔍 Filtering by category:', category);
+      query = query.where('category', '==', category);
+    }
+    if (platform) {
+      console.log('🔍 Filtering by platform:', platform);
+      query = query.where('platform', '==', platform);
+    }
+    if (highlight === 'true') {
+      console.log('🔍 Filtering by highlight:', true);
+      query = query.where('isHighlight', '==', true);
+    }
+    
+    // Order by createdAt if it exists, otherwise just limit
+    // We'll try to order, but if the field doesn't exist, we'll handle gracefully
+    try {
+      query = query.orderBy('createdAt', 'desc');
+    } catch (orderError) {
+      console.warn('⚠️ Cannot order by createdAt (field may not exist in all docs):', orderError.message);
+      // Continue without ordering
+    }
+    
+    query = query.limit(parseInt(limit) || 50);
+    
+    const snapshot = await query.get();
+    console.log('📊 Documents found:', snapshot.size);
     
     const templates = [];
     snapshot.forEach(doc => {
-      templates.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      // Only include if not explicitly inactive
+      if (data.isActive !== false) {
+        templates.push({ 
+          id: doc.id, 
+          ...data,
+          // Ensure these fields exist to prevent frontend errors
+          title: data.title || 'Untitled',
+          slug: data.slug || doc.id,
+          description: data.description || '',
+          image: data.image || '',
+          category: data.category || '',
+          platform: data.platform || 'all',
+          hashtags: data.hashtags || [],
+          isHighlight: data.isHighlight || false,
+          usageCount: data.usageCount || 0,
+        });
+      }
     });
     
+    console.log('✅ Returning', templates.length, 'templates');
     res.json({ success: true, templates });
+    
   } catch (error) {
-    console.error('Get templates error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch templates' });
+    console.error('❌ Get templates error:', error);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Send a detailed error message for debugging
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      details: error.stack,
+      message: 'Failed to fetch templates. Please check Firestore configuration.'
+    });
   }
 });
 
