@@ -1,23 +1,26 @@
-// frontend/pages/stats.js
+// pages/stats.js
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import Meta from '../components/Meta';
+import { useAuth } from '../components/AuthScreen';
 import AuthScreen from '../components/AuthScreen';
-import api from '../services/api';
+import Meta from '../components/Meta';
+
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export default function Stats() {
-  const { user, isAuthenticated, loading, refreshUser } = useAuth();
+  const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // Fetch campaigns if authenticated
+  // Fetch campaigns if authenticated and completed
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !needsCompletion) {
       const fetchCampaigns = async () => {
         try {
-          const response = await api.get('/campaigns');
-          if (response.data.success) {
-            setCampaigns(response.data.campaigns);
+          // Use the API helper from AuthScreen, or just fetch directly
+          const res = await fetch(`${API_BASE}/campaigns`);
+          const data = await res.json();
+          if (data.success) {
+            setCampaigns(data.campaigns || []);
           }
         } catch (error) {
           console.error('Failed to fetch campaigns:', error);
@@ -29,9 +32,8 @@ export default function Stats() {
     } else {
       setStatsLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, needsCompletion]);
 
-  // If loading auth, show nothing or a subtle loader
   if (loading) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
@@ -40,7 +42,6 @@ export default function Stats() {
     );
   }
 
-  // If not authenticated, show AuthScreen
   if (!isAuthenticated) {
     return (
       <>
@@ -50,7 +51,17 @@ export default function Stats() {
     );
   }
 
-  // If authenticated, show stats dashboard
+  if (needsCompletion) {
+    return (
+      <>
+        <Meta title="Complete Profile" description="Complete your profile." />
+        <AuthScreen onSuccess={refreshUser} />
+      </>
+    );
+  }
+
+  const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+
   return (
     <>
       <Meta title="Analytics" description="Track your campaign performance." />
@@ -62,7 +73,7 @@ export default function Stats() {
             { label: 'Total Campaigns', value: user?.stats?.totalCampaigns || 0, icon: '📊' },
             { label: 'Total Unlocks', value: user?.stats?.totalUnlocks || 0, icon: '🚀' },
             { label: 'Total Views', value: user?.stats?.totalViews || 0, icon: '👁️' },
-            { label: 'Active Campaigns', value: campaigns.filter(c => c.status === 'active').length, icon: '🎯' },
+            { label: 'Active Campaigns', value: activeCampaigns, icon: '🎯' },
           ].map((stat, idx) => (
             <div key={idx} className="rounded-xl bg-white p-4 shadow-sm border border-border">
               <div className="text-2xl mb-1">{stat.icon}</div>
@@ -72,10 +83,13 @@ export default function Stats() {
           ))}
         </div>
 
-        {/* Your campaigns list or other content */}
         <div className="mt-6 rounded-xl bg-white p-6 shadow-sm border border-border">
           <h3 className="text-sm font-medium text-gray-700 mb-4">Your Campaigns</h3>
-          {campaigns.length === 0 ? (
+          {statsLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+            </div>
+          ) : campaigns.length === 0 ? (
             <p className="text-sm text-gray-400">You haven't created any campaigns yet.</p>
           ) : (
             <div className="space-y-3">
@@ -83,7 +97,7 @@ export default function Stats() {
                 <div key={camp.id} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{camp.title}</p>
-                    <p className="text-xs text-gray-400">{camp.platform} • {camp.actionType}</p>
+                    <p className="text-xs text-gray-400">{camp.platform || 'Unknown'} • {camp.actionType || 'Action'}</p>
                   </div>
                   <span className="text-sm font-semibold text-primary">{camp.unlockCount || 0} unlocks</span>
                 </div>
