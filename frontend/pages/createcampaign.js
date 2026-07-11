@@ -1,7 +1,7 @@
 // pages/createcampaign.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth, auth } from '../components/AuthScreen';  // 👈 import auth
+import { useAuth, auth } from '../components/AuthScreen'; // ✅ import auth
 import Meta from '../components/Meta';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
@@ -131,7 +131,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ===== SUBMIT – FIXED: use auth.currentUser =====
+  // ===== SUBMIT =====
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -143,7 +143,6 @@ export default function CreateCampaign() {
     }
 
     try {
-      // ✅ Get the Firebase user directly from `auth`
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) {
         setMessage('❌ You must be logged in to create a campaign.');
