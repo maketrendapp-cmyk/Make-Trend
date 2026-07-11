@@ -1,7 +1,7 @@
 // pages/createcampaign.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../components/AuthScreen';
+import { useAuth, auth } from '../components/AuthScreen';  // 👈 import auth
 import Meta from '../components/Meta';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
@@ -87,13 +87,11 @@ export default function CreateCampaign() {
 
   // ===== VALIDATION =====
   const validateForm = () => {
-    // Check if at least one feature is enabled
     if (!shareCountEnabled && !tasksEnabled && !finalUrlEnabled) {
       setMessage('Please enable at least one feature: Share Count, Tasks, or Final URL');
       return false;
     }
 
-    // Validate share count
     if (shareCountEnabled) {
       const num = Number(shareCount);
       if (!Number.isInteger(num) || num < 1 || num > 9999) {
@@ -102,7 +100,6 @@ export default function CreateCampaign() {
       }
     }
 
-    // Validate tasks
     if (tasksEnabled) {
       for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
@@ -117,7 +114,6 @@ export default function CreateCampaign() {
       }
     }
 
-    // Validate final URL
     if (finalUrlEnabled && finalUrl && !isValidUrl(finalUrl)) {
       setMessage('Please enter a valid final redirect URL');
       return false;
@@ -135,7 +131,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ===== SUBMIT =====
+  // ===== SUBMIT – FIXED: use auth.currentUser =====
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -147,7 +143,15 @@ export default function CreateCampaign() {
     }
 
     try {
-      const token = await user.getIdToken();
+      // ✅ Get the Firebase user directly from `auth`
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        setMessage('❌ You must be logged in to create a campaign.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const token = await firebaseUser.getIdToken();
 
       const payload = {
         templateId: template.id,
@@ -187,7 +191,7 @@ export default function CreateCampaign() {
     setIsSubmitting(false);
   };
 
-  // ===== LOADING =====
+  // ===== LOADING / ERROR =====
   if (authLoading || loading) {
     return (
       <main className="max-w-4xl mx-auto px-4 py-16 flex justify-center items-center min-h-[60vh]">
@@ -199,7 +203,6 @@ export default function CreateCampaign() {
     );
   }
 
-  // ===== ERROR =====
   if (error || !template) {
     return (
       <main className="max-w-4xl mx-auto px-4 py-16 text-center">
@@ -436,7 +439,6 @@ export default function CreateCampaign() {
         </form>
       </main>
 
-      {/* ===== ANIMATIONS ===== */}
       <style jsx>{`
         @keyframes slideDown {
           from { opacity: 0; transform: translateY(-10px); }
