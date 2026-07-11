@@ -1,7 +1,8 @@
 // pages/createcampaign.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth, auth } from '../components/AuthScreen'; // ✅ import auth
+import { useAuth } from '../components/AuthScreen';
+import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
