@@ -3,74 +3,22 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 
-// Backend URL – use environment variable or fallback
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
 export default function Create() {
   const router = useRouter();
+
+  // State
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // ===== FILTER STATE =====
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // ===== CATEGORIES & PLATFORMS (extracted from templates) =====
-  const categories = useMemo(() => {
-    const cats = new Set();
-    templates.forEach(t => {
-      if (t.category) cats.add(t.category);
-    });
-    return ['All', ...Array.from(cats)];
-  }, [templates]);
-
-  const platforms = useMemo(() => {
-    const plats = new Set();
-    templates.forEach(t => {
-      if (t.platform) plats.add(t.platform);
-    });
-    return ['All', ...Array.from(plats)];
-  }, [templates]);
-
-  // ===== FILTERED TEMPLATES =====
-  const filteredTemplates = useMemo(() => {
-    let filtered = [...templates];
-
-    // Search filter (title, description, hashtags, category, platform)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(t => {
-        const title = (t.title || '').toLowerCase();
-        const description = (t.description || '').toLowerCase();
-        const hashtags = (t.hashtags || []).join(' ').toLowerCase();
-        const category = (t.category || '').toLowerCase();
-        const platform = (t.platform || '').toLowerCase();
-        return title.includes(query) ||
-               description.includes(query) ||
-               hashtags.includes(query) ||
-               category.includes(query) ||
-               platform.includes(query);
-      });
-    }
-
-    // Category filter
-    if (selectedCategory && selectedCategory !== 'All') {
-      filtered = filtered.filter(t => t.category === selectedCategory);
-    }
-
-    // Platform filter
-    if (selectedPlatform && selectedPlatform !== 'All') {
-      filtered = filtered.filter(t => t.platform === selectedPlatform);
-    }
-
-    return filtered;
-  }, [templates, searchQuery, selectedCategory, selectedPlatform]);
-
-  // ===== FETCH TEMPLATES =====
+  // Fetch templates
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
@@ -79,7 +27,7 @@ export default function Create() {
         if (!res.ok) {
           if (res.status === 500) {
             const text = await res.text();
-            console.warn('Backend responded with 500:', text);
+            console.warn('Backend error:', text);
             setTemplates([]);
             setLoading(false);
             return;
@@ -88,7 +36,7 @@ export default function Create() {
         }
         const data = await res.json();
         if (data.success) {
-          setTemplates(data.templates);
+          setTemplates(data.templates || []);
         } else {
           setError(data.error || 'Failed to fetch templates');
         }
@@ -99,12 +47,50 @@ export default function Create() {
         setLoading(false);
       }
     };
-
     fetchTemplates();
   }, []);
 
-  // ===== HANDLERS =====
-  const handleTemplateSelect = (slug) => {
+  // Extract unique categories & platforms
+  const categories = useMemo(() => {
+    const cats = new Set();
+    templates.forEach(t => { if (t.category) cats.add(t.category); });
+    return ['All', ...Array.from(cats)];
+  }, [templates]);
+
+  const platforms = useMemo(() => {
+    const plats = new Set();
+    templates.forEach(t => { if (t.platform) plats.add(t.platform); });
+    return ['All', ...Array.from(plats)];
+  }, [templates]);
+
+  // Filter logic
+  const filteredTemplates = useMemo(() => {
+    let filtered = [...templates];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q) ||
+        (t.hashtags || []).join(' ').toLowerCase().includes(q) ||
+        (t.category || '').toLowerCase().includes(q) ||
+        (t.platform || '').toLowerCase().includes(q)
+      );
+    }
+    if (selectedCategory && selectedCategory !== 'All') {
+      filtered = filtered.filter(t => t.category === selectedCategory);
+    }
+    if (selectedPlatform && selectedPlatform !== 'All') {
+      filtered = filtered.filter(t => t.platform === selectedPlatform);
+    }
+    return filtered;
+  }, [templates, searchQuery, selectedCategory, selectedPlatform]);
+
+  // Handlers
+  const handlePreview = (slug) => {
+    router.push(`/template/${slug}`);
+  };
+
+  const handleUseTemplate = (slug) => {
     router.push(`/createcampaign/${slug}`);
   };
 
@@ -114,65 +100,59 @@ export default function Create() {
     setSelectedPlatform('');
   };
 
-  // ===== PLATFORM BADGE COLORS =====
+  // Platform badge colors
   const platformColors = {
-    tiktok: 'bg-black/80 text-white border-pink-500',
+    tiktok: 'bg-black/80 text-white',
     instagram: 'bg-gradient-to-br from-purple-600 to-pink-500 text-white',
     youtube: 'bg-red-600 text-white',
     facebook: 'bg-blue-700 text-white',
     all: 'bg-gray-600 text-white',
   };
 
-  // ===== LOADING STATE =====
+  // ===== LOADING =====
   if (loading) {
     return (
       <>
-        <Meta title="Choose a Template" description="Select a template to start your campaign." />
-        <main className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex justify-center items-center min-h-[60vh]">
-            <div className="text-center">
-              <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto"></div>
-              <p className="mt-4 text-gray-500">Loading templates...</p>
-            </div>
+        <Meta title="Choose a Template" />
+        <main className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 flex justify-center items-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+            <p className="mt-4 text-gray-500">Loading templates...</p>
           </div>
         </main>
       </>
     );
   }
 
-  // ===== ERROR STATE =====
+  // ===== ERROR =====
   if (error) {
     return (
       <>
-        <Meta title="Error" description="Could not load templates." />
-        <main className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4">😕</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-            <p className="text-gray-500">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
-            >
-              Retry
-            </button>
-          </div>
+        <Meta title="Error" />
+        <main className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+          <div className="text-5xl mb-4">😕</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-500">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+          >
+            Retry
+          </button>
         </main>
       </>
     );
   }
 
-  // ===== EMPTY STATE (No Templates) =====
+  // ===== EMPTY =====
   if (templates.length === 0) {
     return (
       <>
-        <Meta title="No Templates Available" description="No templates yet." />
-        <main className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4">📭</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">No templates found</h2>
-            <p className="text-gray-500">Check back later or contact the administrator.</p>
-          </div>
+        <Meta title="No Templates" />
+        <main className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+          <div className="text-5xl mb-4">📭</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">No templates found</h2>
+          <p className="text-gray-500">Check back later or contact the administrator.</p>
         </main>
       </>
     );
@@ -181,20 +161,16 @@ export default function Create() {
   // ===== MAIN RENDER =====
   return (
     <>
-      <Meta 
-        title="Choose a Template" 
-        description="Select a template to start your viral campaign." 
-      />
+      <Meta title="Choose a Template" description="Select a template to launch your campaign." />
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* ===== HEADER ===== */}
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">✨ Choose a Template</h1>
-          <p className="text-gray-500 mt-1">Select a template to customize and launch your campaign.</p>
+          <p className="text-gray-500 mt-1">Select a template, preview it, or start building your campaign.</p>
         </div>
 
-        {/* ===== SEARCH + FILTERS ===== */}
+        {/* Search & Filters */}
         <div className="mb-8 space-y-4">
-          {/* Search Bar */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <input
@@ -224,7 +200,6 @@ export default function Create() {
             </button>
           </div>
 
-          {/* Filter Dropdowns */}
           {showFilters && (
             <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-xl border border-border">
               <div className="flex-1 min-w-[150px]">
@@ -240,7 +215,6 @@ export default function Create() {
                   ))}
                 </select>
               </div>
-
               <div className="flex-1 min-w-[150px]">
                 <label className="text-xs font-medium text-gray-500 block mb-1">Platform</label>
                 <select
@@ -254,37 +228,27 @@ export default function Create() {
                   ))}
                 </select>
               </div>
-
-              <div className="flex items-center gap-2 self-end pb-0.5">
-                {(searchQuery || selectedCategory || selectedPlatform) && (
-                  <button
-                    onClick={clearFilters}
-                    className="text-sm text-red-500 hover:text-red-700 transition"
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
+              {(searchQuery || selectedCategory || selectedPlatform) && (
+                <button onClick={clearFilters} className="text-sm text-red-500 hover:text-red-700 transition self-end pb-0.5">
+                  Clear all
+                </button>
+              )}
             </div>
           )}
 
-          {/* Results Count */}
           <div className="text-sm text-gray-400">
             Showing <span className="font-medium text-gray-600">{filteredTemplates.length}</span> of{' '}
             <span className="font-medium text-gray-600">{templates.length}</span> templates
           </div>
         </div>
 
-        {/* ===== TEMPLATE GRID ===== */}
+        {/* Template Grid */}
         {filteredTemplates.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-xl border border-border">
             <div className="text-4xl mb-3">🔍</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No templates match</h3>
             <p className="text-gray-500 text-sm">Try adjusting your search or filters.</p>
-            <button
-              onClick={clearFilters}
-              className="mt-3 px-4 py-1.5 bg-primary/10 text-primary rounded-lg text-sm hover:bg-primary/20 transition"
-            >
+            <button onClick={clearFilters} className="mt-3 px-4 py-1.5 bg-primary/10 text-primary rounded-lg text-sm hover:bg-primary/20 transition">
               Clear all filters
             </button>
           </div>
@@ -293,8 +257,7 @@ export default function Create() {
             {filteredTemplates.map((template) => (
               <div
                 key={template.id}
-                onClick={() => handleTemplateSelect(template.slug)}
-                className="group bg-white rounded-xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
+                className="group bg-white rounded-xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300 overflow-hidden flex flex-col"
               >
                 {/* Image */}
                 <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
@@ -306,9 +269,7 @@ export default function Create() {
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300">
-                      🎨
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300">🎨</div>
                   )}
                   {/* Highlight Badge */}
                   {template.isHighlight && (
@@ -318,10 +279,18 @@ export default function Create() {
                   )}
                   {/* Platform Badge */}
                   <div className="absolute bottom-3 left-3">
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full shadow-lg ${platformColors[template.platform] || platformColors.all}`}>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full shadow-lg ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
                       {template.platform ? template.platform.toUpperCase() : 'ALL'}
                     </span>
                   </div>
+                  {/* Plan Badge */}
+                  {template.plan && template.plan !== 'free' && (
+                    <div className="absolute top-3 right-3">
+                      <span className="text-xs font-bold px-3 py-1 rounded-full shadow-lg bg-purple-600 text-white">
+                        {template.plan.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                   {/* Usage Count */}
                   <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5">
                     <span>👥</span> {template.usageCount || 0}
@@ -356,15 +325,20 @@ export default function Create() {
                       )}
                     </div>
                   )}
-                  <div className="mt-4 pt-3 border-t border-border">
+
+                  {/* Buttons */}
+                  <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-2">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTemplateSelect(template.slug);
-                      }}
-                      className="w-full text-center text-sm font-medium text-primary hover:text-primary/80 transition"
+                      onClick={() => handlePreview(template.slug)}
+                      className="text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 py-2 rounded-lg transition"
                     >
-                      Use this template →
+                      👁️ Preview
+                    </button>
+                    <button
+                      onClick={() => handleUseTemplate(template.slug)}
+                      className="text-sm font-medium text-white bg-primary hover:bg-primary/90 py-2 rounded-lg transition"
+                    >
+                      ✨ Use
                     </button>
                   </div>
                 </div>
