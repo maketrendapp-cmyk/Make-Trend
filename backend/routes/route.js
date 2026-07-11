@@ -1,6 +1,6 @@
 // backend/routes/route.js
 // ============================================================
-// COMPLETE: AUTH + TEMPLATES + CAMPAIGNS
+// COMPLETE: AUTH + TEMPLATES + CAMPAIGNS (with collection group queries)
 // ============================================================
 
 const express = require('express');
@@ -39,6 +39,18 @@ async function isAdmin(uid) {
   } catch {
     return false;
   }
+}
+
+// ============================================================
+// HELPER: Get campaign by ID (collection group query)
+// ============================================================
+async function getCampaignById(campaignId) {
+  const snapshot = await db.collectionGroup('campaigns')
+    .where('__name__', '==', campaignId)
+    .limit(1)
+    .get();
+  if (snapshot.empty) return null;
+  return { ref: snapshot.docs[0].ref, data: snapshot.docs[0].data() };
 }
 
 // ============================================================
@@ -531,7 +543,8 @@ router.post('/templates/:id/usage', async (req, res) => {
 router.get('/campaigns', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
-    const snapshot = await db.collection('campaigns')
+    // Use collection group query to get all campaigns
+    const snapshot = await db.collectionGroup('campaigns')
       .where('status', '==', 'active')
       .orderBy('createdAt', 'desc')
       .limit(limit)
@@ -547,21 +560,21 @@ router.get('/campaigns', async (req, res) => {
   }
 });
 
-// GET CAMPAIGN BY ID (Public)
+// GET CAMPAIGN BY ID (Public – using collection group query)
 router.get('/campaigns/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
+    const campaign = await getCampaignById(id);
+    if (!campaign) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
-    const campaignData = doc.data();
-    db.collection('campaigns').doc(id).update({
+    // Increment view count (async)
+    await campaign.ref.update({
       views: admin.firestore.FieldValue.increment(1)
     }).catch(() => {});
     res.json({
       success: true,
-      campaign: { id: doc.id, ...campaignData }
+      campaign: { id: campaign.ref.id, ...campaign.data }
     });
   } catch (error) {
     console.error('Error fetching campaign:', error);
@@ -687,11 +700,11 @@ router.put('/campaigns/:id', verifyToken, async (req, res) => {
     const uid = req.user.uid;
     const updates = req.body;
 
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
+    const campaign = await getCampaignById(id);
+    if (!campaign) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
-    const data = doc.data();
+    const data = campaign.data;
     if (data.userId !== uid) {
       return res.status(403).json({ success: false, error: 'Forbidden: You do not own this campaign' });
     }
@@ -704,7 +717,7 @@ router.put('/campaigns/:id', verifyToken, async (req, res) => {
       }
     });
     filteredUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-    await db.collection('campaigns').doc(id).update(filteredUpdates);
+    await campaign.ref.update(filteredUpdates);
     res.json({ success: true, message: 'Campaign updated' });
   } catch (error) {
     console.error('Update campaign error:', error);
@@ -717,15 +730,15 @@ router.delete('/campaigns/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
+    const campaign = await getCampaignById(id);
+    if (!campaign) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
-    const data = doc.data();
+    const data = campaign.data;
     if (data.userId !== uid) {
       return res.status(403).json({ success: false, error: 'Forbidden: You do not own this campaign' });
     }
-    await db.collection('campaigns').doc(id).update({
+    await campaign.ref.update({
       status: 'deleted',
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -740,20 +753,20 @@ router.delete('/campaigns/:id', verifyToken, async (req, res) => {
 router.post('/campaigns/:id/share', async (req, res) => {
   try {
     const { id } = req.params;
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
+    const { platform } = req.body;
+    const campaign = await getCampaignById(id);
+    if (!campaign) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
-    await db.collection('campaigns').doc(id).update({
+    await campaign.ref.update({
       shares: admin.firestore.FieldValue.increment(1),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    const updatedDoc = await db.collection('campaigns').doc(id).get();
-    const campaignData = updatedDoc.data();
+    const updatedData = (await campaign.ref.get()).data();
     res.json({
       success: true,
       message: 'Share recorded successfully!',
-      totalShares: campaignData.shares || 0
+      totalShares: updatedData.shares || 0
     });
   } catch (error) {
     console.error('Error recording share:', error);
@@ -765,16 +778,16 @@ router.post('/campaigns/:id/share', async (req, res) => {
 router.get('/campaigns/:id/share-count', async (req, res) => {
   try {
     const { id } = req.params;
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
+    const campaign = await getCampaignById(id);
+    if (!campaign) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
-    const campaignData = doc.data();
+    const data = campaign.data;
     res.json({
       success: true,
-      shares: campaignData.shares || 0,
-      shareCount: campaignData.shareCount || 0,
-      isComplete: (campaignData.shares || 0) >= (campaignData.shareCount || 0)
+      shares: data.shares || 0,
+      shareCount: data.shareCount || 0,
+      isComplete: (data.shares || 0) >= (data.shareCount || 0)
     });
   } catch (error) {
     console.error('Error getting share count:', error);
@@ -787,16 +800,16 @@ router.post('/campaigns/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
+    const campaign = await getCampaignById(id);
+    if (!campaign) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
-    await db.collection('campaigns').doc(id).update({
+    await campaign.ref.update({
       completions: admin.firestore.FieldValue.increment(1),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     if (userId) {
-      await db.collection('campaigns').doc(id).collection('completedBy').doc(userId).set({
+      await campaign.ref.collection('completedBy').doc(userId).set({
         userId,
         completedAt: admin.firestore.FieldValue.serverTimestamp()
       });
