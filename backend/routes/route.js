@@ -334,4 +334,274 @@ router.get('/auth/profile', async (req, res) => {
   }
 });
 
+//PROFILE DONE LOGIN DONE REGISTERED DONE ✅ ✅//
+
+// ============================================================
+// TEMPLATE ENDPOINTS (with admin check)
+// ============================================================
+
+// Helper: check if user has admin claim
+async function isAdmin(uid) {
+  try {
+    const user = await admin.auth().getUser(uid);
+    return user.customClaims?.admin === true;
+  } catch {
+    return false;
+  }
+}
+
+// 1. GET ALL TEMPLATES (Public) – with filters
+router.get('/templates', async (req, res) => {
+  try {
+    const { category, platform, highlight, limit = 50 } = req.query;
+    
+    let query = db.collection('templates').where('isActive', '==', true);
+    
+    if (category) query = query.where('category', '==', category);
+    if (platform) query = query.where('platform', '==', platform);
+    if (highlight === 'true') query = query.where('isHighlight', '==', true);
+    
+    const snapshot = await query.orderBy('createdAt', 'desc').limit(parseInt(limit)).get();
+    
+    const templates = [];
+    snapshot.forEach(doc => {
+      templates.push({ id: doc.id, ...doc.data() });
+    });
+    
+    res.json({ success: true, templates });
+  } catch (error) {
+    console.error('Get templates error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch templates' });
+  }
+});
+
+// 2. GET SINGLE TEMPLATE BY SLUG (Public)
+router.get('/templates/slug/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const snapshot = await db.collection('templates')
+      .where('slug', '==', slug)
+      .where('isActive', '==', true)
+      .limit(1)
+      .get();
+    
+    if (snapshot.empty) {
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+    
+    const doc = snapshot.docs[0];
+    res.json({ success: true, template: { id: doc.id, ...doc.data() } });
+  } catch (error) {
+    console.error('Get template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch template' });
+  }
+});
+
+// 3. GET FILTERS (categories, platforms) – from active templates
+router.get('/templates/filters', async (req, res) => {
+  try {
+    const snapshot = await db.collection('templates')
+      .where('isActive', '==', true)
+      .get();
+    
+    const categories = new Set();
+    const platforms = new Set();
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.category) categories.add(data.category);
+      if (data.platform) platforms.add(data.platform);
+    });
+    
+    res.json({
+      success: true,
+      categories: Array.from(categories),
+      platforms: Array.from(platforms)
+    });
+  } catch (error) {
+    console.error('Get filters error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch filters' });
+  }
+});
+
+// 4. CREATE TEMPLATE (Admin only)
+router.post('/templates', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    
+    // Check admin claim
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    
+    const { 
+      title, slug, description, image, thumbnail, 
+      category, platform, hashtags, isHighlight 
+    } = req.body;
+    
+    // Validate
+    if (!title || !slug) {
+      return res.status(400).json({ success: false, error: 'Title and slug are required' });
+    }
+    
+    // Slug uniqueness
+    const existing = await db.collection('templates')
+      .where('slug', '==', slug)
+      .get();
+    if (!existing.empty) {
+      return res.status(409).json({ success: false, error: 'Slug already exists' });
+    }
+    
+    const templateData = {
+      title,
+      slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      description: description || '',
+      image: image || '',
+      thumbnail: thumbnail || image || '',
+      category: category || 'other',
+      platform: platform || 'all',
+      hashtags: hashtags || [],
+      isHighlight: isHighlight || false,
+      isActive: true,
+      usageCount: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    
+    const docRef = await db.collection('templates').add(templateData);
+    
+    res.status(201).json({ 
+      success: true, 
+      template: { id: docRef.id, ...templateData } 
+    });
+  } catch (error) {
+    console.error('Create template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create template' });
+  }
+});
+
+// 5. UPDATE TEMPLATE (Admin only)
+router.put('/templates/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    
+    const updates = req.body;
+    delete updates.createdAt;
+    delete updates.usageCount;
+    delete updates.id;
+    
+    // If slug is updated, check uniqueness
+    if (updates.slug) {
+      updates.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const existing = await db.collection('templates')
+        .where('slug', '==', updates.slug)
+        .get();
+      if (!existing.empty && existing.docs[0].id !== id) {
+        return res.status(409).json({ success: false, error: 'Slug already exists' });
+      }
+    }
+    
+    updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    await db.collection('templates').doc(id).update(updates);
+    
+    res.json({ success: true, message: 'Template updated' });
+  } catch (error) {
+    console.error('Update template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update template' });
+  }
+});
+
+// 6. DELETE TEMPLATE (soft delete – Admin only)
+router.delete('/templates/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    
+    await db.collection('templates').doc(id).update({
+      isActive: false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    res.json({ success: true, message: 'Template archived' });
+  } catch (error) {
+    console.error('Delete template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete template' });
+  }
+});
+
+// 7. INCREMENT USAGE (Public – called when a campaign is created)
+router.post('/templates/:id/usage', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('templates').doc(id).update({
+      usageCount: admin.firestore.FieldValue.increment(1)
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Increment usage error:', error);
+    res.status(500).json({ success: false, error: 'Failed to increment usage' });
+  }
+});
+
+
+// ============================================================
+// ADMIN SETUP ENDPOINT (One‑time use, with secret key)
+// ============================================================
+router.post('/auth/set-admin', async (req, res) => {
+  try {
+    const { email, secret } = req.body;
+    
+    // Verify secret key
+    if (secret !== 'PANKAJ@123sah') {
+      return res.status(403).json({ success: false, error: 'Invalid secret key' });
+    }
+    
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required' });
+    }
+    
+    // 1. Get user by email
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(email);
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        return res.status(404).json({ success: false, error: 'User not found. Please create an account first.' });
+      }
+      throw error;
+    }
+    
+    // 2. Set admin custom claim
+    await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
+    
+    // 3. Also store role in Firestore for easy querying
+    await db.collection('users').doc(userRecord.uid).set({
+      email: email,
+      role: 'admin',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    
+    res.json({
+      success: true,
+      message: `Admin claim set for ${email}`,
+      uid: userRecord.uid
+    });
+  } catch (error) {
+    console.error('Set admin error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
 module.exports = router;
