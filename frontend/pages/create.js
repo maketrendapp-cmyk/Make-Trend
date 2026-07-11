@@ -9,7 +9,6 @@ const API_BASE = BACKEND_URL + '/api';
 export default function Create() {
   const router = useRouter();
 
-  // State
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -50,7 +49,7 @@ export default function Create() {
     fetchTemplates();
   }, []);
 
-  // Extract unique categories & platforms
+  // Extract categories & platforms
   const categories = useMemo(() => {
     const cats = new Set();
     templates.forEach(t => { if (t.category) cats.add(t.category); });
@@ -85,13 +84,13 @@ export default function Create() {
     return filtered;
   }, [templates, searchQuery, selectedCategory, selectedPlatform]);
 
-  // Handlers
+  // ===== SIMPLE NAVIGATION =====
   const handlePreview = (slug) => {
-    router.push(`/template/${slug}`);
+    router.push(`/${slug}?mode=preview`);
   };
 
   const handleUseTemplate = (slug) => {
-    router.push(`/createcampaign/${slug}`);
+    router.push(`/createcampaign?slug=${slug}`);
   };
 
   const clearFilters = () => {
@@ -100,7 +99,6 @@ export default function Create() {
     setSelectedPlatform('');
   };
 
-  // Platform badge colors
   const platformColors = {
     tiktok: 'bg-black/80 text-white',
     instagram: 'bg-gradient-to-br from-purple-600 to-pink-500 text-white',
@@ -109,7 +107,7 @@ export default function Create() {
     all: 'bg-gray-600 text-white',
   };
 
-  // ===== LOADING =====
+  // Loading
   if (loading) {
     return (
       <>
@@ -124,7 +122,7 @@ export default function Create() {
     );
   }
 
-  // ===== ERROR =====
+  // Error
   if (error) {
     return (
       <>
@@ -144,7 +142,7 @@ export default function Create() {
     );
   }
 
-  // ===== EMPTY =====
+  // Empty
   if (templates.length === 0) {
     return (
       <>
@@ -158,7 +156,7 @@ export default function Create() {
     );
   }
 
-  // ===== MAIN RENDER =====
+  // Main render
   return (
     <>
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
@@ -166,7 +164,7 @@ export default function Create() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">✨ Choose a Template</h1>
-          <p className="text-gray-500 mt-1">Select a template, preview it, or start building your campaign.</p>
+          <p className="text-gray-500 mt-1">Preview any template or start building your campaign.</p>
         </div>
 
         {/* Search & Filters */}
@@ -271,19 +269,16 @@ export default function Create() {
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300">🎨</div>
                   )}
-                  {/* Highlight Badge */}
                   {template.isHighlight && (
                     <div className="absolute top-3 left-3 bg-yellow-400 text-gray-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg">
                       ⭐ Featured
                     </div>
                   )}
-                  {/* Platform Badge */}
                   <div className="absolute bottom-3 left-3">
                     <span className={`text-xs font-bold px-3 py-1 rounded-full shadow-lg ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
                       {template.platform ? template.platform.toUpperCase() : 'ALL'}
                     </span>
                   </div>
-                  {/* Plan Badge */}
                   {template.plan && template.plan !== 'free' && (
                     <div className="absolute top-3 right-3">
                       <span className="text-xs font-bold px-3 py-1 rounded-full shadow-lg bg-purple-600 text-white">
@@ -291,7 +286,6 @@ export default function Create() {
                       </span>
                     </div>
                   )}
-                  {/* Usage Count */}
                   <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5">
                     <span>👥</span> {template.usageCount || 0}
                   </div>
@@ -312,7 +306,6 @@ export default function Create() {
                   <p className="text-sm text-gray-500 mt-1 line-clamp-2 flex-1">
                     {template.description || 'No description provided.'}
                   </p>
-                  {/* Hashtags */}
                   {template.hashtags && template.hashtags.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1">
                       {template.hashtags.slice(0, 3).map((tag, i) => (
