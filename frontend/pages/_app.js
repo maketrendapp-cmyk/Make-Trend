@@ -1,6 +1,6 @@
 // pages/_app.js
 import { useState } from 'react';
-import { AuthProvider } from '../components/AuthScreen';  // ← FROM AuthScreen.js
+import { AuthProvider } from '../components/AuthScreen';
 import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
