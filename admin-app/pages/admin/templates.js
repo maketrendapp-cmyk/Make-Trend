@@ -1,5 +1,5 @@
 // pages/admin/templates.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../components/Auth';
 
@@ -17,24 +17,44 @@ export default function AdminTemplates() {
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
 
-  // Redirect if not admin
+  // Prevent multiple redirects
+  const redirectDone = useRef(false);
+
+  // Redirect if not admin (only once)
   useEffect(() => {
-    if (!loading && (!isAuthenticated || !user?.isAdmin)) router.push('/login');
-  }, [loading, isAuthenticated, user]);
+    if (redirectDone.current) return;
+    if (!loading) {
+      if (!isAuthenticated || !user?.isAdmin) {
+        redirectDone.current = true;
+        router.push('/login');
+      }
+    }
+  }, [loading, isAuthenticated, user, router]);
 
-  const fetchTemplates = async () => {
+  // Fetch templates (only when admin and not loading)
+  const fetchTemplates = useCallback(async () => {
+    if (dataLoading) return;
+    setDataLoading(true);
     try {
       const res = await fetch(`${API_BASE}/templates`);
       const data = await res.json();
       if (data.success) setTemplates(data.templates);
-    } catch (e) { console.error(e); }
-  };
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (user?.isAdmin) fetchTemplates();
-  }, [user]);
+    if (user?.isAdmin) {
+      fetchTemplates();
+    }
+  }, [user?.isAdmin, fetchTemplates]);
 
+  // Handlers...
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -68,7 +88,7 @@ export default function AdminTemplates() {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage(editingId ? '✅ Template updated!' : '✅ Template created!');
+        setMessage(editingId ? '✅ Updated!' : '✅ Created!');
         fetchTemplates();
         resetForm();
       } else {
@@ -97,7 +117,7 @@ export default function AdminTemplates() {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage('✅ Template archived');
+        setMessage('✅ Archived');
         fetchTemplates();
       }
     } catch (err) {
@@ -105,7 +125,10 @@ export default function AdminTemplates() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  // Show loading while checking auth
+  if (loading || (user && !user.isAdmin)) {
+    return <div className="p-8 text-center">Loading...</div>;
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -152,6 +175,8 @@ export default function AdminTemplates() {
           </button>
         </form>
       )}
+
+      {dataLoading && <div className="text-center py-4">Loading templates...</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {templates.map(t => (
