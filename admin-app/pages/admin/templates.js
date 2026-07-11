@@ -1,7 +1,7 @@
 // pages/admin/templates.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../../components/Auth';
+import { useAuth, auth } from '../../components/Auth'; // 👈 import auth
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -16,7 +16,6 @@ export default function AdminTemplates() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect if not admin
   useEffect(() => {
     if (!loading && (!isAuthenticated || !user?.isAdmin)) {
       router.replace('/login');
@@ -44,7 +43,15 @@ export default function AdminTemplates() {
     setMessage('');
 
     try {
-      const token = await user.getIdToken();
+      // ✅ Use auth.currentUser to get the token
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        setMessage('❌ Not authenticated. Please log in again.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const token = await firebaseUser.getIdToken();
       const payload = { 
         ...form, 
         hashtags: form.hashtags.split(',').map(t => t.trim()).filter(Boolean) 
