@@ -35,12 +35,12 @@ cloudinary.config({
 console.log('☁️ Cloudinary initialized');
 
 // ============================================================
-// 3. MULTER SETUP (Memory storage - streams directly to Cloudinary)
+// 3. MULTER SETUP
 // ============================================================
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (allowedTypes.includes(file.mimetype)) {
@@ -57,15 +57,41 @@ const upload = multer({
 const app = express();
 
 // ============================================================
-// 5. SECURITY MIDDLEWARE
+// 5. HELMET (Security Headers)
 // ============================================================
 app.use(helmet());
+
+// ============================================================
+// 6. CORS (Allow multiple domains)
+// ============================================================
+const allowedOrigins = [
+  process.env.CLIENT_URL || 'https://maketrend.vercel.app',
+  'https://make-trend-system.vercel.app',
+  'https://maketrend.vercel.app',
+  'https://make-trend.vercel.app',
+  'http://localhost:3000',
+  // Add your admin domain here if different
+  // 'https://admin.maketrend.vercel.app',
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'https://maketrend.vercel.app',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      console.warn('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
 }));
 
+// ============================================================
+// 7. RATE LIMITING
+// ============================================================
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -75,24 +101,27 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// ============================================================
+// 8. BODY PARSERS
+// ============================================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ============================================================
-// 6. HEALTH CHECK
+// 9. HEALTH CHECK
 // ============================================================
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // ============================================================
-// 7. ROUTES
+// 10. ROUTES
 // ============================================================
 const apiRoutes = require('./routes/route');
 app.use('/api', apiRoutes);
 
 // ============================================================
-// 8. CLOUDINARY UPLOAD ROUTE (Protected)
+// 11. CLOUDINARY UPLOAD ROUTE
 // ============================================================
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -115,7 +144,6 @@ app.post('/api/upload', verifyToken, upload.single('image'), async (req, res) =>
       return res.status(400).json({ success: false, error: 'No image provided' });
     }
 
-    // Upload to Cloudinary using stream
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
@@ -142,7 +170,7 @@ app.post('/api/upload', verifyToken, upload.single('image'), async (req, res) =>
 });
 
 // ============================================================
-// 9. GLOBAL ERROR HANDLER
+// 12. GLOBAL ERROR HANDLER
 // ============================================================
 app.use((err, req, res, next) => {
   console.error('🔥 Global error:', err);
@@ -159,11 +187,11 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================================
-// 10. START SERVER
+// 13. START SERVER
 // ============================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on port ${PORT}`);
-  console.log(`🔒 Allowed origin: ${process.env.CLIENT_URL}`);
+  console.log(`🔒 Allowed origins:`, allowedOrigins);
   console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
 });
