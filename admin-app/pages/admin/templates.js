@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../components/Auth';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
+// Backend URL fallback
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+const API_BASE = BACKEND_URL + '/api';
 
 export default function AdminTemplates() {
   const router = useRouter();
@@ -19,48 +21,31 @@ export default function AdminTemplates() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // Redirect if not admin – but only after loading is complete
+  // Redirect if not admin
   useEffect(() => {
-    if (!loading) {
-      if (!isAuthenticated || !user?.isAdmin) {
-        router.replace('/login');
-      }
+    if (!loading && (!isAuthenticated || !user?.isAdmin)) {
+      router.replace('/login');
     }
   }, [loading, isAuthenticated, user, router]);
 
   const fetchTemplates = async () => {
     setDataLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/templates`);
+      const res = await fetch(API_BASE + '/templates');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.success) setTemplates(data.templates);
     } catch (e) {
-      console.error(e);
+      console.error('Fetch error:', e);
+      setMessage('Failed to load templates: ' + e.message);
     } finally {
       setDataLoading(false);
     }
   };
 
-  // Fetch templates only when user is admin
   useEffect(() => {
-    if (user?.isAdmin) {
-      fetchTemplates();
-    }
+    if (user?.isAdmin) fetchTemplates();
   }, [user]);
-
-  // If still loading or not admin, show nothing (redirect will happen)
-  if (loading || !user?.isAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-500">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Handlers (same as before) ...
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -94,15 +79,16 @@ export default function AdminTemplates() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setMessage(editingId ? '✅ Updated!' : '✅ Created!');
         fetchTemplates();
         resetForm();
       } else {
-        setMessage(data.error || 'Failed');
+        setMessage(data.error || `Server error (${res.status})`);
       }
     } catch (err) {
-      setMessage('Network error');
+      console.error('Network error:', err);
+      setMessage('Network error: ' + err.message);
     }
     setIsSubmitting(false);
   };
@@ -126,11 +112,21 @@ export default function AdminTemplates() {
       if (data.success) {
         setMessage('✅ Archived');
         fetchTemplates();
+      } else {
+        setMessage(data.error || 'Failed to archive');
       }
     } catch (err) {
-      setMessage('Failed to archive');
+      setMessage('Failed to archive: ' + err.message);
     }
   };
+
+  if (loading || !user?.isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-6">
