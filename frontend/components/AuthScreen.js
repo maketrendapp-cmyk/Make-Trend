@@ -1,6 +1,6 @@
 // components/AuthScreen.js
 // ============================================================
-// FINAL UI: Professional, Animated, Validated, No Health Check
+// FINAL UI: No Brand, Centered Avatar, Upload Button Below, Professional Design
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -345,7 +345,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI COMPONENT (FINAL)
+// AUTH SCREEN UI COMPONENT (FINAL – No Brand, Centered Avatar)
 // ============================================================
 export default function AuthScreen({ onSuccess }) {
   const {
@@ -398,7 +398,7 @@ export default function AuthScreen({ onSuccess }) {
     }
   }, [user, needsSocialCompletion]);
 
-  // Email check (only if not social completion)
+  // Email check
   useEffect(() => {
     if (email.length > 3 && email.includes('@') && !needsSocialCompletion) {
       clearTimeout(emailTimerRef.current);
@@ -412,7 +412,7 @@ export default function AuthScreen({ onSuccess }) {
           if (!res.ok) throw new Error('Backend error');
           const data = await res.json();
           setEmailExists(data.exists);
-        } catch (err) {
+        } catch {
           setEmailExists(null);
           setEmailError('Could not verify email. Please try again.');
         } finally {
@@ -512,7 +512,6 @@ export default function AuthScreen({ onSuccess }) {
     let avatarUrl = socialAvatarPreview || '';
     if (socialAvatarFile) {
       try {
-        // Validate file size and type
         if (socialAvatarFile.size > 5 * 1024 * 1024) {
           setError('Image must be smaller than 5MB.');
           setIsSubmitting(false);
@@ -583,7 +582,6 @@ export default function AuthScreen({ onSuccess }) {
         setIsSubmitting(false);
         return;
       }
-      // Avatar validation (if selected)
       if (avatarFile) {
         if (avatarFile.size > 5 * 1024 * 1024) {
           setError('Image must be smaller than 5MB.');
@@ -599,35 +597,16 @@ export default function AuthScreen({ onSuccess }) {
       }
 
       let avatarUrl = '';
-      if (avatarFile) {
-        try {
-          // Upload avatar during registration (user is not yet created, so we need to upload after registration)
-          // We'll upload after registration is complete using the token.
-          // But we can't upload before registration because there's no token.
-          // For simplicity, we'll upload after registration (in background) or skip.
-          // The user can upload later. We'll just register and then upload if we have a token.
-          // Actually, we can upload after registration if we get the token from the new user.
-          // But the user may not have a profile yet, so it's best to upload after registration is complete.
-          // We'll handle this by uploading after the register API call.
-        } catch (err) {
-          setError('Avatar upload failed. You can add it later.');
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
       const result = await register(email, password, fullname, username, avatarUrl, referralCode);
       if (result.success) {
-        // If avatar file exists, upload it now using the user's token.
         if (avatarFile) {
           try {
             const uploadedUrl = await uploadAvatar(avatarFile);
-            // Update user profile with the new avatar (we could call a separate API)
-            // For simplicity, we'll refresh the user profile.
+            // optionally update profile with avatar
+            // but since we already have the user, we'll just refresh
             onSuccess?.();
           } catch (err) {
             console.warn('Avatar upload after registration failed:', err);
-            // Still proceed, user can add avatar later.
           }
         }
         onSuccess?.();
@@ -642,7 +621,6 @@ export default function AuthScreen({ onSuccess }) {
   const handleAvatarChange = (e, type = 'register') => {
     const file = e.target.files[0];
     if (!file) return;
-    // Validate file
     if (file.size > 5 * 1024 * 1024) {
       setError('Image must be smaller than 5MB.');
       e.target.value = '';
@@ -690,29 +668,26 @@ export default function AuthScreen({ onSuccess }) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
-          {/* Avatar at top */}
-          <div className="flex justify-center mb-6">
-            <div className="relative">
-              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
-                {socialAvatarPreview ? (
-                  <img src={socialAvatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-4xl text-gray-400">📷</span>
-                )}
-              </div>
-              <label className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1.5 shadow-md cursor-pointer hover:bg-primary/90 transition">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          {/* Avatar section - centered */}
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
+              {socialAvatarPreview ? (
+                <img src={socialAvatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'social')} disabled={isSubmitting} />
-              </label>
+              )}
             </div>
+            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition">
+              Upload Profile Picture
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'social')} disabled={isSubmitting} />
+            </label>
+            <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, GIF • Max 5MB</p>
           </div>
 
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Complete Your Profile</h2>
-            <p className="text-sm text-gray-400 mt-1">One more step to get started</p>
-          </div>
+          <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Complete Your Profile</h2>
+          <p className="text-sm text-center text-gray-400 mb-6">One more step to get started</p>
 
           {error && (
             <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-slideDown">
@@ -805,36 +780,32 @@ export default function AuthScreen({ onSuccess }) {
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
 
-        {/* ===== AVATAR (top of email) ===== */}
+        {/* ===== AVATAR SECTION (only in register mode) ===== */}
         {emailExists === false && email.length > 3 && (
-          <div className="flex justify-center mb-6 animate-slideDown">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-3xl text-gray-400">📷</span>
-                )}
-              </div>
-              <label className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1.5 shadow-md cursor-pointer hover:bg-primary/90 transition">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <div className="flex flex-col items-center mb-6 animate-slideDown">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
-              </label>
+              )}
             </div>
-            <p className="text-xs text-gray-400 mt-1 text-center">Optional</p>
+            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition">
+              Upload Profile Picture
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
+            </label>
+            <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, GIF • Max 5MB</p>
+            <p className="text-sm text-gray-500 mt-3">Create your account in seconds</p>
           </div>
         )}
 
-        {/* ===== BRAND ===== */}
+        {/* ===== HEADING (without brand) ===== */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-primary">
-            Make<span className="text-gray-900">Trend</span>
-          </h1>
-          <p className="text-sm text-gray-400 mt-1">
-            {emailExists === true ? 'Welcome back!' :
-             emailExists === false && email.length > 3 ? 'Create your account' :
+          <p className="text-sm text-gray-400">
+            {emailExists === true ? 'Welcome back! Enter your password.' :
+             emailExists === false && email.length > 3 ? 'Fill in your details below' :
              'Enter your email to get started'}
           </p>
         </div>
@@ -994,7 +965,6 @@ export default function AuthScreen({ onSuccess }) {
                     {showPassword ? '🙈' : '👁️'}
                   </button>
                 </div>
-                {/* Password strength bar */}
                 {password.length > 0 && (
                   <div className="mt-2">
                     <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
