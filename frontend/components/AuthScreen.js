@@ -1,11 +1,11 @@
 // components/AuthScreen.js
 // ============================================================
-// ONE FILE: Auth Context + API Calls + UI (Login/Register/Social)
+// ONE FILE: Auth Context + API Calls + UI
 // Uses Firebase from services/firebase.js
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { 
+import {
   auth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -21,6 +21,8 @@ import {
 // BACKEND API HELPER (Direct fetch)
 // ============================================================
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
+// Health check URL - remove /api from the base URL
+const HEALTH_URL = API_BASE ? API_BASE.replace('/api', '') + '/health' : 'https://make-trend.onrender.com/health';
 
 async function apiRequest(endpoint, options = {}, token = null) {
   const url = `${API_BASE}${endpoint}`;
@@ -48,20 +50,22 @@ export function AuthProvider({ children }) {
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const [backendAvailable, setBackendAvailable] = useState(true);
 
-  // Check backend health
+  // ===== Check backend health (FIXED: uses /health, not /api/health) =====
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const res = await fetch(`${API_BASE}/health`);
+        const res = await fetch(HEALTH_URL);
         setBackendAvailable(res.ok);
-      } catch {
+        if (!res.ok) console.warn('[Auth] Backend health check failed:', res.status);
+      } catch (err) {
+        console.warn('[Auth] Backend health check error:', err.message);
         setBackendAvailable(false);
       }
     };
     checkBackend();
   }, []);
 
-  // Upload Avatar
+  // ===== Upload Avatar =====
   const uploadAvatar = async (file) => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) throw new Error('Not authenticated');
@@ -79,7 +83,7 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
-  // Fetch user profile
+  // ===== Fetch user profile =====
   const fetchUserProfile = useCallback(async (firebaseUser) => {
     try {
       const token = await firebaseUser.getIdToken();
@@ -90,7 +94,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Check profile status
+  // ===== Check profile status =====
   const checkProfileStatus = useCallback(async (uid) => {
     try {
       const data = await apiRequest(`/auth/profile?uid=${uid}`);
@@ -100,7 +104,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Auth state listener
+  // ===== Auth state listener =====
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
@@ -151,7 +155,7 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, [fetchUserProfile, checkProfileStatus]);
 
-  // Login
+  // ===== Login =====
   const login = async (email, password) => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -176,7 +180,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Register
+  // ===== Register =====
   const register = async (email, password, fullname, username, avatarUrl, referralCode = '') => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -203,7 +207,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Social Login
+  // ===== Social Login =====
   const socialLogin = async (providerName) => {
     setIsSocialLoading(true);
     let provider;
@@ -264,7 +268,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Complete Social Profile
+  // ===== Complete Social Profile =====
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
     try {
       const firebaseUser = auth.currentUser;
@@ -295,7 +299,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Logout
+  // ===== Logout =====
   const logout = async () => {
     try {
       await signOut(auth);
@@ -308,7 +312,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Reset Password
+  // ===== Reset Password =====
   const resetPassword = async (email) => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -320,7 +324,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Refresh User
+  // ===== Refresh User =====
   const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
       const profile = await fetchUserProfile(auth.currentUser);
@@ -403,7 +407,7 @@ export default function AuthScreen({ onSuccess }) {
   const emailTimerRef = useRef(null);
   const usernameTimerRef = useRef(null);
 
-  // Check email
+  // ===== Check email =====
   useEffect(() => {
     if (email.length > 3 && email.includes('@') && !needsSocialCompletion && backendAvailable) {
       clearTimeout(emailTimerRef.current);
@@ -432,7 +436,7 @@ export default function AuthScreen({ onSuccess }) {
     return () => clearTimeout(emailTimerRef.current);
   }, [email, needsSocialCompletion, backendAvailable]);
 
-  // Check username
+  // ===== Check username =====
   const usernameToCheck = needsSocialCompletion ? socialUsername : username;
   const isRegisterMode = (emailExists === false && email.length > 3) || needsSocialCompletion;
 
@@ -461,7 +465,7 @@ export default function AuthScreen({ onSuccess }) {
     return () => clearTimeout(usernameTimerRef.current);
   }, [isRegisterMode, usernameToCheck, backendAvailable]);
 
-  // Social login handler
+  // ===== Social login handler =====
   const handleSocialLogin = async (provider) => {
     setError('');
     const result = await socialLogin(provider);
@@ -481,7 +485,7 @@ export default function AuthScreen({ onSuccess }) {
     }
   };
 
-  // Social completion handler
+  // ===== Social completion handler =====
   const handleSocialCompletion = async (e) => {
     e.preventDefault();
     setError('');
@@ -523,7 +527,7 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(false);
   };
 
-  // Email/password form submit
+  // ===== Email/password form submit =====
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -574,7 +578,7 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(false);
   };
 
-  // Avatar handlers
+  // ===== Avatar handlers =====
   const handleAvatarChange = (e, type = 'register') => {
     const file = e.target.files[0];
     if (!file) return;
@@ -591,7 +595,7 @@ export default function AuthScreen({ onSuccess }) {
     reader.readAsDataURL(file);
   };
 
-  // Reset password
+  // ===== Reset password =====
   const handleResetPassword = async () => {
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address.');
@@ -607,7 +611,7 @@ export default function AuthScreen({ onSuccess }) {
     }
   };
 
-  // Backend unavailable
+  // ===== Backend unavailable =====
   if (!backendAvailable) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
@@ -615,12 +619,19 @@ export default function AuthScreen({ onSuccess }) {
           <div className="text-6xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Backend Unavailable</h2>
           <p className="text-sm text-gray-500">The backend server is not responding. Please try again later.</p>
+          <p className="text-xs text-gray-400 mt-4">Make sure your backend is deployed on Render and the URL is correct.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
-  // Social completion UI
+  // ===== Social completion UI =====
   if (needsSocialCompletion) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
@@ -674,7 +685,7 @@ export default function AuthScreen({ onSuccess }) {
     );
   }
 
-  // Main login/register UI
+  // ===== Main login/register UI =====
   return (
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border">
