@@ -18,7 +18,6 @@ const auth = getAuth(app);
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-// ---- Auth Context ----
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
@@ -31,19 +30,36 @@ export function AuthProvider({ children }) {
       setLoading(true);
       if (firebaseUser) {
         try {
+          // Get token and check admin claim
+          const tokenResult = await firebaseUser.getIdTokenResult();
+          const isAdmin = tokenResult.claims.admin === true;
+
+          // Fetch user profile from backend
           const token = await firebaseUser.getIdToken();
           const res = await fetch(`${API_BASE}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const data = await res.json();
+
           if (data.success) {
-            setUser({ uid: firebaseUser.uid, email: firebaseUser.email, ...data.user });
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              ...data.user,
+              isAdmin: isAdmin, // set from token claim
+            });
             setIsAuthenticated(true);
           } else {
-            setUser(null);
-            setIsAuthenticated(false);
+            // fallback
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              isAdmin: isAdmin,
+            });
+            setIsAuthenticated(true);
           }
-        } catch {
+        } catch (err) {
+          console.error('Auth error:', err);
           setUser(null);
           setIsAuthenticated(false);
         }
@@ -59,18 +75,8 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      // Fetch profile again
-      const token = await cred.user.getIdToken();
-      const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUser({ uid: cred.user.uid, email: cred.user.email, ...data.user });
-        setIsAuthenticated(true);
-        return { success: true };
-      }
-      return { success: false, error: 'Profile not found' };
+      // Wait for auth state to update (it will trigger the listener above)
+      return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
     }
