@@ -1,6 +1,6 @@
 // components/AuthScreen.js
 // ============================================================
-// FINAL UI: No Brand, Centered Avatar, Upload Button Below, Professional Design
+// FINAL UI: "MAKE TREND" Hero Title, Compact & Professional
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -345,7 +345,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI COMPONENT (FINAL – No Brand, Centered Avatar)
+// AUTH SCREEN UI COMPONENT (FINAL)
 // ============================================================
 export default function AuthScreen({ onSuccess }) {
   const {
@@ -602,8 +602,6 @@ export default function AuthScreen({ onSuccess }) {
         if (avatarFile) {
           try {
             const uploadedUrl = await uploadAvatar(avatarFile);
-            // optionally update profile with avatar
-            // but since we already have the user, we'll just refresh
             onSuccess?.();
           } catch (err) {
             console.warn('Avatar upload after registration failed:', err);
@@ -668,7 +666,8 @@ export default function AuthScreen({ onSuccess }) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
-          {/* Avatar section - centered */}
+
+          {/* Avatar section */}
           <div className="flex flex-col items-center mb-6">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
               {socialAvatarPreview ? (
@@ -679,7 +678,7 @@ export default function AuthScreen({ onSuccess }) {
                 </svg>
               )}
             </div>
-            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition">
+            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-primary/50">
               Upload Profile Picture
               <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'social')} disabled={isSubmitting} />
             </label>
@@ -780,9 +779,17 @@ export default function AuthScreen({ onSuccess }) {
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
 
+        {/* ===== HERO TITLE ===== */}
+        <div className="text-center mb-4">
+          <h1 className="axis-hero-title">
+            <span className="axis-word">MAKE</span>
+            <span className="battle-word">TREND</span>
+          </h1>
+        </div>
+
         {/* ===== AVATAR SECTION (only in register mode) ===== */}
         {emailExists === false && email.length > 3 && (
-          <div className="flex flex-col items-center mb-6 animate-slideDown">
+          <div className="flex flex-col items-center mb-3 animate-slideDown">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
               {avatarPreview ? (
                 <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
@@ -792,17 +799,17 @@ export default function AuthScreen({ onSuccess }) {
                 </svg>
               )}
             </div>
-            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition">
+            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-primary/50">
               Upload Profile Picture
               <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
             </label>
             <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, GIF • Max 5MB</p>
-            <p className="text-sm text-gray-500 mt-3">Create your account in seconds</p>
+            <p className="text-sm text-gray-500 mt-2">Create your account in seconds</p>
           </div>
         )}
 
-        {/* ===== HEADING (without brand) ===== */}
-        <div className="text-center mb-6">
+        {/* ===== SUBTITLE ===== */}
+        <div className="text-center mb-3">
           <p className="text-sm text-gray-400">
             {emailExists === true ? 'Welcome back! Enter your password.' :
              emailExists === false && email.length > 3 ? 'Fill in your details below' :
@@ -812,18 +819,18 @@ export default function AuthScreen({ onSuccess }) {
 
         {/* ===== ERROR / SUCCESS ===== */}
         {error && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-slideDown">
+          <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-slideDown">
             {error}
           </div>
         )}
         {resetSent && (
-          <div className="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-600 animate-slideDown">
+          <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-600 animate-slideDown">
             ✅ Password reset link sent!
           </div>
         )}
 
         {/* ===== FORM ===== */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* EMAIL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
@@ -897,7 +904,7 @@ export default function AuthScreen({ onSuccess }) {
 
           {/* REGISTER FIELDS */}
           {emailExists === false && email.length > 3 && (
-            <div className="space-y-4 animate-slideDown">
+            <div className="space-y-3 animate-slideDown">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                 <input
@@ -966,7 +973,7 @@ export default function AuthScreen({ onSuccess }) {
                   </button>
                 </div>
                 {password.length > 0 && (
-                  <div className="mt-2">
+                  <div className="mt-1">
                     <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
                       <div className={`h-full transition-all duration-300 rounded-full ${
                         passwordStrength <= 1 ? 'bg-red-500 w-1/4' :
@@ -975,7 +982,7 @@ export default function AuthScreen({ onSuccess }) {
                         'bg-green-500 w-full'
                       }`} />
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-0.5">
                       Strength: {
                         passwordStrength <= 1 ? 'Weak' :
                         passwordStrength === 2 ? 'Fair' :
@@ -1025,7 +1032,7 @@ export default function AuthScreen({ onSuccess }) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed mt-1"
             >
               {isSubmitting ? 'Processing...' : emailExists === true ? 'Log In' : 'Create Account'}
             </button>
@@ -1043,7 +1050,7 @@ export default function AuthScreen({ onSuccess }) {
         </form>
 
         {/* ===== DIVIDER ===== */}
-        <div className="relative my-6">
+        <div className="relative my-5">
           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
           <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">Or continue with</span></div>
         </div>
@@ -1102,7 +1109,7 @@ export default function AuthScreen({ onSuccess }) {
         )}
       </div>
 
-      {/* ===== CSS ANIMATIONS ===== */}
+      {/* ===== CSS STYLES ===== */}
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -1114,6 +1121,45 @@ export default function AuthScreen({ onSuccess }) {
         }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         .animate-slideDown { animation: slideDown 0.3s ease-out; }
+
+        /* ===== HERO TITLE STYLES ===== */
+        .axis-hero-title {
+          font-family: 'Orbitron', 'Inter', sans-serif;
+          font-size: clamp(36px, 7vw, 68px);
+          font-weight: 900;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          line-height: 1.05;
+          margin: 0;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          align-items: center;
+          gap: 0.3em;
+        }
+
+        .axis-word {
+          background: linear-gradient(135deg, #ffffff 0%, #00f0ff 60%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          filter: drop-shadow(0 0 20px rgba(0, 240, 255, 0.5));
+        }
+
+        .battle-word {
+          background: linear-gradient(135deg, #ff4ef8 0%, #ff8ef5 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          filter: drop-shadow(0 0 20px rgba(255, 78, 248, 0.5));
+        }
+
+        @media (max-width: 480px) {
+          .axis-hero-title {
+            font-size: clamp(28px, 10vw, 36px);
+            gap: 0.1em;
+          }
+        }
       `}</style>
     </div>
   );
