@@ -1,7 +1,6 @@
 // components/AuthScreen.js
 // ============================================================
-// ONE FILE: Auth Context + API Calls + UI
-// Uses Firebase from services/firebase.js
+// FIXED: Social Login + Email Verification
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -18,11 +17,10 @@ import {
 } from '../services/firebase';
 
 // ============================================================
-// BACKEND API HELPER (Direct fetch)
+// BACKEND API HELPER
 // ============================================================
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
-// Health check URL - remove /api from the base URL
-const HEALTH_URL = API_BASE ? API_BASE.replace('/api', '') + '/health' : 'https://make-trend.onrender.com/health';
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
+const HEALTH_URL = API_BASE.replace('/api', '') + '/health';
 
 async function apiRequest(endpoint, options = {}, token = null) {
   const url = `${API_BASE}${endpoint}`;
@@ -50,10 +48,11 @@ export function AuthProvider({ children }) {
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const [backendAvailable, setBackendAvailable] = useState(true);
 
-  // ===== Check backend health (FIXED: uses /health, not /api/health) =====
+  // Check backend health
   useEffect(() => {
     const checkBackend = async () => {
       try {
+        console.log('[Auth] Checking backend at:', HEALTH_URL);
         const res = await fetch(HEALTH_URL);
         setBackendAvailable(res.ok);
         if (!res.ok) console.warn('[Auth] Backend health check failed:', res.status);
@@ -65,7 +64,7 @@ export function AuthProvider({ children }) {
     checkBackend();
   }, []);
 
-  // ===== Upload Avatar =====
+  // Upload Avatar
   const uploadAvatar = async (file) => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) throw new Error('Not authenticated');
@@ -83,7 +82,7 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
-  // ===== Fetch user profile =====
+  // Fetch user profile
   const fetchUserProfile = useCallback(async (firebaseUser) => {
     try {
       const token = await firebaseUser.getIdToken();
@@ -94,7 +93,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ===== Check profile status =====
+  // Check profile status
   const checkProfileStatus = useCallback(async (uid) => {
     try {
       const data = await apiRequest(`/auth/profile?uid=${uid}`);
@@ -104,7 +103,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ===== Auth state listener =====
+  // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
@@ -155,7 +154,7 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, [fetchUserProfile, checkProfileStatus]);
 
-  // ===== Login =====
+  // Login
   const login = async (email, password) => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -180,7 +179,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ===== Register =====
+  // Register
   const register = async (email, password, fullname, username, avatarUrl, referralCode = '') => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -207,7 +206,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ===== Social Login =====
+  // Social Login - FIXED
   const socialLogin = async (providerName) => {
     setIsSocialLoading(true);
     let provider;
@@ -225,8 +224,12 @@ export function AuthProvider({ children }) {
     }
 
     try {
+      console.log('[Social] Attempting login with:', providerName);
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+      console.log('[Social] User authenticated:', firebaseUser.uid);
+
+      // Check ban
       try {
         const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
         if (data.banned) {
@@ -236,7 +239,10 @@ export function AuthProvider({ children }) {
         }
       } catch {}
 
+      // Check profile status
       const status = await checkProfileStatus(firebaseUser.uid);
+      console.log('[Social] Profile status:', status);
+
       if (status.completed) {
         const profile = await fetchUserProfile(firebaseUser);
         if (profile) {
@@ -245,30 +251,41 @@ export function AuthProvider({ children }) {
           setNeedsCompletion(false);
           setIsSocialLoading(false);
           return { success: true };
-        } else {
-          setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
-          setIsAuthenticated(true);
-          setNeedsCompletion(true);
-          setIsSocialLoading(false);
-          return { success: true, needsCompletion: true };
         }
-      } else {
-        setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
-        setIsAuthenticated(true);
-        setNeedsCompletion(true);
-        setIsSocialLoading(false);
-        return { success: true, needsCompletion: true };
       }
+
+      // Not completed - return user data for completion
+      const socialUserData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || '',
+        photoURL: firebaseUser.photoURL || '',
+        completed: false,
+      };
+
+      setUser(socialUserData);
+      setIsAuthenticated(true);
+      setNeedsCompletion(true);
+      setIsSocialLoading(false);
+
+      // Return needsCompletion: true so the UI shows the completion form
+      return { 
+        success: true, 
+        needsCompletion: true,
+        user: socialUserData 
+      };
     } catch (error) {
+      console.error('[Social] Login error:', error);
       let message = 'Unable to sign in.';
       if (error.code === 'auth/popup-blocked') message = 'Popup blocked. Please allow popups.';
       if (error.code === 'auth/popup-closed-by-user') message = 'Popup closed. Try again.';
+      if (error.code === 'auth/unauthorized-domain') message = 'Domain not authorized for login.';
       setIsSocialLoading(false);
       return { success: false, error: message };
     }
   };
 
-  // ===== Complete Social Profile =====
+  // Complete Social Profile
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
     try {
       const firebaseUser = auth.currentUser;
@@ -299,7 +316,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ===== Logout =====
+  // Logout
   const logout = async () => {
     try {
       await signOut(auth);
@@ -312,7 +329,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ===== Reset Password =====
+  // Reset Password
   const resetPassword = async (email) => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -324,7 +341,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ===== Refresh User =====
+  // Refresh User
   const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
       const profile = await fetchUserProfile(auth.currentUser);
@@ -377,6 +394,7 @@ export default function AuthScreen({ onSuccess }) {
     isSocialLoading,
     resetPassword,
     backendAvailable,
+    user,
   } = useAuth();
 
   // State
@@ -407,9 +425,25 @@ export default function AuthScreen({ onSuccess }) {
   const emailTimerRef = useRef(null);
   const usernameTimerRef = useRef(null);
 
-  // ===== Check email =====
+  // ============================================================
+  // CHECK FOR SOCIAL COMPLETION NEEDS
+  // ============================================================
   useEffect(() => {
-    if (email.length > 3 && email.includes('@') && !needsSocialCompletion && backendAvailable) {
+    // If user exists and needs completion, show the social completion form
+    if (user && user.completed === false && !needsSocialCompletion) {
+      console.log('[AuthScreen] User needs social completion:', user);
+      setSocialUser(user);
+      setSocialFullname(user.displayName || '');
+      setSocialAvatarPreview(user.photoURL || '');
+      setNeedsSocialCompletion(true);
+    }
+  }, [user, needsSocialCompletion]);
+
+  // ============================================================
+  // CHECK EMAIL (FIXED - better error handling)
+  // ============================================================
+  useEffect(() => {
+    if (email.length > 3 && email.includes('@') && !needsSocialCompletion) {
       clearTimeout(emailTimerRef.current);
       setIsCheckingEmail(true);
       setEmailError('');
@@ -417,13 +451,24 @@ export default function AuthScreen({ onSuccess }) {
 
       emailTimerRef.current = setTimeout(async () => {
         try {
+          console.log('[Auth] Checking email:', email);
           const res = await fetch(`${API_BASE}/auth/check-email?email=${encodeURIComponent(email)}`);
-          if (!res.ok) throw new Error('Backend error');
+          
+          if (!res.ok) {
+            console.warn('[Auth] Email check failed:', res.status);
+            setEmailError('Could not verify email. Please try again.');
+            setEmailExists(null);
+            setIsCheckingEmail(false);
+            return;
+          }
+          
           const data = await res.json();
+          console.log('[Auth] Email check result:', data);
           setEmailExists(data.exists);
-        } catch {
+        } catch (err) {
+          console.error('[Auth] Email check error:', err);
+          setEmailError('Could not verify email. Please try again.');
           setEmailExists(null);
-          setEmailError('Could not verify email.');
         } finally {
           setIsCheckingEmail(false);
         }
@@ -434,9 +479,11 @@ export default function AuthScreen({ onSuccess }) {
       setEmailError('');
     }
     return () => clearTimeout(emailTimerRef.current);
-  }, [email, needsSocialCompletion, backendAvailable]);
+  }, [email, needsSocialCompletion]);
 
-  // ===== Check username =====
+  // ============================================================
+  // CHECK USERNAME
+  // ============================================================
   const usernameToCheck = needsSocialCompletion ? socialUsername : username;
   const isRegisterMode = (emailExists === false && email.length > 3) || needsSocialCompletion;
 
@@ -465,19 +512,28 @@ export default function AuthScreen({ onSuccess }) {
     return () => clearTimeout(usernameTimerRef.current);
   }, [isRegisterMode, usernameToCheck, backendAvailable]);
 
-  // ===== Social login handler =====
+  // ============================================================
+  // SOCIAL LOGIN HANDLER (FIXED)
+  // ============================================================
   const handleSocialLogin = async (provider) => {
     setError('');
+    console.log('[AuthScreen] Social login with:', provider);
+    
     const result = await socialLogin(provider);
+    console.log('[AuthScreen] Social login result:', result);
+    
     if (result.success) {
       if (result.needsCompletion) {
-        const user = result.user || {};
-        setSocialUser(user);
-        setSocialFullname(user.displayName || '');
-        setSocialAvatarPreview(user.photoURL || '');
+        // Profile completion needed
+        const userData = result.user || {};
+        console.log('[AuthScreen] Setting social completion user:', userData);
+        setSocialUser(userData);
+        setSocialFullname(userData.displayName || '');
+        setSocialAvatarPreview(userData.photoURL || '');
         setNeedsSocialCompletion(true);
         setError('');
       } else {
+        // Already completed - redirect
         onSuccess?.();
       }
     } else {
@@ -485,11 +541,15 @@ export default function AuthScreen({ onSuccess }) {
     }
   };
 
-  // ===== Social completion handler =====
+  // ============================================================
+  // SOCIAL COMPLETION HANDLER
+  // ============================================================
   const handleSocialCompletion = async (e) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
+
+    console.log('[AuthScreen] Completing social profile...');
 
     if (socialFullname.length < 2) {
       setError('Full name must be at least 2 characters.');
@@ -519,7 +579,10 @@ export default function AuthScreen({ onSuccess }) {
     }
 
     const result = await completeSocialProfile(socialFullname, socialUsername, avatarUrl);
+    console.log('[AuthScreen] Social completion result:', result);
+    
     if (result.success) {
+      setNeedsSocialCompletion(false);
       onSuccess?.();
     } else {
       setError(result.error || 'Failed to complete profile.');
@@ -527,13 +590,16 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(false);
   };
 
-  // ===== Email/password form submit =====
+  // ============================================================
+  // EMAIL/PASSWORD FORM SUBMIT
+  // ============================================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
     if (emailExists === true) {
+      // LOGIN
       const result = await login(email, password);
       if (result.success) {
         onSuccess?.();
@@ -541,6 +607,7 @@ export default function AuthScreen({ onSuccess }) {
         setError(result.error || 'Login failed.');
       }
     } else {
+      // REGISTER
       if (fullname.length < 2) {
         setError('Full name must be at least 2 characters.');
         setIsSubmitting(false);
@@ -578,7 +645,9 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(false);
   };
 
-  // ===== Avatar handlers =====
+  // ============================================================
+  // AVATAR HANDLERS
+  // ============================================================
   const handleAvatarChange = (e, type = 'register') => {
     const file = e.target.files[0];
     if (!file) return;
@@ -595,7 +664,9 @@ export default function AuthScreen({ onSuccess }) {
     reader.readAsDataURL(file);
   };
 
-  // ===== Reset password =====
+  // ============================================================
+  // RESET PASSWORD
+  // ============================================================
   const handleResetPassword = async () => {
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address.');
@@ -611,7 +682,9 @@ export default function AuthScreen({ onSuccess }) {
     }
   };
 
-  // ===== Backend unavailable =====
+  // ============================================================
+  // RENDER: BACKEND UNAVAILABLE
+  // ============================================================
   if (!backendAvailable) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
@@ -631,8 +704,11 @@ export default function AuthScreen({ onSuccess }) {
     );
   }
 
-  // ===== Social completion UI =====
+  // ============================================================
+  // RENDER: SOCIAL COMPLETION
+  // ============================================================
   if (needsSocialCompletion) {
+    console.log('[AuthScreen] Rendering social completion form');
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border">
@@ -685,7 +761,9 @@ export default function AuthScreen({ onSuccess }) {
     );
   }
 
-  // ===== Main login/register UI =====
+  // ============================================================
+  // RENDER: MAIN LOGIN/REGISTER FLOW
+  // ============================================================
   return (
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border">
