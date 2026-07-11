@@ -677,7 +677,177 @@ router.post('/auth/set-admin', async (req, res) => {
   }
 });
 
+// ============================================================
+// CREATE CAMPAIGN (Protected) – with full validation
+// ============================================================
+router.post('/campaigns', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
 
+    // 1. Extract fields
+    const {
+      templateId,
+      shareCount,
+      tasks,
+      finalUrl,
+      features
+    } = req.body;
+
+    // 2. Validate template exists
+    if (!templateId) {
+      return res.status(400).json({ success: false, error: 'Template ID is required' });
+    }
+    const templateRef = db.collection('templates').doc(templateId);
+    const templateDoc = await templateRef.get();
+    if (!templateDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+
+    // 3. Validate features object
+    const { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled } = features || {};
+    if (typeof scEnabled !== 'boolean' || typeof tasksEnabled !== 'boolean' || typeof fuEnabled !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'Features must include shareCount, tasks, finalUrl as booleans'
+      });
+    }
+
+    // 4. At least one feature must be enabled
+    if (!scEnabled && !tasksEnabled && !fuEnabled) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one feature (share count, tasks, or final URL) must be enabled'
+      });
+    }
+
+    // 5. Validate share count if enabled
+    let finalShareCount = 0;
+    if (scEnabled) {
+      if (shareCount === undefined || shareCount === null) {
+        return res.status(400).json({ success: false, error: 'Share count is required when enabled' });
+      }
+      const num = Number(shareCount);
+      if (!Number.isInteger(num) || num < 1 || num > 9999) {
+        return res.status(400).json({
+          success: false,
+          error: 'Share count must be a whole number between 1 and 9999'
+        });
+      }
+      finalShareCount = num;
+    }
+
+    // 6. Validate tasks if enabled
+    let finalTasks = [];
+    if (tasksEnabled) {
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'At least one task is required when tasks are enabled'
+        });
+      }
+      if (tasks.length > 100) {
+        return res.status(400).json({
+          success: false,
+          error: 'Maximum 100 tasks allowed'
+        });
+      }
+      for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        if (!task.text || typeof task.text !== 'string' || task.text.length < 1 || task.text.length > 250) {
+          return res.status(400).json({
+            success: false,
+            error: `Task ${i+1}: Text must be between 1 and 250 characters`
+          });
+        }
+        if (!task.url || typeof task.url !== 'string') {
+          return res.status(400).json({
+            success: false,
+            error: `Task ${i+1}: URL is required`
+          });
+        }
+        try {
+          new URL(task.url);
+        } catch {
+          return res.status(400).json({
+            success: false,
+            error: `Task ${i+1}: Invalid URL format`
+          });
+        }
+      }
+      finalTasks = tasks.map(t => ({ text: t.text.trim(), url: t.url.trim() }));
+    }
+
+    // 7. Validate final URL if enabled
+    let finalFinalUrl = '';
+    if (fuEnabled) {
+      if (!finalUrl || typeof finalUrl !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'Final URL is required when enabled'
+        });
+      }
+      try {
+        new URL(finalUrl);
+        finalFinalUrl = finalUrl.trim();
+      } catch {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid final redirect URL format'
+        });
+      }
+    }
+
+    // 8. Get template data for fallback values
+    const templateData = templateDoc.data();
+
+    // 9. Build campaign document
+    const campaignData = {
+      templateId,
+      userId: uid,
+      shareCount: finalShareCount,
+      tasks: finalTasks,
+      finalUrl: finalFinalUrl,
+      features: {
+        shareCount: scEnabled,
+        tasks: tasksEnabled,
+        finalUrl: fuEnabled,
+      },
+      title: templateData.title || 'Untitled Campaign',
+      description: templateData.description || '',
+      image: templateData.image || '',
+      reward: templateData.reward || 'Exclusive Reward',
+      status: 'active',
+      views: 0,
+      completions: 0,
+      shares: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    // 10. Save to Firestore subcollection under template
+    const campaignRef = await templateRef.collection('campaigns').add(campaignData);
+
+    // 11. Increment template usage
+    await templateRef.update({
+      usageCount: admin.firestore.FieldValue.increment(1)
+    });
+
+    // 12. Return campaign ID
+    res.status(201).json({
+      success: true,
+      campaignId: campaignRef.id,
+      message: 'Campaign created successfully'
+    });
+
+  } catch (error) {
+    console.error('Create campaign error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create campaign',
+      details: error.message
+    });
+  }
+});
 
 
 module.exports = router;
