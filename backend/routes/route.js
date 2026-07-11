@@ -337,32 +337,20 @@ router.get('/auth/profile', async (req, res) => {
 //PROFILE DONE LOGIN DONE REGISTERED DONE ✅ ✅//
 
 // ============================================================
-// TEMPLATE ENDPOINTS (with admin check)
+// TEMPLATE ENDPOINTS (UPDATED with 'plan' field)
 // ============================================================
 
-// Helper: check if user has admin claim
-async function isAdmin(uid) {
-  try {
-    const user = await admin.auth().getUser(uid);
-    return user.customClaims?.admin === true;
-  } catch {
-    return false;
-  }
-}
-
-// 1. GET ALL TEMPLATES (Public) – with filters
-// routes/route.js – GET /templates (Robust Version)
-
+// 1. GET ALL TEMPLATES (Public – with filters)
 router.get('/templates', async (req, res) => {
   try {
-    const { category, platform, highlight, limit = 50 } = req.query;
+    const { category, platform, highlight, plan, limit = 50 } = req.query;
     
-    console.log('📡 Fetching templates with filters:', { category, platform, highlight, limit });
+    console.log('📡 Fetching templates with filters:', { category, platform, highlight, plan, limit });
     
-    // Start with a simple query – don't filter by isActive to avoid missing field issues
+    // Start with base query
     let query = db.collection('templates');
     
-    // Apply filters only if they exist
+    // Apply filters if provided
     if (category) {
       console.log('🔍 Filtering by category:', category);
       query = query.where('category', '==', category);
@@ -375,14 +363,16 @@ router.get('/templates', async (req, res) => {
       console.log('🔍 Filtering by highlight:', true);
       query = query.where('isHighlight', '==', true);
     }
+    if (plan) {
+      console.log('🔍 Filtering by plan:', plan);
+      query = query.where('plan', '==', plan);
+    }
     
-    // Order by createdAt if it exists, otherwise just limit
-    // We'll try to order, but if the field doesn't exist, we'll handle gracefully
+    // Order by createdAt if possible
     try {
       query = query.orderBy('createdAt', 'desc');
     } catch (orderError) {
-      console.warn('⚠️ Cannot order by createdAt (field may not exist in all docs):', orderError.message);
-      // Continue without ordering
+      console.warn('⚠️ Cannot order by createdAt:', orderError.message);
     }
     
     query = query.limit(parseInt(limit) || 50);
@@ -395,10 +385,9 @@ router.get('/templates', async (req, res) => {
       const data = doc.data();
       // Only include if not explicitly inactive
       if (data.isActive !== false) {
-        templates.push({ 
-          id: doc.id, 
+        templates.push({
+          id: doc.id,
           ...data,
-          // Ensure these fields exist to prevent frontend errors
           title: data.title || 'Untitled',
           slug: data.slug || doc.id,
           description: data.description || '',
@@ -408,6 +397,9 @@ router.get('/templates', async (req, res) => {
           hashtags: data.hashtags || [],
           isHighlight: data.isHighlight || false,
           usageCount: data.usageCount || 0,
+          plan: data.plan || 'free',  // ✅ Added plan
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
         });
       }
     });
@@ -417,14 +409,10 @@ router.get('/templates', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Get templates error:', error);
-    console.error('❌ Error stack:', error.stack);
-    
-    // Send a detailed error message for debugging
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: error.message,
-      details: error.stack,
-      message: 'Failed to fetch templates. Please check Firestore configuration.'
+      message: 'Failed to fetch templates.'
     });
   }
 });
@@ -444,14 +432,23 @@ router.get('/templates/slug/:slug', async (req, res) => {
     }
     
     const doc = snapshot.docs[0];
-    res.json({ success: true, template: { id: doc.id, ...doc.data() } });
+    const data = doc.data();
+    
+    res.json({
+      success: true,
+      template: {
+        id: doc.id,
+        ...data,
+        plan: data.plan || 'free',  // ✅ Added plan
+      }
+    });
   } catch (error) {
     console.error('Get template error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch template' });
   }
 });
 
-// 3. GET FILTERS (categories, platforms) – from active templates
+// 3. GET FILTERS (categories, platforms, plans) – from active templates
 router.get('/templates/filters', async (req, res) => {
   try {
     const snapshot = await db.collection('templates')
@@ -460,17 +457,20 @@ router.get('/templates/filters', async (req, res) => {
     
     const categories = new Set();
     const platforms = new Set();
+    const plans = new Set();
     
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.category) categories.add(data.category);
       if (data.platform) platforms.add(data.platform);
+      if (data.plan) plans.add(data.plan);
     });
     
     res.json({
       success: true,
       categories: Array.from(categories),
-      platforms: Array.from(platforms)
+      platforms: Array.from(platforms),
+      plans: Array.from(plans),  // ✅ Added plans
     });
   } catch (error) {
     console.error('Get filters error:', error);
@@ -488,17 +488,27 @@ router.post('/templates', verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
     
-    const { 
-      title, slug, description, image, thumbnail, 
-      category, platform, hashtags, isHighlight 
+    const {
+      title, slug, description, image, thumbnail,
+      category, platform, hashtags, isHighlight,
+      plan = 'free'  // ✅ Added plan with default
     } = req.body;
     
-    // Validate
+    // Validate required fields
     if (!title || !slug) {
       return res.status(400).json({ success: false, error: 'Title and slug are required' });
     }
     
-    // Slug uniqueness
+    // Validate plan
+    const validPlans = ['free', 'pro'];
+    if (plan && !validPlans.includes(plan)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid plan. Must be: free, pro'
+      });
+    }
+    
+    // Check slug uniqueness
     const existing = await db.collection('templates')
       .where('slug', '==', slug)
       .get();
@@ -512,10 +522,11 @@ router.post('/templates', verifyToken, async (req, res) => {
       description: description || '',
       image: image || '',
       thumbnail: thumbnail || image || '',
-      category: category || 'other',
-      platform: platform || 'all',
+      category: category || '',
+      platform: platform || '',
       hashtags: hashtags || [],
       isHighlight: isHighlight || false,
+      plan: plan || 'free',  // ✅ Store plan
       isActive: true,
       usageCount: 0,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -524,9 +535,9 @@ router.post('/templates', verifyToken, async (req, res) => {
     
     const docRef = await db.collection('templates').add(templateData);
     
-    res.status(201).json({ 
-      success: true, 
-      template: { id: docRef.id, ...templateData } 
+    res.status(201).json({
+      success: true,
+      template: { id: docRef.id, ...templateData }
     });
   } catch (error) {
     console.error('Create template error:', error);
@@ -548,6 +559,17 @@ router.put('/templates/:id', verifyToken, async (req, res) => {
     delete updates.createdAt;
     delete updates.usageCount;
     delete updates.id;
+    
+    // Validate plan if present
+    if (updates.plan) {
+      const validPlans = ['free', 'pro'];
+      if (!validPlans.includes(updates.plan)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid plan. Must be: free, pro'
+        });
+      }
+    }
     
     // If slug is updated, check uniqueness
     if (updates.slug) {
@@ -592,7 +614,7 @@ router.delete('/templates/:id', verifyToken, async (req, res) => {
   }
 });
 
-// 7. INCREMENT USAGE (Public – called when a campaign is created)
+// 7. INCREMENT TEMPLATE USAGE (Public – called when a campaign is created)
 router.post('/templates/:id/usage', async (req, res) => {
   try {
     const { id } = req.params;
