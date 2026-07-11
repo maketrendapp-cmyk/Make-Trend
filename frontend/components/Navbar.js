@@ -1,7 +1,7 @@
-// frontend/components/Navbar.js
+// components/Navbar.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useAuth } from './AuthScreen'; // Assuming AuthScreen exports useAuth
+import { useAuth } from '../components/AuthScreen';
 
 export default function Navbar() {
   const router = useRouter();
@@ -20,9 +20,7 @@ export default function Navbar() {
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-1 group">
               <span className="text-xl font-bold text-primary">Make</span>
-              <span className="text-xl font-bold text-gray-900 group-hover:text-primary/80 transition">
-                Trend
-              </span>
+              <span className="text-xl font-bold text-gray-900 group-hover:text-primary/80 transition">Trend</span>
             </Link>
 
             {/* Desktop Navigation Links */}
@@ -40,28 +38,14 @@ export default function Navbar() {
 
               {isAuthenticated && (
                 <Link
-                  href="/dashboard"
+                  href="/stats"
                   className={`transition ${
-                    router.pathname === '/dashboard'
+                    router.pathname === '/stats'
                       ? 'text-gray-900 font-medium'
                       : 'text-gray-500 hover:text-gray-900'
                   }`}
                 >
-                  Dashboard
-                </Link>
-              )}
-
-              {/* Admin link – only visible to admins */}
-              {user?.isAdmin && (
-                <Link
-                  href="/admin/templates"
-                  className={`transition ${
-                    router.pathname.startsWith('/admin')
-                      ? 'text-primary font-medium'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  Admin
+                  Stats
                 </Link>
               )}
             </div>
@@ -91,7 +75,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/auth/register"
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary/90 transition"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-all duration-200 text-sm shadow-sm hover:shadow-md"
                 >
                   Get Started
                 </Link>
