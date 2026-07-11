@@ -209,7 +209,7 @@ export default function CreateCampaign() {
         <div className="text-5xl mb-4">😕</div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Template not found</h2>
         <p className="text-gray-500">{error || 'The template you\'re looking for doesn\'t exist.'}</p>
-        <button onClick={() => router.push('/create')} className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition">
+        <button onClick={() => router.push('/create')} className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md">
           Browse Templates
         </button>
       </main>
@@ -239,24 +239,24 @@ export default function CreateCampaign() {
                   setMessage('✅ Link copied!');
                   setTimeout(() => setMessage(''), 3000);
                 }}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition text-sm"
+                className="inline-flex items-center justify-center px-5 py-2.5 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 text-sm shadow-sm hover:shadow-md"
               >
                 Copy
               </button>
             </div>
             {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
-            <div className="mt-6 flex gap-3 justify-center">
+            <div className="mt-6 flex flex-wrap gap-3 justify-center">
               <button
                 onClick={() => router.push(campaignUrl)}
-                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+                className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 View Campaign
               </button>
               <button
-                onClick={() => router.push('/dashboard')}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                onClick={() => router.push('/stats')}
+                className="inline-flex items-center justify-center px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-300 transition-all duration-200"
               >
-                Go to Dashboard
+                View Stats
               </button>
             </div>
           </div>
@@ -272,8 +272,14 @@ export default function CreateCampaign() {
       <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700 transition mb-2 flex items-center gap-1">
-            ← Back
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition mb-3"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back
           </button>
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>Template:</span>
@@ -284,17 +290,17 @@ export default function CreateCampaign() {
         </div>
 
         {message && (
-          <div className={`mb-4 p-4 rounded-xl ${message.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+          <div className={`mb-6 p-4 rounded-xl ${message.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
             {message}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* ===== SHARE COUNT ===== */}
-          <div className="bg-white p-6 rounded-xl border border-border">
+          <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold">📢 Share Count</h2>
+                <h2 className="text-lg font-semibold text-gray-900">📢 Share Count</h2>
                 <p className="text-sm text-gray-500">Require users to share your campaign</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -319,7 +325,7 @@ export default function CreateCampaign() {
                   min="1"
                   max="9999"
                   step="1"
-                  className="w-full max-w-xs border border-border rounded-lg px-4 py-2.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full max-w-xs border border-border rounded-xl px-4 py-2.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                 />
                 <p className="text-xs text-gray-400 mt-1">Enter a whole number between 1 and 9999</p>
               </div>
@@ -327,10 +333,10 @@ export default function CreateCampaign() {
           </div>
 
           {/* ===== TASKS ===== */}
-          <div className="bg-white p-6 rounded-xl border border-border">
+          <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold">📋 Tasks</h2>
+                <h2 className="text-lg font-semibold text-gray-900">📋 Tasks</h2>
                 <p className="text-sm text-gray-500">Add tasks users must complete</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -349,14 +355,14 @@ export default function CreateCampaign() {
               <div className="mt-4 space-y-4 animate-slideDown">
                 <p className="text-sm text-gray-500">Add up to 100 tasks</p>
                 {tasks.map((task, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg border border-border">
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-border">
                     <div className="md:col-span-1">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Task {index + 1} Text</label>
                       <input
                         value={task.text}
                         onChange={(e) => updateTask(index, 'text', e.target.value)}
                         placeholder="e.g., Follow @username"
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                         maxLength="250"
                       />
                       <p className="text-xs text-gray-400 mt-1">{task.text.length}/250</p>
@@ -367,14 +373,14 @@ export default function CreateCampaign() {
                         value={task.url}
                         onChange={(e) => updateTask(index, 'url', e.target.value)}
                         placeholder="https://instagram.com/..."
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                       />
                     </div>
                     <div className="flex items-end justify-end">
                       <button
                         type="button"
                         onClick={() => removeTask(index)}
-                        className="px-3 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition"
+                        className="inline-flex items-center justify-center px-4 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium"
                       >
                         Remove
                       </button>
@@ -385,7 +391,7 @@ export default function CreateCampaign() {
                   <button
                     type="button"
                     onClick={addTask}
-                    className="w-full py-2 border-2 border-dashed border-border rounded-lg text-sm text-gray-500 hover:text-primary hover:border-primary/50 transition"
+                    className="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-gray-500 hover:text-primary hover:border-primary/50 transition-all duration-200 font-medium"
                   >
                     + Add Task
                   </button>
@@ -395,10 +401,10 @@ export default function CreateCampaign() {
           </div>
 
           {/* ===== FINAL URL ===== */}
-          <div className="bg-white p-6 rounded-xl border border-border">
+          <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold">🔗 Final Redirect URL</h2>
+                <h2 className="text-lg font-semibold text-gray-900">🔗 Final Redirect URL</h2>
                 <p className="text-sm text-gray-500">Redirect users after completing the campaign</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -421,7 +427,7 @@ export default function CreateCampaign() {
                   value={finalUrl}
                   onChange={(e) => setFinalUrl(e.target.value)}
                   placeholder="https://your-site.com/thank-you"
-                  className="w-full border border-border rounded-lg px-4 py-2.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full border border-border rounded-xl px-4 py-2.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                 />
                 <p className="text-xs text-gray-400 mt-1">Optional: Users will be redirected here after completion</p>
               </div>
@@ -432,9 +438,19 @@ export default function CreateCampaign() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center py-3.5 px-6 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-base"
           >
-            {isSubmitting ? 'Creating Campaign...' : 'Create Campaign 🚀'}
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Creating Campaign...
+              </>
+            ) : (
+              'Create Campaign 🚀'
+            )}
           </button>
         </form>
       </main>
