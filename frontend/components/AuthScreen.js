@@ -1,6 +1,6 @@
 // components/AuthScreen.js
 // ============================================================
-// FINAL UI: "MAKE TREND" Hero Title, Compact & Professional
+// FINAL UI: MAKE TREND Hero Title, Professional Design
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -667,7 +667,6 @@ export default function AuthScreen({ onSuccess }) {
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
 
-          {/* Avatar section */}
           <div className="flex flex-col items-center mb-6">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
               {socialAvatarPreview ? (
@@ -682,7 +681,6 @@ export default function AuthScreen({ onSuccess }) {
               Upload Profile Picture
               <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'social')} disabled={isSubmitting} />
             </label>
-            <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, GIF • Max 5MB</p>
           </div>
 
           <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Complete Your Profile</h2>
@@ -781,9 +779,9 @@ export default function AuthScreen({ onSuccess }) {
 
         {/* ===== HERO TITLE ===== */}
         <div className="text-center mb-4">
-          <h1 className="axis-hero-title">
-            <span className="axis-word">MAKE</span>
-            <span className="battle-word">TREND</span>
+          <h1 className="hero-title">
+            <span className="make-word">MAKE</span>
+            <span className="trend-word">TREND</span>
           </h1>
         </div>
 
@@ -803,7 +801,6 @@ export default function AuthScreen({ onSuccess }) {
               Upload Profile Picture
               <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
             </label>
-            <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, GIF • Max 5MB</p>
             <p className="text-sm text-gray-500 mt-2">Create your account in seconds</p>
           </div>
         )}
@@ -812,7 +809,7 @@ export default function AuthScreen({ onSuccess }) {
         <div className="text-center mb-3">
           <p className="text-sm text-gray-400">
             {emailExists === true ? 'Welcome back! Enter your password.' :
-             emailExists === false && email.length > 3 ? 'Fill in your details below' :
+             emailExists === false && email.length > 3 ? 'Enter your details to get started' :
              'Enter your email to get started'}
           </p>
         </div>
@@ -870,9 +867,6 @@ export default function AuthScreen({ onSuccess }) {
                 Existing account — enter your password below.
                 <button type="button" onClick={handleResetPassword} className="ml-1 text-primary hover:underline">Forgot password?</button>
               </p>
-            )}
-            {emailExists === false && email.length > 3 && (
-              <p className="mt-1 text-xs text-gray-400">New account — fill in your details below.</p>
             )}
           </div>
 
@@ -1122,42 +1116,43 @@ export default function AuthScreen({ onSuccess }) {
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         .animate-slideDown { animation: slideDown 0.3s ease-out; }
 
-        /* ===== HERO TITLE STYLES ===== */
-        .axis-hero-title {
-          font-family: 'Orbitron', 'Inter', sans-serif;
-          font-size: clamp(36px, 7vw, 68px);
+        /* ===== HERO TITLE ===== */
+        .hero-title {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-size: clamp(32px, 6vw, 60px);
           font-weight: 900;
-          letter-spacing: 3px;
+          letter-spacing: 4px;
           text-transform: uppercase;
-          line-height: 1.05;
+          line-height: 1.1;
           margin: 0;
           display: flex;
           flex-wrap: wrap;
           justify-content: center;
           align-items: center;
-          gap: 0.3em;
+          gap: 0.2em;
         }
 
-        .axis-word {
-          background: linear-gradient(135deg, #ffffff 0%, #00f0ff 60%);
+        .make-word {
+          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
-          filter: drop-shadow(0 0 20px rgba(0, 240, 255, 0.5));
+          text-shadow: 0 2px 40px rgba(15, 52, 96, 0.15);
         }
 
-        .battle-word {
-          background: linear-gradient(135deg, #ff4ef8 0%, #ff8ef5 100%);
+        .trend-word {
+          background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 40%, #fd79a8 70%, #fdcb6e 100%);
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
-          filter: drop-shadow(0 0 20px rgba(255, 78, 248, 0.5));
+          filter: drop-shadow(0 4px 30px rgba(108, 92, 231, 0.25));
         }
 
         @media (max-width: 480px) {
-          .axis-hero-title {
-            font-size: clamp(28px, 10vw, 36px);
+          .hero-title {
+            font-size: clamp(26px, 9vw, 34px);
             gap: 0.1em;
+            letter-spacing: 2px;
           }
         }
       `}</style>
