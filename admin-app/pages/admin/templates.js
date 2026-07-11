@@ -1,5 +1,5 @@
 // pages/admin/templates.js
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../components/Auth';
 
@@ -7,7 +7,7 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export default function AdminTemplates() {
   const router = useRouter();
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
   const [templates, setTemplates] = useState([]);
   const [form, setForm] = useState({
     title: '', slug: '', description: '', image: '',
@@ -19,23 +19,16 @@ export default function AdminTemplates() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // Prevent multiple redirects
-  const redirectDone = useRef(false);
-
-  // Redirect if not admin (only once)
+  // Redirect if not admin – but only after loading is complete
   useEffect(() => {
-    if (redirectDone.current) return;
     if (!loading) {
       if (!isAuthenticated || !user?.isAdmin) {
-        redirectDone.current = true;
-        router.push('/login');
+        router.replace('/login');
       }
     }
   }, [loading, isAuthenticated, user, router]);
 
-  // Fetch templates (only when admin and not loading)
-  const fetchTemplates = useCallback(async () => {
-    if (dataLoading) return;
+  const fetchTemplates = async () => {
     setDataLoading(true);
     try {
       const res = await fetch(`${API_BASE}/templates`);
@@ -46,15 +39,29 @@ export default function AdminTemplates() {
     } finally {
       setDataLoading(false);
     }
-  }, []);
+  };
 
+  // Fetch templates only when user is admin
   useEffect(() => {
     if (user?.isAdmin) {
       fetchTemplates();
     }
-  }, [user?.isAdmin, fetchTemplates]);
+  }, [user]);
 
-  // Handlers...
+  // If still loading or not admin, show nothing (redirect will happen)
+  if (loading || !user?.isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handlers (same as before) ...
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -124,11 +131,6 @@ export default function AdminTemplates() {
       setMessage('Failed to archive');
     }
   };
-
-  // Show loading while checking auth
-  if (loading || (user && !user.isAdmin)) {
-    return <div className="p-8 text-center">Loading...</div>;
-  }
 
   return (
     <div className="max-w-6xl mx-auto p-6">
