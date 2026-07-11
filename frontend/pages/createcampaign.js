@@ -177,19 +177,20 @@ export default function CreateCampaign() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        const campaignId = data.campaignId;
-        const url = `/${slug}?id=${campaignId}`;
-        setCampaignUrl(url);
-        setMessage('✅ Campaign created successfully!');
-      } else {
-        setMessage(data.error || 'Failed to create campaign');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      setMessage('Network error: ' + err.message);
+      const campaignId = data.campaignId;
+      // ✅ CLEAN URL: /[slug]/[campaignId]
+      const url = `/${slug}/${campaignId}`;
+      setCampaignUrl(url);
+      setMessage('✅ Campaign created successfully!');
+    } else {
+      setMessage(data.error || 'Failed to create campaign');
     }
-    setIsSubmitting(false);
-  };
+  } catch (err) {
+    console.error('Error:', err);
+    setMessage('Network error: ' + err.message);
+  }
+  setIsSubmitting(false);
+};
 
   // ===== LOADING / ERROR =====
   if (authLoading || loading) {
