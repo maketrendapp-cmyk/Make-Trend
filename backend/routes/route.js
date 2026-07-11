@@ -1,6 +1,6 @@
 // backend/routes/route.js
 // ============================================================
-// AUTH ONLY: Login, Register, Profile – No Campaigns, No Stats
+// COMPLETE: AUTH + TEMPLATES + CAMPAIGNS
 // ============================================================
 
 const express = require('express');
@@ -30,7 +30,19 @@ const verifyToken = async (req, res, next) => {
 };
 
 // ============================================================
-// HELPERS
+// HELPER: Check if user is admin
+// ============================================================
+async function isAdmin(uid) {
+  try {
+    const user = await admin.auth().getUser(uid);
+    return user.customClaims?.admin === true;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================
+// HELPERS (Auth)
 // ============================================================
 function sanitizeUsername(str) {
   if (!str) return '';
@@ -73,20 +85,16 @@ async function generateUniqueReferralCode() {
 }
 
 // ============================================================
-// 1. CHECK USERNAME AVAILABILITY
+// ===================== AUTH ENDPOINTS =====================
 // ============================================================
+
 router.get('/auth/check-username', async (req, res) => {
   try {
     const username = sanitizeUsername(req.query.username);
     if (!username || username.length < 3) {
       return res.status(400).json({ success: false, error: 'Username must be at least 3 characters' });
     }
-
-    const snapshot = await db.collection('users')
-      .where('username', '==', username)
-      .limit(1)
-      .get();
-
+    const snapshot = await db.collection('users').where('username', '==', username).limit(1).get();
     const available = snapshot.empty;
     res.json({ success: true, available });
   } catch (error) {
@@ -95,21 +103,13 @@ router.get('/auth/check-username', async (req, res) => {
   }
 });
 
-// ============================================================
-// 2. CHECK EMAIL AVAILABILITY
-// ============================================================
 router.get('/auth/check-email', async (req, res) => {
   try {
     const email = req.query.email?.trim().toLowerCase();
     if (!email || !email.includes('@')) {
       return res.status(400).json({ success: false, error: 'Invalid email' });
     }
-
-    const snapshot = await db.collection('users')
-      .where('email', '==', email)
-      .limit(1)
-      .get();
-
+    const snapshot = await db.collection('users').where('email', '==', email).limit(1).get();
     const exists = !snapshot.empty;
     res.json({ success: true, exists });
   } catch (error) {
@@ -118,14 +118,9 @@ router.get('/auth/check-email', async (req, res) => {
   }
 });
 
-// ============================================================
-// 3. REGISTER NEW USER (Email/Password)
-// ============================================================
 router.post('/auth/register', async (req, res) => {
   try {
     const { uid, username, fullname, email, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
-
-    // Validate
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -133,35 +128,25 @@ router.post('/auth/register', async (req, res) => {
     if (!uid || !cleanUsername || !cleanFullname || !cleanEmail) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
-
     if (cleanUsername.length < 3 || cleanUsername.length > 30) {
       return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
     }
-
     if (cleanFullname.length < 2 || cleanFullname.length > 100) {
       return res.status(400).json({ success: false, error: 'Full name must be 2-100 characters' });
     }
 
-    // Check duplicates
-    const existingUser = await db.collection('users')
-      .where('username', '==', cleanUsername)
-      .get();
+    const existingUser = await db.collection('users').where('username', '==', cleanUsername).get();
     if (!existingUser.empty) {
       return res.status(409).json({ success: false, error: 'Username already taken' });
     }
-
-    const existingEmail = await db.collection('users')
-      .where('email', '==', cleanEmail)
-      .get();
+    const existingEmail = await db.collection('users').where('email', '==', cleanEmail).get();
     if (!existingEmail.empty) {
       return res.status(409).json({ success: false, error: 'Email already registered' });
     }
 
-    // Generate unique referral code for the new user
     const newReferralCode = await generateUniqueReferralCode();
     const cleanReferredBy = sanitizeReferralCode(referredByCode);
 
-    // User document (no stats, plan: 'free' kept)
     const userData = {
       uid,
       username: cleanUsername,
@@ -172,17 +157,14 @@ router.post('/auth/register', async (req, res) => {
       referredBy: cleanReferredBy || null,
       deviceFingerprint: deviceFingerprint || '',
       completed: true,
-      plan: 'free',                       // kept for future payment logic
+      plan: 'free',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp(),
       isBanned: false,
     };
 
     await db.collection('users').doc(uid).set(userData);
-
-    // Remove sensitive fields
     delete userData.deviceFingerprint;
-
     res.status(201).json({ success: true, user: userData });
   } catch (error) {
     console.error('Register error:', error);
@@ -190,13 +172,9 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
-// ============================================================
-// 4. COMPLETE SOCIAL PROFILE (Google / Facebook)
-// ============================================================
 router.post('/auth/complete-social', verifyToken, async (req, res) => {
   try {
     const { uid, email, fullname, username, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
-
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -204,20 +182,15 @@ router.post('/auth/complete-social', verifyToken, async (req, res) => {
     if (!cleanUsername || !cleanFullname || !cleanEmail) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
-
     if (cleanUsername.length < 3 || cleanUsername.length > 30) {
       return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
     }
 
-    // Check if username is taken by another user
-    const existing = await db.collection('users')
-      .where('username', '==', cleanUsername)
-      .get();
+    const existing = await db.collection('users').where('username', '==', cleanUsername).get();
     if (!existing.empty && existing.docs[0].id !== uid) {
       return res.status(409).json({ success: false, error: 'Username already taken' });
     }
 
-    // Generate referral code for the new social user
     const newReferralCode = await generateUniqueReferralCode();
     const cleanReferredBy = sanitizeReferralCode(referredByCode);
 
@@ -238,7 +211,6 @@ router.post('/auth/complete-social', verifyToken, async (req, res) => {
     };
 
     await db.collection('users').doc(uid).set(userData, { merge: true });
-
     res.json({ success: true });
   } catch (error) {
     console.error('Complete social profile error:', error);
@@ -246,21 +218,15 @@ router.post('/auth/complete-social', verifyToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// 5. GET USER PROFILE (Protected)
-// ============================================================
 router.get('/auth/me', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
     const doc = await db.collection('users').doc(uid).get();
-
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
-
     const userData = doc.data();
     delete userData.deviceFingerprint;
-
     res.json({ success: true, user: { uid, ...userData } });
   } catch (error) {
     console.error('Get profile error:', error);
@@ -268,21 +234,16 @@ router.get('/auth/me', verifyToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// 6. CHECK BAN STATUS
-// ============================================================
 router.get('/auth/check-ban', async (req, res) => {
   try {
     const uid = req.query.uid;
     if (!uid) {
       return res.status(400).json({ success: false, error: 'Missing uid' });
     }
-
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
       return res.json({ success: true, banned: false });
     }
-
     const data = doc.data();
     res.json({ success: true, banned: data.isBanned || false });
   } catch (error) {
@@ -291,9 +252,6 @@ router.get('/auth/check-ban', async (req, res) => {
   }
 });
 
-// ============================================================
-// 7. RECORD LOGIN (Protected)
-// ============================================================
 router.post('/auth/record-login', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -307,21 +265,16 @@ router.post('/auth/record-login', verifyToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// 8. CHECK PROFILE COMPLETION STATUS
-// ============================================================
 router.get('/auth/profile', async (req, res) => {
   try {
     const uid = req.query.uid;
     if (!uid) {
       return res.status(400).json({ success: false, error: 'Missing uid' });
     }
-
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
       return res.json({ success: true, completed: false, username: null });
     }
-
     const data = doc.data();
     res.json({
       success: true,
@@ -334,56 +287,63 @@ router.get('/auth/profile', async (req, res) => {
   }
 });
 
-//PROFILE DONE LOGIN DONE REGISTERED DONE ✅ ✅//
+router.post('/auth/set-admin', async (req, res) => {
+  try {
+    const { email, secret } = req.body;
+    if (secret !== 'PANKAJ@123sah') {
+      return res.status(403).json({ success: false, error: 'Invalid secret key' });
+    }
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required' });
+    }
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(email);
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        return res.status(404).json({ success: false, error: 'User not found. Please create an account first.' });
+      }
+      throw error;
+    }
+    await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
+    await db.collection('users').doc(userRecord.uid).set({
+      email: email,
+      role: 'admin',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    res.json({
+      success: true,
+      message: `Admin claim set for ${email}`,
+      uid: userRecord.uid
+    });
+  } catch (error) {
+    console.error('Set admin error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // ============================================================
-// TEMPLATE ENDPOINTS (UPDATED with 'plan' field)
+// ===================== TEMPLATE ENDPOINTS =====================
 // ============================================================
 
-// 1. GET ALL TEMPLATES (Public – with filters)
 router.get('/templates', async (req, res) => {
   try {
     const { category, platform, highlight, plan, limit = 50 } = req.query;
-    
-    console.log('📡 Fetching templates with filters:', { category, platform, highlight, plan, limit });
-    
-    // Start with base query
     let query = db.collection('templates');
-    
-    // Apply filters if provided
-    if (category) {
-      console.log('🔍 Filtering by category:', category);
-      query = query.where('category', '==', category);
-    }
-    if (platform) {
-      console.log('🔍 Filtering by platform:', platform);
-      query = query.where('platform', '==', platform);
-    }
-    if (highlight === 'true') {
-      console.log('🔍 Filtering by highlight:', true);
-      query = query.where('isHighlight', '==', true);
-    }
-    if (plan) {
-      console.log('🔍 Filtering by plan:', plan);
-      query = query.where('plan', '==', plan);
-    }
-    
-    // Order by createdAt if possible
+    if (category) query = query.where('category', '==', category);
+    if (platform) query = query.where('platform', '==', platform);
+    if (highlight === 'true') query = query.where('isHighlight', '==', true);
+    if (plan) query = query.where('plan', '==', plan);
     try {
       query = query.orderBy('createdAt', 'desc');
     } catch (orderError) {
       console.warn('⚠️ Cannot order by createdAt:', orderError.message);
     }
-    
     query = query.limit(parseInt(limit) || 50);
-    
     const snapshot = await query.get();
-    console.log('📊 Documents found:', snapshot.size);
-    
     const templates = [];
     snapshot.forEach(doc => {
       const data = doc.data();
-      // Only include if not explicitly inactive
       if (data.isActive !== false) {
         templates.push({
           id: doc.id,
@@ -397,27 +357,19 @@ router.get('/templates', async (req, res) => {
           hashtags: data.hashtags || [],
           isHighlight: data.isHighlight || false,
           usageCount: data.usageCount || 0,
-          plan: data.plan || 'free',  // ✅ Added plan
+          plan: data.plan || 'free',
           createdAt: data.createdAt || null,
           updatedAt: data.updatedAt || null,
         });
       }
     });
-    
-    console.log('✅ Returning', templates.length, 'templates');
     res.json({ success: true, templates });
-    
   } catch (error) {
     console.error('❌ Get templates error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: 'Failed to fetch templates.'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 2. GET SINGLE TEMPLATE BY SLUG (Public)
 router.get('/templates/slug/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -426,21 +378,14 @@ router.get('/templates/slug/:slug', async (req, res) => {
       .where('isActive', '==', true)
       .limit(1)
       .get();
-    
     if (snapshot.empty) {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
-    
     const doc = snapshot.docs[0];
     const data = doc.data();
-    
     res.json({
       success: true,
-      template: {
-        id: doc.id,
-        ...data,
-        plan: data.plan || 'free',  // ✅ Added plan
-      }
+      template: { id: doc.id, ...data, plan: data.plan || 'free' }
     });
   } catch (error) {
     console.error('Get template error:', error);
@@ -448,29 +393,23 @@ router.get('/templates/slug/:slug', async (req, res) => {
   }
 });
 
-// 3. GET FILTERS (categories, platforms, plans) – from active templates
 router.get('/templates/filters', async (req, res) => {
   try {
-    const snapshot = await db.collection('templates')
-      .where('isActive', '==', true)
-      .get();
-    
+    const snapshot = await db.collection('templates').where('isActive', '==', true).get();
     const categories = new Set();
     const platforms = new Set();
     const plans = new Set();
-    
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.category) categories.add(data.category);
       if (data.platform) platforms.add(data.platform);
       if (data.plan) plans.add(data.plan);
     });
-    
     res.json({
       success: true,
       categories: Array.from(categories),
       platforms: Array.from(platforms),
-      plans: Array.from(plans),  // ✅ Added plans
+      plans: Array.from(plans),
     });
   } catch (error) {
     console.error('Get filters error:', error);
@@ -478,44 +417,24 @@ router.get('/templates/filters', async (req, res) => {
   }
 });
 
-// 4. CREATE TEMPLATE (Admin only)
 router.post('/templates', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
-    
-    // Check admin claim
     if (!(await isAdmin(uid))) {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
-    
-    const {
-      title, slug, description, image, thumbnail,
-      category, platform, hashtags, isHighlight,
-      plan = 'free'  // ✅ Added plan with default
-    } = req.body;
-    
-    // Validate required fields
+    const { title, slug, description, image, thumbnail, category, platform, hashtags, isHighlight, plan = 'free' } = req.body;
     if (!title || !slug) {
       return res.status(400).json({ success: false, error: 'Title and slug are required' });
     }
-    
-    // Validate plan
     const validPlans = ['free', 'pro'];
     if (plan && !validPlans.includes(plan)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid plan. Must be: free, pro'
-      });
+      return res.status(400).json({ success: false, error: 'Invalid plan. Must be: free, pro' });
     }
-    
-    // Check slug uniqueness
-    const existing = await db.collection('templates')
-      .where('slug', '==', slug)
-      .get();
+    const existing = await db.collection('templates').where('slug', '==', slug).get();
     if (!existing.empty) {
       return res.status(409).json({ success: false, error: 'Slug already exists' });
     }
-    
     const templateData = {
       title,
       slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
@@ -526,65 +445,46 @@ router.post('/templates', verifyToken, async (req, res) => {
       platform: platform || '',
       hashtags: hashtags || [],
       isHighlight: isHighlight || false,
-      plan: plan || 'free',  // ✅ Store plan
+      plan: plan || 'free',
       isActive: true,
       usageCount: 0,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
-    
     const docRef = await db.collection('templates').add(templateData);
-    
-    res.status(201).json({
-      success: true,
-      template: { id: docRef.id, ...templateData }
-    });
+    res.status(201).json({ success: true, template: { id: docRef.id, ...templateData } });
   } catch (error) {
     console.error('Create template error:', error);
     res.status(500).json({ success: false, error: 'Failed to create template' });
   }
 });
 
-// 5. UPDATE TEMPLATE (Admin only)
 router.put('/templates/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
-    
     if (!(await isAdmin(uid))) {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
-    
     const updates = req.body;
     delete updates.createdAt;
     delete updates.usageCount;
     delete updates.id;
-    
-    // Validate plan if present
     if (updates.plan) {
       const validPlans = ['free', 'pro'];
       if (!validPlans.includes(updates.plan)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid plan. Must be: free, pro'
-        });
+        return res.status(400).json({ success: false, error: 'Invalid plan. Must be: free, pro' });
       }
     }
-    
-    // If slug is updated, check uniqueness
     if (updates.slug) {
       updates.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      const existing = await db.collection('templates')
-        .where('slug', '==', updates.slug)
-        .get();
+      const existing = await db.collection('templates').where('slug', '==', updates.slug).get();
       if (!existing.empty && existing.docs[0].id !== id) {
         return res.status(409).json({ success: false, error: 'Slug already exists' });
       }
     }
-    
     updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await db.collection('templates').doc(id).update(updates);
-    
     res.json({ success: true, message: 'Template updated' });
   } catch (error) {
     console.error('Update template error:', error);
@@ -592,21 +492,17 @@ router.put('/templates/:id', verifyToken, async (req, res) => {
   }
 });
 
-// 6. DELETE TEMPLATE (soft delete – Admin only)
 router.delete('/templates/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
-    
     if (!(await isAdmin(uid))) {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
-    
     await db.collection('templates').doc(id).update({
       isActive: false,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
     res.json({ success: true, message: 'Template archived' });
   } catch (error) {
     console.error('Delete template error:', error);
@@ -614,7 +510,6 @@ router.delete('/templates/:id', verifyToken, async (req, res) => {
   }
 });
 
-// 7. INCREMENT TEMPLATE USAGE (Public – called when a campaign is created)
 router.post('/templates/:id/usage', async (req, res) => {
   try {
     const { id } = req.params;
@@ -628,72 +523,58 @@ router.post('/templates/:id/usage', async (req, res) => {
   }
 });
 
+// ============================================================
+// ===================== CAMPAIGN ENDPOINTS =====================
+// ============================================================
 
-// ============================================================
-// ADMIN SETUP ENDPOINT (One‑time use, with secret key)
-// ============================================================
-router.post('/auth/set-admin', async (req, res) => {
+// GET ALL CAMPAIGNS (Public)
+router.get('/campaigns', async (req, res) => {
   try {
-    const { email, secret } = req.body;
-    
-    // Verify secret key
-    if (secret !== 'PANKAJ@123sah') {
-      return res.status(403).json({ success: false, error: 'Invalid secret key' });
-    }
-    
-    if (!email) {
-      return res.status(400).json({ success: false, error: 'Email is required' });
-    }
-    
-    // 1. Get user by email
-    let userRecord;
-    try {
-      userRecord = await admin.auth().getUserByEmail(email);
-    } catch (error) {
-      if (error.code === 'auth/user-not-found') {
-        return res.status(404).json({ success: false, error: 'User not found. Please create an account first.' });
-      }
-      throw error;
-    }
-    
-    // 2. Set admin custom claim
-    await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
-    
-    // 3. Also store role in Firestore for easy querying
-    await db.collection('users').doc(userRecord.uid).set({
-      email: email,
-      role: 'admin',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    
-    res.json({
-      success: true,
-      message: `Admin claim set for ${email}`,
-      uid: userRecord.uid
+    const limit = parseInt(req.query.limit) || 20;
+    const snapshot = await db.collection('campaigns')
+      .where('status', '==', 'active')
+      .orderBy('createdAt', 'desc')
+      .limit(limit)
+      .get();
+    const campaigns = [];
+    snapshot.forEach(doc => {
+      campaigns.push({ id: doc.id, ...doc.data() });
     });
+    res.json({ success: true, campaigns });
   } catch (error) {
-    console.error('Set admin error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Get campaigns error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch campaigns' });
   }
 });
 
-// ============================================================
-// CREATE CAMPAIGN (Protected) – with full validation
-// ============================================================
+// GET CAMPAIGN BY ID (Public)
+router.get('/campaigns/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const campaignData = doc.data();
+    db.collection('campaigns').doc(id).update({
+      views: admin.firestore.FieldValue.increment(1)
+    }).catch(() => {});
+    res.json({
+      success: true,
+      campaign: { id: doc.id, ...campaignData }
+    });
+  } catch (error) {
+    console.error('Error fetching campaign:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch campaign' });
+  }
+});
+
+// CREATE CAMPAIGN (Protected)
 router.post('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
+    const { templateId, shareCount, tasks, finalUrl, features } = req.body;
 
-    // 1. Extract fields
-    const {
-      templateId,
-      shareCount,
-      tasks,
-      finalUrl,
-      features
-    } = req.body;
-
-    // 2. Validate template exists
     if (!templateId) {
       return res.status(400).json({ success: false, error: 'Template ID is required' });
     }
@@ -703,7 +584,6 @@ router.post('/campaigns', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
 
-    // 3. Validate features object
     const { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled } = features || {};
     if (typeof scEnabled !== 'boolean' || typeof tasksEnabled !== 'boolean' || typeof fuEnabled !== 'boolean') {
       return res.status(400).json({
@@ -711,16 +591,13 @@ router.post('/campaigns', verifyToken, async (req, res) => {
         error: 'Features must include shareCount, tasks, finalUrl as booleans'
       });
     }
-
-    // 4. At least one feature must be enabled
     if (!scEnabled && !tasksEnabled && !fuEnabled) {
       return res.status(400).json({
         success: false,
-        error: 'At least one feature (share count, tasks, or final URL) must be enabled'
+        error: 'At least one feature must be enabled'
       });
     }
 
-    // 5. Validate share count if enabled
     let finalShareCount = 0;
     if (scEnabled) {
       if (shareCount === undefined || shareCount === null) {
@@ -728,90 +605,55 @@ router.post('/campaigns', verifyToken, async (req, res) => {
       }
       const num = Number(shareCount);
       if (!Number.isInteger(num) || num < 1 || num > 9999) {
-        return res.status(400).json({
-          success: false,
-          error: 'Share count must be a whole number between 1 and 9999'
-        });
+        return res.status(400).json({ success: false, error: 'Share count must be a whole number between 1 and 9999' });
       }
       finalShareCount = num;
     }
 
-    // 6. Validate tasks if enabled
     let finalTasks = [];
     if (tasksEnabled) {
       if (!Array.isArray(tasks) || tasks.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'At least one task is required when tasks are enabled'
-        });
+        return res.status(400).json({ success: false, error: 'At least one task is required when tasks are enabled' });
       }
       if (tasks.length > 100) {
-        return res.status(400).json({
-          success: false,
-          error: 'Maximum 100 tasks allowed'
-        });
+        return res.status(400).json({ success: false, error: 'Maximum 100 tasks allowed' });
       }
       for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
         if (!task.text || typeof task.text !== 'string' || task.text.length < 1 || task.text.length > 250) {
-          return res.status(400).json({
-            success: false,
-            error: `Task ${i+1}: Text must be between 1 and 250 characters`
-          });
+          return res.status(400).json({ success: false, error: `Task ${i+1}: Text must be between 1 and 250 characters` });
         }
         if (!task.url || typeof task.url !== 'string') {
-          return res.status(400).json({
-            success: false,
-            error: `Task ${i+1}: URL is required`
-          });
+          return res.status(400).json({ success: false, error: `Task ${i+1}: URL is required` });
         }
-        try {
-          new URL(task.url);
-        } catch {
-          return res.status(400).json({
-            success: false,
-            error: `Task ${i+1}: Invalid URL format`
-          });
+        try { new URL(task.url); } catch {
+          return res.status(400).json({ success: false, error: `Task ${i+1}: Invalid URL format` });
         }
       }
       finalTasks = tasks.map(t => ({ text: t.text.trim(), url: t.url.trim() }));
     }
 
-    // 7. Validate final URL if enabled
     let finalFinalUrl = '';
     if (fuEnabled) {
       if (!finalUrl || typeof finalUrl !== 'string') {
-        return res.status(400).json({
-          success: false,
-          error: 'Final URL is required when enabled'
-        });
+        return res.status(400).json({ success: false, error: 'Final URL is required when enabled' });
       }
       try {
         new URL(finalUrl);
         finalFinalUrl = finalUrl.trim();
       } catch {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid final redirect URL format'
-        });
+        return res.status(400).json({ success: false, error: 'Invalid final redirect URL format' });
       }
     }
 
-    // 8. Get template data for fallback values
     const templateData = templateDoc.data();
-
-    // 9. Build campaign document
     const campaignData = {
       templateId,
       userId: uid,
       shareCount: finalShareCount,
       tasks: finalTasks,
       finalUrl: finalFinalUrl,
-      features: {
-        shareCount: scEnabled,
-        tasks: tasksEnabled,
-        finalUrl: fuEnabled,
-      },
+      features: { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled },
       title: templateData.title || 'Untitled Campaign',
       description: templateData.description || '',
       image: templateData.image || '',
@@ -824,30 +666,152 @@ router.post('/campaigns', verifyToken, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    // 10. Save to Firestore subcollection under template
     const campaignRef = await templateRef.collection('campaigns').add(campaignData);
+    await templateRef.update({ usageCount: admin.firestore.FieldValue.increment(1) });
 
-    // 11. Increment template usage
-    await templateRef.update({
-      usageCount: admin.firestore.FieldValue.increment(1)
-    });
-
-    // 12. Return campaign ID
     res.status(201).json({
       success: true,
       campaignId: campaignRef.id,
       message: 'Campaign created successfully'
     });
-
   } catch (error) {
     console.error('Create campaign error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create campaign',
-      details: error.message
-    });
+    res.status(500).json({ success: false, error: 'Failed to create campaign' });
   }
 });
 
+// UPDATE CAMPAIGN (Protected)
+router.put('/campaigns/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const updates = req.body;
 
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const data = doc.data();
+    if (data.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'Forbidden: You do not own this campaign' });
+    }
+
+    const allowedFields = ['title', 'description', 'reward', 'image', 'shareCount', 'tasks', 'finalUrl', 'status', 'features'];
+    const filteredUpdates = {};
+    allowedFields.forEach(field => {
+      if (updates[field] !== undefined) {
+        filteredUpdates[field] = updates[field];
+      }
+    });
+    filteredUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    await db.collection('campaigns').doc(id).update(filteredUpdates);
+    res.json({ success: true, message: 'Campaign updated' });
+  } catch (error) {
+    console.error('Update campaign error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update campaign' });
+  }
+});
+
+// DELETE CAMPAIGN (Protected)
+router.delete('/campaigns/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const data = doc.data();
+    if (data.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'Forbidden: You do not own this campaign' });
+    }
+    await db.collection('campaigns').doc(id).update({
+      status: 'deleted',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ success: true, message: 'Campaign deleted' });
+  } catch (error) {
+    console.error('Delete campaign error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete campaign' });
+  }
+});
+
+// RECORD SHARE (Public)
+router.post('/campaigns/:id/share', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    await db.collection('campaigns').doc(id).update({
+      shares: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    const updatedDoc = await db.collection('campaigns').doc(id).get();
+    const campaignData = updatedDoc.data();
+    res.json({
+      success: true,
+      message: 'Share recorded successfully!',
+      totalShares: campaignData.shares || 0
+    });
+  } catch (error) {
+    console.error('Error recording share:', error);
+    res.status(500).json({ success: false, error: 'Failed to record share' });
+  }
+});
+
+// GET CAMPAIGN SHARE COUNT (Public)
+router.get('/campaigns/:id/share-count', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const campaignData = doc.data();
+    res.json({
+      success: true,
+      shares: campaignData.shares || 0,
+      shareCount: campaignData.shareCount || 0,
+      isComplete: (campaignData.shares || 0) >= (campaignData.shareCount || 0)
+    });
+  } catch (error) {
+    console.error('Error getting share count:', error);
+    res.status(500).json({ success: false, error: 'Failed to get share count' });
+  }
+});
+
+// COMPLETE CAMPAIGN (Public)
+router.post('/campaigns/:id/complete', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    await db.collection('campaigns').doc(id).update({
+      completions: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    if (userId) {
+      await db.collection('campaigns').doc(id).collection('completedBy').doc(userId).set({
+        userId,
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    res.json({
+      success: true,
+      message: 'Campaign completed successfully!'
+    });
+  } catch (error) {
+    console.error('Error completing campaign:', error);
+    res.status(500).json({ success: false, error: 'Failed to complete campaign' });
+  }
+});
+
+// ============================================================
+// ===================== EXPORT =====================
+// ============================================================
 module.exports = router;
