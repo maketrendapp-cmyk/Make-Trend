@@ -1,10 +1,10 @@
-// frontend/pages/profile.js
-import { useAuth } from '../context/AuthContext';
-import Meta from '../components/Meta';
+// pages/profile.js
+import { useAuth } from '../components/AuthScreen';
 import AuthScreen from '../components/AuthScreen';
+import Meta from '../components/Meta';
 
 export default function Profile() {
-  const { user, isAuthenticated, loading, logout, refreshUser } = useAuth();
+  const { user, isAuthenticated, needsCompletion, loading, logout, refreshUser } = useAuth();
 
   if (loading) {
     return (
@@ -23,6 +23,15 @@ export default function Profile() {
     );
   }
 
+  if (needsCompletion) {
+    return (
+      <>
+        <Meta title="Complete Profile" description="Complete your profile." />
+        <AuthScreen onSuccess={refreshUser} />
+      </>
+    );
+  }
+
   const initials = user?.fullname
     ? user.fullname.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.charAt(0).toUpperCase() || 'U';
@@ -34,9 +43,9 @@ export default function Profile() {
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-border sm:p-8">
           
           <div className="flex items-center gap-4">
-            <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center text-3xl text-primary font-bold">
+            <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center text-3xl text-primary font-bold overflow-hidden">
               {user?.avatar ? (
-                <img src={user.avatar} alt="Avatar" className="h-20 w-20 rounded-full object-cover" />
+                <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
               ) : (
                 initials
               )}
