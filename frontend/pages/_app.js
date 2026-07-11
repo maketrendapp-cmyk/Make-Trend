@@ -14,9 +14,10 @@ import '../styles/globals.css';
 const NO_LAYOUT_PAGES = [
   '/templates/ncell-reward-v1',
   '/ncell-reward-v1', // if you're using a rewrite
-  // Add more template pages here as you create them, e.g.:
-  // '/templates/another-template',
-  // '/another-template',
+  
+// Task & Share pages (standalone – no navbar/bottom nav/menu)
+  '/tasks',
+  '/share',
 ];
 
 function MyApp({ Component, pageProps }) {
