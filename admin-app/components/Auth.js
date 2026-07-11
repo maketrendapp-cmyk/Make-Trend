@@ -16,7 +16,7 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL + '/api';
 
 const AuthContext = createContext();
 
@@ -24,48 +24,64 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('🔐 Auth state changed:', firebaseUser ? firebaseUser.email : 'null');
       setLoading(true);
+      setError(null);
+      
       if (firebaseUser) {
         try {
-          // Get token and check admin claim
+          const token = await firebaseUser.getIdToken();
+          console.log('✅ Firebase token obtained');
+
+          // Check admin claim
           const tokenResult = await firebaseUser.getIdTokenResult();
           const isAdmin = tokenResult.claims.admin === true;
+          console.log('🔑 Admin claim:', isAdmin);
 
-          // Fetch user profile from backend
-          const token = await firebaseUser.getIdToken();
+          // Fetch user profile
+          console.log('📡 Fetching user profile from:', `${API_BASE}/auth/me`);
           const res = await fetch(`${API_BASE}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
+          
+          console.log('📡 Response status:', res.status);
+          
+          if (!res.ok) {
+            const text = await res.text();
+            console.error('❌ Backend error:', res.status, text);
+            throw new Error(`Backend auth error: ${res.status} - ${text}`);
+          }
+          
           const data = await res.json();
-
+          console.log('📡 Backend response:', data);
+          
           if (data.success) {
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               ...data.user,
-              isAdmin: isAdmin, // set from token claim
-            });
-            setIsAuthenticated(true);
-          } else {
-            // fallback
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
               isAdmin: isAdmin,
             });
             setIsAuthenticated(true);
+            console.log('✅ User authenticated:', firebaseUser.email);
+          } else {
+            throw new Error(data.error || 'Profile fetch failed');
           }
         } catch (err) {
-          console.error('Auth error:', err);
+          console.error('❌ Auth error:', err.message);
+          setError(err.message);
           setUser(null);
           setIsAuthenticated(false);
         }
       } else {
+        console.log('🔓 User logged out');
         setUser(null);
         setIsAuthenticated(false);
+        setError(null);
       }
       setLoading(false);
     });
@@ -74,11 +90,18 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      // Wait for auth state to update (it will trigger the listener above)
+      console.log('🔐 Attempting login for:', email);
+      await signInWithEmailAndPassword(auth, email, password);
+      console.log('✅ Login successful, waiting for auth state...');
       return { success: true };
     } catch (err) {
-      return { success: false, error: err.message };
+      console.error('❌ Login error:', err.code, err.message);
+      let message = err.message;
+      if (err.code === 'auth/user-not-found') message = 'No account found with this email.';
+      if (err.code === 'auth/wrong-password') message = 'Incorrect password.';
+      if (err.code === 'auth/too-many-requests') message = 'Too many failed attempts. Please wait.';
+      if (err.code === 'auth/invalid-email') message = 'Invalid email address.';
+      return { success: false, error: message };
     }
   };
 
@@ -88,7 +111,7 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false);
   };
 
-  const value = { user, loading, isAuthenticated, login, logout };
+  const value = { user, loading, isAuthenticated, error, login, logout };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
