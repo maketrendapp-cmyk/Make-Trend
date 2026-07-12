@@ -23,6 +23,9 @@ export default function CreateCampaign() {
   const [campaignUrl, setCampaignUrl] = useState('');
 
   // ===== FORM STATE =====
+  // ✅ NEW: Title field
+  const [campaignTitle, setCampaignTitle] = useState('');
+
   const [shareCountEnabled, setShareCountEnabled] = useState(false);
   const [shareCount, setShareCount] = useState(10);
 
@@ -47,6 +50,8 @@ export default function CreateCampaign() {
       const data = await res.json();
       if (data.success) {
         setTemplate(data.template);
+        // ✅ Set default title from template
+        setCampaignTitle(data.template.title || '');
         setError('');
       } else {
         setError('Template not found');
@@ -84,6 +89,16 @@ export default function CreateCampaign() {
 
   // ===== VALIDATION =====
   const validateForm = () => {
+    // ✅ Validate title
+    if (!campaignTitle || campaignTitle.trim().length < 1) {
+      setMessage('Please enter a campaign title');
+      return false;
+    }
+    if (campaignTitle.length > 100) {
+      setMessage('Campaign title must be less than 100 characters');
+      return false;
+    }
+
     if (!shareCountEnabled && !tasksEnabled && !finalUrlEnabled) {
       setMessage('Please enable at least one feature: Share Count, Tasks, or Final URL');
       return false;
@@ -151,6 +166,7 @@ export default function CreateCampaign() {
 
       const payload = {
         templateId: template.id,
+        title: campaignTitle.trim(), // ✅ Send title to backend
         shareCount: shareCountEnabled ? Number(shareCount) : 0,
         tasks: tasksEnabled ? tasks : [],
         finalUrl: finalUrlEnabled ? finalUrl : '',
@@ -375,6 +391,23 @@ export default function CreateCampaign() {
 
         {/* ===== FORM ===== */}
         <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+          {/* ✅ NEW: Campaign Title */}
+          <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">📝 Campaign Title</h2>
+              <p className="text-sm text-gray-500">Give your campaign a unique name</p>
+            </div>
+            <input
+              type="text"
+              value={campaignTitle}
+              onChange={(e) => setCampaignTitle(e.target.value)}
+              placeholder="Enter campaign title..."
+              className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+              maxLength="100"
+            />
+            <p className="text-xs text-gray-400 mt-1">{campaignTitle.length}/100 characters</p>
+          </div>
+
           {/* Share Count */}
           <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-4">
