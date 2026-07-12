@@ -527,19 +527,24 @@ router.post('/templates/:id/usage', async (req, res) => {
 // ===================== CAMPAIGN ENDPOINTS =====================
 // ============================================================
 
-// GET ALL CAMPAIGNS (Public)
-router.get('/campaigns', async (req, res) => {
+// GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
+router.get('/campaigns', verifyToken, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 20;
+    const uid = req.user.uid;
+    const limit = parseInt(req.query.limit) || 50;
+
     const snapshot = await db.collection('campaigns')
-      .where('status', '==', 'active')
+      .where('userId', '==', uid)
+      .where('status', '!=', 'deleted')
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get();
+
     const campaigns = [];
     snapshot.forEach(doc => {
       campaigns.push({ id: doc.id, ...doc.data() });
     });
+
     res.json({ success: true, campaigns });
   } catch (error) {
     console.error('Get campaigns error:', error);
