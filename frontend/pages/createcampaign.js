@@ -52,12 +52,13 @@ export default function CreateCampaign() {
       const data = await res.json();
       if (data.success) {
         setTemplate(data.template);
+        setError('');
       } else {
         setError('Template not found');
       }
     } catch (err) {
+      console.error('Error fetching template:', err);
       setError('Failed to load template');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -178,7 +179,6 @@ export default function CreateCampaign() {
 
       if (res.ok && data.success) {
         const campaignId = data.campaignId;
-        // ✅ CLEAN URL: /[slug]/[campaignId]
         const url = `/${slug}/${campaignId}`;
         setCampaignUrl(url);
         setMessage('✅ Campaign created successfully!');
@@ -193,12 +193,12 @@ export default function CreateCampaign() {
   };
 
   // ===== ERROR =====
-  if (error || !template) {
+  if (error) {
     return (
       <main className="max-w-4xl mx-auto px-4 py-16 text-center">
         <div className="text-5xl mb-4">😕</div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Template not found</h2>
-        <p className="text-gray-500">{error || 'The template you\'re looking for doesn\'t exist.'}</p>
+        <p className="text-gray-500">{error}</p>
         <button
           onClick={() => router.push('/create')}
           className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
@@ -217,12 +217,10 @@ export default function CreateCampaign() {
         <Meta title="Campaign Created!" />
         <main className="max-w-2xl mx-auto px-4 py-16">
           <div className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-3xl p-8 md:p-10 text-center shadow-xl">
-            {/* Decorative elements */}
             <div className="absolute top-0 right-0 w-40 h-40 bg-green-200/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-40 h-40 bg-emerald-200/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
             <div className="relative z-10">
-              {/* Success Icon with animation */}
               <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center shadow-lg shadow-green-200/50 animate-[popIn_0.6s_ease-out]">
                 <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -232,7 +230,6 @@ export default function CreateCampaign() {
               <h2 className="text-3xl font-bold text-gray-900">🎉 Campaign Created!</h2>
               <p className="text-gray-600 mt-2">Your campaign is ready to share with the world.</p>
 
-              {/* URL Box */}
               <div className="mt-6 p-4 bg-white rounded-2xl border border-green-200 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
                 <input
                   type="text"
@@ -253,12 +250,10 @@ export default function CreateCampaign() {
               </div>
               {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
 
-              {/* Template info */}
               <div className="mt-4 text-xs text-gray-400">
                 Template: <span className="font-mono font-medium text-gray-600">{slug}</span>
               </div>
 
-              {/* Action Buttons */}
               <div className="mt-6 flex flex-wrap gap-3 justify-center">
                 <button
                   onClick={() => router.push(campaignUrl)}
@@ -275,6 +270,65 @@ export default function CreateCampaign() {
               </div>
             </div>
           </div>
+        </main>
+      </>
+    );
+  }
+
+  // ===== SKELETON LOADING =====
+  if (loading) {
+    return (
+      <>
+        <Meta title="Create Campaign" />
+        <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
+          {/* Back button skeleton */}
+          <div className="w-20 h-8 bg-gray-200 rounded-lg mb-4" />
+
+          {/* Template info skeleton */}
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-20 h-5 bg-gray-200 rounded" />
+            <div className="w-32 h-6 bg-gray-200 rounded-md" />
+          </div>
+
+          {/* Title skeleton */}
+          <div className="w-64 h-9 bg-gray-200 rounded mb-2" />
+          <div className="w-80 h-5 bg-gray-200 rounded mb-6" />
+
+          {/* Share Count skeleton */}
+          <div className="bg-white p-6 rounded-2xl border border-border mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="w-32 h-6 bg-gray-200 rounded mb-1" />
+                <div className="w-48 h-4 bg-gray-200 rounded" />
+              </div>
+              <div className="w-11 h-6 bg-gray-200 rounded-full" />
+            </div>
+          </div>
+
+          {/* Tasks skeleton */}
+          <div className="bg-white p-6 rounded-2xl border border-border mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="w-32 h-6 bg-gray-200 rounded mb-1" />
+                <div className="w-48 h-4 bg-gray-200 rounded" />
+              </div>
+              <div className="w-11 h-6 bg-gray-200 rounded-full" />
+            </div>
+          </div>
+
+          {/* Final URL skeleton */}
+          <div className="bg-white p-6 rounded-2xl border border-border mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="w-32 h-6 bg-gray-200 rounded mb-1" />
+                <div className="w-48 h-4 bg-gray-200 rounded" />
+              </div>
+              <div className="w-11 h-6 bg-gray-200 rounded-full" />
+            </div>
+          </div>
+
+          {/* Submit button skeleton */}
+          <div className="w-full h-14 bg-gray-200 rounded-xl" />
         </main>
       </>
     );
