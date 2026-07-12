@@ -1,5 +1,5 @@
 // pages/stats.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import AuthScreen from '../components/AuthScreen';
@@ -26,9 +26,13 @@ export default function Stats() {
   const [message, setMessage] = useState('');
 
   // ===== FETCH CAMPAIGNS – with token =====
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     try {
       setStatsLoading(true);
+      if (!user) {
+        setStatsLoading(false);
+        return;
+      }
       const token = await user.getIdToken();
       const res = await fetch(`${API_BASE}/campaigns`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -42,7 +46,7 @@ export default function Stats() {
     } finally {
       setStatsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (isAuthenticated && !needsCompletion && user) {
@@ -50,7 +54,7 @@ export default function Stats() {
     } else {
       setStatsLoading(false);
     }
-  }, [isAuthenticated, needsCompletion, user]);
+  }, [isAuthenticated, needsCompletion, user, fetchCampaigns]);
 
   // ===== HANDLE CREATE =====
   const handleCreateCampaign = () => {
