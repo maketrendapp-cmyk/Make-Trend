@@ -25,7 +25,7 @@ export default function Stats() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  // ===== FETCH CAMPAIGNS – with token =====
+  // ===== FETCH CAMPAIGNS – with proper error handling =====
   const fetchCampaigns = useCallback(async () => {
     try {
       setStatsLoading(true);
@@ -37,12 +37,20 @@ export default function Stats() {
       const res = await fetch(`${API_BASE}/campaigns`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Server error (${res.status}): ${errorText}`);
+      }
+      
       const data = await res.json();
       if (data.success) {
         setCampaigns(data.campaigns || []);
+      } else {
+        throw new Error(data.error || 'Unknown API error');
       }
     } catch (error) {
-      console.error('Failed to fetch campaigns:', error);
+      console.error('❌ fetchCampaigns error:', error.message);
     } finally {
       setStatsLoading(false);
     }
