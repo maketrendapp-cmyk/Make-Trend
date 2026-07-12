@@ -753,27 +753,37 @@ router.delete('/campaigns/:id', verifyToken, async (req, res) => {
 });
 
 // RECORD SHARE (Public)
+// routes/route.js
 router.post('/campaigns/:id/share', async (req, res) => {
   try {
     const { id } = req.params;
     const { platform } = req.body;
+
     const doc = await db.collection('campaigns').doc(id).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
+
+    const campaignData = doc.data();
+    const targetShareCount = campaignData.shareCount || 0;
+
+    // ✅ Set shares to the target count (not increment)
     await doc.ref.update({
-      shares: admin.firestore.FieldValue.increment(1),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      shares: targetShareCount,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    const updatedData = (await doc.ref.get()).data();
+
+    const updatedDoc = await doc.ref.get();
+    const data = updatedDoc.data();
+
     res.json({
       success: true,
-      message: 'Share recorded successfully!',
-      totalShares: updatedData.shares || 0
+      shares: data.shares || 0,
+      shareCount: data.shareCount || 0,
     });
   } catch (error) {
-    console.error('Error recording share:', error);
-    res.status(500).json({ success: false, error: 'Failed to record share' });
+    console.error('❌ Share error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -803,27 +813,66 @@ router.post('/campaigns/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
+
     const doc = await db.collection('campaigns').doc(id).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
+
+    // ✅ Add 1 completion
     await doc.ref.update({
       completions: admin.firestore.FieldValue.increment(1),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
     if (userId) {
       await doc.ref.collection('completedBy').doc(userId).set({
         userId,
-        completedAt: admin.firestore.FieldValue.serverTimestamp()
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
+
     res.json({
       success: true,
-      message: 'Campaign completed successfully!'
+      message: 'Campaign completed!',
     });
   } catch (error) {
-    console.error('Error completing campaign:', error);
-    res.status(500).json({ success: false, error: 'Failed to complete campaign' });
+    console.error('❌ Complete error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// routes/route.js
+router.post('/campaigns/:id/unlock', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    // ✅ Add 1 unlock
+    await doc.ref.update({
+      unlockCount: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (userId) {
+      await doc.ref.collection('unlockedBy').doc(userId).set({
+        userId,
+        unlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Campaign unlocked!',
+    });
+  } catch (error) {
+    console.error('❌ Unlock error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
