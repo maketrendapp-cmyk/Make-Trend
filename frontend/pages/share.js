@@ -42,9 +42,10 @@ export default function CampaignShare() {
         setCampaign(data.campaign);
         const count = data.campaign.shareCount || 0;
         setShareCount(count);
-        const current = data.campaign.shares || 0;
-        setShares(current);
-        if (count > 0 && current >= count) {
+        const currentShares = data.campaign.shares || 0;
+        setShares(currentShares);
+        // ✅ Check if shares are already complete
+        if (count > 0 && currentShares >= count) {
           setSharesComplete(true);
         }
       } else {
@@ -58,12 +59,15 @@ export default function CampaignShare() {
     }
   };
 
-  // ===== SHARE API CALL (simple increment) =====
+  // ===== SHARE =====
   const handleShare = async (platform) => {
-    if (isSharing || sharesComplete) return;
+    if (isSharing) return;
+    if (sharesComplete) {
+      alert('Shares already completed!');
+      return;
+    }
     setIsSharing(true);
 
-    // Open share dialog
     const url = `${window.location.origin}/tasks?id=${id}`;
     const shareUrls = {
       whatsapp: `https://wa.me/?text=${encodeURIComponent(`Check this out! ${url}`)}`,
@@ -81,8 +85,11 @@ export default function CampaignShare() {
       });
       const data = await res.json();
       if (data.success) {
-        setShares(data.currentShares || shares + 1);
-        if (data.isComplete) {
+        // ✅ Update shares with the value from backend
+        const newShares = data.shares || shares + 1;
+        setShares(newShares);
+        // ✅ Check if complete
+        if (data.isComplete || newShares >= shareCount) {
           setSharesComplete(true);
         }
       }
@@ -93,29 +100,63 @@ export default function CampaignShare() {
     }
   };
 
+  // ===== COPY LINK =====
   const handleCopyLink = async () => {
     const link = `${window.location.origin}/tasks?id=${id}`;
     try {
-      await navigator.clipboard.writeText(link);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 3000);
-      await handleShare('copy');
+      // ✅ Use clipboard API properly
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 3000);
+        // ✅ Call share API after copy
+        if (!sharesComplete && shareCount > 0) {
+          await handleShare('copy');
+        }
+      } else {
+        // ✅ Fallback method
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 3000);
+        if (!sharesComplete && shareCount > 0) {
+          await handleShare('copy');
+        }
+      }
     } catch (err) {
+      console.error('Error copying:', err);
+      // ✅ Fallback for any error
       const textarea = document.createElement('textarea');
       textarea.value = link;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
       document.body.appendChild(textarea);
+      textarea.focus();
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 3000);
-      await handleShare('copy');
     }
   };
 
-  // ===== COMPLETE API CALL =====
+  // ===== COMPLETE =====
   const handleComplete = async () => {
     if (isCompleting) return;
+    // ✅ If shares are required but not complete, show message
+    if (shareCount > 0 && !sharesComplete) {
+      alert(`Please complete all shares first (${shares}/${shareCount})`);
+      return;
+    }
     setIsCompleting(true);
 
     try {
@@ -136,7 +177,7 @@ export default function CampaignShare() {
         alert(data.error || 'Failed to complete campaign');
       }
     } catch (err) {
-      console.error('Error completing campaign:', err);
+      console.error('Error completing:', err);
       alert('Network error. Please try again.');
     } finally {
       setIsCompleting(false);
@@ -199,7 +240,6 @@ export default function CampaignShare() {
       <Meta title={`${campaign.title || 'Campaign'} - Share`} />
       <div className="min-h-screen bg-gray-50 py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
         <div className="max-w-2xl mx-auto">
-          {/* Back button */}
           <button
             onClick={() => router.push('/')}
             className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-6"
@@ -210,7 +250,6 @@ export default function CampaignShare() {
             Back to Home
           </button>
 
-          {/* Main Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-border p-6 sm:p-8 text-center transition-all hover:shadow-md">
             <div className="text-6xl mb-4 animate-bounce-in">📤</div>
             <h1 className="text-2xl font-bold text-gray-900">Share Campaign</h1>
@@ -315,7 +354,6 @@ export default function CampaignShare() {
         </div>
       </div>
 
-      {/* ===== ANIMATIONS ===== */}
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
