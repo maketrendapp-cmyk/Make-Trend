@@ -528,6 +528,7 @@ router.post('/templates/:id/usage', async (req, res) => {
 // ============================================================
 
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
+// GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
 router.get('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -535,20 +536,23 @@ router.get('/campaigns', verifyToken, async (req, res) => {
 
     const snapshot = await db.collection('campaigns')
       .where('userId', '==', uid)
-      .where('status', '!=', 'deleted')
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get();
 
     const campaigns = [];
     snapshot.forEach(doc => {
-      campaigns.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      // Only exclude documents marked as 'deleted'
+      if (data.status !== 'deleted') {
+        campaigns.push({ id: doc.id, ...data });
+      }
     });
 
     res.json({ success: true, campaigns });
   } catch (error) {
     console.error('Get campaigns error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch campaigns' });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
