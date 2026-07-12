@@ -24,8 +24,7 @@ export default function Create() {
         const res = await fetch(`${API_BASE}/templates`);
         if (!res.ok) {
           if (res.status === 500) {
-            const text = await res.text();
-            console.warn('Backend error:', text);
+            console.warn('Backend error');
             setTemplates([]);
             setLoading(false);
             return;
@@ -103,20 +102,7 @@ export default function Create() {
     all: 'bg-gray-600 text-white',
   };
 
-  if (loading) {
-    return (
-      <>
-        <Meta title="Choose a Template" />
-        <main className="max-w-4xl mx-auto px-4 py-16 flex justify-center items-center min-h-[50vh]">
-          <div className="text-center">
-            <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-            <p className="mt-3 text-gray-500 text-sm">Loading templates...</p>
-          </div>
-        </main>
-      </>
-    );
-  }
-
+  // Show error if any
   if (error) {
     return (
       <>
@@ -133,7 +119,8 @@ export default function Create() {
     );
   }
 
-  if (templates.length === 0) {
+  // Show empty state
+  if (!loading && templates.length === 0) {
     return (
       <>
         <Meta title="No Templates" />
@@ -149,7 +136,7 @@ export default function Create() {
   return (
     <>
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
-      <main className="max-w-4xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <main className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">✨ Choose a Template</h1>
@@ -228,7 +215,23 @@ export default function Create() {
         </div>
 
         {/* Template Grid */}
-        {filteredTemplates.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden animate-pulse">
+                <div className="aspect-[4/3] bg-gray-200" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  <div className="flex gap-2 mt-3">
+                    <div className="h-8 bg-gray-200 rounded w-1/2" />
+                    <div className="h-8 bg-gray-200 rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredTemplates.length === 0 ? (
           <div className="text-center py-10 bg-gray-50 rounded-xl border border-border">
             <div className="text-4xl mb-2">🔍</div>
             <h3 className="text-base font-semibold text-gray-900 mb-0.5">No templates match</h3>
@@ -244,7 +247,7 @@ export default function Create() {
                 key={template.id}
                 className="group bg-white rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden"
               >
-                {/* Image - Full width rounded bubble */}
+                {/* Image - Full image shown with object-cover */}
                 <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                   {template.image ? (
                     <img
