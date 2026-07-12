@@ -66,20 +66,21 @@ export default function Stats() {
     }
   }, [isAuthenticated, needsCompletion, fetchCampaigns]);
 
-  // ===== FORMAT DATE – FIXED (Local time) =====
+  // ===== ROBUST DATE FORMATTER =====
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
       if (timestamp.toDate) {
         date = timestamp.toDate();
-      } else if (timestamp.seconds) {
+      } else if (timestamp.seconds !== undefined) {
         date = new Date(timestamp.seconds * 1000);
+      } else if (typeof timestamp === 'number') {
+        date = new Date(timestamp);
       } else {
         date = new Date(timestamp);
       }
       if (isNaN(date.getTime())) return 'N/A';
-      // ✅ Returns formatted local date and time
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -221,7 +222,6 @@ export default function Stats() {
   const totalUnlocks = campaigns.reduce((sum, c) => sum + (c.unlockCount || 0), 0);
   const totalCompletions = campaigns.reduce((sum, c) => sum + (c.completions || 0), 0);
   const totalShares = campaigns.reduce((sum, c) => sum + (c.shares || 0), 0);
-  const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
   const successfulCampaigns = campaigns.filter(c =>
     c.shareCount > 0 && c.shares >= c.shareCount
   ).length;
@@ -234,8 +234,8 @@ export default function Stats() {
           <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
           <div className="h-4 w-64 bg-gray-200 rounded" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 animate-pulse">
-          {[1, 2, 3, 4, 5].map((i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 animate-pulse">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white rounded-2xl p-5 border border-border">
               <div className="h-8 w-8 bg-gray-200 rounded-full mb-3" />
               <div className="h-7 w-12 bg-gray-200 rounded mb-1" />
@@ -304,19 +304,17 @@ export default function Stats() {
           </button>
         </div>
 
-        {/* ===== STATS BUBBLE CARDS ===== */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+        {/* ===== STATS BUBBLE CARDS (Active removed) ===== */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {[
             { label: 'Total Campaigns', value: campaigns.length, icon: '📊', color: 'bg-blue-50 text-blue-600 border-blue-100' },
             { label: 'Total Unlocks', value: totalUnlocks, icon: '🔓', color: 'bg-purple-50 text-purple-600 border-purple-100' },
             { label: 'Total Views', value: totalViews, icon: '👁️', color: 'bg-green-50 text-green-600 border-green-100' },
             { label: 'Total Shares', value: totalShares, icon: '📤', color: 'bg-orange-50 text-orange-600 border-orange-100' },
-            { label: 'Active Campaigns', value: activeCampaigns, icon: '🎯', color: 'bg-rose-50 text-rose-600 border-rose-100' },
           ].map((stat, idx) => (
             <div
               key={idx}
-              className="rounded-2xl p-4 sm:p-5 border text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200"
-              style={{ background: 'white', borderColor: '#e5e7eb' }}
+              className="rounded-2xl p-4 sm:p-5 border text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200 bg-white"
             >
               <div className="text-3xl sm:text-4xl mb-1">{stat.icon}</div>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">{stat.value}</p>
@@ -339,17 +337,21 @@ export default function Stats() {
           </div>
         </div>
 
-        {/* ===== CAMPAIGN LIST ===== */}
-        <div className="bg-white rounded-2xl shadow-sm border border-border p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Your Campaigns</h3>
-            <span className="text-xs text-gray-400">{campaigns.length} total</span>
+        {/* ===== CAMPAIGN LIST (Enhanced) ===== */}
+        <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-border bg-gray-50/50">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Your Campaigns</h3>
+              <span className="text-xs text-gray-400 bg-white px-3 py-1 rounded-full border border-border">
+                {campaigns.length} total
+              </span>
+            </div>
           </div>
 
           {statsLoading ? (
-            <div className="space-y-3">
+            <div className="p-4 space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col sm:flex-row justify-between gap-3 py-3 border-b border-border last:border-0 animate-pulse">
+                <div key={i} className="animate-pulse flex flex-col sm:flex-row justify-between gap-3 p-4 border-b border-border last:border-0">
                   <div className="flex-1">
                     <div className="h-5 w-3/4 bg-gray-200 rounded mb-1" />
                     <div className="flex flex-wrap gap-2">
@@ -366,7 +368,7 @@ export default function Stats() {
               ))}
             </div>
           ) : campaigns.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 px-4">
               <div className="text-5xl mb-4">📭</div>
               <p className="text-gray-500 text-sm">You haven't created any campaigns yet.</p>
               <button
@@ -381,66 +383,78 @@ export default function Stats() {
               {campaigns.map((camp) => {
                 const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
                 return (
-                  <div key={camp.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3 sm:py-4 first:pt-0 last:pb-0">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                          {camp.title || 'Untitled Campaign'}
-                        </p>
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                          camp.status === 'active' ? 'bg-green-100 text-green-700' :
-                          camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-gray-100 text-gray-500'
-                        }`}>
-                          {camp.status || 'Active'}
-                        </span>
-                        {isSuccessful && (
-                          <span className="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
-                            ✅ Success
+                  <div key={camp.id} className="px-4 sm:px-6 py-4 hover:bg-gray-50/30 transition-colors duration-150">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {/* Left: Title + badges + stats */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                            {camp.title || 'Untitled Campaign'}
+                          </p>
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            camp.status === 'active' ? 'bg-green-100 text-green-700' :
+                            camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-500'
+                          }`}>
+                            {camp.status || 'Active'}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                        <span className="text-xs text-gray-500 flex items-center gap-1">
-                          🔓 {camp.unlockCount || 0}
-                        </span>
-                        <span className="text-xs text-gray-500 flex items-center gap-1">
-                          👁️ {camp.views || 0}
-                        </span>
-                        <span className="text-xs text-gray-500 flex items-center gap-1">
-                          📤 {camp.shares || 0}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          📅 {formatDate(camp.createdAt)}
-                        </span>
-                      </div>
-                      {camp.features && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {camp.features.shareCount && (
-                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>
-                          )}
-                          {camp.features.tasks && (
-                            <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Tasks</span>
-                          )}
-                          {camp.features.finalUrl && (
-                            <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Redirect</span>
+                          {isSuccessful && (
+                            <span className="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                              ✅ Success
+                            </span>
                           )}
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                      <button
-                        onClick={() => handleEditCampaign(camp)}
-                        className="inline-flex items-center justify-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCampaign(camp.id)}
-                        className="inline-flex items-center justify-center px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
-                      >
-                        Delete
-                      </button>
+
+                        {/* Stats row with icons */}
+                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            🔓 <span className="font-medium text-gray-700">{camp.unlockCount || 0}</span> unlocks
+                          </span>
+                          <span className="flex items-center gap-1">
+                            👁️ <span className="font-medium text-gray-700">{camp.views || 0}</span> views
+                          </span>
+                          <span className="flex items-center gap-1">
+                            📤 <span className="font-medium text-gray-700">{camp.shares || 0}</span> shares
+                          </span>
+                          <span className="flex items-center gap-1">
+                            ✅ <span className="font-medium text-gray-700">{camp.completions || 0}</span> completions
+                          </span>
+                          <span className="text-gray-400">
+                            📅 {formatDate(camp.createdAt)}
+                          </span>
+                        </div>
+
+                        {/* Feature badges */}
+                        {camp.features && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {camp.features.shareCount && (
+                              <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>
+                            )}
+                            {camp.features.tasks && (
+                              <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Tasks</span>
+                            )}
+                            {camp.features.finalUrl && (
+                              <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Redirect</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Edit/Delete buttons */}
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleEditCampaign(camp)}
+                          className="inline-flex items-center justify-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCampaign(camp.id)}
+                          className="inline-flex items-center justify-center px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -450,7 +464,7 @@ export default function Stats() {
         </div>
       </main>
 
-      {/* ===== EDIT MODAL ===== */}
+      {/* ===== EDIT MODAL (unchanged) ===== */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
