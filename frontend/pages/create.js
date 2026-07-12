@@ -107,7 +107,7 @@ export default function Create() {
     return (
       <>
         <Meta title="Choose a Template" />
-        <main className="max-w-3xl mx-auto px-4 py-16 sm:px-6 lg:px-8 flex justify-center items-center min-h-[50vh]">
+        <main className="max-w-4xl mx-auto px-4 py-16 flex justify-center items-center min-h-[50vh]">
           <div className="text-center">
             <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
             <p className="mt-3 text-gray-500 text-sm">Loading templates...</p>
@@ -121,7 +121,7 @@ export default function Create() {
     return (
       <>
         <Meta title="Error" />
-        <main className="max-w-3xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+        <main className="max-w-4xl mx-auto px-4 py-16 text-center">
           <div className="text-5xl mb-4">😕</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
           <p className="text-gray-500">{error}</p>
@@ -137,7 +137,7 @@ export default function Create() {
     return (
       <>
         <Meta title="No Templates" />
-        <main className="max-w-3xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+        <main className="max-w-4xl mx-auto px-4 py-16 text-center">
           <div className="text-5xl mb-4">📭</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">No templates found</h2>
           <p className="text-gray-500">Check back later or contact the administrator.</p>
@@ -149,11 +149,11 @@ export default function Create() {
   return (
     <>
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
-      <main className="max-w-3xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <main className="max-w-4xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">✨ Choose a Template</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Preview any template or start building your campaign.</p>
+          <p className="text-gray-500 text-sm mt-0.5">Select a template to customize and launch your campaign</p>
         </div>
 
         {/* Search & Filters */}
@@ -227,7 +227,7 @@ export default function Create() {
           </div>
         </div>
 
-        {/* Template List – Vertical with Circular Bubble Thumbnail */}
+        {/* Template Grid */}
         {filteredTemplates.length === 0 ? (
           <div className="text-center py-10 bg-gray-50 rounded-xl border border-border">
             <div className="text-4xl mb-2">🔍</div>
@@ -238,42 +238,48 @@ export default function Create() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredTemplates.map((template) => (
               <div
                 key={template.id}
-                className="group bg-white rounded-2xl border border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden flex items-center p-3 sm:p-4 gap-4"
+                className="group bg-white rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden"
               >
-                {/* Circular Thumbnail (Bubble) */}
-                <div className="flex-shrink-0">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-sm relative">
-                    {template.image ? (
-                      <img
-                        src={template.image}
-                        alt={template.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl text-gray-300">🎨</div>
-                    )}
-                    {template.isHighlight && (
-                      <div className="absolute -top-0.5 -right-0.5 bg-yellow-400 text-gray-900 text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-md">
-                        ⭐
-                      </div>
-                    )}
-                    {template.plan && template.plan !== 'free' && (
-                      <div className="absolute -bottom-0.5 -right-0.5 bg-purple-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-md">
-                        {template.plan.slice(0, 3)}
-                      </div>
-                    )}
+                {/* Image - Full width rounded bubble */}
+                <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
+                  {template.image ? (
+                    <img
+                      src={template.image}
+                      alt={template.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">🎨</div>
+                  )}
+                  {template.isHighlight && (
+                    <div className="absolute top-2 left-2 bg-yellow-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                      ⭐ Featured
+                    </div>
+                  )}
+                  {template.plan && template.plan !== 'free' && (
+                    <div className="absolute top-2 right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                      {template.plan.toUpperCase()}
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
+                      {template.platform ? template.platform.toUpperCase() : 'ALL'}
+                    </span>
+                  </div>
+                  <div className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span>👥</span> {template.usageCount || 0}
                   </div>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0">
+                <div className="p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base leading-tight truncate">
+                    <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">
                       {template.title}
                     </h3>
                     {template.category && (
@@ -282,41 +288,37 @@ export default function Create() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-500 mt-0.5 line-clamp-1">
-                    {template.description || 'No description'}
+                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                    {template.description || 'No description provided.'}
                   </p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
-                      {template.platform ? template.platform.toUpperCase() : 'ALL'}
-                    </span>
-                    {template.hashtags && template.hashtags.slice(0, 2).map((tag, i) => (
-                      <span key={i} className="text-[10px] bg-primary/5 text-primary/70 px-2 py-0.5 rounded-full">
-                        {tag}
-                      </span>
-                    ))}
-                    {template.hashtags && template.hashtags.length > 2 && (
-                      <span className="text-[10px] text-gray-400">+{template.hashtags.length - 2}</span>
-                    )}
-                    <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                      <span>👥</span> {template.usageCount || 0}
-                    </span>
-                  </div>
-                </div>
+                  {template.hashtags && template.hashtags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {template.hashtags.slice(0, 3).map((tag, i) => (
+                        <span key={i} className="text-[10px] bg-primary/5 text-primary/70 px-2 py-0.5 rounded-full">
+                          {tag}
+                        </span>
+                      ))}
+                      {template.hashtags.length > 3 && (
+                        <span className="text-[10px] text-gray-400">+{template.hashtags.length - 3}</span>
+                      )}
+                    </div>
+                  )}
 
-                {/* Buttons */}
-                <div className="flex flex-col sm:flex-row gap-1.5 flex-shrink-0">
-                  <button
-                    onClick={() => handlePreview(template.slug)}
-                    className="text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition whitespace-nowrap"
-                  >
-                    👁️ Preview
-                  </button>
-                  <button
-                    onClick={() => handleUseTemplate(template.slug)}
-                    className="text-xs font-medium text-white bg-primary hover:bg-primary/90 px-3 py-1.5 rounded-xl transition shadow-sm whitespace-nowrap"
-                  >
-                    ✨ Use
-                  </button>
+                  {/* Buttons */}
+                  <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handlePreview(template.slug)}
+                      className="text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 py-1.5 rounded-lg transition"
+                    >
+                      👁️ Preview
+                    </button>
+                    <button
+                      onClick={() => handleUseTemplate(template.slug)}
+                      className="text-xs font-medium text-white bg-primary hover:bg-primary/90 py-1.5 rounded-lg transition"
+                    >
+                      ✨ Use
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
