@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import AuthScreen from '../components/AuthScreen';
 import Meta from '../components/Meta';
+import { auth } from '../services/firebase'; // ✅ Import auth
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -25,15 +26,20 @@ export default function Stats() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  // ===== FETCH CAMPAIGNS – with proper error handling =====
+  // ===== FETCH CAMPAIGNS – using auth.currentUser =====
   const fetchCampaigns = useCallback(async () => {
     try {
       setStatsLoading(true);
-      if (!user) {
+      
+      // ✅ Use auth.currentUser directly
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        console.error('❌ No Firebase user logged in');
         setStatsLoading(false);
         return;
       }
-      const token = await user.getIdToken();
+      
+      const token = await firebaseUser.getIdToken();
       const res = await fetch(`${API_BASE}/campaigns`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -54,15 +60,15 @@ export default function Stats() {
     } finally {
       setStatsLoading(false);
     }
-  }, [user]);
+  }, []); // ✅ No dependency on user
 
   useEffect(() => {
-    if (isAuthenticated && !needsCompletion && user) {
+    if (isAuthenticated && !needsCompletion) {
       fetchCampaigns();
     } else {
       setStatsLoading(false);
     }
-  }, [isAuthenticated, needsCompletion, user, fetchCampaigns]);
+  }, [isAuthenticated, needsCompletion, fetchCampaigns]);
 
   // ===== HANDLE CREATE =====
   const handleCreateCampaign = () => {
@@ -84,11 +90,16 @@ export default function Stats() {
     document.body.style.overflow = 'hidden';
   };
 
-  // ===== HANDLE DELETE =====
+  // ===== HANDLE DELETE – using auth.currentUser =====
   const handleDeleteCampaign = async (campaignId) => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
     try {
-      const token = await user.getIdToken();
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        alert('You must be logged in');
+        return;
+      }
+      const token = await firebaseUser.getIdToken();
       const res = await fetch(`${API_BASE}/campaigns/${campaignId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
@@ -107,14 +118,20 @@ export default function Stats() {
     }
   };
 
-  // ===== HANDLE EDIT SUBMIT =====
+  // ===== HANDLE EDIT SUBMIT – using auth.currentUser =====
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('');
 
     try {
-      const token = await user.getIdToken();
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        setMessage('❌ You must be logged in');
+        setIsSubmitting(false);
+        return;
+      }
+      const token = await firebaseUser.getIdToken();
       const payload = {
         title: editForm.title,
         shareCount: editForm.features.shareCount ? editForm.shareCount : 0,
