@@ -55,6 +55,7 @@ const upload = multer({
 // 4. EXPRESS APP
 // ============================================================
 const app = express();
+app.set('trust proxy', 1); // ✅ Add this line
 
 // ============================================================
 // 5. HELMET (Security Headers)
