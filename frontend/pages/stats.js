@@ -25,18 +25,14 @@ export default function Stats() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    if (isAuthenticated && !needsCompletion) {
-      fetchCampaigns();
-    } else {
-      setStatsLoading(false);
-    }
-  }, [isAuthenticated, needsCompletion]);
-
+  // ===== FETCH CAMPAIGNS – with token =====
   const fetchCampaigns = async () => {
     try {
       setStatsLoading(true);
-      const res = await fetch(`${API_BASE}/campaigns`);
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE}/campaigns`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       const data = await res.json();
       if (data.success) {
         setCampaigns(data.campaigns || []);
@@ -48,10 +44,20 @@ export default function Stats() {
     }
   };
 
+  useEffect(() => {
+    if (isAuthenticated && !needsCompletion && user) {
+      fetchCampaigns();
+    } else {
+      setStatsLoading(false);
+    }
+  }, [isAuthenticated, needsCompletion, user]);
+
+  // ===== HANDLE CREATE =====
   const handleCreateCampaign = () => {
     router.push('/create');
   };
 
+  // ===== HANDLE EDIT =====
   const handleEditCampaign = (campaign) => {
     setEditingCampaign(campaign);
     setEditForm({
@@ -66,6 +72,7 @@ export default function Stats() {
     document.body.style.overflow = 'hidden';
   };
 
+  // ===== HANDLE DELETE =====
   const handleDeleteCampaign = async (campaignId) => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
     try {
@@ -88,6 +95,7 @@ export default function Stats() {
     }
   };
 
+  // ===== HANDLE EDIT SUBMIT =====
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -137,7 +145,7 @@ export default function Stats() {
     setMessage('');
   };
 
-  // ===== ADD/REMOVE TASK IN EDIT MODAL =====
+  // ===== TASK HANDLERS FOR EDIT MODAL =====
   const addTaskInEdit = () => {
     if (editForm.tasks.length >= 100) {
       setMessage('Maximum 100 tasks allowed');
@@ -176,7 +184,7 @@ export default function Stats() {
     });
   };
 
-  // ===== LOADING =====
+  // ===== LOADING STATE =====
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
