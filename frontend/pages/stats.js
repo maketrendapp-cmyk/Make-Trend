@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import AuthScreen from '../components/AuthScreen';
 import Meta from '../components/Meta';
-import { auth } from '../services/firebase'; // ✅ Import auth
+import { auth } from '../services/firebase';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -26,29 +26,25 @@ export default function Stats() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  // ===== FETCH CAMPAIGNS – using auth.currentUser =====
+  // ===== FETCH CAMPAIGNS =====
   const fetchCampaigns = useCallback(async () => {
     try {
       setStatsLoading(true);
-      
-      // ✅ Use auth.currentUser directly
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) {
-        console.error('❌ No Firebase user logged in');
         setStatsLoading(false);
         return;
       }
-      
       const token = await firebaseUser.getIdToken();
       const res = await fetch(`${API_BASE}/campaigns`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(`Server error (${res.status}): ${errorText}`);
       }
-      
+
       const data = await res.json();
       if (data.success) {
         setCampaigns(data.campaigns || []);
@@ -60,7 +56,7 @@ export default function Stats() {
     } finally {
       setStatsLoading(false);
     }
-  }, []); // ✅ No dependency on user
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && !needsCompletion) {
@@ -70,12 +66,9 @@ export default function Stats() {
     }
   }, [isAuthenticated, needsCompletion, fetchCampaigns]);
 
-  // ===== HANDLE CREATE =====
-  const handleCreateCampaign = () => {
-    router.push('/create');
-  };
+  // ===== HANDLERS =====
+  const handleCreateCampaign = () => router.push('/create');
 
-  // ===== HANDLE EDIT =====
   const handleEditCampaign = (campaign) => {
     setEditingCampaign(campaign);
     setEditForm({
@@ -90,15 +83,11 @@ export default function Stats() {
     document.body.style.overflow = 'hidden';
   };
 
-  // ===== HANDLE DELETE – using auth.currentUser =====
   const handleDeleteCampaign = async (campaignId) => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
     try {
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        alert('You must be logged in');
-        return;
-      }
+      if (!firebaseUser) { alert('You must be logged in'); return; }
       const token = await firebaseUser.getIdToken();
       const res = await fetch(`${API_BASE}/campaigns/${campaignId}`, {
         method: 'DELETE',
@@ -118,7 +107,6 @@ export default function Stats() {
     }
   };
 
-  // ===== HANDLE EDIT SUBMIT – using auth.currentUser =====
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -203,17 +191,39 @@ export default function Stats() {
     setEditForm(prev => ({ ...prev, tasks: updated }));
   };
 
+  // ===== FORMAT DATE (FIXED) =====
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    try {
+      let date;
+      if (timestamp.toDate) {
+        date = timestamp.toDate();
+      } else if (timestamp.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      } else {
+        date = new Date(timestamp);
+      }
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
-  // ===== LOADING STATE =====
+  // ===== AGGREGATED STATS =====
+  const totalViews = campaigns.reduce((sum, c) => sum + (c.views || 0), 0);
+  const totalUnlocks = campaigns.reduce((sum, c) => sum + (c.unlockCount || 0), 0);
+  const totalCompletions = campaigns.reduce((sum, c) => sum + (c.completions || 0), 0);
+  const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+  const successfulCampaigns = campaigns.filter(c => 
+    c.shareCount > 0 && c.shares >= c.shareCount
+  ).length;
+
+  // ===== LOADING =====
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
@@ -267,8 +277,6 @@ export default function Stats() {
     );
   }
 
-  const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
-
   return (
     <>
       <Meta title="Dashboard" description="Manage your campaigns and track performance." />
@@ -293,9 +301,9 @@ export default function Stats() {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {[
-            { label: 'Total Campaigns', value: user?.stats?.totalCampaigns || campaigns.length, icon: '📊' },
-            { label: 'Total Unlocks', value: user?.stats?.totalUnlocks || 0, icon: '🚀' },
-            { label: 'Total Views', value: user?.stats?.totalViews || 0, icon: '👁️' },
+            { label: 'Total Campaigns', value: campaigns.length, icon: '📊' },
+            { label: 'Total Unlocks', value: totalUnlocks, icon: '🚀' },
+            { label: 'Total Views', value: totalViews, icon: '👁️' },
             { label: 'Active Campaigns', value: activeCampaigns, icon: '🎯' },
           ].map((stat, idx) => (
             <div key={idx} className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm border border-border hover:shadow-md transition-all duration-200">
@@ -365,8 +373,24 @@ export default function Stats() {
                       </span>
                       <span className="w-1 h-1 rounded-full bg-gray-300" />
                       <span className="text-xs text-primary font-medium">
-                        {camp.unlockCount || 0} unlocks
+                        🔓 {camp.unlockCount || 0} unlocks
                       </span>
+                      <span className="w-1 h-1 rounded-full bg-gray-300" />
+                      <span className="text-xs text-gray-400">
+                        👁️ {camp.views || 0} views
+                      </span>
+                      <span className="w-1 h-1 rounded-full bg-gray-300" />
+                      <span className="text-xs text-gray-400">
+                        📤 {camp.shares || 0} shares
+                      </span>
+                      {camp.shareCount > 0 && camp.shares >= camp.shareCount && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-gray-300" />
+                          <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                            ✅ Completed
+                          </span>
+                        </>
+                      )}
                       <span className="w-1 h-1 rounded-full bg-gray-300" />
                       <span className="text-xs text-gray-400">
                         {formatDate(camp.createdAt)}
@@ -413,10 +437,7 @@ export default function Stats() {
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
             <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Edit Campaign</h2>
-              <button
-                onClick={closeModal}
-                className="p-2 rounded-lg hover:bg-gray-100 transition"
-              >
+              <button onClick={closeModal} className="p-2 rounded-lg hover:bg-gray-100 transition">
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -433,7 +454,6 @@ export default function Stats() {
                 </div>
               )}
 
-              {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
                 <input
@@ -445,7 +465,6 @@ export default function Stats() {
                 />
               </div>
 
-              {/* Share Count */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">Share Count</label>
@@ -476,7 +495,6 @@ export default function Stats() {
                 )}
               </div>
 
-              {/* Tasks */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">Tasks</label>
@@ -532,7 +550,6 @@ export default function Stats() {
                 )}
               </div>
 
-              {/* Final URL */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">Final Redirect URL</label>
@@ -561,7 +578,6 @@ export default function Stats() {
                 )}
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-3 pt-4 border-t border-border">
                 <button
                   type="submit"
