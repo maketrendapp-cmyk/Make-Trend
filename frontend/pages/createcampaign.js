@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import AuthScreen from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 
@@ -11,7 +12,7 @@ const API_BASE = BACKEND_URL + '/api';
 export default function CreateCampaign() {
   const router = useRouter();
   const { slug } = router.query;
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, refreshUser } = useAuth();
 
   // ===== STATE =====
   const [template, setTemplate] = useState(null);
@@ -33,16 +34,10 @@ export default function CreateCampaign() {
 
   // ===== FETCH TEMPLATE =====
   useEffect(() => {
-    if (slug) {
+    if (slug && isAuthenticated) {
       fetchTemplate();
     }
-  }, [slug]);
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login?returnTo=' + encodeURIComponent(router.asPath));
-    }
-  }, [authLoading, isAuthenticated, router]);
+  }, [slug, isAuthenticated]);
 
   const fetchTemplate = async () => {
     try {
@@ -192,7 +187,17 @@ export default function CreateCampaign() {
     setIsSubmitting(false);
   };
 
-  // ===== ERROR =====
+  // ===== HANDLE NOT AUTHENTICATED =====
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <>
+        <Meta title="Login Required" />
+        <AuthScreen onSuccess={refreshUser} />
+      </>
+    );
+  }
+
+  // ===== HANDLE TEMPLATE NOT FOUND =====
   if (error) {
     return (
       <main className="max-w-4xl mx-auto px-4 py-16 text-center">
@@ -281,20 +286,14 @@ export default function CreateCampaign() {
       <>
         <Meta title="Create Campaign" />
         <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
-          {/* Back button skeleton */}
           <div className="w-20 h-8 bg-gray-200 rounded-lg mb-4" />
-
-          {/* Template info skeleton */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-20 h-5 bg-gray-200 rounded" />
             <div className="w-32 h-6 bg-gray-200 rounded-md" />
           </div>
-
-          {/* Title skeleton */}
           <div className="w-64 h-9 bg-gray-200 rounded mb-2" />
           <div className="w-80 h-5 bg-gray-200 rounded mb-6" />
 
-          {/* Share Count skeleton */}
           <div className="bg-white p-6 rounded-2xl border border-border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -305,7 +304,6 @@ export default function CreateCampaign() {
             </div>
           </div>
 
-          {/* Tasks skeleton */}
           <div className="bg-white p-6 rounded-2xl border border-border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -316,7 +314,6 @@ export default function CreateCampaign() {
             </div>
           </div>
 
-          {/* Final URL skeleton */}
           <div className="bg-white p-6 rounded-2xl border border-border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -327,7 +324,6 @@ export default function CreateCampaign() {
             </div>
           </div>
 
-          {/* Submit button skeleton */}
           <div className="w-full h-14 bg-gray-200 rounded-xl" />
         </main>
       </>
