@@ -112,7 +112,7 @@ export default function Create() {
     return (
       <>
         <Meta title="Choose a Template" />
-        <main className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 flex justify-center items-center min-h-[50vh]">
+        <main className="max-w-3xl mx-auto px-4 py-16 sm:px-6 lg:px-8 flex justify-center items-center min-h-[50vh]">
           <div className="text-center">
             <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
             <p className="mt-3 text-gray-500 text-sm">Loading templates...</p>
@@ -127,7 +127,7 @@ export default function Create() {
     return (
       <>
         <Meta title="Error" />
-        <main className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+        <main className="max-w-3xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
           <div className="text-5xl mb-4">😕</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
           <p className="text-gray-500">{error}</p>
@@ -147,7 +147,7 @@ export default function Create() {
     return (
       <>
         <Meta title="No Templates" />
-        <main className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+        <main className="max-w-3xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
           <div className="text-5xl mb-4">📭</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">No templates found</h2>
           <p className="text-gray-500">Check back later or contact the administrator.</p>
@@ -156,11 +156,11 @@ export default function Create() {
     );
   }
 
-  // Main render
+  // Main render – Vertical Style
   return (
     <>
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
-      <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <main className="max-w-3xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">✨ Choose a Template</h1>
@@ -241,7 +241,7 @@ export default function Create() {
           </div>
         </div>
 
-        {/* Template Grid – Compact Cards */}
+        {/* Template List – Vertical Style */}
         {filteredTemplates.length === 0 ? (
           <div className="text-center py-10 bg-gray-50 rounded-xl border border-border">
             <div className="text-4xl mb-2">🔍</div>
@@ -255,14 +255,14 @@ export default function Create() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+          <div className="space-y-4">
             {filteredTemplates.map((template) => (
               <div
                 key={template.id}
-                className="group bg-white rounded-2xl border border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
+                className="group bg-white rounded-2xl border border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col sm:flex-row"
               >
-                {/* Image – Full bleed in bubble */}
-                <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                {/* Image – Bubble container (circular/rounded) */}
+                <div className="sm:w-48 md:w-56 aspect-square sm:aspect-square bg-gray-100 relative overflow-hidden flex-shrink-0">
                   {template.image ? (
                     <img
                       src={template.image}
@@ -271,11 +271,11 @@ export default function Create() {
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">🎨</div>
+                    <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">🎨</div>
                   )}
                   {template.isHighlight && (
                     <div className="absolute top-2 left-2 bg-yellow-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                      ⭐
+                      ⭐ Featured
                     </div>
                   )}
                   {template.plan && template.plan !== 'free' && (
@@ -293,33 +293,47 @@ export default function Create() {
                   </div>
                 </div>
 
-                {/* Content – Compact */}
-                <div className="p-3 flex flex-col flex-1">
-                  <div className="flex items-start justify-between gap-1.5">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1 flex-1">
-                      {template.title}
-                    </h3>
-                    {template.category && (
-                      <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                        {template.category}
-                      </span>
+                {/* Content – Vertical Details */}
+                <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-gray-900 text-base leading-tight">
+                        {template.title}
+                      </h3>
+                      {template.category && (
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {template.category}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                      {template.description || 'No description provided.'}
+                    </p>
+                    {template.hashtags && template.hashtags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {template.hashtags.slice(0, 4).map((tag, i) => (
+                          <span key={i} className="text-[10px] bg-primary/5 text-primary/70 px-2 py-0.5 rounded-full">
+                            {tag}
+                          </span>
+                        ))}
+                        {template.hashtags.length > 4 && (
+                          <span className="text-[10px] text-gray-400">+{template.hashtags.length - 4}</span>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                    {template.description || 'No description'}
-                  </p>
 
                   {/* Buttons */}
-                  <div className="mt-2.5 pt-2 border-t border-border grid grid-cols-2 gap-1.5">
+                  <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handlePreview(template.slug)}
-                      className="text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 py-1.5 rounded-lg transition"
+                      className="text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 py-2 rounded-xl transition"
                     >
                       👁️ Preview
                     </button>
                     <button
                       onClick={() => handleUseTemplate(template.slug)}
-                      className="text-xs font-medium text-white bg-primary hover:bg-primary/90 py-1.5 rounded-lg transition"
+                      className="text-sm font-medium text-white bg-primary hover:bg-primary/90 py-2 rounded-xl transition shadow-sm hover:shadow-md"
                     >
                       ✨ Use
                     </button>
