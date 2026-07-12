@@ -66,6 +66,32 @@ export default function Stats() {
     }
   }, [isAuthenticated, needsCompletion, fetchCampaigns]);
 
+  // ===== FORMAT DATE – FIXED (Local time) =====
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    try {
+      let date;
+      if (timestamp.toDate) {
+        date = timestamp.toDate();
+      } else if (timestamp.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      } else {
+        date = new Date(timestamp);
+      }
+      if (isNaN(date.getTime())) return 'N/A';
+      // ✅ Returns formatted local date and time
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return 'N/A';
+    }
+  };
+
   // ===== HANDLERS =====
   const handleCreateCampaign = () => router.push('/create');
 
@@ -162,7 +188,6 @@ export default function Stats() {
     setMessage('');
   };
 
-  // ===== TASK HANDLERS FOR EDIT MODAL =====
   const addTaskInEdit = () => {
     if (editForm.tasks.length >= 100) {
       setMessage('Maximum 100 tasks allowed');
@@ -191,56 +216,34 @@ export default function Stats() {
     setEditForm(prev => ({ ...prev, tasks: updated }));
   };
 
-  // ===== FORMAT DATE (FIXED) =====
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    try {
-      let date;
-      if (timestamp.toDate) {
-        date = timestamp.toDate();
-      } else if (timestamp.seconds) {
-        date = new Date(timestamp.seconds * 1000);
-      } else {
-        date = new Date(timestamp);
-      }
-      if (isNaN(date.getTime())) return 'N/A';
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    } catch {
-      return 'N/A';
-    }
-  };
-
   // ===== AGGREGATED STATS =====
   const totalViews = campaigns.reduce((sum, c) => sum + (c.views || 0), 0);
   const totalUnlocks = campaigns.reduce((sum, c) => sum + (c.unlockCount || 0), 0);
   const totalCompletions = campaigns.reduce((sum, c) => sum + (c.completions || 0), 0);
+  const totalShares = campaigns.reduce((sum, c) => sum + (c.shares || 0), 0);
   const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
-  const successfulCampaigns = campaigns.filter(c => 
+  const successfulCampaigns = campaigns.filter(c =>
     c.shareCount > 0 && c.shares >= c.shareCount
   ).length;
 
-  // ===== LOADING =====
+  // ===== SKELETON LOADING =====
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
-        <div className="mb-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8 animate-pulse">
           <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
           <div className="h-4 w-64 bg-gray-200 rounded" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 animate-pulse">
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="bg-white rounded-2xl p-5 border border-border">
-              <div className="h-8 w-8 bg-gray-200 rounded mb-2" />
+              <div className="h-8 w-8 bg-gray-200 rounded-full mb-3" />
               <div className="h-7 w-12 bg-gray-200 rounded mb-1" />
               <div className="h-4 w-20 bg-gray-200 rounded" />
             </div>
           ))}
         </div>
-        <div className="bg-white rounded-2xl border border-border p-6">
+        <div className="bg-white rounded-2xl border border-border p-6 animate-pulse">
           <div className="h-6 w-32 bg-gray-200 rounded mb-4" />
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex flex-col sm:flex-row justify-between gap-3 py-4 border-b border-border last:border-0">
@@ -251,7 +254,10 @@ export default function Stats() {
                   <div className="h-3 w-12 bg-gray-200 rounded" />
                 </div>
               </div>
-              <div className="h-8 w-24 bg-gray-200 rounded" />
+              <div className="flex gap-2">
+                <div className="h-8 w-16 bg-gray-200 rounded" />
+                <div className="h-8 w-16 bg-gray-200 rounded" />
+              </div>
             </div>
           ))}
         </div>
@@ -285,7 +291,7 @@ export default function Stats() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">📊 Dashboard</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Manage your campaigns and track performance</p>
+            <p className="text-gray-500 text-sm mt-0.5">Overview of all your campaigns</p>
           </div>
           <button
             onClick={handleCreateCampaign}
@@ -298,24 +304,43 @@ export default function Stats() {
           </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        {/* ===== STATS BUBBLE CARDS ===== */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
           {[
-            { label: 'Total Campaigns', value: campaigns.length, icon: '📊' },
-            { label: 'Total Unlocks', value: totalUnlocks, icon: '🚀' },
-            { label: 'Total Views', value: totalViews, icon: '👁️' },
-            { label: 'Active Campaigns', value: activeCampaigns, icon: '🎯' },
+            { label: 'Total Campaigns', value: campaigns.length, icon: '📊', color: 'bg-blue-50 text-blue-600 border-blue-100' },
+            { label: 'Total Unlocks', value: totalUnlocks, icon: '🔓', color: 'bg-purple-50 text-purple-600 border-purple-100' },
+            { label: 'Total Views', value: totalViews, icon: '👁️', color: 'bg-green-50 text-green-600 border-green-100' },
+            { label: 'Total Shares', value: totalShares, icon: '📤', color: 'bg-orange-50 text-orange-600 border-orange-100' },
+            { label: 'Active Campaigns', value: activeCampaigns, icon: '🎯', color: 'bg-rose-50 text-rose-600 border-rose-100' },
           ].map((stat, idx) => (
-            <div key={idx} className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm border border-border hover:shadow-md transition-all duration-200">
-              <div className="text-2xl sm:text-3xl mb-1">{stat.icon}</div>
+            <div
+              key={idx}
+              className="rounded-2xl p-4 sm:p-5 border text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200"
+              style={{ background: 'white', borderColor: '#e5e7eb' }}
+            >
+              <div className="text-3xl sm:text-4xl mb-1">{stat.icon}</div>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-xs sm:text-sm text-gray-500">{stat.label}</p>
+              <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Campaign List */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6">
+        {/* Success Stats Row */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 sm:p-5 border border-green-100 text-center">
+            <div className="text-2xl sm:text-3xl mb-1">✅</div>
+            <p className="text-xl sm:text-2xl font-bold text-green-700">{successfulCampaigns}</p>
+            <p className="text-[10px] sm:text-xs font-medium text-green-600 uppercase tracking-wide">Completed Campaigns</p>
+          </div>
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-4 sm:p-5 border border-indigo-100 text-center">
+            <div className="text-2xl sm:text-3xl mb-1">🏆</div>
+            <p className="text-xl sm:text-2xl font-bold text-indigo-700">{totalCompletions}</p>
+            <p className="text-[10px] sm:text-xs font-medium text-indigo-600 uppercase tracking-wide">Total Completions</p>
+          </div>
+        </div>
+
+        {/* ===== CAMPAIGN LIST ===== */}
+        <div className="bg-white rounded-2xl shadow-sm border border-border p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Your Campaigns</h3>
             <span className="text-xs text-gray-400">{campaigns.length} total</span>
@@ -353,79 +378,73 @@ export default function Stats() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {campaigns.map((camp) => (
-                <div key={camp.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3 sm:py-4 first:pt-0 last:pb-0">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                      {camp.title || 'Untitled Campaign'}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      <span className="text-xs text-gray-500">
-                        {camp.platform || 'General'}
-                      </span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-                        camp.status === 'active' ? 'bg-green-100 text-green-700' :
-                        camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100 text-gray-500'
-                      }`}>
-                        {camp.status || 'Active'}
-                      </span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span className="text-xs text-primary font-medium">
-                        🔓 {camp.unlockCount || 0} unlocks
-                      </span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span className="text-xs text-gray-400">
-                        👁️ {camp.views || 0} views
-                      </span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span className="text-xs text-gray-400">
-                        📤 {camp.shares || 0} shares
-                      </span>
-                      {camp.shareCount > 0 && camp.shares >= camp.shareCount && (
-                        <>
-                          <span className="w-1 h-1 rounded-full bg-gray-300" />
-                          <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
-                            ✅ Completed
+              {campaigns.map((camp) => {
+                const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
+                return (
+                  <div key={camp.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3 sm:py-4 first:pt-0 last:pb-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                          {camp.title || 'Untitled Campaign'}
+                        </p>
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          camp.status === 'active' ? 'bg-green-100 text-green-700' :
+                          camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-500'
+                        }`}>
+                          {camp.status || 'Active'}
+                        </span>
+                        {isSuccessful && (
+                          <span className="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                            ✅ Success
                           </span>
-                        </>
-                      )}
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span className="text-xs text-gray-400">
-                        {formatDate(camp.createdAt)}
-                      </span>
-                    </div>
-                    {camp.features && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {camp.features.shareCount && (
-                          <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>
-                        )}
-                        {camp.features.tasks && (
-                          <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Tasks</span>
-                        )}
-                        {camp.features.finalUrl && (
-                          <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Redirect</span>
                         )}
                       </div>
-                    )}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          🔓 {camp.unlockCount || 0}
+                        </span>
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          👁️ {camp.views || 0}
+                        </span>
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          📤 {camp.shares || 0}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          📅 {formatDate(camp.createdAt)}
+                        </span>
+                      </div>
+                      {camp.features && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {camp.features.shareCount && (
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>
+                          )}
+                          {camp.features.tasks && (
+                            <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Tasks</span>
+                          )}
+                          {camp.features.finalUrl && (
+                            <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Redirect</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                      <button
+                        onClick={() => handleEditCampaign(camp)}
+                        className="inline-flex items-center justify-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCampaign(camp.id)}
+                        className="inline-flex items-center justify-center px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                    <button
-                      onClick={() => handleEditCampaign(camp)}
-                      className="inline-flex items-center justify-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCampaign(camp.id)}
-                      className="inline-flex items-center justify-center px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -437,7 +456,10 @@ export default function Stats() {
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
             <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Edit Campaign</h2>
-              <button onClick={closeModal} className="p-2 rounded-lg hover:bg-gray-100 transition">
+              <button
+                onClick={closeModal}
+                className="p-2 rounded-lg hover:bg-gray-100 transition"
+              >
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
