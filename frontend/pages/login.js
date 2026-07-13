@@ -33,13 +33,10 @@ export default function Login() {
   if (isAuthenticated) return null;
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
-
-      {/* ── Background Layer (fixed) ── */}
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-50 via-white to-indigo-100 -z-20" />
-
-      {/* ── Decorative Background Elements ── */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
+    <>
+      {/* ── Fixed Background Layer ── */}
+      <div className="fixed inset-0 z-0 bg-gradient-to-br from-purple-50 via-white to-indigo-100">
+        {/* Decorative elements */}
         <div className="absolute -top-40 -left-40 w-80 h-80 bg-purple-300/30 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-indigo-300/30 rounded-full blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-pink-200/20 rounded-full blur-3xl" />
@@ -59,17 +56,14 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── AuthScreen Card ── */}
+      {/* ── Content Layer ── */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4 py-8">
         <div className="w-full max-w-md">
-          {/* Optional glass wrapper – you can remove if AuthScreen already has styling */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-1">
-            <AuthScreen
-              onSuccess={() => {
-                router.push('/profile');
-              }}
-            />
-          </div>
+          <AuthScreen
+            onSuccess={() => {
+              router.push('/profile');
+            }}
+          />
           <p className="mt-6 text-center text-xs text-gray-400/70">
             By continuing, you agree to our{' '}
             <a href="/terms" className="text-purple-500 hover:underline">Terms</a> and{' '}
@@ -77,7 +71,6 @@ export default function Login() {
           </p>
         </div>
       </div>
-
-    </div>
+    </>
   );
 }
