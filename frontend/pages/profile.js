@@ -36,6 +36,7 @@ export default function Profile() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data;
+      console.log('📄 Profile response:', data); // DEBUG
       if (data.success && data.user) {
         setProfile({
           uid: data.user.uid || user.uid,
@@ -81,9 +82,10 @@ export default function Profile() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data;
+      console.log('📊 Campaigns response:', data); // DEBUG
       const campaigns = data.campaigns || [];
 
-      // Calculate stats manually
+      // Calculate stats manually (backend doesn't return aggregated stats)
       let totalCampaigns = 0;
       let totalViews = 0;
       let totalUnlocks = 0;
@@ -93,13 +95,15 @@ export default function Profile() {
       let successfulCampaigns = 0;
 
       campaigns.forEach(c => {
+        // Skip deleted campaigns (they should already be filtered, but just in case)
         if (c.status === 'deleted') return;
         totalCampaigns++;
         totalViews += c.views || 0;
-        totalUnlocks += c.unlockCount || 0;
+        totalUnlocks += c.unlockCount || 0;   // field name from backend
         totalShares += c.shares || 0;
         totalCompletions += c.completions || 0;
         if (c.status === 'active') activeCampaigns++;
+        // successful if shares >= shareCount (and shareCount > 0)
         if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
       });
 
@@ -156,7 +160,7 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
-  // ── Navigation arrays ──
+  // ── Quick Actions with better spacing ──
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -250,23 +254,23 @@ export default function Profile() {
           </div>
         )}
 
-        {/* ── Quick Actions ── */}
+        {/* ── Quick Actions (improved UI) ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {quickActions.map((action, index) => (
               <Link key={index} href={action.href}>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer">
-                  <action.icon className="w-5 h-5 text-purple-500" />
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200">
+                  <action.icon className="w-5 h-5 text-purple-500 flex-shrink-0" />
                   <span className="text-sm font-medium text-gray-700">{action.label}</span>
                 </div>
               </Link>
             ))}
             <button
               onClick={() => setShowLogoutModal(true)}
-              className="flex items-center gap-3 px-4 py-3 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-red-600"
+              className="flex items-center gap-3 px-4 py-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors text-red-600 border border-transparent hover:border-red-200"
             >
-              <FiLogOut className="w-5 h-5" />
+              <FiLogOut className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm font-medium">Logout</span>
             </button>
           </div>
@@ -298,10 +302,10 @@ export default function Profile() {
         {/* ── Explore ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Explore</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {exploreOptions.map((item, index) => (
               <Link key={index} href={item.href}>
-                <div className="flex flex-col items-center gap-2 px-4 py-4 bg-gray-50 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer">
+                <div className="flex flex-col items-center gap-2 px-4 py-4 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200">
                   <item.icon className="w-6 h-6 text-purple-600" />
                   <span className="text-sm font-medium text-gray-700 text-center">{item.label}</span>
                 </div>
@@ -313,10 +317,10 @@ export default function Profile() {
         {/* ── Legal ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Legal Framework</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {legalLinks.map((item, index) => (
               <Link key={index} href={item.href}>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200">
                   <item.icon className="w-5 h-5 text-gray-400" />
                   <span className="text-sm font-medium text-gray-700">{item.label}</span>
                 </div>
