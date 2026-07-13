@@ -116,24 +116,15 @@ export default function Stats() {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      // Firestore Timestamp (has seconds and nanoseconds)
       if (timestamp.seconds !== undefined) {
         date = new Date(timestamp.seconds * 1000);
-      }
-      // Firebase v9 modular SDK Timestamp (has _seconds and _nanoseconds)
-      else if (timestamp._seconds !== undefined) {
+      } else if (timestamp._seconds !== undefined) {
         date = new Date(timestamp._seconds * 1000);
-      }
-      // ISO string or number (milliseconds)
-      else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
         date = new Date(timestamp);
-      }
-      // If it's already a Date object
-      else if (timestamp instanceof Date) {
+      } else if (timestamp instanceof Date) {
         date = timestamp;
-      }
-      // fallback: try to parse as ISO
-      else {
+      } else {
         date = new Date(timestamp);
       }
       if (isNaN(date.getTime())) return 'N/A';
@@ -336,7 +327,7 @@ export default function Stats() {
       <Meta title="Dashboard" description="Manage your campaigns and track performance." />
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-500 text-sm mt-0.5">Overview of all your campaigns</p>
@@ -351,7 +342,7 @@ export default function Stats() {
         </div>
 
         {/* ===== STATS CARDS ===== */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Total Campaigns', value: stats.totalCampaigns, icon: FiBarChart2, color: 'blue' },
             { label: 'Total Unlocks', value: stats.totalUnlocks, icon: FiUnlock, color: 'purple' },
@@ -360,41 +351,51 @@ export default function Stats() {
           ].map((stat, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200"
+              className="bg-white rounded-2xl p-5 border border-gray-200/60 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1"
             >
-              <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-${stat.color}-50 text-${stat.color}-600 mb-2`}>
-                <stat.icon className="w-5 h-5" />
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-${stat.color}-50 text-${stat.color}-600`}>
+                  <stat.icon className="w-5 h-5" />
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</p>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{stat.label}</p>
             </div>
           ))}
         </div>
 
         {/* Success Stats Row */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 sm:p-5 border border-green-100 text-center">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-green-100 text-green-700 mb-2">
-              <FiCheckCircle className="w-5 h-5" />
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-100/60">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-green-100 text-green-700">
+                <FiCheckCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-700">{stats.successfulCampaigns}</p>
+                <p className="text-xs font-medium text-green-600 uppercase tracking-wider">Completed Campaigns</p>
+              </div>
             </div>
-            <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.successfulCampaigns}</p>
-            <p className="text-[10px] sm:text-xs font-medium text-green-600 uppercase tracking-wide">Completed Campaigns</p>
           </div>
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-4 sm:p-5 border border-indigo-100 text-center">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 mb-2">
-              <FiAward className="w-5 h-5" />
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-5 border border-indigo-100/60">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700">
+                <FiAward className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-indigo-700">{stats.totalCompletions}</p>
+                <p className="text-xs font-medium text-indigo-600 uppercase tracking-wider">Total Completions</p>
+              </div>
             </div>
-            <p className="text-xl sm:text-2xl font-bold text-indigo-700">{stats.totalCompletions}</p>
-            <p className="text-[10px] sm:text-xs font-medium text-indigo-600 uppercase tracking-wide">Total Completions</p>
           </div>
         </div>
 
         {/* ===== CAMPAIGN LIST ===== */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/30">
             <div className="flex items-center justify-between">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">Your Campaigns</h3>
-              <span className="text-xs text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-100">
+              <span className="text-xs text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-200/60">
                 {campaigns.length} total
               </span>
             </div>
@@ -431,34 +432,42 @@ export default function Stats() {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100/60">
               {campaigns.map((camp) => {
                 const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
                 return (
-                  <div key={camp.id} className="px-4 sm:px-6 py-4 hover:bg-gray-50/30 transition-colors duration-150">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div
+                    key={camp.id}
+                    className="px-4 sm:px-6 py-4 hover:bg-gray-50/30 transition-colors duration-150 relative"
+                  >
+                    {/* Accent left border */}
+                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 rounded-r ${
+                      isSuccessful ? 'bg-green-500' : camp.status === 'active' ? 'bg-blue-500' : 'bg-gray-300'
+                    }`}></div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-4">
                       {/* Left: Title + badges + stats */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
                             {camp.title || 'Untitled Campaign'}
                           </p>
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                            camp.status === 'active' ? 'bg-green-100 text-green-700' :
+                          <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
+                            camp.status === 'active' ? 'bg-blue-100 text-blue-700' :
                             camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-gray-100 text-gray-500'
                           }`}>
                             {camp.status || 'Active'}
                           </span>
                           {isSuccessful && (
-                            <span className="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-medium bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">
                               ✅ Success
                             </span>
                           )}
                         </div>
 
                         {/* Stats row with icons */}
-                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
+                        <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <FiUnlock className="w-3 h-3" />
                             <span className="font-medium text-gray-700">{camp.unlockCount || 0}</span> unlocks
@@ -475,15 +484,15 @@ export default function Stats() {
                             <FiCheckCircle className="w-3 h-3" />
                             <span className="font-medium text-gray-700">{camp.completions || 0}</span> completions
                           </span>
-                          <span className="text-gray-400 flex items-center gap-1">
+                          <span className="flex items-center gap-1 text-gray-400">
                             <FiClock className="w-3 h-3" />
                             {formatDate(camp.createdAt)}
                           </span>
                         </div>
 
                         {/* Feature badges */}
-                        {camp.features && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
+                        {camp.features && Object.values(camp.features).some(Boolean) && (
+                          <div className="flex flex-wrap gap-1 mt-2">
                             {camp.features.shareCount && (
                               <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>
                             )}
@@ -498,7 +507,7 @@ export default function Stats() {
                       </div>
 
                       {/* Right: Edit/Delete buttons */}
-                      <div className="flex flex-wrap gap-1.5 sm:gap-2 flex-shrink-0">
+                      <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleEditCampaign(camp)}
                           className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
