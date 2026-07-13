@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { auth } from '../services/firebase';
 import {
   FiSettings, FiLock, FiCreditCard, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
@@ -12,7 +13,7 @@ import { FaCrown } from 'react-icons/fa';
 
 export default function Profile() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth(); // still needed for logout and profile state
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({
     totalCampaigns: 0,
@@ -27,9 +28,8 @@ export default function Profile() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
-  // ── Copy referral code ──
   const copyReferralCode = () => {
     const code = profile?.referralCode || '';
     if (!code) return;
@@ -48,56 +48,45 @@ export default function Profile() {
     });
   };
 
-  // ── Fetch profile using fetch (not axios) ──
+  // ── Fetch profile ──
   const fetchProfile = async () => {
     try {
-      // 1) Check user object
-      if (!user) {
-        console.warn('⏳ No user object yet');
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        console.warn('⏳ No Firebase user logged in');
         return;
       }
-      console.log('👤 User object:', user);
+      console.log('👤 Firebase user:', firebaseUser.uid);
+      const token = await firebaseUser.getIdToken();
+      console.log('✅ Token obtained');
 
-      // 2) Get token
-      let token;
-      try {
-        token = await user.getIdToken();
-        console.log('✅ Token obtained:', token.substring(0, 10) + '...');
-      } catch (tokenErr) {
-        console.error('❌ getIdToken failed:', tokenErr);
-        return;
-      }
-
-      // 3) Fetch
       const url = `${API_BASE}/api/auth/me`;
-      console.log('📡 Fetching profile from:', url);
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log('📡 Response status:', res.status);
       const data = await res.json();
       console.log('🔵 Profile API response:', data);
 
       if (data.success && data.user) {
         setProfile({
-          uid: data.user.uid || user.uid,
+          uid: data.user.uid || firebaseUser.uid,
           username: data.user.username || data.user.email?.split('@')[0] || 'user',
           fullName: data.user.fullname || data.user.displayName || data.user.email || 'User',
-          email: data.user.email || user.email,
-          profilePic: data.user.avatar || data.user.photoURL || user.photoURL || null,
+          email: data.user.email || firebaseUser.email,
+          profilePic: data.user.avatar || data.user.photoURL || firebaseUser.photoURL || null,
           isPro: data.user.plan === 'pro' || false,
           referrals: data.user.referrals || 0,
           referralCode: data.user.referralCode || '',
         });
       } else {
         console.warn('⚠️ Profile API returned success=false or missing user:', data);
-        // fallback
+        // fallback to Firebase Auth
         setProfile({
-          uid: user.uid,
-          username: user.displayName || user.email?.split('@')[0] || 'user',
-          fullName: user.displayName || user.email || 'User',
-          email: user.email,
-          profilePic: user.photoURL || null,
+          uid: firebaseUser.uid,
+          username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'user',
+          fullName: firebaseUser.displayName || firebaseUser.email || 'User',
+          email: firebaseUser.email,
+          profilePic: firebaseUser.photoURL || null,
           isPro: false,
           referrals: 0,
           referralCode: '',
@@ -106,33 +95,35 @@ export default function Profile() {
     } catch (error) {
       console.error('❌ Profile fetch error:', error);
       // fallback
-      setProfile({
-        uid: user?.uid || '',
-        username: user?.displayName || user?.email?.split('@')[0] || 'user',
-        fullName: user?.displayName || user?.email || 'User',
-        email: user?.email || '',
-        profilePic: user?.photoURL || null,
-        isPro: false,
-        referrals: 0,
-        referralCode: '',
-      });
+      const firebaseUser = auth.currentUser;
+      if (firebaseUser) {
+        setProfile({
+          uid: firebaseUser.uid,
+          username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'user',
+          fullName: firebaseUser.displayName || firebaseUser.email || 'User',
+          email: firebaseUser.email,
+          profilePic: firebaseUser.photoURL || null,
+          isPro: false,
+          referrals: 0,
+          referralCode: '',
+        });
+      }
     }
   };
 
-  // ── Fetch campaigns using fetch ──
+  // ── Fetch campaigns ──
   const fetchCampaignsStats = async () => {
     try {
-      if (!user) {
-        console.warn('⏳ No user object for campaigns');
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        console.warn('⏳ No Firebase user for campaigns');
         return;
       }
-      const token = await user.getIdToken();
+      const token = await firebaseUser.getIdToken();
       const url = `${API_BASE}/api/campaigns`;
-      console.log('📡 Fetching campaigns from:', url);
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log('📡 Campaigns status:', res.status);
       const data = await res.json();
       console.log('🟢 Campaigns API response:', data);
 
@@ -165,14 +156,18 @@ export default function Profile() {
   };
 
   useEffect(() => {
-    if (user) {
-      setLoading(true);
-      Promise.all([fetchProfile(), fetchCampaignsStats()])
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
+    // Wait for Firebase auth to be ready
+    const unsubscribe = auth.onAuthStateChanged(firebaseUser => {
+      if (firebaseUser) {
+        setLoading(true);
+        Promise.all([fetchProfile(), fetchCampaignsStats()])
+          .finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []); // runs once
 
   const handleLogout = async () => {
     try {
@@ -184,12 +179,11 @@ export default function Profile() {
     }
   };
 
-  // ── Fallback display user ──
   const displayUser = profile || {
     username: 'guest',
     fullName: 'Guest User',
-    email: user?.email || 'guest@example.com',
-    profilePic: user?.photoURL || null,
+    email: auth.currentUser?.email || 'guest@example.com',
+    profilePic: auth.currentUser?.photoURL || null,
     isPro: false,
     referrals: 0,
     referralCode: '',
@@ -259,7 +253,7 @@ export default function Profile() {
               <p className="text-gray-400 text-sm">{displayUser.email}</p>
 
               {/* ── Referral Code ── */}
-              {user && (
+              {auth.currentUser && (
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-medium text-gray-500">Referral Code:</span>
                   {displayUser.referralCode ? (
@@ -281,10 +275,10 @@ export default function Profile() {
                 </div>
               )}
 
-              {!user && <p className="text-sm text-gray-400 mt-2">Sign in to access your dashboard</p>}
+              {!auth.currentUser && <p className="text-sm text-gray-400 mt-2">Sign in to access your dashboard</p>}
             </div>
 
-            {!user ? (
+            {!auth.currentUser ? (
               <Link href="/login">
                 <button className="px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
                   Login
@@ -303,7 +297,7 @@ export default function Profile() {
         </div>
 
         {/* ── Stats Grid ── */}
-        {user && (
+        {auth.currentUser && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             {statsItems.map((stat, index) => (
               <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
@@ -342,7 +336,7 @@ export default function Profile() {
         </div>
 
         {/* ── Refer & Affiliates ── */}
-        {user && (
+        {auth.currentUser && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Refer & Affiliates</h2>
             <div className="flex items-center justify-between flex-wrap gap-3">
