@@ -7,7 +7,7 @@ import axios from 'axios';
 import {
   FiSettings, FiLock, FiCreditCard, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
-  FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp
+  FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
@@ -26,8 +26,29 @@ export default function Profile() {
   });
   const [loading, setLoading] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState('');
 
-  // ── Fetch user profile (includes referrals) ──
+  // ── Copy referral code ──
+  const copyReferralCode = () => {
+    const code = profile?.referralCode || '';
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setCopySuccess('✅ Copied!');
+      setTimeout(() => setCopySuccess(''), 2000);
+    }).catch(() => {
+      // fallback
+      const textArea = document.createElement('textarea');
+      textArea.value = code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopySuccess('✅ Copied!');
+      setTimeout(() => setCopySuccess(''), 2000);
+    });
+  };
+
+  // ── Fetch profile ──
   const fetchProfile = async () => {
     try {
       const token = await user.getIdToken();
@@ -45,9 +66,9 @@ export default function Profile() {
           profilePic: data.user.avatar || data.user.photoURL || user.photoURL || null,
           isPro: data.user.plan === 'pro' || false,
           referrals: data.user.referrals || 0,
+          referralCode: data.user.referralCode || '',
         });
       } else {
-        // fallback to Firebase Auth
         setProfile({
           uid: user.uid,
           username: user.displayName || user.email?.split('@')[0] || 'user',
@@ -56,6 +77,7 @@ export default function Profile() {
           profilePic: user.photoURL || null,
           isPro: false,
           referrals: 0,
+          referralCode: '',
         });
       }
     } catch (error) {
@@ -68,11 +90,12 @@ export default function Profile() {
         profilePic: user.photoURL || null,
         isPro: false,
         referrals: 0,
+        referralCode: '',
       });
     }
   };
 
-  // ── Fetch campaigns stats (backend already returns `stats`) ──
+  // ── Fetch campaigns + stats ──
   const fetchCampaignsStats = async () => {
     try {
       const token = await user.getIdToken();
@@ -81,27 +104,28 @@ export default function Profile() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data;
+      // If backend provides stats, use them
       if (data.success && data.stats) {
         setStats(data.stats);
-      } else {
-        // fallback: if no stats, compute manually (just in case)
-        const campaigns = data.campaigns || [];
-        let totalCampaigns = 0, totalViews = 0, totalUnlocks = 0,
-            totalShares = 0, totalCompletions = 0, activeCampaigns = 0, successfulCampaigns = 0;
-        campaigns.forEach(c => {
-          if (c.status === 'deleted') return;
-          totalCampaigns++;
-          totalViews += c.views || 0;
-          totalUnlocks += c.unlockCount || 0;
-          totalShares += c.shares || 0;
-          totalCompletions += c.completions || 0;
-          if (c.status === 'active') activeCampaigns++;
-          if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
-        });
-        setStats({ totalCampaigns, totalViews, totalUnlocks, totalShares, totalCompletions, activeCampaigns, successfulCampaigns });
+        return;
       }
+      // Fallback: manual computation
+      const campaigns = data.campaigns || [];
+      let totalCampaigns = 0, totalViews = 0, totalUnlocks = 0,
+          totalShares = 0, totalCompletions = 0, activeCampaigns = 0, successfulCampaigns = 0;
+      campaigns.forEach(c => {
+        if (c.status === 'deleted') return;
+        totalCampaigns++;
+        totalViews += c.views || 0;
+        totalUnlocks += c.unlockCount || 0;
+        totalShares += c.shares || 0;
+        totalCompletions += c.completions || 0;
+        if (c.status === 'active') activeCampaigns++;
+        if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
+      });
+      setStats({ totalCampaigns, totalViews, totalUnlocks, totalShares, totalCompletions, activeCampaigns, successfulCampaigns });
     } catch (error) {
-      console.error('Campaigns stats fetch error:', error);
+      console.error('Campaigns fetch error:', error);
     }
   };
 
@@ -125,7 +149,6 @@ export default function Profile() {
     }
   };
 
-  // ── Display user data (fallback) ──
   const displayUser = profile || {
     username: 'guest',
     fullName: 'Guest User',
@@ -133,6 +156,7 @@ export default function Profile() {
     profilePic: user?.photoURL || null,
     isPro: false,
     referrals: 0,
+    referralCode: '',
   };
 
   const statsItems = [
@@ -142,7 +166,6 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
-  // ── Navigation arrays (Quick Actions with better UI) ──
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -198,6 +221,24 @@ export default function Profile() {
               </div>
               <p className="text-gray-500">@{displayUser.username || 'guest'}</p>
               <p className="text-gray-400 text-sm">{displayUser.email}</p>
+
+              {/* ── Referral Code (with Copy) ── */}
+              {user && displayUser.referralCode && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500">Referral Code:</span>
+                  <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                    {displayUser.referralCode}
+                  </span>
+                  <button
+                    onClick={copyReferralCode}
+                    className="text-purple-600 hover:text-purple-800 transition flex items-center gap-1 text-xs"
+                  >
+                    <FiCopy className="w-3.5 h-3.5" />
+                    {copySuccess || 'Copy'}
+                  </button>
+                </div>
+              )}
+
               {!user && <p className="text-sm text-gray-400 mt-2">Sign in to access your dashboard</p>}
             </div>
 
@@ -236,7 +277,7 @@ export default function Profile() {
           </div>
         )}
 
-        {/* ── Quick Actions (improved UI/UX) ── */}
+        {/* ── Quick Actions ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -262,7 +303,7 @@ export default function Profile() {
         {user && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Refer & Affiliates</h2>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <FiUsers className="w-6 h-6 text-green-500" />
                 <div>
@@ -278,6 +319,23 @@ export default function Profile() {
                 </button>
               </Link>
             </div>
+            {displayUser.referralCode && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between flex-wrap gap-2">
+                <span className="text-sm text-gray-600">Your Referral Code:</span>
+                <div className="flex items-center gap-2">
+                  <code className="bg-white px-3 py-1 rounded border border-gray-300 font-mono text-sm">
+                    {displayUser.referralCode}
+                  </code>
+                  <button
+                    onClick={copyReferralCode}
+                    className="text-purple-600 hover:text-purple-800 transition flex items-center gap-1 text-sm"
+                  >
+                    <FiCopy className="w-4 h-4" />
+                    {copySuccess || 'Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
