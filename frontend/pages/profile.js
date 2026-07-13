@@ -28,7 +28,6 @@ export default function Profile() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
-  // ── Copy referral code ──
   const copyReferralCode = () => {
     const code = profile?.referralCode || '';
     if (!code) return;
@@ -56,6 +55,7 @@ export default function Profile() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      console.log('🔵 Profile API response:', res.data); // DEBUG
       const data = res.data;
       if (data.success && data.user) {
         setProfile({
@@ -69,6 +69,8 @@ export default function Profile() {
           referralCode: data.user.referralCode || '',
         });
       } else {
+        console.warn('⚠️ Profile API returned success=false or missing user:', data);
+        // fallback to Firebase
         setProfile({
           uid: user.uid,
           username: user.displayName || user.email?.split('@')[0] || 'user',
@@ -81,7 +83,8 @@ export default function Profile() {
         });
       }
     } catch (error) {
-      console.error('Profile fetch error:', error);
+      console.error('❌ Profile fetch error:', error); // Log full error
+      // fallback
       setProfile({
         uid: user.uid,
         username: user.displayName || user.email?.split('@')[0] || 'user',
@@ -103,29 +106,34 @@ export default function Profile() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/campaigns`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      console.log('🟢 Campaigns API response:', res.data); // DEBUG
       const data = res.data;
-      // If backend provides stats, use them
-      if (data.success && data.stats) {
-        setStats(data.stats);
-        return;
+      if (data.success) {
+        // Use backend stats if available
+        if (data.stats) {
+          setStats(data.stats);
+        } else {
+          // manual fallback
+          const campaigns = data.campaigns || [];
+          let totalCampaigns = 0, totalViews = 0, totalUnlocks = 0,
+              totalShares = 0, totalCompletions = 0, activeCampaigns = 0, successfulCampaigns = 0;
+          campaigns.forEach(c => {
+            if (c.status === 'deleted') return;
+            totalCampaigns++;
+            totalViews += c.views || 0;
+            totalUnlocks += c.unlockCount || 0;
+            totalShares += c.shares || 0;
+            totalCompletions += c.completions || 0;
+            if (c.status === 'active') activeCampaigns++;
+            if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
+          });
+          setStats({ totalCampaigns, totalViews, totalUnlocks, totalShares, totalCompletions, activeCampaigns, successfulCampaigns });
+        }
+      } else {
+        console.warn('⚠️ Campaigns API returned success=false:', data);
       }
-      // Fallback: manual computation
-      const campaigns = data.campaigns || [];
-      let totalCampaigns = 0, totalViews = 0, totalUnlocks = 0,
-          totalShares = 0, totalCompletions = 0, activeCampaigns = 0, successfulCampaigns = 0;
-      campaigns.forEach(c => {
-        if (c.status === 'deleted') return;
-        totalCampaigns++;
-        totalViews += c.views || 0;
-        totalUnlocks += c.unlockCount || 0;
-        totalShares += c.shares || 0;
-        totalCompletions += c.completions || 0;
-        if (c.status === 'active') activeCampaigns++;
-        if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
-      });
-      setStats({ totalCampaigns, totalViews, totalUnlocks, totalShares, totalCompletions, activeCampaigns, successfulCampaigns });
     } catch (error) {
-      console.error('Campaigns fetch error:', error);
+      console.error('❌ Campaigns fetch error:', error);
     }
   };
 
@@ -222,20 +230,26 @@ export default function Profile() {
               <p className="text-gray-500">@{displayUser.username || 'guest'}</p>
               <p className="text-gray-400 text-sm">{displayUser.email}</p>
 
-              {/* ── Referral Code (with Copy) ── */}
-              {user && displayUser.referralCode && (
-                <div className="mt-2 flex items-center gap-2">
+              {/* ── Referral Code Display ── */}
+              {user && (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-medium text-gray-500">Referral Code:</span>
-                  <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded border border-gray-200">
-                    {displayUser.referralCode}
-                  </span>
-                  <button
-                    onClick={copyReferralCode}
-                    className="text-purple-600 hover:text-purple-800 transition flex items-center gap-1 text-xs"
-                  >
-                    <FiCopy className="w-3.5 h-3.5" />
-                    {copySuccess || 'Copy'}
-                  </button>
+                  {displayUser.referralCode ? (
+                    <>
+                      <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                        {displayUser.referralCode}
+                      </span>
+                      <button
+                        onClick={copyReferralCode}
+                        className="text-purple-600 hover:text-purple-800 transition flex items-center gap-1 text-xs"
+                      >
+                        <FiCopy className="w-3.5 h-3.5" />
+                        {copySuccess || 'Copy'}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-sm text-gray-400">No code yet</span>
+                  )}
                 </div>
               )}
 
