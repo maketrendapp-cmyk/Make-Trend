@@ -450,6 +450,73 @@ router.get('/auth/referrals', verifyToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// SUPPORT TICKETS
+// ============================================================
+
+// GET user's support tickets (Protected)
+router.get('/support', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const snapshot = await db.collection('supportTickets')
+      .where('userId', '==', uid)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const tickets = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      tickets.push({
+        id: doc.id,
+        title: data.title || '',
+        description: data.description || '',
+        image: data.image || '',
+        status: data.status || 'open',
+        createdAt: data.createdAt || null,
+        updatedAt: data.updatedAt || null,
+      });
+    });
+
+    res.json({ success: true, tickets });
+  } catch (error) {
+    console.error('Get support tickets error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tickets' });
+  }
+});
+
+// POST create support ticket (Protected)
+router.post('/support', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { title, description, image } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Title is required' });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({ success: false, error: 'Description is required' });
+    }
+
+    const ticketData = {
+      userId: uid,
+      title: title.trim(),
+      description: description.trim(),
+      image: image || '',
+      status: 'open',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('supportTickets').add(ticketData);
+    const newTicket = { id: docRef.id, ...ticketData };
+
+    res.status(201).json({ success: true, ticket: newTicket });
+  } catch (error) {
+    console.error('Create support ticket error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create ticket' });
+  }
+});
+
 
 
 router.post('/auth/set-admin', async (req, res) => {
