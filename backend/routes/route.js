@@ -218,6 +218,9 @@ router.post('/auth/complete-social', verifyToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// GET USER PROFILE + DASHBOARD STATS (Merged) – Protected
+// ============================================================
 router.get('/auth/me', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -227,7 +230,26 @@ router.get('/auth/me', verifyToken, async (req, res) => {
     }
     const userData = doc.data();
     delete userData.deviceFingerprint;
-    res.json({ success: true, user: { uid, ...userData } });
+
+    // ── Compute referral count ──
+    let referralCount = 0;
+    if (userData.referralCode) {
+      const referralSnapshot = await db.collection('users')
+        .where('referredBy', '==', userData.referralCode)
+        .get();
+      referralCount = referralSnapshot.size;
+    }
+    // Or you could use a stored counter if you have one.
+
+    // ── Build response with referrals included ──
+    res.json({
+      success: true,
+      user: {
+        uid,
+        ...userData,
+        referrals: referralCount,
+      }
+    });
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -529,6 +551,7 @@ router.post('/templates/:id/usage', async (req, res) => {
 
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
 // GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
+// GET USER'S CAMPAIGNS + STATS (Protected)
 router.get('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -541,15 +564,42 @@ router.get('/campaigns', verifyToken, async (req, res) => {
       .get();
 
     const campaigns = [];
+    let totalCampaigns = 0;
+    let totalViews = 0;
+    let totalUnlocks = 0;
+    let totalShares = 0;
+    let totalCompletions = 0;
+    let activeCampaigns = 0;
+    let successfulCampaigns = 0;
+
     snapshot.forEach(doc => {
       const data = doc.data();
-      // Only exclude documents marked as 'deleted'
-      if (data.status !== 'deleted') {
-        campaigns.push({ id: doc.id, ...data });
-      }
+      // Skip deleted campaigns
+      if (data.status === 'deleted') return;
+
+      campaigns.push({ id: doc.id, ...data });
+
+      // Accumulate stats
+      totalCampaigns++;
+      totalViews += data.views || 0;
+      totalUnlocks += data.unlockCount || 0;  // field name from your increment
+      totalShares += data.shares || 0;
+      totalCompletions += data.completions || 0;
+      if (data.status === 'active') activeCampaigns++;
+      if (data.shareCount > 0 && (data.shares || 0) >= data.shareCount) successfulCampaigns++;
     });
 
-    res.json({ success: true, campaigns });
+    const stats = {
+      totalCampaigns,
+      totalViews,
+      totalUnlocks,
+      totalShares,
+      totalCompletions,
+      activeCampaigns,
+      successfulCampaigns,
+    };
+
+    res.json({ success: true, campaigns, stats });
   } catch (error) {
     console.error('Get campaigns error:', error);
     res.status(500).json({ success: false, error: error.message });
