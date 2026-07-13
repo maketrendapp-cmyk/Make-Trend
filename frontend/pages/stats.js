@@ -5,6 +5,19 @@ import { useAuth } from '../components/AuthScreen';
 import AuthScreen from '../components/AuthScreen';
 import Meta from '../components/Meta';
 import { auth } from '../services/firebase';
+import {
+  FiBarChart2,
+  FiEye,
+  FiUnlock,
+  FiShare2,
+  FiCheckCircle,
+  FiAward,
+  FiPlusCircle,
+  FiEdit2,
+  FiTrash2,
+  FiClock,
+} from 'react-icons/fi';
+import { FaCrown } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -13,7 +26,18 @@ export default function Stats() {
   const router = useRouter();
   const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
+  const [stats, setStats] = useState({
+    totalCampaigns: 0,
+    totalViews: 0,
+    totalUnlocks: 0,
+    totalShares: 0,
+    totalCompletions: 0,
+    activeCampaigns: 0,
+    successfulCampaigns: 0,
+  });
   const [statsLoading, setStatsLoading] = useState(true);
+
+  // ── Edit modal states ──
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -26,7 +50,7 @@ export default function Stats() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  // ===== FETCH CAMPAIGNS =====
+  // ===== FETCH CAMPAIGNS & STATS =====
   const fetchCampaigns = useCallback(async () => {
     try {
       setStatsLoading(true);
@@ -37,7 +61,7 @@ export default function Stats() {
       }
       const token = await firebaseUser.getIdToken();
       const res = await fetch(`${API_BASE}/campaigns`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) {
@@ -48,6 +72,28 @@ export default function Stats() {
       const data = await res.json();
       if (data.success) {
         setCampaigns(data.campaigns || []);
+        if (data.stats) {
+          setStats(data.stats);
+        } else {
+          // fallback: compute from campaigns (should not happen if backend is updated)
+          const campaigns = data.campaigns || [];
+          const totalViews = campaigns.reduce((s, c) => s + (c.views || 0), 0);
+          const totalUnlocks = campaigns.reduce((s, c) => s + (c.unlockCount || 0), 0);
+          const totalShares = campaigns.reduce((s, c) => s + (c.shares || 0), 0);
+          const totalCompletions = campaigns.reduce((s, c) => s + (c.completions || 0), 0);
+          const successfulCampaigns = campaigns.filter(
+            (c) => c.shareCount > 0 && c.shares >= c.shareCount
+          ).length;
+          setStats({
+            totalCampaigns: campaigns.length,
+            totalViews,
+            totalUnlocks,
+            totalShares,
+            totalCompletions,
+            activeCampaigns: campaigns.filter((c) => c.status === 'active').length,
+            successfulCampaigns,
+          });
+        }
       } else {
         throw new Error(data.error || 'Unknown API error');
       }
@@ -66,20 +112,15 @@ export default function Stats() {
     }
   }, [isAuthenticated, needsCompletion, fetchCampaigns]);
 
-  // ===== ROBUST DATE FORMATTER =====
+  // ===== DATE FORMATTER =====
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      if (timestamp.toDate) {
-        date = timestamp.toDate();
-      } else if (timestamp.seconds !== undefined) {
-        date = new Date(timestamp.seconds * 1000);
-      } else if (typeof timestamp === 'number') {
-        date = new Date(timestamp);
-      } else {
-        date = new Date(timestamp);
-      }
+      if (timestamp.toDate) date = timestamp.toDate();
+      else if (timestamp.seconds !== undefined) date = new Date(timestamp.seconds * 1000);
+      else if (typeof timestamp === 'number') date = new Date(timestamp);
+      else date = new Date(timestamp);
       if (isNaN(date.getTime())) return 'N/A';
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -122,9 +163,11 @@ export default function Stats() {
       });
       const data = await res.json();
       if (data.success) {
-        setCampaigns(campaigns.filter(c => c.id !== campaignId));
+        setCampaigns(campaigns.filter((c) => c.id !== campaignId));
         setMessage('✅ Campaign deleted successfully!');
         setTimeout(() => setMessage(''), 3000);
+        // re‑fetch to update stats
+        await fetchCampaigns();
       } else {
         alert(data.error || 'Failed to delete campaign');
       }
@@ -194,9 +237,9 @@ export default function Stats() {
       setMessage('Maximum 100 tasks allowed');
       return;
     }
-    setEditForm(prev => ({
+    setEditForm((prev) => ({
       ...prev,
-      tasks: [...prev.tasks, { text: '', url: '' }]
+      tasks: [...prev.tasks, { text: '', url: '' }],
     }));
   };
 
@@ -205,26 +248,17 @@ export default function Stats() {
       setMessage('At least one task is required if tasks are enabled');
       return;
     }
-    setEditForm(prev => ({
+    setEditForm((prev) => ({
       ...prev,
-      tasks: prev.tasks.filter((_, i) => i !== index)
+      tasks: prev.tasks.filter((_, i) => i !== index),
     }));
   };
 
   const updateTaskInEdit = (index, field, value) => {
     const updated = [...editForm.tasks];
     updated[index][field] = value;
-    setEditForm(prev => ({ ...prev, tasks: updated }));
+    setEditForm((prev) => ({ ...prev, tasks: updated }));
   };
-
-  // ===== AGGREGATED STATS =====
-  const totalViews = campaigns.reduce((sum, c) => sum + (c.views || 0), 0);
-  const totalUnlocks = campaigns.reduce((sum, c) => sum + (c.unlockCount || 0), 0);
-  const totalCompletions = campaigns.reduce((sum, c) => sum + (c.completions || 0), 0);
-  const totalShares = campaigns.reduce((sum, c) => sum + (c.shares || 0), 0);
-  const successfulCampaigns = campaigns.filter(c =>
-    c.shareCount > 0 && c.shares >= c.shareCount
-  ).length;
 
   // ===== SKELETON LOADING =====
   if (loading) {
@@ -290,33 +324,33 @@ export default function Stats() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">📊 Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-500 text-sm mt-0.5">Overview of all your campaigns</p>
           </div>
           <button
             onClick={handleCreateCampaign}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md text-sm whitespace-nowrap"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+            <FiPlusCircle className="w-4 h-4" />
             New Campaign
           </button>
         </div>
 
-        {/* ===== STATS BUBBLE CARDS (Active removed) ===== */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        {/* ===== STATS CARDS ===== */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Campaigns', value: campaigns.length, icon: '📊', color: 'bg-blue-50 text-blue-600 border-blue-100' },
-            { label: 'Total Unlocks', value: totalUnlocks, icon: '🔓', color: 'bg-purple-50 text-purple-600 border-purple-100' },
-            { label: 'Total Views', value: totalViews, icon: '👁️', color: 'bg-green-50 text-green-600 border-green-100' },
-            { label: 'Total Shares', value: totalShares, icon: '📤', color: 'bg-orange-50 text-orange-600 border-orange-100' },
+            { label: 'Total Campaigns', value: stats.totalCampaigns, icon: FiBarChart2, color: 'blue' },
+            { label: 'Total Unlocks', value: stats.totalUnlocks, icon: FiUnlock, color: 'purple' },
+            { label: 'Total Views', value: stats.totalViews, icon: FiEye, color: 'green' },
+            { label: 'Total Shares', value: stats.totalShares, icon: FiShare2, color: 'orange' },
           ].map((stat, idx) => (
             <div
               key={idx}
-              className="rounded-2xl p-4 sm:p-5 border text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200 bg-white"
+              className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200"
             >
-              <div className="text-3xl sm:text-4xl mb-1">{stat.icon}</div>
+              <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-${stat.color}-50 text-${stat.color}-600 mb-2`}>
+                <stat.icon className="w-5 h-5" />
+              </div>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">{stat.value}</p>
               <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</p>
             </div>
@@ -324,25 +358,29 @@ export default function Stats() {
         </div>
 
         {/* Success Stats Row */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 sm:p-5 border border-green-100 text-center">
-            <div className="text-2xl sm:text-3xl mb-1">✅</div>
-            <p className="text-xl sm:text-2xl font-bold text-green-700">{successfulCampaigns}</p>
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-green-100 text-green-700 mb-2">
+              <FiCheckCircle className="w-5 h-5" />
+            </div>
+            <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.successfulCampaigns}</p>
             <p className="text-[10px] sm:text-xs font-medium text-green-600 uppercase tracking-wide">Completed Campaigns</p>
           </div>
           <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-4 sm:p-5 border border-indigo-100 text-center">
-            <div className="text-2xl sm:text-3xl mb-1">🏆</div>
-            <p className="text-xl sm:text-2xl font-bold text-indigo-700">{totalCompletions}</p>
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 mb-2">
+              <FiAward className="w-5 h-5" />
+            </div>
+            <p className="text-xl sm:text-2xl font-bold text-indigo-700">{stats.totalCompletions}</p>
             <p className="text-[10px] sm:text-xs font-medium text-indigo-600 uppercase tracking-wide">Total Completions</p>
           </div>
         </div>
 
-        {/* ===== CAMPAIGN LIST (Enhanced) ===== */}
-        <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border bg-gray-50/50">
+        {/* ===== CAMPAIGN LIST ===== */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50">
             <div className="flex items-center justify-between">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">Your Campaigns</h3>
-              <span className="text-xs text-gray-400 bg-white px-3 py-1 rounded-full border border-border">
+              <span className="text-xs text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-100">
                 {campaigns.length} total
               </span>
             </div>
@@ -351,7 +389,7 @@ export default function Stats() {
           {statsLoading ? (
             <div className="p-4 space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse flex flex-col sm:flex-row justify-between gap-3 p-4 border-b border-border last:border-0">
+                <div key={i} className="animate-pulse flex flex-col sm:flex-row justify-between gap-3 p-4 border-b border-gray-100 last:border-0">
                   <div className="flex-1">
                     <div className="h-5 w-3/4 bg-gray-200 rounded mb-1" />
                     <div className="flex flex-wrap gap-2">
@@ -379,7 +417,7 @@ export default function Stats() {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-gray-100">
               {campaigns.map((camp) => {
                 const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
                 return (
@@ -408,19 +446,24 @@ export default function Stats() {
                         {/* Stats row with icons */}
                         <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
-                            🔓 <span className="font-medium text-gray-700">{camp.unlockCount || 0}</span> unlocks
+                            <FiUnlock className="w-3 h-3" />
+                            <span className="font-medium text-gray-700">{camp.unlockCount || 0}</span> unlocks
                           </span>
                           <span className="flex items-center gap-1">
-                            👁️ <span className="font-medium text-gray-700">{camp.views || 0}</span> views
+                            <FiEye className="w-3 h-3" />
+                            <span className="font-medium text-gray-700">{camp.views || 0}</span> views
                           </span>
                           <span className="flex items-center gap-1">
-                            📤 <span className="font-medium text-gray-700">{camp.shares || 0}</span> shares
+                            <FiShare2 className="w-3 h-3" />
+                            <span className="font-medium text-gray-700">{camp.shares || 0}</span> shares
                           </span>
                           <span className="flex items-center gap-1">
-                            ✅ <span className="font-medium text-gray-700">{camp.completions || 0}</span> completions
+                            <FiCheckCircle className="w-3 h-3" />
+                            <span className="font-medium text-gray-700">{camp.completions || 0}</span> completions
                           </span>
-                          <span className="text-gray-400">
-                            📅 {formatDate(camp.createdAt)}
+                          <span className="text-gray-400 flex items-center gap-1">
+                            <FiClock className="w-3 h-3" />
+                            {formatDate(camp.createdAt)}
                           </span>
                         </div>
 
@@ -444,15 +487,15 @@ export default function Stats() {
                       <div className="flex flex-wrap gap-1.5 sm:gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleEditCampaign(camp)}
-                          className="inline-flex items-center justify-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
+                          className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
                         >
-                          Edit
+                          <FiEdit2 className="w-3.5 h-3.5" /> Edit
                         </button>
                         <button
                           onClick={() => handleDeleteCampaign(camp.id)}
-                          className="inline-flex items-center justify-center px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
+                          className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
                         >
-                          Delete
+                          <FiTrash2 className="w-3.5 h-3.5" /> Delete
                         </button>
                       </div>
                     </div>
@@ -464,11 +507,11 @@ export default function Stats() {
         </div>
       </main>
 
-      {/* ===== EDIT MODAL (unchanged) ===== */}
+      {/* ===== EDIT MODAL ===== */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
-            <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex items-center justify-between">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Edit Campaign</h2>
               <button
                 onClick={closeModal}
@@ -496,7 +539,7 @@ export default function Stats() {
                   type="text"
                   value={editForm.title}
                   onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                   placeholder="Campaign title"
                 />
               </div>
@@ -525,7 +568,7 @@ export default function Stats() {
                     onChange={(e) => setEditForm(prev => ({ ...prev, shareCount: Number(e.target.value) }))}
                     min="1"
                     max="9999"
-                    className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                     placeholder="Number of shares required"
                   />
                 )}
@@ -551,18 +594,18 @@ export default function Stats() {
                 {editForm.features.tasks && (
                   <div className="space-y-3">
                     {editForm.tasks.map((task, index) => (
-                      <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-gray-50 rounded-xl border border-border">
+                      <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
                         <input
                           value={task.text}
                           onChange={(e) => updateTaskInEdit(index, 'text', e.target.value)}
                           placeholder="Task text"
-                          className="border border-border rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                         />
                         <input
                           value={task.url}
                           onChange={(e) => updateTaskInEdit(index, 'url', e.target.value)}
                           placeholder="Task URL"
-                          className="border border-border rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                         />
                         <button
                           type="button"
@@ -577,7 +620,7 @@ export default function Stats() {
                       <button
                         type="button"
                         onClick={addTaskInEdit}
-                        className="w-full py-2 border-2 border-dashed border-border rounded-xl text-sm text-gray-500 hover:text-primary hover:border-primary/50 transition"
+                        className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:text-primary hover:border-primary/50 transition"
                       >
                         + Add Task
                       </button>
@@ -608,13 +651,13 @@ export default function Stats() {
                     type="url"
                     value={editForm.finalUrl}
                     onChange={(e) => setEditForm(prev => ({ ...prev, finalUrl: e.target.value }))}
-                    className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                     placeholder="https://your-site.com/thank-you"
                   />
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-border">
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="submit"
                   disabled={isSubmitting}
