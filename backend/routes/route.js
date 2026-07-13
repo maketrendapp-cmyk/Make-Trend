@@ -380,6 +380,76 @@ router.put('/auth/profile', verifyToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// GET REFERRED USERS (Protected)
+// ============================================================
+router.get('/auth/referrals', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    // Get current user's referral code
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = userDoc.data();
+    const referralCode = userData.referralCode;
+
+    if (!referralCode) {
+      return res.json({ success: true, referrals: [], referrer: null });
+    }
+
+    // Find users who used this referral code
+    const snapshot = await db.collection('users')
+      .where('referredBy', '==', referralCode)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const referredUsers = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      referredUsers.push({
+        uid: doc.id,
+        username: data.username || '',
+        fullname: data.fullname || '',
+        email: data.email || '',
+        avatar: data.avatar || '',
+        createdAt: data.createdAt || null,
+      });
+    });
+
+    // Also find who referred the current user (if any)
+    let referrer = null;
+    if (userData.referredBy) {
+      const referrerDoc = await db.collection('users')
+        .where('referralCode', '==', userData.referredBy)
+        .limit(1)
+        .get();
+      if (!referrerDoc.empty) {
+        const refData = referrerDoc.docs[0].data();
+        referrer = {
+          uid: referrerDoc.docs[0].id,
+          username: refData.username || '',
+          fullname: refData.fullname || '',
+          email: refData.email || '',
+          avatar: refData.avatar || '',
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      referralCode,
+      totalReferrals: referredUsers.length,
+      referredUsers,
+      referrer,
+    });
+  } catch (error) {
+    console.error('Get referrals error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch referrals' });
+  }
+});
+
 
 
 router.post('/auth/set-admin', async (req, res) => {
