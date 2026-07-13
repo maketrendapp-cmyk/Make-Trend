@@ -218,9 +218,6 @@ router.post('/auth/complete-social', verifyToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// GET USER PROFILE + DASHBOARD STATS (Merged) – Protected
-// ============================================================
 router.get('/auth/me', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -230,26 +227,7 @@ router.get('/auth/me', verifyToken, async (req, res) => {
     }
     const userData = doc.data();
     delete userData.deviceFingerprint;
-
-    // ── Compute referral count ──
-    let referralCount = 0;
-    if (userData.referralCode) {
-      const referralSnapshot = await db.collection('users')
-        .where('referredBy', '==', userData.referralCode)
-        .get();
-      referralCount = referralSnapshot.size;
-    }
-    // Or you could use a stored counter if you have one.
-
-    // ── Build response with referrals included ──
-    res.json({
-      success: true,
-      user: {
-        uid,
-        ...userData,
-        referrals: referralCount,
-      }
-    });
+    res.json({ success: true, user: { uid, ...userData } });
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -308,6 +286,101 @@ router.get('/auth/profile', async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
   }
 });
+
+// ============================================================
+// UPDATE USER PROFILE (Protected)
+// ============================================================
+router.put('/auth/profile', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { username, fullname, email, avatar } = req.body;
+
+    // Sanitise
+    const cleanUsername = sanitizeUsername(username);
+    const cleanFullname = sanitizeFullName(fullname);
+    const cleanEmail = email?.trim().toLowerCase();
+
+    // Basic validation
+    if (!cleanUsername || !cleanFullname || !cleanEmail) {
+      return res.status(400).json({ success: false, error: 'All fields are required' });
+    }
+    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+      return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
+    }
+    if (cleanFullname.length < 2 || cleanFullname.length > 100) {
+      return res.status(400).json({ success: false, error: 'Full name must be 2-100 characters' });
+    }
+    if (!cleanEmail.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Invalid email' });
+    }
+
+    // Fetch current user document
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const currentData = userDoc.data();
+
+    // ── Check username uniqueness ──
+    if (cleanUsername !== currentData.username) {
+      const existingUsername = await db.collection('users')
+        .where('username', '==', cleanUsername)
+        .limit(1)
+        .get();
+      if (!existingUsername.empty) {
+        return res.status(409).json({ success: false, error: 'Username already taken' });
+      }
+    }
+
+    // ── Check email uniqueness ──
+    if (cleanEmail !== currentData.email) {
+      const existingEmail = await db.collection('users')
+        .where('email', '==', cleanEmail)
+        .limit(1)
+        .get();
+      if (!existingEmail.empty) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
+
+      // Also update Firebase Auth email (requires re‑authentication for sensitive actions)
+      // We'll attempt it – if it fails, we'll still update the Firestore doc? Better to fail early.
+      try {
+        await admin.auth().updateUser(uid, { email: cleanEmail });
+      } catch (authError) {
+        console.error('Firebase Auth email update error:', authError);
+        return res.status(400).json({
+          success: false,
+          error: 'Failed to update email. You may need to re‑authenticate.'
+        });
+      }
+    }
+
+    // ── Update Firestore ──
+    const updateData = {
+      username: cleanUsername,
+      fullname: cleanFullname,
+      email: cleanEmail,
+      avatar: avatar || currentData.avatar || '',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await db.collection('users').doc(uid).update(updateData);
+
+    // Fetch updated document
+    const updatedDoc = await db.collection('users').doc(uid).get();
+    const updatedUser = updatedDoc.data();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: { uid, ...updatedUser },
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update profile' });
+  }
+});
+
+
 
 router.post('/auth/set-admin', async (req, res) => {
   try {
@@ -551,7 +624,6 @@ router.post('/templates/:id/usage', async (req, res) => {
 
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
 // GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
-// GET USER'S CAMPAIGNS + STATS (Protected)
 router.get('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -564,42 +636,15 @@ router.get('/campaigns', verifyToken, async (req, res) => {
       .get();
 
     const campaigns = [];
-    let totalCampaigns = 0;
-    let totalViews = 0;
-    let totalUnlocks = 0;
-    let totalShares = 0;
-    let totalCompletions = 0;
-    let activeCampaigns = 0;
-    let successfulCampaigns = 0;
-
     snapshot.forEach(doc => {
       const data = doc.data();
-      // Skip deleted campaigns
-      if (data.status === 'deleted') return;
-
-      campaigns.push({ id: doc.id, ...data });
-
-      // Accumulate stats
-      totalCampaigns++;
-      totalViews += data.views || 0;
-      totalUnlocks += data.unlockCount || 0;  // field name from your increment
-      totalShares += data.shares || 0;
-      totalCompletions += data.completions || 0;
-      if (data.status === 'active') activeCampaigns++;
-      if (data.shareCount > 0 && (data.shares || 0) >= data.shareCount) successfulCampaigns++;
+      // Only exclude documents marked as 'deleted'
+      if (data.status !== 'deleted') {
+        campaigns.push({ id: doc.id, ...data });
+      }
     });
 
-    const stats = {
-      totalCampaigns,
-      totalViews,
-      totalUnlocks,
-      totalShares,
-      totalCompletions,
-      activeCampaigns,
-      successfulCampaigns,
-    };
-
-    res.json({ success: true, campaigns, stats });
+    res.json({ success: true, campaigns });
   } catch (error) {
     console.error('Get campaigns error:', error);
     res.status(500).json({ success: false, error: error.message });
