@@ -218,19 +218,75 @@ router.post('/auth/complete-social', verifyToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// GET USER PROFILE + DASHBOARD STATS (Merged) – Protected
+// ============================================================
 router.get('/auth/me', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const doc = await db.collection('users').doc(uid).get();
-    if (!doc.exists) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+
+    // 1️⃣ Fetch user profile
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    const userData = doc.data();
-    delete userData.deviceFingerprint;
-    res.json({ success: true, user: { uid, ...userData } });
+    const userData = userDoc.data();
+
+    // 2️⃣ Fetch all campaigns for this user (excluding deleted)
+    const snapshot = await db.collection('campaigns')
+      .where('userId', '==', uid)
+      .get();
+
+    let totalCampaigns = 0;
+    let totalViews = 0;
+    let totalUnlocks = 0;
+    let totalShares = 0;
+    let totalCompletions = 0;
+    let activeCampaigns = 0;
+    let successfulCampaigns = 0;
+    let totalReferrals = 0;
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.status === 'deleted') return; // skip deleted
+
+      totalCampaigns++;
+      totalViews += data.views || 0;
+      totalUnlocks += data.unlockCount || 0;        // adjust field name if needed
+      totalShares += data.shares || 0;
+      totalCompletions += data.completions || 0;
+      if (data.status === 'active') activeCampaigns++;
+      if (data.shareCount > 0 && (data.shares || 0) >= data.shareCount) successfulCampaigns++;
+      totalReferrals += data.referrals || 0;        // if you store referrals per campaign
+    });
+
+    // 3️⃣ Combine profile + stats
+    const response = {
+      success: true,
+      user: {
+        uid: uid,
+        username: userData.username || '',
+        fullName: userData.fullName || '',
+        email: userData.email || '',
+        profilePic: userData.profilePic || '',
+        isPro: userData.isPro || false,
+        referrals: userData.referrals || totalReferrals || 0,
+      },
+      stats: {
+        totalCampaigns,
+        totalViews,
+        totalUnlocks,
+        totalShares,
+        totalCompletions,
+        activeCampaigns,
+        successfulCampaigns,
+      },
+    };
+
+    res.json(response);
   } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch profile' });
+    console.error('❌ /auth/me error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
