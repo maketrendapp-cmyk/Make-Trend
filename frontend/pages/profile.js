@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import axios from 'axios';
 import {
   FiSettings, FiLock, FiCreditCard, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
@@ -28,6 +27,9 @@ export default function Profile() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+
+  // ── Copy referral code ──
   const copyReferralCode = () => {
     const code = profile?.referralCode || '';
     if (!code) return;
@@ -35,7 +37,6 @@ export default function Profile() {
       setCopySuccess('✅ Copied!');
       setTimeout(() => setCopySuccess(''), 2000);
     }).catch(() => {
-      // fallback
       const textArea = document.createElement('textarea');
       textArea.value = code;
       document.body.appendChild(textArea);
@@ -47,16 +48,36 @@ export default function Profile() {
     });
   };
 
-  // ── Fetch profile ──
+  // ── Fetch profile using fetch (not axios) ──
   const fetchProfile = async () => {
     try {
-      const token = await user.getIdToken();
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      console.log('🔵 Profile API response:', res.data); // DEBUG
-      const data = res.data;
+      // 1) Check user object
+      if (!user) {
+        console.warn('⏳ No user object yet');
+        return;
+      }
+      console.log('👤 User object:', user);
+
+      // 2) Get token
+      let token;
+      try {
+        token = await user.getIdToken();
+        console.log('✅ Token obtained:', token.substring(0, 10) + '...');
+      } catch (tokenErr) {
+        console.error('❌ getIdToken failed:', tokenErr);
+        return;
+      }
+
+      // 3) Fetch
+      const url = `${API_BASE}/api/auth/me`;
+      console.log('📡 Fetching profile from:', url);
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log('📡 Response status:', res.status);
+      const data = await res.json();
+      console.log('🔵 Profile API response:', data);
+
       if (data.success && data.user) {
         setProfile({
           uid: data.user.uid || user.uid,
@@ -70,7 +91,7 @@ export default function Profile() {
         });
       } else {
         console.warn('⚠️ Profile API returned success=false or missing user:', data);
-        // fallback to Firebase
+        // fallback
         setProfile({
           uid: user.uid,
           username: user.displayName || user.email?.split('@')[0] || 'user',
@@ -83,14 +104,14 @@ export default function Profile() {
         });
       }
     } catch (error) {
-      console.error('❌ Profile fetch error:', error); // Log full error
+      console.error('❌ Profile fetch error:', error);
       // fallback
       setProfile({
-        uid: user.uid,
-        username: user.displayName || user.email?.split('@')[0] || 'user',
-        fullName: user.displayName || user.email || 'User',
-        email: user.email,
-        profilePic: user.photoURL || null,
+        uid: user?.uid || '',
+        username: user?.displayName || user?.email?.split('@')[0] || 'user',
+        fullName: user?.displayName || user?.email || 'User',
+        email: user?.email || '',
+        profilePic: user?.photoURL || null,
         isPro: false,
         referrals: 0,
         referralCode: '',
@@ -98,18 +119,24 @@ export default function Profile() {
     }
   };
 
-  // ── Fetch campaigns + stats ──
+  // ── Fetch campaigns using fetch ──
   const fetchCampaignsStats = async () => {
     try {
+      if (!user) {
+        console.warn('⏳ No user object for campaigns');
+        return;
+      }
       const token = await user.getIdToken();
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/campaigns`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      console.log('🟢 Campaigns API response:', res.data); // DEBUG
-      const data = res.data;
+      const url = `${API_BASE}/api/campaigns`;
+      console.log('📡 Fetching campaigns from:', url);
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log('📡 Campaigns status:', res.status);
+      const data = await res.json();
+      console.log('🟢 Campaigns API response:', data);
+
       if (data.success) {
-        // Use backend stats if available
         if (data.stats) {
           setStats(data.stats);
         } else {
@@ -157,6 +184,7 @@ export default function Profile() {
     }
   };
 
+  // ── Fallback display user ──
   const displayUser = profile || {
     username: 'guest',
     fullName: 'Guest User',
@@ -230,7 +258,7 @@ export default function Profile() {
               <p className="text-gray-500">@{displayUser.username || 'guest'}</p>
               <p className="text-gray-400 text-sm">{displayUser.email}</p>
 
-              {/* ── Referral Code Display ── */}
+              {/* ── Referral Code ── */}
               {user && (
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-medium text-gray-500">Referral Code:</span>
