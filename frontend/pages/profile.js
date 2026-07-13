@@ -1,12 +1,17 @@
-// pages/profile.js
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useUserAuth } from '../components/UserContext';
+import { useAuth } from '../components/AuthScreen';   // 👈 your existing auth hook
 import axios from 'axios';
-import { FiUser, FiSettings, FiLock, FiCreditCard, FiHelpCircle, FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle, FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp } from 'react-icons/fi';
+import {
+  FiUser, FiSettings, FiLock, FiCreditCard, FiHelpCircle,
+  FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
+  FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp
+} from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
+
+// Alias to keep the rest of the code clean
+const useUserAuth = useAuth;
 
 export default function Profile() {
   const router = useRouter();
@@ -20,7 +25,6 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Fetch user campaign stats
   useEffect(() => {
     if (user) {
       fetchUserStats();
@@ -33,15 +37,14 @@ export default function Profile() {
     try {
       setLoading(true);
       const token = await user.getIdToken();
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/campaigns`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/campaigns`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       const campaigns = response.data.campaigns || [];
       const totalViews = campaigns.reduce((sum, c) => sum + (c.views || 0), 0);
       const totalUnlocks = campaigns.reduce((sum, c) => sum + (c.unlocks || 0), 0);
       const totalReferrals = campaigns.reduce((sum, c) => sum + (c.referrals || 0), 0);
-
       setCampaignStats({
         total: campaigns.length,
         views: totalViews,
@@ -65,7 +68,7 @@ export default function Profile() {
     }
   };
 
-  // Dummy user data if not logged in
+  // Fallback for non‑logged‑in users
   const displayUser = user || {
     displayName: 'Guest User',
     email: 'guest@example.com',
@@ -73,7 +76,7 @@ export default function Profile() {
     isPro: false,
   };
 
-  // Navigation items
+  // ── Navigation items ──
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile', color: 'blue' },
     { icon: FiLock, label: 'Change Password', href: '/change-password', color: 'purple' },
@@ -105,18 +108,15 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+
         {/* Profile Header */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
-            {/* Profile Picture */}
+            {/* Avatar */}
             <div className="relative">
               <div className="w-24 h-24 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center text-white text-4xl font-bold overflow-hidden">
                 {displayUser.photoURL ? (
-                  <img
-                    src={displayUser.photoURL}
-                    alt={displayUser.displayName}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={displayUser.photoURL} alt={displayUser.displayName} className="w-full h-full object-cover" />
                 ) : (
                   displayUser.displayName?.charAt(0).toUpperCase() || 'G'
                 )}
@@ -135,20 +135,16 @@ export default function Profile() {
                   {displayUser.displayName || 'Guest User'}
                 </h1>
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  displayUser.isPro 
-                    ? 'bg-yellow-100 text-yellow-700' 
-                    : 'bg-gray-100 text-gray-600'
+                  displayUser.isPro ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
                 }`}>
                   {displayUser.isPro ? 'PRO' : 'FREE'}
                 </span>
               </div>
               <p className="text-gray-500 mt-1">{displayUser.email || 'guest@example.com'}</p>
-              {!user && (
-                <p className="text-sm text-gray-400 mt-2">Sign in to access your dashboard</p>
-              )}
+              {!user && <p className="text-sm text-gray-400 mt-2">Sign in to access your dashboard</p>}
             </div>
 
-            {/* Login/Logout Button */}
+            {/* Login / Logout Button */}
             {!user ? (
               <Link href="/login">
                 <button className="px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
@@ -167,7 +163,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid (only when logged in) */}
         {user && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             {userStats.map((stat, index) => (
@@ -184,7 +180,7 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Quick Actions Grid */}
+        {/* Quick Actions */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -215,7 +211,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Refer & Affiliates (Logged In Only) */}
+        {/* Refer & Affiliates (logged in only) */}
         {user && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Refer & Affiliates</h2>
