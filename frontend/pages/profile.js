@@ -175,7 +175,7 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
-  // ✅ Quick Actions – removed Billing & Subscription
+  // ✅ Quick Actions – removed Billing & Subscription and Logout
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -254,7 +254,6 @@ export default function Profile() {
     );
   }
 
-  // ===== RENDER ACTUAL PAGE =====
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
