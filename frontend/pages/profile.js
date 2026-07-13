@@ -1,50 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useAuth } from '../components/AuthScreen';
+import { useAuth } from '../components/AuthScreen';   // adjust path if needed
 import axios from 'axios';
 import {
-  FiUser, FiSettings, FiLock, FiCreditCard, FiHelpCircle,
+  FiSettings, FiLock, FiCreditCard, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
   FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
-const useUserAuth = useAuth;
+const useUserAuth = useAuth; // alias to keep code clean
 
 export default function Profile() {
   const router = useRouter();
   const { user, logout } = useUserAuth();
-  const [profileData, setProfileData] = useState(null);
-  const [campaignStats, setCampaignStats] = useState({
-    total: 0,
-    views: 0,
-    unlocks: 0,
-    referrals: 0,
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({
+    totalCampaigns: 0,
+    totalViews: 0,
+    totalUnlocks: 0,
+    totalShares: 0,
+    totalCompletions: 0,
+    activeCampaigns: 0,
+    successfulCampaigns: 0,
   });
   const [loading, setLoading] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // ── Fetch user profile (includes referrals, username, etc.) ──
-  const fetchUserProfile = async () => {
+  // ── Fetch all data from merged endpoint ──
+  const fetchAllData = async () => {
     try {
+      setLoading(true);
       const token = await user.getIdToken();
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const userData = res.data.user; // adjust if structure differs
-      setProfileData(userData);
-      // Immediately set referrals from profile
-      setCampaignStats(prev => ({
-        ...prev,
-        referrals: userData.referrals || userData.totalReferrals || 0
-      }));
-      return userData;
+      const data = res.data;
+      setProfile(data.user);
+      setStats(data.stats);
     } catch (error) {
-      console.error('Profile fetch error:', error);
-      // fallback
-      setProfileData({
+      console.error('Error fetching profile:', error);
+      // fallback to Firebase user data
+      setProfile({
         username: user.displayName || 'User',
         fullName: user.displayName || 'User',
         email: user.email,
@@ -52,44 +51,14 @@ export default function Profile() {
         isPro: false,
         referrals: 0,
       });
-    }
-  };
-
-  // ── Fetch user campaigns (for counts, views, unlocks) ──
-  const fetchUserCampaigns = async () => {
-    try {
-      const token = await user.getIdToken();
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/campaigns`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const campaigns = res.data.campaigns || [];
-      // Sum views (try multiple possible field names)
-      const totalViews = campaigns.reduce((sum, c) => {
-        return sum + (c.views || c.shareCount || c.impressions || 0);
-      }, 0);
-      const totalUnlocks = campaigns.reduce((sum, c) => {
-        return sum + (c.unlocks || c.unlockCount || 0);
-      }, 0);
-
-      setCampaignStats(prev => ({
-        ...prev,
-        total: campaigns.length,
-        views: totalViews,
-        unlocks: totalUnlocks,
-        // referrals is already set from profile, keep it
-      }));
-      return campaigns;
-    } catch (error) {
-      console.error('Campaigns fetch error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     if (user) {
-      setLoading(true);
-      Promise.all([fetchUserProfile(), fetchUserCampaigns()])
-        .finally(() => setLoading(false));
+      fetchAllData();
     } else {
       setLoading(false);
     }
@@ -105,8 +74,8 @@ export default function Profile() {
     }
   };
 
-  // ── Display user data ──
-  const displayUser = profileData || {
+  // ── Fallback for guest state ──
+  const displayUser = profile || {
     username: 'Guest',
     fullName: 'Guest User',
     email: user?.email || 'guest@example.com',
@@ -115,22 +84,20 @@ export default function Profile() {
     referrals: 0,
   };
 
-  // ── Stats grid items ──
   const statsItems = [
-    { icon: FiTrendingUp, label: 'Campaigns Created', value: campaignStats.total },
-    { icon: FiEye, label: 'Total Views', value: campaignStats.views },
-    { icon: FiUnlock, label: 'Total Unlocks', value: campaignStats.unlocks },
-    { icon: FiUsers, label: 'Referrals', value: campaignStats.referrals },
+    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats.totalCampaigns },
+    { icon: FiEye, label: 'Total Views', value: stats.totalViews },
+    { icon: FiUnlock, label: 'Total Unlocks', value: stats.totalUnlocks },
+    { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
   // ── Navigation arrays ──
   const quickActions = [
-    { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile', color: 'blue' },
-    { icon: FiLock, label: 'Change Password', href: '/change-password', color: 'purple' },
-    { icon: FiCreditCard, label: 'Billing & Subscription', href: '/billing', color: 'green' },
-    { icon: FiHelpCircle, label: 'Support', href: '/support', color: 'red' },
-    { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn', color: 'orange' },
-    { icon: FiLogOut, label: 'Logout', href: '#', color: 'gray', action: true },
+    { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
+    { icon: FiLock, label: 'Change Password', href: '/change-password' },
+    { icon: FiCreditCard, label: 'Billing & Subscription', href: '/billing' },
+    { icon: FiHelpCircle, label: 'Support', href: '/support' },
+    { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
   ];
 
   const exploreOptions = [
@@ -149,7 +116,7 @@ export default function Profile() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* ── Profile Header ── */}
+        {/* ── Header ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="relative">
@@ -223,33 +190,24 @@ export default function Profile() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {quickActions.map((action, index) => (
-              <div key={index}>
-                {action.action ? (
-                  <button
-                    onClick={() => setShowLogoutModal(true)}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
-                  >
-                    <action.icon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                      {action.label}
-                    </span>
-                  </button>
-                ) : (
-                  <Link href={action.href}>
-                    <div className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg hover:bg-purple-50 transition-colors group cursor-pointer">
-                      <action.icon className={`w-5 h-5 text-${action.color}-400 group-hover:text-${action.color}-600`} />
-                      <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                        {action.label}
-                      </span>
-                    </div>
-                  </Link>
-                )}
-              </div>
+              <Link key={index} href={action.href}>
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer">
+                  <action.icon className="w-5 h-5 text-purple-500" />
+                  <span className="text-sm font-medium text-gray-700">{action.label}</span>
+                </div>
+              </Link>
             ))}
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="flex items-center gap-3 px-4 py-3 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-red-600"
+            >
+              <FiLogOut className="w-5 h-5" />
+              <span className="text-sm font-medium">Logout</span>
+            </button>
           </div>
         </div>
 
-        {/* ── Refer & Affiliates (Logged In Only) ── */}
+        {/* ── Refer & Affiliates ── */}
         {user && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Refer & Affiliates</h2>
@@ -259,7 +217,7 @@ export default function Profile() {
                 <div>
                   <p className="text-sm text-gray-500">Total Friend Referrals</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {loading ? '...' : campaignStats.referrals}
+                    {loading ? '...' : displayUser.referrals}
                   </p>
                 </div>
               </div>
@@ -280,17 +238,15 @@ export default function Profile() {
               <Link key={index} href={item.href}>
                 <div className="flex flex-col items-center gap-2 px-4 py-4 bg-gray-50 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer">
                   <item.icon className="w-6 h-6 text-purple-600" />
-                  <span className="text-sm font-medium text-gray-700 text-center">
-                    {item.label}
-                  </span>
+                  <span className="text-sm font-medium text-gray-700 text-center">{item.label}</span>
                 </div>
               </Link>
             ))}
           </div>
         </div>
 
-        {/* ── Legal Framework ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        {/* ── Legal ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Legal Framework</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {legalLinks.map((item, index) => (
@@ -309,19 +265,17 @@ export default function Profile() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6">
               <h3 className="text-xl font-bold text-gray-900 mb-2">Confirm Logout</h3>
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to log out of your account?
-              </p>
+              <p className="text-gray-600 mb-6">Are you sure you want to log out?</p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowLogoutModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                 >
                   Yes, Logout
                 </button>
