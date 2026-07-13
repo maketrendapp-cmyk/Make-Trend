@@ -27,7 +27,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // ── Fetch user profile from /api/auth/me ──
+  // ── Fetch user profile (includes referrals) ──
   const fetchProfile = async () => {
     try {
       const token = await user.getIdToken();
@@ -36,7 +36,6 @@ export default function Profile() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data;
-      console.log('📄 Profile response:', data); // DEBUG
       if (data.success && data.user) {
         setProfile({
           uid: data.user.uid || user.uid,
@@ -48,7 +47,7 @@ export default function Profile() {
           referrals: data.user.referrals || 0,
         });
       } else {
-        // Fallback to Firebase Auth
+        // fallback to Firebase Auth
         setProfile({
           uid: user.uid,
           username: user.displayName || user.email?.split('@')[0] || 'user',
@@ -73,8 +72,8 @@ export default function Profile() {
     }
   };
 
-  // ── Fetch campaigns and calculate stats manually ──
-  const fetchCampaignsAndStats = async () => {
+  // ── Fetch campaigns stats (backend already returns `stats`) ──
+  const fetchCampaignsStats = async () => {
     try {
       const token = await user.getIdToken();
       const res = await axios.get(
@@ -82,51 +81,34 @@ export default function Profile() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data;
-      console.log('📊 Campaigns response:', data); // DEBUG
-      const campaigns = data.campaigns || [];
-
-      // Calculate stats manually (backend doesn't return aggregated stats)
-      let totalCampaigns = 0;
-      let totalViews = 0;
-      let totalUnlocks = 0;
-      let totalShares = 0;
-      let totalCompletions = 0;
-      let activeCampaigns = 0;
-      let successfulCampaigns = 0;
-
-      campaigns.forEach(c => {
-        // Skip deleted campaigns (they should already be filtered, but just in case)
-        if (c.status === 'deleted') return;
-        totalCampaigns++;
-        totalViews += c.views || 0;
-        totalUnlocks += c.unlockCount || 0;   // field name from backend
-        totalShares += c.shares || 0;
-        totalCompletions += c.completions || 0;
-        if (c.status === 'active') activeCampaigns++;
-        // successful if shares >= shareCount (and shareCount > 0)
-        if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
-      });
-
-      setStats({
-        totalCampaigns,
-        totalViews,
-        totalUnlocks,
-        totalShares,
-        totalCompletions,
-        activeCampaigns,
-        successfulCampaigns,
-      });
+      if (data.success && data.stats) {
+        setStats(data.stats);
+      } else {
+        // fallback: if no stats, compute manually (just in case)
+        const campaigns = data.campaigns || [];
+        let totalCampaigns = 0, totalViews = 0, totalUnlocks = 0,
+            totalShares = 0, totalCompletions = 0, activeCampaigns = 0, successfulCampaigns = 0;
+        campaigns.forEach(c => {
+          if (c.status === 'deleted') return;
+          totalCampaigns++;
+          totalViews += c.views || 0;
+          totalUnlocks += c.unlockCount || 0;
+          totalShares += c.shares || 0;
+          totalCompletions += c.completions || 0;
+          if (c.status === 'active') activeCampaigns++;
+          if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
+        });
+        setStats({ totalCampaigns, totalViews, totalUnlocks, totalShares, totalCompletions, activeCampaigns, successfulCampaigns });
+      }
     } catch (error) {
-      console.error('Campaigns fetch error:', error);
-      // Keep stats as zeros
+      console.error('Campaigns stats fetch error:', error);
     }
   };
 
-  // ── Load both ──
   useEffect(() => {
     if (user) {
       setLoading(true);
-      Promise.all([fetchProfile(), fetchCampaignsAndStats()])
+      Promise.all([fetchProfile(), fetchCampaignsStats()])
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -143,7 +125,7 @@ export default function Profile() {
     }
   };
 
-  // ── Display user ──
+  // ── Display user data (fallback) ──
   const displayUser = profile || {
     username: 'guest',
     fullName: 'Guest User',
@@ -160,7 +142,7 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
-  // ── Quick Actions with better spacing ──
+  // ── Navigation arrays (Quick Actions with better UI) ──
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -185,7 +167,7 @@ export default function Profile() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* ── Header ── */}
+        {/* ── Profile Header ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="relative">
@@ -254,23 +236,23 @@ export default function Profile() {
           </div>
         )}
 
-        {/* ── Quick Actions (improved UI) ── */}
+        {/* ── Quick Actions (improved UI/UX) ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {quickActions.map((action, index) => (
               <Link key={index} href={action.href}>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200">
-                  <action.icon className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                  <span className="text-sm font-medium text-gray-700">{action.label}</span>
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200 hover:shadow-sm group">
+                  <action.icon className="w-5 h-5 text-purple-500 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{action.label}</span>
                 </div>
               </Link>
             ))}
             <button
               onClick={() => setShowLogoutModal(true)}
-              className="flex items-center gap-3 px-4 py-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors text-red-600 border border-transparent hover:border-red-200"
+              className="flex items-center gap-3 px-4 py-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors text-red-600 border border-transparent hover:border-red-200 hover:shadow-sm group"
             >
-              <FiLogOut className="w-5 h-5 flex-shrink-0" />
+              <FiLogOut className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium">Logout</span>
             </button>
           </div>
@@ -302,12 +284,12 @@ export default function Profile() {
         {/* ── Explore ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Explore</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {exploreOptions.map((item, index) => (
               <Link key={index} href={item.href}>
-                <div className="flex flex-col items-center gap-2 px-4 py-4 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200">
-                  <item.icon className="w-6 h-6 text-purple-600" />
-                  <span className="text-sm font-medium text-gray-700 text-center">{item.label}</span>
+                <div className="flex flex-col items-center gap-2 px-4 py-4 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200 hover:shadow-sm group">
+                  <item.icon className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-medium text-gray-700 text-center group-hover:text-gray-900">{item.label}</span>
                 </div>
               </Link>
             ))}
@@ -317,11 +299,11 @@ export default function Profile() {
         {/* ── Legal ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Legal Framework</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {legalLinks.map((item, index) => (
               <Link key={index} href={item.href}>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200">
-                  <item.icon className="w-5 h-5 text-gray-400" />
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200 hover:shadow-sm">
+                  <item.icon className="w-5 h-5 text-gray-400 group-hover:text-purple-500" />
                   <span className="text-sm font-medium text-gray-700">{item.label}</span>
                 </div>
               </Link>
@@ -338,13 +320,13 @@ export default function Profile() {
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowLogoutModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Yes, Logout
                 </button>
