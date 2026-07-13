@@ -1,7 +1,8 @@
+// pages/profile.js
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useAuth } from '../components/AuthScreen';   // adjust path if needed
+import { useAuth } from '../components/AuthScreen';
 import axios from 'axios';
 import {
   FiSettings, FiLock, FiCreditCard, FiHelpCircle,
@@ -10,11 +11,9 @@ import {
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
-const useUserAuth = useAuth; // alias to keep code clean
-
 export default function Profile() {
   const router = useRouter();
-  const { user, logout } = useUserAuth();
+  const { user, logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({
     totalCampaigns: 0,
@@ -28,37 +27,103 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // ── Fetch all data from merged endpoint ──
-  const fetchAllData = async () => {
+  // ── Fetch user profile from /api/auth/me ──
+  const fetchProfile = async () => {
     try {
-      setLoading(true);
       const token = await user.getIdToken();
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data;
-      setProfile(data.user);
-      setStats(data.stats);
+      if (data.success && data.user) {
+        setProfile({
+          uid: data.user.uid || user.uid,
+          username: data.user.username || data.user.email?.split('@')[0] || 'user',
+          fullName: data.user.fullname || data.user.displayName || data.user.email || 'User',
+          email: data.user.email || user.email,
+          profilePic: data.user.avatar || data.user.photoURL || user.photoURL || null,
+          isPro: data.user.plan === 'pro' || false,
+          referrals: data.user.referrals || 0,
+        });
+      } else {
+        // Fallback to Firebase Auth
+        setProfile({
+          uid: user.uid,
+          username: user.displayName || user.email?.split('@')[0] || 'user',
+          fullName: user.displayName || user.email || 'User',
+          email: user.email,
+          profilePic: user.photoURL || null,
+          isPro: false,
+          referrals: 0,
+        });
+      }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      // fallback to Firebase user data
+      console.error('Profile fetch error:', error);
       setProfile({
-        username: user.displayName || 'User',
-        fullName: user.displayName || 'User',
+        uid: user.uid,
+        username: user.displayName || user.email?.split('@')[0] || 'user',
+        fullName: user.displayName || user.email || 'User',
         email: user.email,
-        profilePic: user.photoURL,
+        profilePic: user.photoURL || null,
         isPro: false,
         referrals: 0,
       });
-    } finally {
-      setLoading(false);
     }
   };
 
+  // ── Fetch campaigns and calculate stats manually ──
+  const fetchCampaignsAndStats = async () => {
+    try {
+      const token = await user.getIdToken();
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/campaigns`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = res.data;
+      const campaigns = data.campaigns || [];
+
+      // Calculate stats manually
+      let totalCampaigns = 0;
+      let totalViews = 0;
+      let totalUnlocks = 0;
+      let totalShares = 0;
+      let totalCompletions = 0;
+      let activeCampaigns = 0;
+      let successfulCampaigns = 0;
+
+      campaigns.forEach(c => {
+        if (c.status === 'deleted') return;
+        totalCampaigns++;
+        totalViews += c.views || 0;
+        totalUnlocks += c.unlockCount || 0;
+        totalShares += c.shares || 0;
+        totalCompletions += c.completions || 0;
+        if (c.status === 'active') activeCampaigns++;
+        if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
+      });
+
+      setStats({
+        totalCampaigns,
+        totalViews,
+        totalUnlocks,
+        totalShares,
+        totalCompletions,
+        activeCampaigns,
+        successfulCampaigns,
+      });
+    } catch (error) {
+      console.error('Campaigns fetch error:', error);
+      // Keep stats as zeros
+    }
+  };
+
+  // ── Load both ──
   useEffect(() => {
     if (user) {
-      fetchAllData();
+      setLoading(true);
+      Promise.all([fetchProfile(), fetchCampaignsAndStats()])
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
@@ -74,9 +139,9 @@ export default function Profile() {
     }
   };
 
-  // ── Fallback for guest state ──
+  // ── Display user ──
   const displayUser = profile || {
-    username: 'Guest',
+    username: 'guest',
     fullName: 'Guest User',
     email: user?.email || 'guest@example.com',
     profilePic: user?.photoURL || null,
