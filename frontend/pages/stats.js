@@ -111,23 +111,33 @@ export default function Stats() {
     }
   }, [isAuthenticated, needsCompletion, fetchCampaigns]);
 
-  // ===== ROBUST DATE FORMATTER =====
+  // ===== ROBUST DATE FORMATTER (local time) =====
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
+      // Firestore Timestamp (has seconds and nanoseconds)
       if (timestamp.seconds !== undefined) {
         date = new Date(timestamp.seconds * 1000);
-      } else if (timestamp._seconds !== undefined) {
+      }
+      // Firebase v9 modular SDK Timestamp (has _seconds and _nanoseconds)
+      else if (timestamp._seconds !== undefined) {
         date = new Date(timestamp._seconds * 1000);
-      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      }
+      // ISO string or number (milliseconds)
+      else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
         date = new Date(timestamp);
-      } else if (timestamp instanceof Date) {
+      }
+      // If it's already a Date object
+      else if (timestamp instanceof Date) {
         date = timestamp;
-      } else {
+      }
+      // fallback: try to parse as ISO
+      else {
         date = new Date(timestamp);
       }
       if (isNaN(date.getTime())) return 'N/A';
+      // Use toLocaleString for local time display
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -282,20 +292,21 @@ export default function Stats() {
             </div>
           ))}
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 animate-pulse">
-          <div className="h-6 w-32 bg-gray-200 rounded mb-4" />
+        <div className="space-y-4 animate-pulse">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex flex-col sm:flex-row justify-between gap-3 py-4 border-b border-gray-100 last:border-0">
-              <div>
-                <div className="h-5 w-48 bg-gray-200 rounded mb-1" />
-                <div className="flex gap-2">
-                  <div className="h-3 w-16 bg-gray-200 rounded" />
-                  <div className="h-3 w-12 bg-gray-200 rounded" />
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex flex-col sm:flex-row justify-between gap-3">
+                <div className="flex-1">
+                  <div className="h-5 w-48 bg-gray-200 rounded mb-1" />
+                  <div className="flex gap-2">
+                    <div className="h-3 w-16 bg-gray-200 rounded" />
+                    <div className="h-3 w-12 bg-gray-200 rounded" />
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <div className="h-8 w-16 bg-gray-200 rounded" />
-                <div className="h-8 w-16 bg-gray-200 rounded" />
+                <div className="flex gap-2">
+                  <div className="h-8 w-16 bg-gray-200 rounded" />
+                  <div className="h-8 w-16 bg-gray-200 rounded" />
+                </div>
               </div>
             </div>
           ))}
@@ -390,38 +401,30 @@ export default function Stats() {
           </div>
         </div>
 
-        {/* ===== CAMPAIGN LIST ===== */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/30">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Your Campaigns</h3>
-              <span className="text-xs text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-200/60">
-                {campaigns.length} total
-              </span>
-            </div>
-          </div>
-
+        {/* ===== CAMPAIGN LIST – each as a separate card ===== */}
+        <div className="space-y-4">
           {statsLoading ? (
-            <div className="p-4 space-y-4">
+            <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse flex flex-col sm:flex-row justify-between gap-3 p-4 border-b border-gray-100 last:border-0">
-                  <div className="flex-1">
-                    <div className="h-5 w-3/4 bg-gray-200 rounded mb-1" />
-                    <div className="flex flex-wrap gap-2">
-                      <div className="h-3 w-16 bg-gray-200 rounded" />
-                      <div className="h-3 w-12 bg-gray-200 rounded" />
-                      <div className="h-3 w-20 bg-gray-200 rounded" />
+                <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
+                  <div className="flex flex-col sm:flex-row justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="h-5 w-48 bg-gray-200 rounded mb-1" />
+                      <div className="flex gap-2">
+                        <div className="h-3 w-16 bg-gray-200 rounded" />
+                        <div className="h-3 w-12 bg-gray-200 rounded" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="h-8 w-16 bg-gray-200 rounded" />
-                    <div className="h-8 w-16 bg-gray-200 rounded" />
+                    <div className="flex gap-2">
+                      <div className="h-8 w-16 bg-gray-200 rounded" />
+                      <div className="h-8 w-16 bg-gray-200 rounded" />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : campaigns.length === 0 ? (
-            <div className="text-center py-12 px-4">
+            <div className="text-center py-12 px-4 bg-white rounded-2xl border border-gray-100">
               <div className="text-5xl mb-4">📭</div>
               <p className="text-gray-500 text-sm">You haven't created any campaigns yet.</p>
               <button
@@ -432,100 +435,98 @@ export default function Stats() {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100/60">
-              {campaigns.map((camp) => {
-                const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
-                return (
-                  <div
-                    key={camp.id}
-                    className="px-4 sm:px-6 py-4 hover:bg-gray-50/30 transition-colors duration-150 relative"
-                  >
-                    {/* Accent left border */}
-                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 rounded-r ${
-                      isSuccessful ? 'bg-green-500' : camp.status === 'active' ? 'bg-blue-500' : 'bg-gray-300'
-                    }`}></div>
+            campaigns.map((camp) => {
+              const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
+              return (
+                <div
+                  key={camp.id}
+                  className="bg-white rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-md transition-all duration-200 p-5 relative overflow-hidden"
+                >
+                  {/* Accent left border */}
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                    isSuccessful ? 'bg-green-500' : camp.status === 'active' ? 'bg-blue-500' : 'bg-gray-300'
+                  }`}></div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-4">
-                      {/* Left: Title + badges + stats */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                            {camp.title || 'Untitled Campaign'}
-                          </p>
-                          <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
-                            camp.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                            camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-500'
-                          }`}>
-                            {camp.status || 'Active'}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-4">
+                    {/* Left: Title + badges + stats */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                          {camp.title || 'Untitled Campaign'}
+                        </p>
+                        <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
+                          camp.status === 'active' ? 'bg-blue-100 text-blue-700' :
+                          camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-500'
+                        }`}>
+                          {camp.status || 'Active'}
+                        </span>
+                        {isSuccessful && (
+                          <span className="text-[10px] font-medium bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">
+                            ✅ Success
                           </span>
-                          {isSuccessful && (
-                            <span className="text-[10px] font-medium bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full">
-                              ✅ Success
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Stats row with icons */}
-                        <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <FiUnlock className="w-3 h-3" />
-                            <span className="font-medium text-gray-700">{camp.unlockCount || 0}</span> unlocks
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <FiEye className="w-3 h-3" />
-                            <span className="font-medium text-gray-700">{camp.views || 0}</span> views
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <FiShare2 className="w-3 h-3" />
-                            <span className="font-medium text-gray-700">{camp.shares || 0}</span> shares
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <FiCheckCircle className="w-3 h-3" />
-                            <span className="font-medium text-gray-700">{camp.completions || 0}</span> completions
-                          </span>
-                          <span className="flex items-center gap-1 text-gray-400">
-                            <FiClock className="w-3 h-3" />
-                            {formatDate(camp.createdAt)}
-                          </span>
-                        </div>
-
-                        {/* Feature badges */}
-                        {camp.features && Object.values(camp.features).some(Boolean) && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {camp.features.shareCount && (
-                              <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>
-                            )}
-                            {camp.features.tasks && (
-                              <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Tasks</span>
-                            )}
-                            {camp.features.finalUrl && (
-                              <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Redirect</span>
-                            )}
-                          </div>
                         )}
                       </div>
 
-                      {/* Right: Edit/Delete buttons */}
-                      <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => handleEditCampaign(camp)}
-                          className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
-                        >
-                          <FiEdit2 className="w-3.5 h-3.5" /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCampaign(camp.id)}
-                          className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
-                        >
-                          <FiTrash2 className="w-3.5 h-3.5" /> Delete
-                        </button>
+                      {/* Stats row with icons */}
+                      <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <FiUnlock className="w-3 h-3" />
+                          <span className="font-medium text-gray-700">{camp.unlockCount || 0}</span> unlocks
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FiEye className="w-3 h-3" />
+                          <span className="font-medium text-gray-700">{camp.views || 0}</span> views
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FiShare2 className="w-3 h-3" />
+                          <span className="font-medium text-gray-700">{camp.shares || 0}</span> shares
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FiCheckCircle className="w-3 h-3" />
+                          <span className="font-medium text-gray-700">{camp.completions || 0}</span> completions
+                        </span>
+                        <span className="flex items-center gap-1 text-gray-400">
+                          <FiClock className="w-3 h-3" />
+                          {formatDate(camp.createdAt)}
+                        </span>
                       </div>
+
+                      {/* Feature badges */}
+                      {camp.features && Object.values(camp.features).some(Boolean) && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {camp.features.shareCount && (
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>
+                          )}
+                          {camp.features.tasks && (
+                            <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Tasks</span>
+                          )}
+                          {camp.features.finalUrl && (
+                            <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Redirect</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Edit/Delete buttons */}
+                    <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleEditCampaign(camp)}
+                        className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
+                      >
+                        <FiEdit2 className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCampaign(camp.id)}
+                        className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-all duration-200 text-xs sm:text-sm"
+                      >
+                        <FiTrash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })
           )}
         </div>
       </main>
