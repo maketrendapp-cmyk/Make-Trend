@@ -131,7 +131,7 @@ export default function Profile() {
         }
       }
     } catch (error) {
-      // silent fail
+      // silent
     }
   };
 
@@ -175,7 +175,7 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
-  // Updated Quick Actions (removed Billing & Logout)
+  // ✅ Quick Actions – removed Billing & Subscription
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -183,7 +183,7 @@ export default function Profile() {
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
   ];
 
-  // Explore: replaced "Platform" with "Follow Us"
+  // ✅ Explore – replaced Platform with Follow Us
   const exploreOptions = [
     { icon: FiGrid, label: 'Follow Us', href: '/follow' },
     { icon: FiInfo, label: 'About Make Trend', href: '/about' },
@@ -201,7 +201,6 @@ export default function Profile() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header skeleton */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <div className="w-24 h-24 rounded-full bg-gray-200" />
@@ -213,62 +212,41 @@ export default function Profile() {
               <div className="w-24 h-10 bg-gray-200 rounded-lg" />
             </div>
           </div>
-
-          {/* Stats skeleton */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center animate-pulse">
-                <div className="flex justify-center mb-2">
-                  <div className="w-6 h-6 bg-gray-200 rounded" />
-                </div>
+                <div className="flex justify-center mb-2"><div className="w-6 h-6 bg-gray-200 rounded" /></div>
                 <div className="h-7 w-12 bg-gray-200 rounded mx-auto mb-1" />
                 <div className="h-3 w-20 bg-gray-200 rounded mx-auto" />
               </div>
             ))}
           </div>
-
-          {/* Quick Actions skeleton */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
             <div className="h-6 w-32 bg-gray-200 rounded mb-4" />
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="h-12 bg-gray-200 rounded-xl" />
-              ))}
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-12 bg-gray-200 rounded-xl" />)}
             </div>
           </div>
-
-          {/* Refer & Affiliates skeleton */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
             <div className="h-6 w-40 bg-gray-200 rounded mb-4" />
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-6 h-6 bg-gray-200 rounded" />
-                <div>
-                  <div className="h-3 w-24 bg-gray-200 rounded mb-1" />
-                  <div className="h-7 w-12 bg-gray-200 rounded" />
-                </div>
+                <div><div className="h-3 w-24 bg-gray-200 rounded mb-1" /><div className="h-7 w-12 bg-gray-200 rounded" /></div>
               </div>
               <div className="w-24 h-10 bg-gray-200 rounded-lg" />
             </div>
           </div>
-
-          {/* Explore skeleton */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
             <div className="h-6 w-32 bg-gray-200 rounded mb-4" />
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="h-20 bg-gray-200 rounded-xl" />
-              ))}
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-gray-200 rounded-xl" />)}
             </div>
           </div>
-
-          {/* Legal skeleton */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
             <div className="h-6 w-40 bg-gray-200 rounded mb-4" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {[1, 2].map(i => (
-                <div key={i} className="h-12 bg-gray-200 rounded-xl" />
-              ))}
+              {[1, 2].map(i => <div key={i} className="h-12 bg-gray-200 rounded-xl" />)}
             </div>
           </div>
         </div>
@@ -372,7 +350,7 @@ export default function Profile() {
           </div>
         )}
 
-        {/* ── Quick Actions ── */}
+        {/* ── Quick Actions (updated) ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -425,7 +403,7 @@ export default function Profile() {
           </div>
         )}
 
-        {/* ── Explore ── */}
+        {/* ── Explore (updated) ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Explore</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
