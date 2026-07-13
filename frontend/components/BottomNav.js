@@ -7,16 +7,13 @@ import {
   FiUser,
   FiMenu,
 } from 'react-icons/fi';
-// 💡 Alternative: use Fa icons (solid) – uncomment below and comment out the Fi imports
-// import { FaHome, FaPlusCircle, FaChartBar, FaUser, FaBars } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
-// Define nav items – you can swap icon sets here
 const navItems = [
-  { name: 'Home', path: '/', icon: FiHome },   // or FaHome
-  { name: 'Create', path: '/create', icon: FiPlusCircle }, // or FaPlusCircle
-  { name: 'Stats', path: '/stats', icon: FiBarChart2 },    // or FaChartBar
-  { name: 'Profile', path: '/profile', icon: FiUser },     // or FaUser
+  { name: 'Home', path: '/', icon: FiHome },
+  { name: 'Create', path: '/create', icon: FiPlusCircle },
+  { name: 'Stats', path: '/stats', icon: FiBarChart2 },
+  { name: 'Profile', path: '/profile', icon: FiUser },
 ];
 
 export default function BottomNav({ onMenuToggle }) {
@@ -29,18 +26,17 @@ export default function BottomNav({ onMenuToggle }) {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_30px_rgba(0,0,0,0.06)] md:hidden">
-        <div className="flex items-center justify-around h-[72px] px-2 max-w-md mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-xl border-t border-gray-100/80 shadow-[0_-2px_20px_rgba(0,0,0,0.04)] md:hidden">
+        <div className="flex items-center justify-around h-[64px] px-2 max-w-md mx-auto">
 
           {/* Menu Button */}
           <button
             onClick={onMenuToggle}
-            className="relative flex flex-col items-center justify-center gap-1 w-14 h-full text-gray-500 hover:text-purple-600 transition-colors group"
+            className="flex flex-col items-center justify-center gap-0.5 w-12 h-full text-gray-400 hover:text-purple-600 transition-colors group"
             aria-label="Open menu"
           >
-            <FiMenu className="w-7 h-7 stroke-[2.5] group-hover:scale-110 transition-transform" />
-            {/* If using Fa: <FaBars className="w-7 h-7 group-hover:scale-110 transition-transform" /> */}
-            <span className="text-[11px] font-bold tracking-wide text-gray-400 group-hover:text-purple-600">
+            <FiMenu className="w-5 h-5 group-hover:scale-105 transition-transform" />
+            <span className="text-[10px] font-medium text-gray-400 group-hover:text-purple-600">
               Menu
             </span>
           </button>
@@ -54,35 +50,33 @@ export default function BottomNav({ onMenuToggle }) {
               <button
                 key={item.name}
                 onClick={() => router.push(item.path)}
-                className="relative flex flex-col items-center justify-center gap-1 w-14 h-full text-gray-500 hover:text-purple-600 transition-colors group"
+                className="flex flex-col items-center justify-center gap-0.5 w-12 h-full text-gray-400 hover:text-purple-600 transition-colors group relative"
                 aria-label={item.name}
               >
-                {/* Active background pill (soft glow) */}
-                {active && (
-                  <motion.div
-                    layoutId="bottomNavPill"
-                    className="absolute inset-0 mx-auto w-12 h-12 rounded-full bg-purple-100/80 -z-0"
-                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                  />
-                )}
-
-                {/* Icon – with bolder stroke (2.5) */}
+                {/* Icon */}
                 <Icon
-                  className={`w-7 h-7 stroke-[2.5] relative z-10 transition-all duration-200 ${
-                    active
-                      ? 'text-purple-600 scale-110'
-                      : 'text-gray-400 group-hover:text-gray-600'
+                  className={`w-5 h-5 transition-all duration-200 ${
+                    active ? 'text-purple-600 scale-105' : 'group-hover:text-gray-600'
                   }`}
                 />
 
-                {/* Label – bold and tight */}
+                {/* Label */}
                 <span
-                  className={`text-[11px] font-bold tracking-wide relative z-10 transition-colors duration-200 ${
-                    active ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-600'
+                  className={`text-[10px] font-medium transition-colors duration-200 ${
+                    active ? 'text-purple-600' : 'group-hover:text-gray-600'
                   }`}
                 >
                   {item.name}
                 </span>
+
+                {/* Active dot indicator */}
+                {active && (
+                  <motion.div
+                    layoutId="bottomNavDot"
+                    className="absolute -top-0.5 w-1 h-1 rounded-full bg-purple-600"
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
+                )}
               </button>
             );
           })}
@@ -90,8 +84,7 @@ export default function BottomNav({ onMenuToggle }) {
         </div>
       </nav>
 
-      {/* Spacer */}
-      <div className="h-[72px] md:hidden" />
+      <div className="h-[64px] md:hidden" />
     </>
   );
 }
