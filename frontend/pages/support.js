@@ -36,7 +36,6 @@ export default function Support() {
           return;
         }
 
-        // Get token
         const token = await firebaseUser.getIdToken();
 
         // Fetch profile
@@ -47,7 +46,6 @@ export default function Support() {
         if (profileData.success && profileData.user) {
           setProfile(profileData.user);
         } else {
-          // fallback
           setProfile({
             username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'user',
             fullname: firebaseUser.displayName || firebaseUser.email || 'User',
@@ -127,7 +125,7 @@ export default function Support() {
       if (imageFile) {
         const formData = new FormData();
         formData.append('image', imageFile);
-        const uploadRes = await fetch(`${API_BASE}/upload`, {
+        const uploadRes = await fetch(`${API_BASE}/api/upload`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
@@ -153,9 +151,7 @@ export default function Support() {
       const createData = await createRes.json();
       if (createData.success) {
         setSuccess('Report submitted successfully!');
-        // Add new ticket to list
         setTickets(prev => [createData.ticket, ...prev]);
-        // Reset form
         setTitle('');
         setDescription('');
         removeImage();
