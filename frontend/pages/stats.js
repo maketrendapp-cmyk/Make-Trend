@@ -17,7 +17,6 @@ import {
   FiTrash2,
   FiClock,
 } from 'react-icons/fi';
-import { FaCrown } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -75,7 +74,7 @@ export default function Stats() {
         if (data.stats) {
           setStats(data.stats);
         } else {
-          // fallback: compute from campaigns (should not happen if backend is updated)
+          // fallback
           const campaigns = data.campaigns || [];
           const totalViews = campaigns.reduce((s, c) => s + (c.views || 0), 0);
           const totalUnlocks = campaigns.reduce((s, c) => s + (c.unlockCount || 0), 0);
@@ -112,15 +111,31 @@ export default function Stats() {
     }
   }, [isAuthenticated, needsCompletion, fetchCampaigns]);
 
-  // ===== DATE FORMATTER =====
+  // ===== ROBUST DATE FORMATTER =====
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      if (timestamp.toDate) date = timestamp.toDate();
-      else if (timestamp.seconds !== undefined) date = new Date(timestamp.seconds * 1000);
-      else if (typeof timestamp === 'number') date = new Date(timestamp);
-      else date = new Date(timestamp);
+      // Firestore Timestamp (has seconds and nanoseconds)
+      if (timestamp.seconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000);
+      }
+      // Firebase v9 modular SDK Timestamp (has _seconds and _nanoseconds)
+      else if (timestamp._seconds !== undefined) {
+        date = new Date(timestamp._seconds * 1000);
+      }
+      // ISO string or number (milliseconds)
+      else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      }
+      // If it's already a Date object
+      else if (timestamp instanceof Date) {
+        date = timestamp;
+      }
+      // fallback: try to parse as ISO
+      else {
+        date = new Date(timestamp);
+      }
       if (isNaN(date.getTime())) return 'N/A';
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -166,7 +181,6 @@ export default function Stats() {
         setCampaigns(campaigns.filter((c) => c.id !== campaignId));
         setMessage('✅ Campaign deleted successfully!');
         setTimeout(() => setMessage(''), 3000);
-        // re‑fetch to update stats
         await fetchCampaigns();
       } else {
         alert(data.error || 'Failed to delete campaign');
@@ -270,17 +284,17 @@ export default function Stats() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 animate-pulse">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 border border-border">
+            <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100">
               <div className="h-8 w-8 bg-gray-200 rounded-full mb-3" />
               <div className="h-7 w-12 bg-gray-200 rounded mb-1" />
               <div className="h-4 w-20 bg-gray-200 rounded" />
             </div>
           ))}
         </div>
-        <div className="bg-white rounded-2xl border border-border p-6 animate-pulse">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 animate-pulse">
           <div className="h-6 w-32 bg-gray-200 rounded mb-4" />
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex flex-col sm:flex-row justify-between gap-3 py-4 border-b border-border last:border-0">
+            <div key={i} className="flex flex-col sm:flex-row justify-between gap-3 py-4 border-b border-gray-100 last:border-0">
               <div>
                 <div className="h-5 w-48 bg-gray-200 rounded mb-1" />
                 <div className="flex gap-2">
@@ -329,7 +343,7 @@ export default function Stats() {
           </div>
           <button
             onClick={handleCreateCampaign}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md text-sm whitespace-nowrap"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md text-sm whitespace-nowrap"
           >
             <FiPlusCircle className="w-4 h-4" />
             New Campaign
@@ -346,7 +360,7 @@ export default function Stats() {
           ].map((stat, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200"
+              className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm text-center transition-all hover:shadow-md hover:-translate-y-0.5 duration-200"
             >
               <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-${stat.color}-50 text-${stat.color}-600 mb-2`}>
                 <stat.icon className="w-5 h-5" />
@@ -411,7 +425,7 @@ export default function Stats() {
               <p className="text-gray-500 text-sm">You haven't created any campaigns yet.</p>
               <button
                 onClick={handleCreateCampaign}
-                className="mt-4 px-6 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-all duration-200 text-sm"
+                className="mt-4 px-6 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-all duration-200 text-sm"
               >
                 Create Your First Campaign
               </button>
@@ -507,7 +521,7 @@ export default function Stats() {
         </div>
       </main>
 
-      {/* ===== EDIT MODAL ===== */}
+      {/* ===== EDIT MODAL (unchanged) ===== */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
@@ -539,7 +553,7 @@ export default function Stats() {
                   type="text"
                   value={editForm.title}
                   onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                   placeholder="Campaign title"
                 />
               </div>
@@ -557,7 +571,7 @@ export default function Stats() {
                       }))}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:bg-primary transition-all duration-200"></div>
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-200 rounded-full peer peer-checked:bg-purple-600 transition-all duration-200"></div>
                     <span className="absolute left-1 top-1 w-3.5 h-3.5 bg-white rounded-full transition-all duration-200 peer-checked:translate-x-4"></span>
                   </label>
                 </div>
@@ -568,7 +582,7 @@ export default function Stats() {
                     onChange={(e) => setEditForm(prev => ({ ...prev, shareCount: Number(e.target.value) }))}
                     min="1"
                     max="9999"
-                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                     placeholder="Number of shares required"
                   />
                 )}
@@ -587,7 +601,7 @@ export default function Stats() {
                       }))}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:bg-primary transition-all duration-200"></div>
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-200 rounded-full peer peer-checked:bg-purple-600 transition-all duration-200"></div>
                     <span className="absolute left-1 top-1 w-3.5 h-3.5 bg-white rounded-full transition-all duration-200 peer-checked:translate-x-4"></span>
                   </label>
                 </div>
@@ -599,13 +613,13 @@ export default function Stats() {
                           value={task.text}
                           onChange={(e) => updateTaskInEdit(index, 'text', e.target.value)}
                           placeholder="Task text"
-                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                         />
                         <input
                           value={task.url}
                           onChange={(e) => updateTaskInEdit(index, 'url', e.target.value)}
                           placeholder="Task URL"
-                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                         />
                         <button
                           type="button"
@@ -620,7 +634,7 @@ export default function Stats() {
                       <button
                         type="button"
                         onClick={addTaskInEdit}
-                        className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:text-primary hover:border-primary/50 transition"
+                        className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:text-purple-600 hover:border-purple-400 transition"
                       >
                         + Add Task
                       </button>
@@ -642,7 +656,7 @@ export default function Stats() {
                       }))}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:bg-primary transition-all duration-200"></div>
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-200 rounded-full peer peer-checked:bg-purple-600 transition-all duration-200"></div>
                     <span className="absolute left-1 top-1 w-3.5 h-3.5 bg-white rounded-full transition-all duration-200 peer-checked:translate-x-4"></span>
                   </label>
                 </div>
@@ -651,7 +665,7 @@ export default function Stats() {
                     type="url"
                     value={editForm.finalUrl}
                     onChange={(e) => setEditForm(prev => ({ ...prev, finalUrl: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                     placeholder="https://your-site.com/thank-you"
                   />
                 )}
@@ -661,7 +675,7 @@ export default function Stats() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 disabled:opacity-50"
+                  className="flex-1 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
