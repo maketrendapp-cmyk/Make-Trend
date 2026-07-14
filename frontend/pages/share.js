@@ -38,7 +38,7 @@ export default function CampaignShare() {
   const [cooldown, setCooldown] = useState(0);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimCountdown, setClaimCountdown] = useState(5);
-  const [shareAttempt, setShareAttempt] = useState(0); // 0, 1, 2
+  const [shareAttempt, setShareAttempt] = useState(0);
 
   const cooldownRef = useRef(null);
   const claimTimerRef = useRef(null);
@@ -151,7 +151,7 @@ export default function CampaignShare() {
       const forwardUrls = {
         whatsapp: `https://wa.me/?text=${encodeURIComponent(fullText)}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
-        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
+        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`, // Messenger doesn't support pre-filled text well
         instagram_dm: `https://www.instagram.com/`,
       };
       window.open(forwardUrls[platform], '_blank');
@@ -253,7 +253,6 @@ export default function CampaignShare() {
   const postPlatforms = [
     { id: 'facebook', label: 'Facebook', icon: FaFacebook, color: 'bg-blue-700 hover:bg-blue-800' },
     { id: 'twitter', label: 'Twitter', icon: FaTwitter, color: 'bg-sky-500 hover:bg-sky-600' },
-    { id: 'copy', label: 'Copy Link', icon: FaCopy, color: 'bg-gray-600 hover:bg-gray-700' },
   ];
 
   // ── Skeleton Loader ──
@@ -307,6 +306,7 @@ export default function CampaignShare() {
   }
 
   const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
+  const shareText = `${campaign.title || 'Check this out!'}\n${campaign.description || ''}\n\n${shareUrl}`;
 
   return (
     <>
@@ -375,7 +375,37 @@ export default function CampaignShare() {
             </div>
           </div>
 
-          {/* Share Platforms */}
+          {/* ── Share Link with Copy Button ── */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
+              <FaLink className="text-purple-500" /> Share Link
+            </h2>
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+              <input
+                type="text"
+                value={shareUrl}
+                readOnly
+                className="flex-1 bg-transparent outline-none text-sm font-mono text-gray-600 truncate"
+              />
+              <button
+                onClick={copyLink}
+                disabled={isSharing || sharesComplete}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  isCopied
+                    ? 'bg-green-500 text-white'
+                    : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.97]'
+                }`}
+              >
+                <FaCopy className="w-3.5 h-3.5" />
+                {isCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Share this link with {shareCount - shares} more {shareCount - shares > 1 ? 'people' : 'person'} to complete
+            </p>
+          </div>
+
+          {/* ── Share Platforms ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7">
             {/* Forward / Message */}
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
