@@ -9,7 +9,6 @@ import {
   FaFacebook,
   FaTiktok,
   FaLink,
-  FaLock,
   FaCheckCircle,
   FaClock,
   FaExternalLinkAlt,
@@ -26,16 +25,14 @@ export default function CampaignTasks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Sequential task state
-  const [activeTaskIndex, setActiveTaskIndex] = useState(0);
+  // Task states
   const [completedIndices, setCompletedIndices] = useState([]);
-  const [pendingTaskIndex, setPendingTaskIndex] = useState(null);
+  const [pendingIndex, setPendingIndex] = useState(null);
   const [countdown, setCountdown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   const timerRef = useRef(null);
-  const countdownIntervalRef = useRef(null);
+  const intervalRef = useRef(null);
 
   // ── Fetch Campaign ──
   useEffect(() => {
@@ -77,25 +74,25 @@ export default function CampaignTasks() {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
   };
 
-  // ── Start verification countdown ──
-  const startCountdown = () => {
+  // ── Start countdown for a task ──
+  const startCountdown = (index) => {
     cleanupTimers();
-    setIsVerifying(true);
-    setCountdown(3);
+    setPendingIndex(index);
+    setCountdown(6);
 
-    countdownIntervalRef.current = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          clearInterval(countdownIntervalRef.current);
-          countdownIntervalRef.current = null;
-          // ✅ Complete the task
-          confirmTaskCompletion();
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+          // Auto complete the task
+          completeTask(index);
           return 0;
         }
         return prev - 1;
@@ -103,59 +100,28 @@ export default function CampaignTasks() {
     }, 1000);
   };
 
-  // ── Confirm task completion ──
-  const confirmTaskCompletion = () => {
+  // ── Complete a task ──
+  const completeTask = (index) => {
     cleanupTimers();
-    if (pendingTaskIndex === null) return;
-    const index = pendingTaskIndex;
-    setCompletedIndices((prev) => [...prev, index]);
-    setActiveTaskIndex(index + 1);
-    setPendingTaskIndex(null);
+    if (!completedIndices.includes(index)) {
+      setCompletedIndices((prev) => [...prev, index]);
+    }
+    setPendingIndex(null);
     setCountdown(0);
-    setIsVerifying(false);
   };
 
-  // ── Handle task click – open URL ──
+  // ── Handle "Open Task" click ──
   const handleOpenTask = (index, url) => {
-    if (index !== activeTaskIndex) return;
     if (completedIndices.includes(index)) return;
-    if (pendingTaskIndex === index) return;
+    if (pendingIndex === index) return; // already pending
 
-    setPendingTaskIndex(index);
-    // Open URL in new tab
+    // Open URL
     window.open(url, '_blank');
-
-    // Start countdown after a small delay (user needs time to switch to the app)
-    timerRef.current = setTimeout(() => {
-      startCountdown();
-    }, 1500);
+    // Start countdown immediately (6 seconds)
+    startCountdown(index);
   };
 
-  // ── Detect return from app / browser ──
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && pendingTaskIndex !== null && !isVerifying) {
-        startCountdown();
-      }
-    };
-
-    const handleFocus = () => {
-      if (pendingTaskIndex !== null && !isVerifying) {
-        startCountdown();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      cleanupTimers();
-    };
-  }, [pendingTaskIndex, isVerifying]);
-
-  // ── Continue to Share ──
+  // ── Continue to Share (Claim) ──
   const handleContinueToShare = async () => {
     const allCompleted = completedIndices.length === campaign?.tasks?.length;
     if (!allCompleted) return;
@@ -188,7 +154,7 @@ export default function CampaignTasks() {
   };
 
   const tasks = campaign?.tasks || [];
-  const allTasksCompleted = tasks.length > 0 && completedIndices.length === tasks.length;
+  const allCompleted = tasks.length > 0 && completedIndices.length === tasks.length;
   const progress = tasks.length > 0 ? (completedIndices.length / tasks.length) * 100 : 0;
 
   // ── Skeleton Loader ──
@@ -327,7 +293,7 @@ export default function CampaignTasks() {
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 transition-all hover:shadow-md">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <span>📋</span> Complete Tasks
+                <span>📋</span> Complete Tasks To Claim
               </h2>
               <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                 {completedIndices.length}/{tasks.length}
@@ -340,9 +306,7 @@ export default function CampaignTasks() {
               <div className="space-y-3">
                 {tasks.map((task, index) => {
                   const isCompleted = completedIndices.includes(index);
-                  const isActive = index === activeTaskIndex && !isCompleted;
-                  const isLocked = index > activeTaskIndex && !isCompleted;
-                  const isPending = pendingTaskIndex === index;
+                  const isPending = pendingIndex === index;
 
                   return (
                     <div
@@ -350,12 +314,8 @@ export default function CampaignTasks() {
                       className={`group relative flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 ${
                         isCompleted
                           ? 'bg-green-50/80 border-green-200'
-                          : isActive && isPending
+                          : isPending
                           ? 'bg-amber-50/80 border-amber-300 shadow-sm shadow-amber-100/50'
-                          : isActive
-                          ? 'bg-purple-50/80 border-purple-300 shadow-sm shadow-purple-100/50 hover:bg-purple-100/60'
-                          : isLocked
-                          ? 'bg-gray-50/80 border-gray-200'
                           : 'bg-gray-50/80 border-gray-200 hover:bg-gray-100/60'
                       }`}
                     >
@@ -365,8 +325,6 @@ export default function CampaignTasks() {
                           <FaCheckCircle className="text-green-500 text-xl" />
                         ) : isPending ? (
                           <FaClock className="text-amber-500 text-xl animate-pulse" />
-                        ) : isLocked ? (
-                          <FaLock className="text-gray-400 text-sm" />
                         ) : (
                           getPlatformIcon(task.url)
                         )}
@@ -379,23 +337,11 @@ export default function CampaignTasks() {
                             className={`font-medium transition-all duration-300 ${
                               isCompleted
                                 ? 'text-gray-500 line-through'
-                                : isLocked
-                                ? 'text-gray-400'
                                 : 'text-gray-900'
                             }`}
                           >
                             {task.text}
                           </p>
-                          {isLocked && (
-                            <span className="text-[10px] font-medium bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
-                              🔒 Locked
-                            </span>
-                          )}
-                          {isActive && !isPending && (
-                            <span className="text-[10px] font-medium bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full animate-pulse">
-                              ⚡ Active
-                            </span>
-                          )}
                           {isPending && (
                             <span className="text-[10px] font-medium bg-amber-200 text-amber-700 px-2 py-0.5 rounded-full animate-pulse">
                               ⏳ Verifying {countdown}s
@@ -407,7 +353,7 @@ export default function CampaignTasks() {
                             </span>
                           )}
                         </div>
-                        {task.url && !isLocked && (
+                        {task.url && (
                           <p className="text-xs text-gray-400 truncate mt-0.5">
                             {task.url.replace(/^https?:\/\//, '')}
                           </p>
@@ -422,11 +368,11 @@ export default function CampaignTasks() {
                           </span>
                         ) : isPending ? (
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-sm font-bold text-amber-600 bg-white">
+                            <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-sm font-bold text-amber-600 bg-white animate-pulse">
                               {countdown}
                             </div>
                           </div>
-                        ) : isActive ? (
+                        ) : (
                           <button
                             onClick={() => handleOpenTask(index, task.url)}
                             className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97]"
@@ -434,15 +380,6 @@ export default function CampaignTasks() {
                             <FaExternalLinkAlt className="w-3 h-3" />
                             Open Task
                           </button>
-                        ) : isLocked ? (
-                          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full flex items-center gap-1">
-                            <FaLock className="w-3 h-3" />
-                            Locked
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">
-                            Waiting
-                          </span>
                         )}
                       </div>
                     </div>
@@ -451,13 +388,13 @@ export default function CampaignTasks() {
               </div>
             )}
 
-            {/* ── Continue Button ── */}
+            {/* ── Claim / Continue Button ── */}
             <button
               onClick={handleContinueToShare}
-              disabled={!allTasksCompleted || isSubmitting}
+              disabled={!allCompleted || isSubmitting}
               className={`w-full mt-8 inline-flex items-center justify-center px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
-                allTasksCompleted && !isSubmitting
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
+                allCompleted && !isSubmitting
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
@@ -469,8 +406,8 @@ export default function CampaignTasks() {
                   </svg>
                   Processing...
                 </span>
-              ) : allTasksCompleted ? (
-                '🚀 Continue to Share'
+              ) : allCompleted ? (
+                '🎁 Claim Reward'
               ) : (
                 `Complete ${tasks.length - completedIndices.length} more task${tasks.length - completedIndices.length > 1 ? 's' : ''}`
               )}
