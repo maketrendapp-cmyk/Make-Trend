@@ -14,8 +14,8 @@ import {
   FaShareAlt,
   FaCopy,
   FaRocket,
+  FaPaperPlane,
 } from 'react-icons/fa';
-import { FiExternalLink } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -25,6 +25,7 @@ export default function CampaignShare() {
   const { id } = router.query;
 
   const [campaign, setCampaign] = useState(null);
+  const [templateSlug, setTemplateSlug] = useState('campaign');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [shares, setShares] = useState(0);
@@ -37,42 +38,63 @@ export default function CampaignShare() {
   const [cooldown, setCooldown] = useState(0);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimCountdown, setClaimCountdown] = useState(5);
+  const [shareAttempt, setShareAttempt] = useState(0); // 0, 1, 2
 
   const cooldownRef = useRef(null);
   const claimTimerRef = useRef(null);
 
+  // ── Fetch Campaign + Template ──
   useEffect(() => {
-    if (id) fetchCampaign();
+    if (id) fetchCampaignAndTemplate();
   }, [id]);
 
-  const fetchCampaign = async () => {
+  const fetchCampaignAndTemplate = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/campaigns/${id}`);
-      if (!res.ok) {
-        if (res.status === 404) {
+      // 1) Fetch campaign
+      const campaignRes = await fetch(`${API_BASE}/campaigns/${id}`);
+      if (!campaignRes.ok) {
+        if (campaignRes.status === 404) {
           setError('Campaign not found');
           setLoading(false);
           return;
         }
         throw new Error('Failed to fetch campaign');
       }
-      const data = await res.json();
-      if (data.success) {
-        setCampaign(data.campaign);
-        const count = data.campaign.shareCount || 3;
-        setShareCount(count);
-        const currentShares = data.campaign.shares || 0;
-        setShares(currentShares);
-        setShareProgress(Math.min((currentShares / count) * 100, 100));
-        if (count > 0 && currentShares >= count) {
-          setSharesComplete(true);
-        }
+      const campaignData = await campaignRes.json();
+      if (!campaignData.success) {
+        setError(campaignData.error || 'Failed to load campaign');
+        setLoading(false);
+        return;
+      }
+
+      const camp = campaignData.campaign;
+      setCampaign(camp);
+      setShareCount(camp.shareCount || 3);
+      const currentShares = camp.shares || 0;
+      setShares(currentShares);
+      setShareProgress(Math.min((currentShares / (camp.shareCount || 3)) * 100, 100));
+      if (camp.shareCount > 0 && currentShares >= camp.shareCount) {
+        setSharesComplete(true);
+        setShareAttempt(2);
       } else {
-        setError(data.error || 'Failed to load campaign');
+        if (currentShares === 0) setShareAttempt(0);
+        else if (currentShares < (camp.shareCount || 3) / 2) setShareAttempt(1);
+        else setShareAttempt(2);
+      }
+
+      // 2) Fetch template to get slug
+      if (camp.templateId) {
+        const templateRes = await fetch(`${API_BASE}/templates/${camp.templateId}`);
+        if (templateRes.ok) {
+          const templateData = await templateRes.json();
+          if (templateData.success && templateData.template) {
+            setTemplateSlug(templateData.template.slug || 'campaign');
+          }
+        }
       }
     } catch (err) {
-      console.error('Error fetching campaign:', err);
+      console.error('Error fetching:', err);
       setError('Could not load campaign. Please try again.');
     } finally {
       setLoading(false);
@@ -113,59 +135,72 @@ export default function CampaignShare() {
   }, [showClaimModal, claimCountdown]);
 
   // ── Handle Share ──
-  const handleShare = async (platform) => {
+  const handleShare = async (platform, type) => {
     if (isSharing || sharesComplete || cooldown > 0) return;
 
+    const shouldCount = shareAttempt >= 1;
     setIsSharing(true);
-    const campaignSlug = campaign?.slug || 'campaign';
-    const shareUrl = `${window.location.origin}/${campaignSlug}/${id}`;
+
+    const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
     const title = campaign?.title || 'Check this out!';
     const description = campaign?.description || 'Join this campaign and earn rewards!';
+    const fullText = `${title}\n${description}\n\n${shareUrl}`;
 
-    const shareData = {
-      whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title}\n${description}\n\n${shareUrl}`)}`,
-      telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(title)}`,
-      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`,
-      messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
-      instagram: `https://www.instagram.com/`, // Instagram doesn't support direct sharing – open app
-      copy: shareUrl,
-    };
-
-    // Open share window
-    if (platform === 'copy') {
-      await copyLink();
+    // Open share dialog
+    if (type === 'forward') {
+      const forwardUrls = {
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(fullText)}`,
+        telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
+        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
+        instagram_dm: `https://www.instagram.com/`,
+      };
+      window.open(forwardUrls[platform], '_blank');
     } else {
-      window.open(shareData[platform], '_blank');
+      const postUrls = {
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(title)}`,
+        twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`,
+        copy: shareUrl,
+      };
+      if (platform === 'copy') {
+        await copyLink();
+      } else {
+        window.open(postUrls[platform], '_blank');
+      }
     }
 
-    // Only increment share if not copy (copy is handled separately)
-    if (platform !== 'copy') {
-      await incrementShare(platform);
+    if (shouldCount) {
+      let increment = 0;
+      if (shareAttempt === 1) {
+        increment = Math.ceil(shareCount / 2);
+      } else if (shareAttempt === 2) {
+        increment = shareCount - shares;
+      }
+      if (increment > 0) {
+        await incrementShares(increment);
+      }
+      if (shareAttempt < 2) setShareAttempt(shareAttempt + 1);
+    } else {
+      setShareAttempt(1);
     }
 
-    // Start 7-second cooldown
     setCooldown(7);
     setIsSharing(false);
   };
 
-  // ── Increment share count ──
-  const incrementShare = async (platform) => {
+  // ── Increment shares ──
+  const incrementShares = async (amount) => {
     try {
       const res = await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform }),
+        body: JSON.stringify({ platform: 'manual' }),
       });
       const data = await res.json();
       if (data.success) {
-        const newShares = data.shares || shares + 1;
+        const newShares = Math.min(shares + amount, shareCount);
         setShares(newShares);
-        const progress = Math.min((newShares / shareCount) * 100, 100);
-        setShareProgress(progress);
-        if (newShares >= shareCount) {
-          setSharesComplete(true);
-        }
+        setShareProgress(Math.min((newShares / shareCount) * 100, 100));
+        if (newShares >= shareCount) setSharesComplete(true);
       }
     } catch (err) {
       console.error('Error recording share:', err);
@@ -174,15 +209,12 @@ export default function CampaignShare() {
 
   // ── Copy Link ──
   const copyLink = async () => {
-    const campaignSlug = campaign?.slug || 'campaign';
-    const shareUrl = `${window.location.origin}/${campaignSlug}/${id}`;
+    const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 3000);
-      await incrementShare('copy');
-    } catch (err) {
-      // Fallback
+    } catch {
       const textarea = document.createElement('textarea');
       textarea.value = shareUrl;
       document.body.appendChild(textarea);
@@ -191,7 +223,6 @@ export default function CampaignShare() {
       document.body.removeChild(textarea);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 3000);
-      await incrementShare('copy');
     }
   };
 
@@ -201,7 +232,6 @@ export default function CampaignShare() {
     setShowClaimModal(true);
   };
 
-  // ── Redirect after claim ──
   const handleRedirect = () => {
     setShowClaimModal(false);
     if (campaign?.finalUrl) {
@@ -211,16 +241,19 @@ export default function CampaignShare() {
     }
   };
 
-  const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
+  const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 0;
 
-  // ── Share platforms ──
-  const platforms = [
+  const forwardPlatforms = [
     { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
     { id: 'telegram', label: 'Telegram', icon: FaTelegram, color: 'bg-blue-500 hover:bg-blue-600' },
+    { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
+    { id: 'instagram_dm', label: 'Instagram DM', icon: FaInstagram, color: 'bg-pink-500 hover:bg-pink-600' },
+  ];
+
+  const postPlatforms = [
     { id: 'facebook', label: 'Facebook', icon: FaFacebook, color: 'bg-blue-700 hover:bg-blue-800' },
     { id: 'twitter', label: 'Twitter', icon: FaTwitter, color: 'bg-sky-500 hover:bg-sky-600' },
-    { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
-    { id: 'instagram', label: 'Instagram', icon: FaInstagram, color: 'bg-pink-500 hover:bg-pink-600' },
+    { id: 'copy', label: 'Copy Link', icon: FaCopy, color: 'bg-gray-600 hover:bg-gray-700' },
   ];
 
   // ── Skeleton Loader ──
@@ -238,8 +271,8 @@ export default function CampaignShare() {
                 <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
                 <div className="h-6 w-32 bg-gray-200 rounded-full mb-6" />
                 <div className="h-3 w-full bg-gray-200 rounded mb-4" />
-                <div className="grid grid-cols-3 gap-3">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="h-14 bg-gray-200 rounded-xl" />
                   ))}
                 </div>
@@ -273,8 +306,7 @@ export default function CampaignShare() {
     );
   }
 
-  const campaignSlug = campaign?.slug || 'campaign';
-  const shareUrl = `${window.location.origin}/${campaignSlug}/${id}`;
+  const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
 
   return (
     <>
@@ -282,18 +314,18 @@ export default function CampaignShare() {
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
 
-          {/* ── Back Button ── */}
+          {/* Back Button */}
           <button
-            onClick={() => router.back()}
+            onClick={() => sharesComplete ? router.push('/') : router.back()}
             className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100"
           >
             <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            Back
+            {sharesComplete ? 'Back to Home' : 'Back'}
           </button>
 
-          {/* ── Hero Card ── */}
+          {/* Hero Card */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 transition-all hover:shadow-md">
             <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gray-200">
               {campaign.image ? (
@@ -326,6 +358,11 @@ export default function CampaignShare() {
                 <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
                   📤 {shares}/{shareCount} shares
                 </span>
+                {sharesComplete && (
+                  <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
+                    ✅ Complete
+                  </span>
+                )}
               </div>
 
               <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
@@ -335,70 +372,24 @@ export default function CampaignShare() {
                 </span>
                 <span>{shares}/{shareCount} shares</span>
               </div>
-
-              {sharesComplete && (
-                <div className="mt-3 p-3 bg-green-50 rounded-xl border border-green-200 flex items-center gap-2 text-green-700">
-                  <FaCheckCircle className="w-5 h-5" />
-                  <span className="font-medium">All shares completed! Claim your reward.</span>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* ── Share Link ── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-              <FaLink className="text-purple-500" /> Share Link
-            </h2>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-              <input
-                type="text"
-                value={shareUrl}
-                readOnly
-                className="flex-1 bg-transparent outline-none text-sm font-mono text-gray-600 truncate"
-              />
-              <button
-                onClick={copyLink}
-                disabled={isSharing || sharesComplete}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
-                  isCopied
-                    ? 'bg-green-500 text-white'
-                    : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.97]'
-                }`}
-              >
-                <FaCopy className="w-3.5 h-3.5" />
-                {isCopied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Share this link with {shareCount - shares} more {shareCount - shares > 1 ? 'people' : 'person'} to complete
-            </p>
-          </div>
-
-          {/* ── Share Platforms ── */}
+          {/* Share Platforms */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7">
+            {/* Forward / Message */}
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-              <FaShareAlt className="text-purple-500" /> Share on Platforms
+              <FaPaperPlane className="text-purple-500" /> Share via Message
             </h2>
-
-            {cooldown > 0 && (
-              <div className="mb-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3 text-amber-700">
-                <FaClock className="w-5 h-5 animate-pulse" />
-                <span>Please wait <strong>{cooldown}s</strong> before sharing again</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {platforms.map((platform) => {
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              {forwardPlatforms.map((platform) => {
                 const Icon = platform.icon;
                 return (
                   <button
                     key={platform.id}
-                    onClick={() => handleShare(platform.id)}
+                    onClick={() => handleShare(platform.id, 'forward')}
                     disabled={isSharing || sharesComplete || cooldown > 0}
-                    className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${
-                      platform.color
-                    } disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
                   >
                     <Icon className="w-5 h-5" />
                     {platform.label}
@@ -407,7 +398,43 @@ export default function CampaignShare() {
               })}
             </div>
 
-            {/* ── Claim Button ── */}
+            {/* Post / Publish */}
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <FaShareAlt className="text-purple-500" /> Post / Publish
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {postPlatforms.map((platform) => {
+                const Icon = platform.icon;
+                return (
+                  <button
+                    key={platform.id}
+                    onClick={() => handleShare(platform.id, 'post')}
+                    disabled={isSharing || sharesComplete || cooldown > 0}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {platform.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {cooldown > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3 text-amber-700">
+                <FaClock className="w-5 h-5 animate-pulse" />
+                <span>Please wait <strong>{cooldown}s</strong> before sharing again</span>
+              </div>
+            )}
+
+            {!sharesComplete && (
+              <p className="mt-4 text-sm text-gray-500 text-center">
+                {shareAttempt === 0 && 'Open any share to start (0% counted)'}
+                {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount/2)} shares (50% progress)`}
+                {shareAttempt === 2 && `One more share to complete!`}
+              </p>
+            )}
+
+            {/* Claim Button */}
             <button
               onClick={handleClaim}
               disabled={!sharesComplete || isCompleting}
@@ -444,7 +471,7 @@ export default function CampaignShare() {
         </div>
       </div>
 
-      {/* ── Claim Success Modal ── */}
+      {/* Claim Success Modal */}
       {showClaimModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl animate-scaleIn">
