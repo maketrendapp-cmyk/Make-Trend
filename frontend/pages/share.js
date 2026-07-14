@@ -83,16 +83,31 @@ export default function CampaignShare() {
         else setShareAttempt(2);
       }
 
-      // 2) Fetch template to get slug
+      // 2) Fetch template to get slug (with fallback)
+      let slug = 'campaign';
       if (camp.templateId) {
-        const templateRes = await fetch(`${API_BASE}/templates/${camp.templateId}`);
-        if (templateRes.ok) {
-          const templateData = await templateRes.json();
-          if (templateData.success && templateData.template) {
-            setTemplateSlug(templateData.template.slug || 'campaign');
+        try {
+          const templateRes = await fetch(`${API_BASE}/templates/${camp.templateId}`);
+          if (templateRes.ok) {
+            const templateData = await templateRes.json();
+            if (templateData.success && templateData.template) {
+              slug = templateData.template.slug || 'campaign';
+            }
           }
+        } catch (err) {
+          console.warn('Template fetch failed, using fallback:', err);
         }
       }
+      // Fallback: if still 'campaign', try to use campaign.templateSlug if exists
+      if (slug === 'campaign' && camp.templateSlug) {
+        slug = camp.templateSlug;
+      }
+      // Final fallback: generate from title
+      if (slug === 'campaign' && camp.title) {
+        slug = camp.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      }
+      setTemplateSlug(slug);
+
     } catch (err) {
       console.error('Error fetching:', err);
       setError('Could not load campaign. Please try again.');
@@ -101,7 +116,7 @@ export default function CampaignShare() {
     }
   };
 
-  // ── Cooldown timer ──
+  // ── Cooldown timer (3 seconds) ──
   useEffect(() => {
     if (cooldown > 0) {
       cooldownRef.current = setInterval(() => {
@@ -143,15 +158,15 @@ export default function CampaignShare() {
 
     const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
     const title = campaign?.title || 'Check this out!';
-    const description = campaign?.description || 'Join this campaign and earn rewards!';
-    const fullText = `${title}\n${description}\n\n${shareUrl}`;
+    const description = campaign?.description || '';
+    const fullText = description ? `${title}\n${description}\n\n${shareUrl}` : `${title}\n\n${shareUrl}`;
 
     // Open share dialog
     if (type === 'forward') {
       const forwardUrls = {
         whatsapp: `https://wa.me/?text=${encodeURIComponent(fullText)}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
-        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`, // Messenger doesn't support pre-filled text well
+        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
         instagram_dm: `https://www.instagram.com/`,
       };
       window.open(forwardUrls[platform], '_blank');
@@ -168,6 +183,7 @@ export default function CampaignShare() {
       }
     }
 
+    // Increment shares if this is a counting share
     if (shouldCount) {
       let increment = 0;
       if (shareAttempt === 1) {
@@ -183,7 +199,7 @@ export default function CampaignShare() {
       setShareAttempt(1);
     }
 
-    setCooldown(7);
+    setCooldown(3); // 3‑second cooldown
     setIsSharing(false);
   };
 
@@ -242,6 +258,7 @@ export default function CampaignShare() {
   };
 
   const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 0;
+  const remaining = Math.max(shareCount - shares, 0);
 
   const forwardPlatforms = [
     { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
@@ -306,7 +323,7 @@ export default function CampaignShare() {
   }
 
   const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
-  const shareText = `${campaign.title || 'Check this out!'}\n${campaign.description || ''}\n\n${shareUrl}`;
+  const isComplete = sharesComplete;
 
   return (
     <>
@@ -314,18 +331,18 @@ export default function CampaignShare() {
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
 
-          {/* Back Button */}
+          {/* ── Back Button ── */}
           <button
-            onClick={() => sharesComplete ? router.push('/') : router.back()}
+            onClick={() => isComplete ? router.push('/') : router.back()}
             className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100"
           >
             <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            {sharesComplete ? 'Back to Home' : 'Back'}
+            {isComplete ? 'Back to Home' : 'Back'}
           </button>
 
-          {/* Hero Card */}
+          {/* ── Hero Card ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 transition-all hover:shadow-md">
             <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gray-200">
               {campaign.image ? (
@@ -358,7 +375,7 @@ export default function CampaignShare() {
                 <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
                   📤 {shares}/{shareCount} shares
                 </span>
-                {sharesComplete && (
+                {isComplete && (
                   <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
                     ✅ Complete
                   </span>
@@ -389,7 +406,7 @@ export default function CampaignShare() {
               />
               <button
                 onClick={copyLink}
-                disabled={isSharing || sharesComplete}
+                disabled={isSharing || isComplete}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
                   isCopied
                     ? 'bg-green-500 text-white'
@@ -400,9 +417,6 @@ export default function CampaignShare() {
                 {isCopied ? 'Copied!' : 'Copy'}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Share this link with {shareCount - shares} more {shareCount - shares > 1 ? 'people' : 'person'} to complete
-            </p>
           </div>
 
           {/* ── Share Platforms ── */}
@@ -418,7 +432,7 @@ export default function CampaignShare() {
                   <button
                     key={platform.id}
                     onClick={() => handleShare(platform.id, 'forward')}
-                    disabled={isSharing || sharesComplete || cooldown > 0}
+                    disabled={isSharing || isComplete || cooldown > 0}
                     className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
                   >
                     <Icon className="w-5 h-5" />
@@ -439,7 +453,7 @@ export default function CampaignShare() {
                   <button
                     key={platform.id}
                     onClick={() => handleShare(platform.id, 'post')}
-                    disabled={isSharing || sharesComplete || cooldown > 0}
+                    disabled={isSharing || isComplete || cooldown > 0}
                     className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
                   >
                     <Icon className="w-5 h-5" />
@@ -456,7 +470,7 @@ export default function CampaignShare() {
               </div>
             )}
 
-            {!sharesComplete && (
+            {!isComplete && (
               <p className="mt-4 text-sm text-gray-500 text-center">
                 {shareAttempt === 0 && 'Open any share to start (0% counted)'}
                 {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount/2)} shares (50% progress)`}
@@ -464,47 +478,53 @@ export default function CampaignShare() {
               </p>
             )}
 
-            {/* Claim Button */}
-            <button
-              onClick={handleClaim}
-              disabled={!sharesComplete || isCompleting}
-              className={`w-full mt-6 inline-flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
-                sharesComplete && !isCompleting
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isCompleting ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Processing...
-                </span>
-              ) : sharesComplete ? (
-                <>
-                  <FaRocket className="w-5 h-5" />
-                  Claim Now
-                </>
-              ) : (
-                `Share ${shareCount - shares} more time${shareCount - shares > 1 ? 's' : ''}`
-              )}
-            </button>
+            {/* ── Claim Button (always shows "Claim") ── */}
+            <div className="mt-6">
+              <button
+                onClick={handleClaim}
+                disabled={!isComplete || isCompleting}
+                className={`w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
+                  isComplete && !isCompleting
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isCompleting ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  <>
+                    <FaRocket className="w-5 h-5" />
+                    Claim
+                  </>
+                )}
+              </button>
 
-            {!sharesComplete && shareCount > 0 && (
-              <p className="mt-3 text-center text-xs text-gray-400">
-                {shareCount - shares} share{shareCount - shares > 1 ? 's' : ''} remaining • {Math.round(progress)}% complete
-              </p>
-            )}
+              {/* Helper text below the button */}
+              {!isComplete && shareCount > 0 && (
+                <p className="mt-2 text-center text-xs text-gray-400">
+                  {remaining} share{remaining > 1 ? 's' : ''} remaining
+                </p>
+              )}
+              {isComplete && (
+                <p className="mt-2 text-center text-xs text-green-600 font-medium">
+                  ✅ All shares completed – claim your reward!
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Claim Success Modal */}
+      {/* ── Professional Claim Success Modal (centered card, not full overlay) ── */}
       {showClaimModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl animate-scaleIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl animate-scaleIn border border-gray-100">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center animate-bounce-in">
               <FaCheckCircle className="w-10 h-10 text-green-500" />
             </div>
@@ -512,9 +532,11 @@ export default function CampaignShare() {
             <p className="text-gray-500 mt-2">
               {campaign?.reward ? `You've claimed: ${campaign.reward}` : 'Your reward has been claimed successfully!'}
             </p>
-            <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-sm text-gray-500">Redirecting in <strong className="text-purple-600">{claimCountdown}s</strong></p>
-              <div className="mt-2 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-sm text-gray-500">
+                Redirecting in <strong className="text-purple-600">{claimCountdown}s</strong>
+              </p>
+              <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 rounded-full"
                   style={{ width: `${((5 - claimCountdown) / 5) * 100}%` }}
