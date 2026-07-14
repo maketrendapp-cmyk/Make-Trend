@@ -655,7 +655,7 @@ router.post('/templates', verifyToken, async (req, res) => {
     if (!(await isAdmin(uid))) {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
-    const { title, slug, description, image, thumbnail, category, platform, hashtags, isHighlight, plan = 'free' } = req.body;
+    const { title, slug, description, image, thumbnail, category, platform, hashtags, isHighlight, plan = 'free', reward } = req.body;
     if (!title || !slug) {
       return res.status(400).json({ success: false, error: 'Title and slug are required' });
     }
@@ -678,6 +678,7 @@ router.post('/templates', verifyToken, async (req, res) => {
       hashtags: hashtags || [],
       isHighlight: isHighlight || false,
       plan: plan || 'free',
+      reward: reward || 'Exclusive Reward',
       isActive: true,
       usageCount: 0,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -755,6 +756,26 @@ router.post('/templates/:id/usage', async (req, res) => {
   }
 });
 
+router.get('/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = await db.collection('templates').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+    const data = doc.data();
+    if (data.isActive === false) {
+      return res.status(404).json({ success: false, error: 'Template not available' });
+    }
+    res.json({
+      success: true,
+      template: { id: doc.id, ...data }
+    });
+  } catch (error) {
+    console.error('Get template by ID error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch template' });
+  }
+});
 // ============================================================
 // ===================== CAMPAIGN ENDPOINTS =====================
 // ============================================================
@@ -890,6 +911,8 @@ router.post('/campaigns', verifyToken, async (req, res) => {
 
     const templateData = templateDoc.data();
 
+    const customTitle = req.body.title && req.body.title.trim() ? req.body.title.trim() : null;
+
     const campaignData = {
       templateId,
       userId: uid,
@@ -897,7 +920,7 @@ router.post('/campaigns', verifyToken, async (req, res) => {
       tasks: finalTasks,
       finalUrl: finalFinalUrl,
       features: { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled },
-      title: templateData.title || 'Untitled Campaign',
+      title: customTitle || templateData.title || 'Untitled Campaign',
       description: templateData.description || '',
       image: templateData.image || '',
       reward: templateData.reward || 'Exclusive Reward',
