@@ -12,6 +12,7 @@ import {
   FaLock,
   FaCheckCircle,
   FaClock,
+  FaExternalLinkAlt,
 } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
@@ -31,8 +32,10 @@ export default function CampaignTasks() {
   const [pendingTaskIndex, setPendingTaskIndex] = useState(null);
   const [countdown, setCountdown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const timerRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
 
   // ── Fetch Campaign ──
   useEffect(() => {
@@ -54,7 +57,6 @@ export default function CampaignTasks() {
       const data = await res.json();
       if (data.success) {
         setCampaign(data.campaign);
-        // If no tasks, skip to share
         if (!data.campaign.tasks || data.campaign.tasks.length === 0) {
           router.push(`/share?id=${id}`);
         }
@@ -69,52 +71,89 @@ export default function CampaignTasks() {
     }
   };
 
-  // ── Detect return from app / browser ──
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && pendingTaskIndex !== null && countdown === 0) {
-        // Start 3-second countdown
-        setCountdown(3);
-        timerRef.current = setInterval(() => {
-          setCountdown((prev) => {
-            if (prev <= 1) {
-              clearInterval(timerRef.current);
-              // ✅ Complete the task
-              confirmTaskCompletion();
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
-    };
+  // ── Cleanup timers ──
+  const cleanupTimers = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [pendingTaskIndex, countdown]);
+  // ── Start verification countdown ──
+  const startCountdown = () => {
+    cleanupTimers();
+    setIsVerifying(true);
+    setCountdown(3);
+
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+          // ✅ Complete the task
+          confirmTaskCompletion();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   // ── Confirm task completion ──
   const confirmTaskCompletion = () => {
+    cleanupTimers();
     if (pendingTaskIndex === null) return;
     const index = pendingTaskIndex;
     setCompletedIndices((prev) => [...prev, index]);
     setActiveTaskIndex(index + 1);
     setPendingTaskIndex(null);
     setCountdown(0);
-    if (timerRef.current) clearInterval(timerRef.current);
+    setIsVerifying(false);
   };
 
-  // ── Handle task click ──
-  const handleTaskClick = (index, url) => {
+  // ── Handle task click – open URL ──
+  const handleOpenTask = (index, url) => {
     if (index !== activeTaskIndex) return;
     if (completedIndices.includes(index)) return;
+    if (pendingTaskIndex === index) return;
+
     setPendingTaskIndex(index);
-    // Open URL in new tab (app will open automatically on mobile)
+    // Open URL in new tab
     window.open(url, '_blank');
+
+    // Start countdown after a small delay (user needs time to switch to the app)
+    timerRef.current = setTimeout(() => {
+      startCountdown();
+    }, 1500);
   };
+
+  // ── Detect return from app / browser ──
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && pendingTaskIndex !== null && !isVerifying) {
+        startCountdown();
+      }
+    };
+
+    const handleFocus = () => {
+      if (pendingTaskIndex !== null && !isVerifying) {
+        startCountdown();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      cleanupTimers();
+    };
+  }, [pendingTaskIndex, isVerifying]);
 
   // ── Continue to Share ──
   const handleContinueToShare = async () => {
@@ -140,10 +179,10 @@ export default function CampaignTasks() {
   const getPlatformIcon = (url) => {
     if (!url) return <FaLink className="text-gray-400" />;
     const lower = url.toLowerCase();
-    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return <FaYoutube className="text-red-500" />;
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return <FaYoutube className="text-red-600" />;
     if (lower.includes('twitter.com') || lower.includes('x.com')) return <FaTwitter className="text-blue-400" />;
-    if (lower.includes('instagram.com')) return <FaInstagram className="text-pink-500" />;
-    if (lower.includes('facebook.com') || lower.includes('fb.com')) return <FaFacebook className="text-blue-600" />;
+    if (lower.includes('instagram.com')) return <FaInstagram className="text-pink-600" />;
+    if (lower.includes('facebook.com') || lower.includes('fb.com')) return <FaFacebook className="text-blue-700" />;
     if (lower.includes('tiktok.com')) return <FaTiktok className="text-black" />;
     return <FaLink className="text-gray-400" />;
   };
@@ -157,11 +196,11 @@ export default function CampaignTasks() {
     return (
       <>
         <Meta title="Loading Campaign" />
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:py-12">
+        <div className="min-h-screen bg-gray-50 py-4 px-4 sm:py-6">
           <div className="max-w-3xl mx-auto animate-pulse">
-            <div className="w-24 h-5 bg-gray-200 rounded mb-6" />
+            <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="h-64 bg-gray-200" />
+              <div className="h-48 sm:h-56 bg-gray-200" />
               <div className="p-6">
                 <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
                 <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
@@ -211,13 +250,13 @@ export default function CampaignTasks() {
   return (
     <>
       <Meta title={`${campaign.title || 'Campaign'} - Tasks`} />
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
 
           {/* ── Back Button ── */}
           <button
             onClick={() => router.back()}
-            className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-6 px-3 py-1.5 rounded-lg hover:bg-gray-100"
+            className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100"
           >
             <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -228,7 +267,7 @@ export default function CampaignTasks() {
           {/* ── Hero Card ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 transition-all hover:shadow-md">
             {/* Image */}
-            <div className="relative h-56 sm:h-72 overflow-hidden bg-gray-200">
+            <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gray-200">
               {campaign.image ? (
                 <img
                   src={campaign.image}
@@ -241,23 +280,23 @@ export default function CampaignTasks() {
                 </div>
               )}
               {/* Progress overlay */}
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200/50">
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/60">
                 <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
             {/* Content */}
-            <div className="p-6 sm:p-8">
+            <div className="p-5 sm:p-7">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{campaign.title || 'Campaign'}</h1>
               {campaign.description && (
                 <p className="text-gray-500 text-sm sm:text-base mt-1">{campaign.description}</p>
               )}
 
               {/* Badges */}
-              <div className="flex flex-wrap items-center gap-2 mt-4">
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 {campaign.reward && (
                   <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200">
                     🎁 {campaign.reward}
@@ -275,16 +314,21 @@ export default function CampaignTasks() {
 
               {/* Progress text */}
               <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-                <span>Progress</span>
-                <span className="font-medium">{Math.round(progress)}%</span>
+                <span className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
+                  <span>complete</span>
+                </span>
+                <span>{completedIndices.length}/{tasks.length} tasks</span>
               </div>
             </div>
           </div>
 
           {/* ── Tasks List ── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 transition-all hover:shadow-md">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Complete Tasks</h2>
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 transition-all hover:shadow-md">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <span>📋</span> Complete Tasks
+              </h2>
               <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                 {completedIndices.length}/{tasks.length}
               </span>
@@ -303,19 +347,20 @@ export default function CampaignTasks() {
                   return (
                     <div
                       key={index}
-                      className={`group relative flex items-start gap-4 p-4 rounded-2xl border transition-all duration-300 ${
+                      className={`group relative flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 ${
                         isCompleted
-                          ? 'bg-green-50 border-green-200'
+                          ? 'bg-green-50/80 border-green-200'
+                          : isActive && isPending
+                          ? 'bg-amber-50/80 border-amber-300 shadow-sm shadow-amber-100/50'
                           : isActive
-                          ? 'bg-purple-50 border-purple-300 shadow-sm shadow-purple-100/50 cursor-pointer hover:bg-purple-100/50'
+                          ? 'bg-purple-50/80 border-purple-300 shadow-sm shadow-purple-100/50 hover:bg-purple-100/60'
                           : isLocked
-                          ? 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
-                          : 'bg-gray-50 border-gray-200 cursor-pointer hover:border-gray-300'
+                          ? 'bg-gray-50/80 border-gray-200'
+                          : 'bg-gray-50/80 border-gray-200 hover:bg-gray-100/60'
                       }`}
-                      onClick={() => isActive && handleTaskClick(index, task.url)}
                     >
                       {/* Icon / Status */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg bg-white shadow-sm border border-gray-200">
+                      <div className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-lg bg-white shadow-sm border border-gray-200">
                         {isCompleted ? (
                           <FaCheckCircle className="text-green-500 text-xl" />
                         ) : isPending ? (
@@ -329,7 +374,7 @@ export default function CampaignTasks() {
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p
                             className={`font-medium transition-all duration-300 ${
                               isCompleted
@@ -343,51 +388,63 @@ export default function CampaignTasks() {
                           </p>
                           {isLocked && (
                             <span className="text-[10px] font-medium bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
-                              Locked
+                              🔒 Locked
                             </span>
                           )}
-                          {isActive && (
+                          {isActive && !isPending && (
                             <span className="text-[10px] font-medium bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full animate-pulse">
-                              Active
-                            </span>
-                          )}
-                          {isCompleted && (
-                            <span className="text-[10px] font-medium bg-green-200 text-green-700 px-2 py-0.5 rounded-full">
-                              Done
+                              ⚡ Active
                             </span>
                           )}
                           {isPending && (
                             <span className="text-[10px] font-medium bg-amber-200 text-amber-700 px-2 py-0.5 rounded-full animate-pulse">
-                              Verifying {countdown}s...
+                              ⏳ Verifying {countdown}s
+                            </span>
+                          )}
+                          {isCompleted && (
+                            <span className="text-[10px] font-medium bg-green-200 text-green-700 px-2 py-0.5 rounded-full">
+                              ✅ Done
                             </span>
                           )}
                         </div>
                         {task.url && !isLocked && (
-                          <a
-                            href={task.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-purple-600 hover:underline truncate block mt-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {task.url}
-                          </a>
+                          <p className="text-xs text-gray-400 truncate mt-0.5">
+                            {task.url.replace(/^https?:\/\//, '')}
+                          </p>
                         )}
                       </div>
 
-                      {/* Action hint */}
-                      {isActive && !isPending && !isCompleted && (
-                        <div className="flex-shrink-0 text-xs text-purple-600 font-medium bg-purple-100 px-3 py-1 rounded-full">
-                          Click to start
-                        </div>
-                      )}
-                      {isPending && (
-                        <div className="flex-shrink-0 flex items-center gap-1">
-                          <div className="w-6 h-6 rounded-full border-2 border-amber-500 flex items-center justify-center text-xs font-bold text-amber-600">
-                            {countdown}
+                      {/* ── Action Button ── */}
+                      <div className="flex-shrink-0">
+                        {isCompleted ? (
+                          <span className="text-xs font-medium text-green-600 bg-green-100 px-3 py-1.5 rounded-full">
+                            Completed
+                          </span>
+                        ) : isPending ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-sm font-bold text-amber-600 bg-white">
+                              {countdown}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        ) : isActive ? (
+                          <button
+                            onClick={() => handleOpenTask(index, task.url)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97]"
+                          >
+                            <FaExternalLinkAlt className="w-3 h-3" />
+                            Open Task
+                          </button>
+                        ) : isLocked ? (
+                          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full flex items-center gap-1">
+                            <FaLock className="w-3 h-3" />
+                            Locked
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">
+                            Waiting
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -400,7 +457,7 @@ export default function CampaignTasks() {
               disabled={!allTasksCompleted || isSubmitting}
               className={`w-full mt-8 inline-flex items-center justify-center px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
                 allTasksCompleted && !isSubmitting
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-md hover:scale-[1.02] active:scale-[0.98]'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
@@ -413,7 +470,7 @@ export default function CampaignTasks() {
                   Processing...
                 </span>
               ) : allTasksCompleted ? (
-                'Continue to Share 🚀'
+                '🚀 Continue to Share'
               ) : (
                 `Complete ${tasks.length - completedIndices.length} more task${tasks.length - completedIndices.length > 1 ? 's' : ''}`
               )}
