@@ -25,7 +25,6 @@ export default function CampaignTasks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Task states
   const [completedIndices, setCompletedIndices] = useState([]);
   const [pendingIndex, setPendingIndex] = useState(null);
   const [countdown, setCountdown] = useState(0);
@@ -34,7 +33,6 @@ export default function CampaignTasks() {
   const timerRef = useRef(null);
   const intervalRef = useRef(null);
 
-  // ── Fetch Campaign ──
   useEffect(() => {
     if (id) fetchCampaign();
   }, [id]);
@@ -68,7 +66,6 @@ export default function CampaignTasks() {
     }
   };
 
-  // ── Cleanup timers ──
   const cleanupTimers = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -80,7 +77,6 @@ export default function CampaignTasks() {
     }
   };
 
-  // ── Start countdown for a task ──
   const startCountdown = (index) => {
     cleanupTimers();
     setPendingIndex(index);
@@ -91,7 +87,6 @@ export default function CampaignTasks() {
         if (prev <= 1) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
-          // Auto complete the task
           completeTask(index);
           return 0;
         }
@@ -100,7 +95,6 @@ export default function CampaignTasks() {
     }, 1000);
   };
 
-  // ── Complete a task ──
   const completeTask = (index) => {
     cleanupTimers();
     if (!completedIndices.includes(index)) {
@@ -110,18 +104,13 @@ export default function CampaignTasks() {
     setCountdown(0);
   };
 
-  // ── Handle "Open Task" click ──
   const handleOpenTask = (index, url) => {
     if (completedIndices.includes(index)) return;
-    if (pendingIndex === index) return; // already pending
-
-    // Open URL
+    if (pendingIndex === index) return;
     window.open(url, '_blank');
-    // Start countdown immediately (6 seconds)
     startCountdown(index);
   };
 
-  // ── Continue to Share (Claim) ──
   const handleContinueToShare = async () => {
     const allCompleted = completedIndices.length === campaign?.tasks?.length;
     if (!allCompleted) return;
@@ -141,7 +130,6 @@ export default function CampaignTasks() {
     }
   };
 
-  // ── Get platform icon ──
   const getPlatformIcon = (url) => {
     if (!url) return <FaLink className="text-gray-400" />;
     const lower = url.toLowerCase();
@@ -232,20 +220,14 @@ export default function CampaignTasks() {
 
           {/* ── Hero Card ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 transition-all hover:shadow-md">
-            {/* Image */}
             <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gray-200">
               {campaign.image ? (
-                <img
-                  src={campaign.image}
-                  alt={campaign.title}
-                  className="w-full h-full object-cover"
-                />
+                <img src={campaign.image} alt={campaign.title} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300 bg-gradient-to-br from-purple-50 to-indigo-50">
                   🎯
                 </div>
               )}
-              {/* Progress overlay */}
               <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/60">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"
@@ -254,14 +236,12 @@ export default function CampaignTasks() {
               </div>
             </div>
 
-            {/* Content */}
             <div className="p-5 sm:p-7">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{campaign.title || 'Campaign'}</h1>
               {campaign.description && (
                 <p className="text-gray-500 text-sm sm:text-base mt-1">{campaign.description}</p>
               )}
 
-              {/* Badges */}
               <div className="flex flex-wrap items-center gap-2 mt-3">
                 {campaign.reward && (
                   <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200">
@@ -278,7 +258,6 @@ export default function CampaignTasks() {
                 )}
               </div>
 
-              {/* Progress text */}
               <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
                 <span className="flex items-center gap-2">
                   <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
@@ -319,7 +298,6 @@ export default function CampaignTasks() {
                           : 'bg-gray-50/80 border-gray-200 hover:bg-gray-100/60'
                       }`}
                     >
-                      {/* Icon / Status */}
                       <div className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-lg bg-white shadow-sm border border-gray-200">
                         {isCompleted ? (
                           <FaCheckCircle className="text-green-500 text-xl" />
@@ -330,14 +308,11 @@ export default function CampaignTasks() {
                         )}
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <p
                             className={`font-medium transition-all duration-300 ${
-                              isCompleted
-                                ? 'text-gray-500 line-through'
-                                : 'text-gray-900'
+                              isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'
                             }`}
                           >
                             {task.text}
@@ -360,7 +335,6 @@ export default function CampaignTasks() {
                         )}
                       </div>
 
-                      {/* ── Action Button ── */}
                       <div className="flex-shrink-0">
                         {isCompleted ? (
                           <span className="text-xs font-medium text-green-600 bg-green-100 px-3 py-1.5 rounded-full">
@@ -388,30 +362,37 @@ export default function CampaignTasks() {
               </div>
             )}
 
-            {/* ── Claim / Continue Button ── */}
-            <button
-              onClick={handleContinueToShare}
-              disabled={!allCompleted || isSubmitting}
-              className={`w-full mt-8 inline-flex items-center justify-center px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
-                allCompleted && !isSubmitting
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Processing...
-                </span>
-              ) : allCompleted ? (
-                '🎁 Claim Reward'
-              ) : (
-                `Complete ${tasks.length - completedIndices.length} more task${tasks.length - completedIndices.length > 1 ? 's' : ''}`
+            {/* ── Claim Button (always visible, locked until all tasks completed) ── */}
+            <div className="mt-8">
+              <button
+                onClick={handleContinueToShare}
+                disabled={!allCompleted || isSubmitting}
+                className={`w-full inline-flex items-center justify-center px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
+                  allCompleted && !isSubmitting
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  '🎁 Claim'
+                )}
+              </button>
+
+              {/* Helper text when not all tasks are completed */}
+              {!allCompleted && tasks.length > 0 && (
+                <p className="mt-2 text-center text-xs text-gray-400">
+                  Complete all {tasks.length} tasks to claim your reward
+                </p>
               )}
-            </button>
+            </div>
           </div>
         </div>
       </div>
