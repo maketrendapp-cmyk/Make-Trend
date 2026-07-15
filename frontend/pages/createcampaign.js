@@ -304,36 +304,36 @@ export default function CreateCampaign() {
     );
   }
 
-  // ── Success Screen (Scaled Up by ~15%) ──
+  // ── Success Screen (Gaps Reduced) ──
   if (campaignUrl) {
     const fullUrl = `${window.location.origin}${campaignUrl}`;
     return (
       <>
         <Meta title="Campaign Created!" />
-        <main className="min-h-screen flex items-center justify-center px-4 py-5 bg-gradient-to-b from-gray-50 to-white">
+        <main className="min-h-screen flex items-center justify-center px-4 py-3 bg-gradient-to-b from-gray-50 to-white">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            {/* Header – scaled up */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 sm:px-7 sm:py-5">
-              <div className="flex items-center gap-4 text-white">
-                <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-2xl flex-shrink-0">
+            {/* Header – reduced padding */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-3.5 sm:px-6 sm:py-4">
+              <div className="flex items-center gap-3 text-white">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl flex-shrink-0">
                   🎉
                 </div>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold">Campaign Created!</h1>
-                  <p className="text-purple-100 text-sm">Your campaign is ready to share.</p>
+                  <h1 className="text-xl sm:text-2xl font-bold">Campaign Created!</h1>
+                  <p className="text-purple-100 text-xs">Your campaign is ready to share.</p>
                 </div>
               </div>
             </div>
 
-            {/* Body – scaled up padding and spacing */}
-            <div className="p-5 sm:p-6 space-y-5">
+            {/* Body – reduced padding and spacing */}
+            <div className="p-4 sm:p-5 space-y-4">
               {/* Preview Card */}
               <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Preview</h2>
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Preview</h2>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
-                    {/* Image – scaled up */}
-                    <div className="sm:w-48 h-40 sm:h-auto bg-gray-200 flex-shrink-0">
+                    {/* Image – reduced height */}
+                    <div className="sm:w-44 h-36 sm:h-auto bg-gray-200 flex-shrink-0">
                       {template?.image ? (
                         <img
                           src={template.image}
@@ -341,33 +341,33 @@ export default function CreateCampaign() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
+                        <div className="w-full h-full flex items-center justify-center text-3xl text-gray-300">
                           🎯
                         </div>
                       )}
                     </div>
-                    {/* Details – scaled up */}
-                    <div className="flex-1 p-4 space-y-2">
-                      <h3 className="text-lg font-bold text-gray-900">{campaignTitle}</h3>
+                    {/* Details – reduced padding */}
+                    <div className="flex-1 p-3.5 space-y-1.5">
+                      <h3 className="text-base font-bold text-gray-900">{campaignTitle}</h3>
                       {campaignDescription && (
-                        <p className="text-gray-600 text-sm">{campaignDescription}</p>
+                        <p className="text-gray-600 text-xs">{campaignDescription}</p>
                       )}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full text-xs font-medium border border-amber-200">
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-amber-200">
                           🎁 {campaignReward}
                         </span>
                         {shareCountEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-medium border border-blue-200">
+                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-blue-200">
                             📢 {shareCount} shares
                           </span>
                         )}
                         {tasksEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-2.5 py-1 rounded-full text-xs font-medium border border-purple-200">
+                          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-purple-200">
                             📋 {tasks.length} tasks
                           </span>
                         )}
                         {finalUrlEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-medium border border-green-200">
+                          <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-green-200">
                             🔗 Redirect
                           </span>
                         )}
@@ -377,15 +377,15 @@ export default function CreateCampaign() {
                 </div>
               </div>
 
-              {/* Copy URL – scaled up */}
+              {/* Copy URL – reduced spacing */}
               <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Share Link</h2>
-                <div className="flex flex-col sm:flex-row items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Share Link</h2>
+                <div className="flex flex-col sm:flex-row items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
                   <input
                     type="text"
                     value={fullUrl}
                     readOnly
-                    className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-gray-700 truncate"
+                    className="flex-1 w-full bg-transparent outline-none text-xs font-mono text-gray-700 truncate"
                   />
                   <button
                     onClick={() => {
@@ -393,31 +393,31 @@ export default function CreateCampaign() {
                       setMessage('✅ Link copied!');
                       setTimeout(() => setMessage(''), 3000);
                     }}
-                    className="flex-shrink-0 w-full sm:w-auto px-5 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm"
+                    className="flex-shrink-0 w-full sm:w-auto px-4 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 shadow-sm"
                   >
                     Copy Link
                   </button>
                 </div>
-                {message && <p className="mt-2 text-sm text-green-600 text-center">{message}</p>}
+                {message && <p className="mt-1 text-xs text-green-600 text-center">{message}</p>}
               </div>
 
-              {/* Actions – scaled up */}
-              <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200">
+              {/* Actions – reduced padding */}
+              <div className="flex flex-wrap gap-2 justify-center pt-2.5 border-t border-gray-200">
                 <button
                   onClick={() => router.push(campaignUrl)}
-                  className="inline-flex items-center justify-center px-5 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm"
+                  className="inline-flex items-center justify-center px-4 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 shadow-sm"
                 >
                   👁️ View Campaign
                 </button>
                 <button
                   onClick={() => router.push('/stats')}
-                  className="inline-flex items-center justify-center px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-all duration-200"
+                  className="inline-flex items-center justify-center px-4 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-200 transition-all duration-200"
                 >
                   📊 View Stats
                 </button>
                 <button
                   onClick={() => router.push('/create')}
-                  className="inline-flex items-center justify-center px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-all duration-200"
+                  className="inline-flex items-center justify-center px-4 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-200 transition-all duration-200"
                 >
                   ✨ Create Another
                 </button>
