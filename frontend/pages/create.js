@@ -1,5 +1,5 @@
 // pages/create.js
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 
@@ -8,6 +8,7 @@ const API_BASE = BACKEND_URL + '/api';
 
 export default function Create() {
   const router = useRouter();
+  const { slug: highlightSlug } = router.query;
 
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +17,10 @@ export default function Create() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [highlightedId, setHighlightedId] = useState(null);
+  const highlightTimeoutRef = useRef(null);
 
+  // ── Fetch templates ──
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
@@ -34,6 +38,17 @@ export default function Create() {
         const data = await res.json();
         if (data.success) {
           setTemplates(data.templates || []);
+          // If highlightSlug is present, find and highlight that template
+          if (highlightSlug) {
+            const found = data.templates.find(t => t.slug === highlightSlug);
+            if (found) {
+              setHighlightedId(found.id);
+              // After 3 seconds, remove highlight
+              highlightTimeoutRef.current = setTimeout(() => {
+                setHighlightedId(null);
+              }, 3000);
+            }
+          }
         } else {
           setError(data.error || 'Failed to fetch templates');
         }
@@ -45,8 +60,23 @@ export default function Create() {
       }
     };
     fetchTemplates();
-  }, []);
 
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, [highlightSlug]);
+
+  // ── Scroll to highlighted template ──
+  useEffect(() => {
+    if (highlightedId) {
+      const el = document.getElementById(`template-${highlightedId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [highlightedId]);
+
+  // ── Filters ──
   const categories = useMemo(() => {
     const cats = new Set();
     templates.forEach(t => { if (t.category) cats.add(t.category); });
@@ -59,8 +89,14 @@ export default function Create() {
     return ['All', ...Array.from(plats)];
   }, [templates]);
 
-  const filteredTemplates = useMemo(() => {
-    let filtered = [...templates];
+  const { highlightedTemplates, regularTemplates } = useMemo(() => {
+    const highlighted = templates.filter(t => t.isHighlight === true);
+    const regular = templates.filter(t => !t.isHighlight);
+    return { highlightedTemplates: highlighted, regularTemplates: regular };
+  }, [templates]);
+
+  const filteredRegular = useMemo(() => {
+    let filtered = [...regularTemplates];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(t =>
@@ -78,21 +114,21 @@ export default function Create() {
       filtered = filtered.filter(t => t.platform === selectedPlatform);
     }
     return filtered;
-  }, [templates, searchQuery, selectedCategory, selectedPlatform]);
+  }, [regularTemplates, searchQuery, selectedCategory, selectedPlatform]);
 
-  const handlePreview = (slug) => {
+  const handlePreview = useCallback((slug) => {
     router.push(`/${slug}`);
-  };
+  }, [router]);
 
-  const handleUseTemplate = (slug) => {
+  const handleUseTemplate = useCallback((slug) => {
     router.push(`/createcampaign?slug=${slug}`);
-  };
+  }, [router]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedPlatform('');
-  };
+  }, []);
 
   const platformColors = {
     tiktok: 'bg-black/80 text-white',
@@ -102,7 +138,7 @@ export default function Create() {
     all: 'bg-gray-600 text-white',
   };
 
-  // Show error if any
+  // ── Error state ──
   if (error) {
     return (
       <>
@@ -119,7 +155,7 @@ export default function Create() {
     );
   }
 
-  // Show empty state
+  // ── Empty state ──
   if (!loading && templates.length === 0) {
     return (
       <>
@@ -136,14 +172,14 @@ export default function Create() {
   return (
     <>
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
-      <main className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Header */}
+      <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        {/* ── Header ── */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">✨ Choose a Template</h1>
           <p className="text-gray-500 text-sm mt-0.5">Select a template to customize and launch your campaign</p>
         </div>
 
-        {/* Search & Filters */}
+        {/* ── Search & Filters ── */}
         <div className="mb-6 space-y-3">
           <div className="flex flex-col sm:flex-row gap-2.5">
             <div className="flex-1 relative">
@@ -209,12 +245,79 @@ export default function Create() {
           )}
 
           <div className="text-xs text-gray-400">
-            Showing <span className="font-medium text-gray-600">{filteredTemplates.length}</span> of{' '}
-            <span className="font-medium text-gray-600">{templates.length}</span> templates
+            Showing <span className="font-medium text-gray-600">{filteredRegular.length}</span> of{' '}
+            <span className="font-medium text-gray-600">{regularTemplates.length}</span> templates
           </div>
         </div>
 
-        {/* Template Grid */}
+        {/* ── Highlighted Templates Carousel ── */}
+        {highlightedTemplates.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
+              <span>⭐ Featured Templates</span>
+              <span className="text-xs font-normal text-gray-400">(scroll to see more)</span>
+            </h2>
+            <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <div className="flex gap-4 w-max">
+                {highlightedTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="w-64 flex-shrink-0 bg-white rounded-xl border border-border shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
+                  >
+                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
+                      {template.image ? (
+                        <img
+                          src={template.image}
+                          alt={template.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">🎨</div>
+                      )}
+                      <div className="absolute bottom-2 left-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
+                          {template.platform ? template.platform.toUpperCase() : 'ALL'}
+                        </span>
+                      </div>
+                      <div className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span>👥</span> {template.usageCount || 0}
+                      </div>
+                      <div className="absolute top-2 left-2 bg-yellow-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                        ⭐ Featured
+                      </div>
+                      {template.plan && template.plan !== 'free' && (
+                        <div className="absolute top-2 right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                          {template.plan.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <h3 className="font-semibold text-gray-900 text-sm truncate">{template.title}</h3>
+                      <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{template.description || 'No description.'}</p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => handlePreview(template.slug)}
+                          className="flex-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 py-1 rounded-lg transition"
+                        >
+                          👁️ Preview
+                        </button>
+                        <button
+                          onClick={() => handleUseTemplate(template.slug)}
+                          className="flex-1 text-xs font-medium text-white bg-primary hover:bg-primary/90 py-1 rounded-lg transition"
+                        >
+                          ✨ Use
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Regular Templates Grid ── */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -231,7 +334,7 @@ export default function Create() {
               </div>
             ))}
           </div>
-        ) : filteredTemplates.length === 0 ? (
+        ) : filteredRegular.length === 0 ? (
           <div className="text-center py-10 bg-gray-50 rounded-xl border border-border">
             <div className="text-4xl mb-2">🔍</div>
             <h3 className="text-base font-semibold text-gray-900 mb-0.5">No templates match</h3>
@@ -242,89 +345,97 @@ export default function Create() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTemplates.map((template) => (
-              <div
-                key={template.id}
-                className="group bg-white rounded-2xl border border-border shadow-sm hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-pointer overflow-hidden"
-              >
-                {/* Image - Full image shown with object-cover */}
-                <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
-                  {template.image ? (
-                    <img
-                      src={template.image}
-                      alt={template.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">🎨</div>
-                  )}
-                  {template.isHighlight && (
-                    <div className="absolute top-2 left-2 bg-yellow-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                      ⭐ Featured
-                    </div>
-                  )}
-                  {template.plan && template.plan !== 'free' && (
-                    <div className="absolute top-2 right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                      {template.plan.toUpperCase()}
-                    </div>
-                  )}
-                  <div className="absolute bottom-2 left-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
-                      {template.platform ? template.platform.toUpperCase() : 'ALL'}
-                    </span>
-                  </div>
-                  <div className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <span>👥</span> {template.usageCount || 0}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">
-                      {template.title}
-                    </h3>
-                    {template.category && (
-                      <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        {template.category}
-                      </span>
+            {filteredRegular.map((template) => {
+              const isHighlighted = highlightedId === template.id;
+              return (
+                <div
+                  key={template.id}
+                  id={`template-${template.id}`}
+                  className={`group bg-white rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden ${
+                    isHighlighted
+                      ? 'border-2 border-primary shadow-xl shadow-primary/20 scale-[1.02] ring-4 ring-primary/30'
+                      : 'border-border hover:border-primary/30'
+                  }`}
+                >
+                  {/* Image */}
+                  <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
+                    {template.image ? (
+                      <img
+                        src={template.image}
+                        alt={template.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">🎨</div>
                     )}
+                    {template.isHighlight && (
+                      <div className="absolute top-2 left-2 bg-yellow-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                        ⭐ Featured
+                      </div>
+                    )}
+                    {template.plan && template.plan !== 'free' && (
+                      <div className="absolute top-2 right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                        {template.plan.toUpperCase()}
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 left-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
+                        {template.platform ? template.platform.toUpperCase() : 'ALL'}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span>👥</span> {template.usageCount || 0}
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                    {template.description || 'No description provided.'}
-                  </p>
-                  {template.hashtags && template.hashtags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {template.hashtags.slice(0, 3).map((tag, i) => (
-                        <span key={i} className="text-[10px] bg-primary/5 text-primary/70 px-2 py-0.5 rounded-full">
-                          {tag}
+
+                  {/* Content */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-1">
+                        {template.title}
+                      </h3>
+                      {template.category && (
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {template.category}
                         </span>
-                      ))}
-                      {template.hashtags.length > 3 && (
-                        <span className="text-[10px] text-gray-400">+{template.hashtags.length - 3}</span>
                       )}
                     </div>
-                  )}
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      {template.description || 'No description provided.'}
+                    </p>
+                    {template.hashtags && template.hashtags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {template.hashtags.slice(0, 3).map((tag, i) => (
+                          <span key={i} className="text-[10px] bg-primary/5 text-primary/70 px-2 py-0.5 rounded-full">
+                            {tag}
+                          </span>
+                        ))}
+                        {template.hashtags.length > 3 && (
+                          <span className="text-[10px] text-gray-400">+{template.hashtags.length - 3}</span>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Buttons */}
-                  <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handlePreview(template.slug)}
-                      className="text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 py-1.5 rounded-lg transition"
-                    >
-                      👁️ Preview
-                    </button>
-                    <button
-                      onClick={() => handleUseTemplate(template.slug)}
-                      className="text-xs font-medium text-white bg-primary hover:bg-primary/90 py-1.5 rounded-lg transition"
-                    >
-                      ✨ Use
-                    </button>
+                    {/* Buttons */}
+                    <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handlePreview(template.slug)}
+                        className="text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 py-1.5 rounded-lg transition"
+                      >
+                        👁️ Preview
+                      </button>
+                      <button
+                        onClick={() => handleUseTemplate(template.slug)}
+                        className="text-xs font-medium text-white bg-primary hover:bg-primary/90 py-1.5 rounded-lg transition"
+                      >
+                        ✨ Use
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
