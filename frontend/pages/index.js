@@ -12,7 +12,6 @@ import {
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-// ── Emoji mapping for categories ──
 const categoryEmojis = {
   giveaway: '🎁',
   simcard: '📱',
@@ -35,7 +34,6 @@ export default function Home() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const carouselIntervalRef = useRef(null);
 
-  // ── Fetch featured templates ──
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
@@ -54,7 +52,6 @@ export default function Home() {
     fetchFeatured();
   }, []);
 
-  // ── Carousel auto‑slide ──
   useEffect(() => {
     if (featuredTemplates.length > 1) {
       carouselIntervalRef.current = setInterval(() => {
@@ -100,14 +97,12 @@ export default function Home() {
       <Meta
         title="Make Trend – Create & Share Viral Campaigns"
         description="Launch share‑to‑unlock campaigns for Instagram, TikTok, YouTube, and more. Grow your audience in minutes."
-        image="https://maketrend.vercel.app/og-home.jpg"
-        url="https://maketrend.vercel.app"
       />
       <main className="min-h-screen bg-gradient-to-b from-white to-gray-50/80">
-        {/* ── Hero Section ── */}
+        {/* ── Hero ── */}
         <section className="relative overflow-hidden px-4 pt-12 pb-16 sm:pt-20 sm:pb-24">
           <div className="max-w-6xl mx-auto text-center">
-            <div className="inline-block mb-4 px-4 py-1.5 bg-primary/10 rounded-full text-primary text-xs font-bold tracking-wider uppercase">
+            <div className="inline-block mb-4 px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full tracking-wider uppercase">
               🚀 Launch viral campaigns in minutes
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight">
@@ -123,7 +118,7 @@ export default function Home() {
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <button
                 onClick={() => router.push('/create')}
-                className="px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:bg-primary/95 transition-all flex items-center gap-2"
+                className="px-6 py-3 bg-purple-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2"
               >
                 Browse Templates <FiChevronRight className="w-4 h-4" />
               </button>
@@ -135,13 +130,11 @@ export default function Home() {
               </button>
             </div>
           </div>
-
-          {/* Decorative background shapes */}
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none" />
         </section>
 
-        {/* ── Stats Bar ── */}
+        {/* ── Stats ── */}
         <section className="border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6">
           <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             <div>
@@ -163,19 +156,17 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Featured Templates Carousel ── */}
+        {/* ── Featured Carousel ── */}
         <section className="py-16 px-4">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                  <span>⭐ Featured Templates</span>
-                </h2>
+                <h2 className="text-2xl font-bold text-slate-900">⭐ Featured Templates</h2>
                 <p className="text-slate-500 text-sm mt-0.5">Hand‑picked templates to get you started</p>
               </div>
               <button
                 onClick={() => router.push('/create')}
-                className="text-sm font-semibold text-primary hover:underline flex items-center gap-1"
+                className="text-sm font-semibold text-purple-600 hover:underline flex items-center gap-1"
               >
                 View all <FiChevronRight className="w-4 h-4" />
               </button>
@@ -210,7 +201,6 @@ export default function Home() {
                   {featuredTemplates.map((template) => (
                     <div key={template.id} className="w-full flex-shrink-0">
                       <div className="flex flex-col sm:flex-row p-4 sm:p-6 gap-4 sm:gap-6">
-                        {/* Image */}
                         <div className="w-full sm:w-48 h-40 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
                           {template.image ? (
                             <img
@@ -224,7 +214,6 @@ export default function Home() {
                             </div>
                           )}
                         </div>
-                        {/* Details */}
                         <div className="flex-1 flex flex-col justify-between">
                           <div>
                             <div className="flex flex-wrap items-center gap-1.5 mb-1">
@@ -265,7 +254,7 @@ export default function Home() {
                             </button>
                             <button
                               onClick={() => handleUseTemplate(template.slug)}
-                              className="px-4 py-1.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary/90 transition shadow-sm"
+                              className="px-4 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition shadow-sm"
                             >
                               ✨ Use Template
                             </button>
@@ -275,8 +264,6 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-
-                {/* Dots */}
                 {featuredTemplates.length > 1 && (
                   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
                     {featuredTemplates.map((_, idx) => (
@@ -284,7 +271,7 @@ export default function Home() {
                         key={idx}
                         onClick={() => goToSlide(idx)}
                         className={`h-1.5 rounded-full transition-all ${
-                          idx === carouselIndex ? 'bg-primary w-6' : 'bg-slate-300 w-1.5'
+                          idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-1.5'
                         }`}
                         aria-label={`Go to slide ${idx + 1}`}
                       />
@@ -305,7 +292,7 @@ export default function Home() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-primary text-2xl">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
                   <FiRocket />
                 </div>
                 <h3 className="font-bold text-slate-900">Launch in Minutes</h3>
@@ -314,7 +301,7 @@ export default function Home() {
                 </p>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-primary text-2xl">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
                   <FiTrendingUp />
                 </div>
                 <h3 className="font-bold text-slate-900">Real‑Time Analytics</h3>
@@ -323,7 +310,7 @@ export default function Home() {
                 </p>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-primary text-2xl">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
                   <FiUsers />
                 </div>
                 <h3 className="font-bold text-slate-900">Grow Your Audience</h3>
@@ -356,15 +343,9 @@ export default function Home() {
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <span>© {new Date().getFullYear()} Make Trend. All rights reserved.</span>
             <div className="flex gap-4">
-              <a href="/terms" className="hover:text-slate-700 transition">
-                Terms
-              </a>
-              <a href="/privacy" className="hover:text-slate-700 transition">
-                Privacy
-              </a>
-              <a href="/support" className="hover:text-slate-700 transition">
-                Support
-              </a>
+              <a href="/terms" className="hover:text-slate-700 transition">Terms</a>
+              <a href="/privacy" className="hover:text-slate-700 transition">Privacy</a>
+              <a href="/support" className="hover:text-slate-700 transition">Support</a>
             </div>
           </div>
         </footer>
