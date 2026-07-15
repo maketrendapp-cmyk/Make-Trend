@@ -1,4 +1,5 @@
 // lib/withCampaignMeta.js
+import React from 'react';
 import Meta from '../components/Meta';
 
 // ── Internal helper (not exported) ──
