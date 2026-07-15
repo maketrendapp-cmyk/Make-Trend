@@ -782,7 +782,7 @@ router.get('/templates/:id', async (req, res) => {
 
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
 // GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
-// // ============================================================
+// ============================================================
 // GET USER'S CAMPAIGNS (Paginated) – Protected
 // ============================================================
 router.get('/campaigns', verifyToken, async (req, res) => {
@@ -792,10 +792,11 @@ router.get('/campaigns', verifyToken, async (req, res) => {
     const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
     const lastId = req.query.lastId || null;
 
-    // ── Build query: fetch ONLY non‑deleted campaigns ──
+    // ── Build query: fetch only non‑deleted campaigns ──
+    // Use 'in' filter (equality) to avoid inequality ordering restrictions
     let query = db.collection('campaigns')
       .where('userId', '==', uid)
-      .where('status', '!=', 'deleted')   // ✅ exclude deleted at the source
+      .where('status', 'in', ['active', 'paused'])   // exclude deleted
       .orderBy('createdAt', 'desc')
       .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
       .limit(limit);
@@ -815,7 +816,6 @@ router.get('/campaigns', verifyToken, async (req, res) => {
       lastDoc = doc;
     });
 
-    // ── hasMore: if we fetched exactly 'limit' docs, there are more ──
     const hasMore = snapshot.size === limit;
 
     res.json({
