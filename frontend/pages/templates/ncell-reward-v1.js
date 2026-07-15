@@ -1,9 +1,10 @@
 // pages/templates/ncell-reward-v1.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import Head from 'next/head';
+import Meta from '../../components/Meta';
+import { fetchCampaign } from '../../lib/fetchCampaign';
 
-export default function NcellRewardV1() {
+export default function NcellRewardV1({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
@@ -14,15 +15,29 @@ export default function NcellRewardV1() {
   const [refSuffix, setRefSuffix] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // ── Meta data (server‑side) ──
+  const meta = campaign
+    ? {
+        title: campaign.title,
+        description: campaign.description,
+        image: campaign.image || 'https://maketrend.vercel.app/og-default.jpg',
+        url: `https://maketrend.vercel.app/ncell-reward-v1?id=${campaign.id}`,
+      }
+    : {
+        title: 'Ncell Axiata • Digital Reward 2026',
+        description: 'Claim your exclusive Rs. 100 cashback reward from Ncell Axiata. Limited time offer for prepaid users.',
+        image: 'https://maketrend.vercel.app/og-ncell.jpg',
+        url: 'https://maketrend.vercel.app/ncell-reward-v1',
+      };
+
+  // ── Component logic (unchanged) ──
   const handleMobileChange = (e) => {
     const val = e.target.value.replace(/\D/g, '');
     setMobileNumber(val);
     if (error) setError('');
   };
 
-  const validateNcellNumber = (num) => {
-    return /^(98|97)\d{8}$/.test(num);
-  };
+  const validateNcellNumber = (num) => /^(98|97)\d{8}$/.test(num);
 
   const handleClaim = () => {
     if (!validateNcellNumber(mobileNumber)) {
@@ -50,17 +65,9 @@ export default function NcellRewardV1() {
 
   return (
     <>
-      <Head>
-        <title>Ncell Axiata • Reward Verification Portal</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-      </Head>
-
+      <Meta {...meta} />
       <div className="page-wrapper">
-        {/* Header */}
+        {/* ── Your existing UI (unchanged) ── */}
         <header className="site-header">
           <div className="header-logo">
             <img
@@ -220,7 +227,7 @@ export default function NcellRewardV1() {
         </footer>
       </div>
 
-      {/* ===== ALL STYLES EMBEDDED ===== */}
+      {/* ── Styles (unchanged) ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ===== RESET ===== */
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -361,4 +368,16 @@ export default function NcellRewardV1() {
       `}} />
     </>
   );
+}
+
+// ── Server‑side data fetching for social crawlers ──
+export async function getServerSideProps({ query }) {
+  const campaignId = query.id || query.campaign || null;
+  let campaign = null;
+  if (campaignId) {
+    campaign = await fetchCampaign(campaignId);
+  }
+  return {
+    props: { campaign },
+  };
 }
