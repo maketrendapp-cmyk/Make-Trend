@@ -7,54 +7,6 @@ import Meta from '../components/Meta';
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-// --- Premium Custom Vector Icons ---
-const Icons = {
-  Search: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  ),
-  Filter: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-    </svg>
-  ),
-  Eye: () => (
-    <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-    </svg>
-  ),
-  Sparkles: () => (
-    <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-    </svg>
-  ),
-  Users: () => (
-    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-  ),
-  Gift: () => (
-    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5a2 2 0 10-2 2h2zm0 0h4l-2 3H10l-2-3h4zm-7 3h14v10a2 2 0 01-2 2H5a2 2 0 01-2-2V11z" />
-    </svg>
-  ),
-  Clock: () => (
-    <svg className="w-3.5 h-3.5 text-primary mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  ImagePlaceholder: () => (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
-      <svg className="w-8 h-8 mb-1 opacity-55" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-      <span className="text-[10px] font-bold tracking-wider uppercase">Loading Preview</span>
-    </div>
-  )
-};
-
 export default function Create() {
   const router = useRouter();
   const { slug: highlightSlug } = router.query;
@@ -73,42 +25,40 @@ export default function Create() {
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
 
-  // ── Memoized Fetch Function (Avoids full page refreshes on Retries) ──
-  const fetchTemplates = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch(`${API_BASE}/templates`);
-      if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
-      const data = await res.json();
-      if (data.success) {
-        setTemplates(data.templates || []);
-        if (highlightSlug) {
-          const found = data.templates.find(t => t.slug === highlightSlug);
-          if (found) {
-            setHighlightedId(found.id);
-            highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
-          }
-        }
-      } else {
-        throw new Error(data.error || 'Failed to fetch templates');
-      }
-    } catch (err) {
-      setError(err.message);
-      console.error('Fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [highlightSlug]);
-
-  // ── Fetch templates on mount or deep link change ──
+  // ── Fetch templates (Matches original safe rendering pipeline) ──
   useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`${API_BASE}/templates`);
+        if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
+        const data = await res.json();
+        if (data.success) {
+          setTemplates(data.templates || []);
+          if (highlightSlug) {
+            const found = data.templates.find(t => t.slug === highlightSlug);
+            if (found) {
+              setHighlightedId(found.id);
+              highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
+            }
+          }
+        } else {
+          throw new Error(data.error || 'Failed to fetch templates');
+        }
+      } catch (err) {
+        setError(err.message);
+        console.error('Fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchTemplates();
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [fetchTemplates]);
+  }, [highlightSlug]);
 
   useEffect(() => {
     if (highlightedId) {
@@ -210,6 +160,7 @@ export default function Create() {
     }
   };
 
+  // ── Error state ──
   if (error) {
     return (
       <>
@@ -222,7 +173,11 @@ export default function Create() {
           <p className="text-slate-500 text-xs mb-5">{error}</p>
           <button
             type="button"
-            onClick={fetchTemplates}
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              router.reload();
+            }}
             className="w-full py-2.5 bg-primary text-white rounded-xl font-bold shadow-md shadow-primary/25 hover:bg-primary/95 transition active:scale-95"
           >
             Try Again
@@ -252,7 +207,7 @@ export default function Create() {
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
         
-        {/* ── Modern Condensed Header ── */}
+        {/* ── Header ── */}
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
@@ -274,7 +229,10 @@ export default function Create() {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Icons.Search />
+                {/* Search Icon */}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
               </div>
               <input
                 type="text"
@@ -293,7 +251,10 @@ export default function Create() {
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <Icons.Filter />
+              {/* Filter Icon */}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
               <span className="hidden sm:inline">Filters</span>
               {(selectedCategory || selectedPlatform) && (
                 <span className="bg-primary text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">
@@ -311,7 +272,7 @@ export default function Create() {
               className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all ${
                 !selectedCategory 
                   ? 'bg-slate-900 text-white shadow-sm' 
-                  : 'bg-white text-slate-600 border border-slate-200/50 hover:border-slate-300'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
               }`}
             >
               🔥 All
@@ -324,7 +285,7 @@ export default function Create() {
                 className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all capitalize ${
                   selectedCategory === cat 
                     ? 'bg-primary text-white shadow-sm' 
-                    : 'bg-white text-slate-600 border border-slate-200/50 hover:border-slate-300'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
                 }`}
               >
                 {cat === 'giveaway' ? '🎁' : cat === 'simcard' ? '🚀' : '✨'} {cat}
@@ -334,7 +295,7 @@ export default function Create() {
 
           {/* Expanded Dropdown Filters */}
           <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showFilters ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
-            <div className="grid grid-cols-2 gap-2 p-2 bg-slate-100 rounded-xl border border-slate-200/40">
+            <div className="grid grid-cols-2 gap-2 p-2 bg-slate-100 rounded-xl border border-slate-200">
               <div className="relative">
                 <select
                   value={selectedCategory}
@@ -371,11 +332,15 @@ export default function Create() {
               <span className="text-amber-500 text-sm">★</span>
               <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Featured Template</h2>
               <span className="text-[9px] bg-primary/10 text-primary px-1 rounded-full font-extrabold ml-2 flex items-center">
-                <Icons.Clock /> Auto‑play
+                {/* Clock Icon */}
+                <svg className="w-3.5 h-3.5 text-primary mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Auto‑play
               </span>
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+            <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
               <div
                 className="flex transition-transform duration-700 ease-out"
                 style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
@@ -384,17 +349,17 @@ export default function Create() {
                   <div key={template.id} className="w-full flex-shrink-0">
                     <div className="flex flex-col">
                       
-                      {/* Image Frame (Double-Layer Fit Solution) */}
+                      {/* Image Frame with Double-Layer Fit System */}
                       <div className="w-full aspect-[16/10] sm:aspect-[21/9] relative bg-slate-950 overflow-hidden">
                         
-                        {/* Layer 1: Blurred Backdrop (Fills container perfectly) */}
+                        {/* Layer 1: Blurred Background */}
                         {template.image && (
                           <div className="absolute inset-0 select-none pointer-events-none scale-110 filter blur-xl opacity-40">
                             <img src={template.image} className="w-full h-full object-cover" alt="" />
                           </div>
                         )}
 
-                        {/* Layer 2: Main Image (Fully Fit with object-contain to prevent cutting off text) */}
+                        {/* Layer 2: Main Responsive Fitted Image */}
                         {template.image ? (
                           <img
                             src={template.image}
@@ -402,10 +367,15 @@ export default function Create() {
                             className="relative w-full h-full object-contain z-10 mx-auto"
                           />
                         ) : (
-                          <Icons.ImagePlaceholder />
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                            <svg className="w-8 h-8 mb-1 opacity-55" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-[10px] font-bold tracking-wider uppercase">Loading Preview</span>
+                          </div>
                         )}
 
-                        {/* Badges Overlaid Directly Inside the Frame */}
+                        {/* Corner Overlays */}
                         <div className="absolute top-2.5 left-2.5 flex gap-1 z-20">
                           <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                             ⭐ Featured
@@ -418,7 +388,7 @@ export default function Create() {
                         </div>
                       </div>
                       
-                      {/* Condensed Meta & Details Block */}
+                      {/* Details Segment */}
                       <div className="p-3 bg-white">
                         <div className="flex flex-wrap items-center gap-1.5 mb-1 bg-white">
                           {template.platform && (
@@ -441,24 +411,33 @@ export default function Create() {
                         </h3>
                         
                         <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
-                          {template.description || 'Launch your custom campaign with this template.'}
+                          {template.description || 'Launch your campaign with this template.'}
                         </p>
 
-                        {/* Symmetrical Dual Buttons - Matches normal card layout sizing */}
+                        {/* Symmetrical Dual Action Buttons */}
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() => handlePreview(template.slug)}
                             className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
                           >
-                            <Icons.Eye /> Preview
+                            {/* Eye Icon */}
+                            <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Preview
                           </button>
                           <button
                             type="button"
                             onClick={() => handleUseTemplate(template.slug)}
                             className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
                           >
-                            <Icons.Sparkles /> Use Template
+                            {/* Sparkles Icon */}
+                            <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                            </svg>
+                            Use Template
                           </button>
                         </div>
                       </div>
@@ -498,7 +477,7 @@ export default function Create() {
           </span>
         </div>
 
-        {/* ── Regular Templates Grid (Optimized Density & Fitted Images) ── */}
+        {/* ── Regular Templates Grid ── */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {[1, 2, 3].map((i) => (
@@ -539,21 +518,21 @@ export default function Create() {
                   className={`group bg-white rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.015)] ${
                     isHighlighted
                       ? 'border-primary ring-4 ring-primary/10 scale-[1.01]'
-                      : 'border-slate-200/60 hover:border-slate-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)]'
+                      : 'border-slate-200 hover:border-slate-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)]'
                   }`}
                 >
                   
-                  {/* Fitted Image Frame (No cropped banners) */}
+                  {/* Fitted Image Frame */}
                   <div className="w-full aspect-[16/10] bg-slate-950 relative overflow-hidden">
                     
-                    {/* Layer 1: Blurred Backdrop */}
+                    {/* Blurred backdrop layer */}
                     {template.image && (
                       <div className="absolute inset-0 select-none pointer-events-none scale-110 filter blur-xl opacity-40">
                         <img src={template.image} className="w-full h-full object-cover" alt="" />
                       </div>
                     )}
 
-                    {/* Layer 2: Main Fitted Image */}
+                    {/* Main Fitted Image */}
                     {template.image ? (
                       <img
                         src={template.image}
@@ -562,7 +541,12 @@ export default function Create() {
                         loading="lazy"
                       />
                     ) : (
-                      <Icons.ImagePlaceholder />
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                        <svg className="w-8 h-8 mb-1 opacity-55" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-[10px] font-bold tracking-wider uppercase">Loading Preview</span>
+                      </div>
                     )}
                     
                     {/* Floating Corner Badges */}
@@ -588,7 +572,7 @@ export default function Create() {
                     </div>
                   </div>
 
-                  {/* Information & Actions Row (Compact) */}
+                  {/* Compact Info and Action Segment */}
                   <div className="p-3 flex-grow flex flex-col justify-between">
                     <div>
                       <div className="flex items-start justify-between gap-1.5 bg-white">
@@ -633,27 +617,40 @@ export default function Create() {
                       </div>
 
                       {template.reward && (
-                        <div className="mt-1 text-[10px] font-extrabold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100/60 px-1.5 py-0.5 rounded-lg w-fit">
-                          <Icons.Gift /> {template.reward}
+                        <div className="mt-1 text-[10px] font-extrabold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-lg w-fit">
+                          {/* Gift Icon */}
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5a2 2 0 10-2 2h2zm0 0h4l-2 3H10l-2-3h4zm-7 3h14v10a2 2 0 01-2 2H5a2 2 0 01-2-2V11z" />
+                          </svg>
+                          {template.reward}
                         </div>
                       )}
                     </div>
 
-                    {/* Symmetrical Dual Actions (Exactly matches Featured button sizes!) */}
+                    {/* Symmetrical Dual Actions Row */}
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
                       <button
                         type="button"
                         onClick={() => handlePreview(template.slug)}
                         className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
                       >
-                        <Icons.Eye /> Preview
+                        {/* Eye Icon */}
+                        <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Preview
                       </button>
                       <button
                         type="button"
                         onClick={() => handleUseTemplate(template.slug)}
                         className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
                       >
-                        <Icons.Sparkles /> Use Template
+                        {/* Sparkles Icon */}
+                        <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                        Use Template
                       </button>
                     </div>
                   </div>
