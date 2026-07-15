@@ -14,17 +14,19 @@ export default function CreateCampaign() {
   const { slug } = router.query;
   const { user, isAuthenticated, loading: authLoading, refreshUser } = useAuth();
 
-  // ===== STATE =====
+  // ── State ──
   const [template, setTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [campaignUrl, setCampaignUrl] = useState('');
+  const [campaignId, setCampaignId] = useState('');
 
-  // ===== FORM STATE =====
-  // ✅ NEW: Title field
+  // ── Form State ──
   const [campaignTitle, setCampaignTitle] = useState('');
+  const [campaignDescription, setCampaignDescription] = useState('');
+  const [campaignReward, setCampaignReward] = useState('');
 
   const [shareCountEnabled, setShareCountEnabled] = useState(false);
   const [shareCount, setShareCount] = useState(10);
@@ -35,7 +37,10 @@ export default function CreateCampaign() {
   const [finalUrlEnabled, setFinalUrlEnabled] = useState(false);
   const [finalUrl, setFinalUrl] = useState('');
 
-  // ===== FETCH TEMPLATE =====
+  // ── Storage key per template slug ──
+  const storageKey = `createCampaign_${slug || 'new'}`;
+
+  // ── Load template ──
   useEffect(() => {
     if (slug && isAuthenticated) {
       fetchTemplate();
@@ -50,9 +55,13 @@ export default function CreateCampaign() {
       const data = await res.json();
       if (data.success) {
         setTemplate(data.template);
-        // ✅ Set default title from template
+        // Pre‑fill from template
         setCampaignTitle(data.template.title || '');
+        setCampaignDescription(data.template.description || '');
+        setCampaignReward(data.template.reward || 'Exclusive Reward');
         setError('');
+        // Load saved form from localStorage
+        loadSavedForm();
       } else {
         setError('Template not found');
       }
@@ -64,7 +73,61 @@ export default function CreateCampaign() {
     }
   };
 
-  // ===== TASK HANDLERS =====
+  // ── Load saved form from localStorage ──
+  const loadSavedForm = () => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.title !== undefined) setCampaignTitle(parsed.title);
+        if (parsed.description !== undefined) setCampaignDescription(parsed.description);
+        if (parsed.reward !== undefined) setCampaignReward(parsed.reward);
+        if (parsed.shareCountEnabled !== undefined) setShareCountEnabled(parsed.shareCountEnabled);
+        if (parsed.shareCount !== undefined) setShareCount(parsed.shareCount);
+        if (parsed.tasksEnabled !== undefined) setTasksEnabled(parsed.tasksEnabled);
+        if (parsed.tasks !== undefined) setTasks(parsed.tasks);
+        if (parsed.finalUrlEnabled !== undefined) setFinalUrlEnabled(parsed.finalUrlEnabled);
+        if (parsed.finalUrl !== undefined) setFinalUrl(parsed.finalUrl);
+      }
+    } catch (e) {
+      console.warn('Failed to load saved form', e);
+    }
+  };
+
+  // ── Save form to localStorage on any change ──
+  useEffect(() => {
+    if (!template) return;
+    const formData = {
+      title: campaignTitle,
+      description: campaignDescription,
+      reward: campaignReward,
+      shareCountEnabled,
+      shareCount,
+      tasksEnabled,
+      tasks,
+      finalUrlEnabled,
+      finalUrl,
+    };
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(formData));
+    } catch (e) {
+      // ignore
+    }
+  }, [
+    campaignTitle,
+    campaignDescription,
+    campaignReward,
+    shareCountEnabled,
+    shareCount,
+    tasksEnabled,
+    tasks,
+    finalUrlEnabled,
+    finalUrl,
+    template,
+    storageKey,
+  ]);
+
+  // ── Task Handlers ──
   const addTask = () => {
     if (tasks.length >= 100) {
       setMessage('Maximum 100 tasks allowed');
@@ -87,15 +150,18 @@ export default function CreateCampaign() {
     setTasks(updated);
   };
 
-  // ===== VALIDATION =====
+  // ── Validation ──
   const validateForm = () => {
-    // ✅ Validate title
     if (!campaignTitle || campaignTitle.trim().length < 1) {
       setMessage('Please enter a campaign title');
       return false;
     }
     if (campaignTitle.length > 100) {
       setMessage('Campaign title must be less than 100 characters');
+      return false;
+    }
+    if (campaignDescription && campaignDescription.length > 500) {
+      setMessage('Description must be less than 500 characters');
       return false;
     }
 
@@ -143,7 +209,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ===== SUBMIT =====
+  // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -166,7 +232,9 @@ export default function CreateCampaign() {
 
       const payload = {
         templateId: template.id,
-        title: campaignTitle.trim(), // ✅ Send title to backend
+        title: campaignTitle.trim(),
+        description: campaignDescription.trim(),
+        reward: campaignReward.trim(),
         shareCount: shareCountEnabled ? Number(shareCount) : 0,
         tasks: tasksEnabled ? tasks : [],
         finalUrl: finalUrlEnabled ? finalUrl : '',
@@ -189,10 +257,13 @@ export default function CreateCampaign() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        const campaignId = data.campaignId;
-        const url = `/${slug}/${campaignId}`;
+        const cId = data.campaignId;
+        setCampaignId(cId);
+        const url = `/${slug}/${cId}`;
         setCampaignUrl(url);
         setMessage('✅ Campaign created successfully!');
+        // Clear saved form after success (optional)
+        localStorage.removeItem(storageKey);
       } else {
         setMessage(data.error || 'Failed to create campaign');
       }
@@ -203,7 +274,7 @@ export default function CreateCampaign() {
     setIsSubmitting(false);
   };
 
-  // ===== HANDLE NOT AUTHENTICATED =====
+  // ── Handlers for non‑authenticated ──
   if (!authLoading && !isAuthenticated) {
     return (
       <>
@@ -213,7 +284,7 @@ export default function CreateCampaign() {
     );
   }
 
-  // ===== HANDLE TEMPLATE NOT FOUND =====
+  // ── Error state ──
   if (error) {
     return (
       <main className="max-w-4xl mx-auto px-4 py-16 text-center">
@@ -230,33 +301,71 @@ export default function CreateCampaign() {
     );
   }
 
-  // ===== SUCCESS =====
+  // ── Success Screen ──
   if (campaignUrl) {
     const fullUrl = `${window.location.origin}${campaignUrl}`;
     return (
       <>
         <Meta title="Campaign Created!" />
-        <main className="max-w-2xl mx-auto px-4 py-16">
-          <div className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-3xl p-8 md:p-10 text-center shadow-xl">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-green-200/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-40 h-40 bg-emerald-200/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+        <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* ── Preview Card ── */}
+            <div className="p-6 sm:p-8 border-b border-gray-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">🎉 Campaign Created!</h2>
+              <p className="text-gray-500 mb-6">Here's a preview of how your campaign will look when shared.</p>
 
-            <div className="relative z-10">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center shadow-lg shadow-green-200/50 animate-[popIn_0.6s_ease-out]">
-                <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
+              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+                <div className="flex flex-col sm:flex-row gap-6">
+                  {/* Image */}
+                  <div className="sm:w-48 h-48 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0">
+                    {template?.image ? (
+                      <img src={template.image} alt={campaignTitle} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
+                        🎯
+                      </div>
+                    )}
+                  </div>
+                  {/* Details */}
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-900">{campaignTitle}</h3>
+                    {campaignDescription && (
+                      <p className="text-gray-600 text-sm mt-1">{campaignDescription}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-xs font-medium border border-amber-200">
+                        🎁 {campaignReward}
+                      </span>
+                      {shareCountEnabled && (
+                        <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-200">
+                          📢 {shareCount} shares
+                        </span>
+                      )}
+                      {tasksEnabled && (
+                        <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-xs font-medium border border-purple-200">
+                          📋 {tasks.length} tasks
+                        </span>
+                      )}
+                      {finalUrlEnabled && (
+                        <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium border border-green-200">
+                          🔗 Redirect
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
 
-              <h2 className="text-3xl font-bold text-gray-900">🎉 Campaign Created!</h2>
-              <p className="text-gray-600 mt-2">Your campaign is ready to share with the world.</p>
-
-              <div className="mt-6 p-4 bg-white rounded-2xl border border-green-200 shadow-sm flex items-center gap-3 transition-all hover:shadow-md">
+            {/* ── Share URL ── */}
+            <div className="p-6 sm:p-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Share Your Campaign</h3>
+              <div className="flex flex-col sm:flex-row items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <input
                   type="text"
                   value={fullUrl}
                   readOnly
-                  className="flex-1 bg-transparent outline-none text-sm font-mono text-gray-700 truncate"
+                  className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-gray-700 truncate"
                 />
                 <button
                   onClick={() => {
@@ -264,18 +373,14 @@ export default function CreateCampaign() {
                     setMessage('✅ Link copied!');
                     setTimeout(() => setMessage(''), 3000);
                   }}
-                  className="flex-shrink-0 px-4 py-2 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 text-sm shadow-sm hover:shadow-md"
+                  className="flex-shrink-0 px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-all duration-200 text-sm shadow-sm hover:shadow-md"
                 >
-                  Copy
+                  Copy Link
                 </button>
               </div>
               {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
 
-              <div className="mt-4 text-xs text-gray-400">
-                Template: <span className="font-mono font-medium text-gray-600">{slug}</span>
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3 justify-center">
+              <div className="mt-6 flex flex-wrap gap-3 justify-center sm:justify-start">
                 <button
                   onClick={() => router.push(campaignUrl)}
                   className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-md hover:shadow-lg"
@@ -288,6 +393,12 @@ export default function CreateCampaign() {
                 >
                   📊 View Stats
                 </button>
+                <button
+                  onClick={() => router.push('/create')}
+                  className="inline-flex items-center justify-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200"
+                >
+                  ✨ Create Another
+                </button>
               </div>
             </div>
           </div>
@@ -296,7 +407,7 @@ export default function CreateCampaign() {
     );
   }
 
-  // ===== SKELETON LOADING =====
+  // ── Skeleton Loading ──
   if (loading) {
     return (
       <>
@@ -346,12 +457,12 @@ export default function CreateCampaign() {
     );
   }
 
-  // ===== MAIN FORM =====
+  // ── Main Form ──
   return (
     <>
       <Meta title={`Create Campaign - ${template?.title || 'Campaign'}`} />
       <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* ===== BACK BUTTON ===== */}
+        {/* Back Button */}
         <button
           onClick={() => router.back()}
           className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-4 px-3 py-1.5 rounded-lg hover:bg-gray-100"
@@ -362,23 +473,19 @@ export default function CreateCampaign() {
           Back
         </button>
 
-        {/* ===== TEMPLATE INFO ===== */}
+        {/* Template Info */}
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-2">
           <span>Template:</span>
-          <span className="font-mono font-medium text-gray-800 bg-gray-100 px-2.5 py-0.5 rounded-md">
-            {slug}
-          </span>
+          <span className="font-mono font-medium text-gray-800 bg-gray-100 px-2.5 py-0.5 rounded-md">{slug}</span>
           {template?.category && (
-            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-              {template.category}
-            </span>
+            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{template.category}</span>
           )}
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mt-1">Create Campaign</h1>
         <p className="text-gray-500 mt-1 text-sm">Enable the features you want and customize your campaign</p>
 
-        {/* ===== MESSAGE ===== */}
+        {/* Messages */}
         {message && (
           <div className={`mt-6 p-4 rounded-xl ${
             message.includes('✅')
@@ -389,26 +496,54 @@ export default function CreateCampaign() {
           </div>
         )}
 
-        {/* ===== FORM ===== */}
+        {/* Form */}
         <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-          {/* ✅ NEW: Campaign Title */}
+          {/* ── Campaign Details ── */}
           <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">📝 Campaign Title</h2>
-              <p className="text-sm text-gray-500">Give your campaign a unique name</p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">📝 Campaign Details</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={campaignTitle}
+                  onChange={(e) => setCampaignTitle(e.target.value)}
+                  placeholder="Enter campaign title..."
+                  className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                  maxLength="100"
+                />
+                <p className="text-xs text-gray-400 mt-1">{campaignTitle.length}/100 characters</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={campaignDescription}
+                  onChange={(e) => setCampaignDescription(e.target.value)}
+                  placeholder="Describe your campaign..."
+                  rows="3"
+                  className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition resize-y"
+                  maxLength="500"
+                />
+                <p className="text-xs text-gray-400 mt-1">{campaignDescription.length}/500 characters</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">🎁 Reward</label>
+                <input
+                  type="text"
+                  value={campaignReward}
+                  onChange={(e) => setCampaignReward(e.target.value)}
+                  placeholder="e.g., Exclusive Gift Card"
+                  className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                />
+                <p className="text-xs text-gray-400 mt-1">What users get after completing the campaign</p>
+              </div>
             </div>
-            <input
-              type="text"
-              value={campaignTitle}
-              onChange={(e) => setCampaignTitle(e.target.value)}
-              placeholder="Enter campaign title..."
-              className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
-              maxLength="100"
-            />
-            <p className="text-xs text-gray-400 mt-1">{campaignTitle.length}/100 characters</p>
           </div>
 
-          {/* Share Count */}
+          {/* ── Share Count ── */}
           <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -444,7 +579,7 @@ export default function CreateCampaign() {
             )}
           </div>
 
-          {/* Tasks */}
+          {/* ── Tasks ── */}
           <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -512,7 +647,7 @@ export default function CreateCampaign() {
             )}
           </div>
 
-          {/* Final URL */}
+          {/* ── Final URL ── */}
           <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -576,13 +711,7 @@ export default function CreateCampaign() {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        @keyframes popIn {
-          0% { transform: scale(0); opacity: 0; }
-          60% { transform: scale(1.15); }
-          100% { transform: scale(1); opacity: 1; }
-        }
         .animate-slideDown { animation: slideDown 0.3s ease-out; }
-        .animate-popIn { animation: popIn 0.6s ease-out; }
       `}</style>
     </>
   );
