@@ -2,7 +2,6 @@
 import React from 'react';
 import Meta from '../components/Meta';
 
-// ── Internal helper (not exported) ──
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
 async function fetchCampaign(id) {
@@ -16,7 +15,6 @@ async function fetchCampaign(id) {
   }
 }
 
-// ── Main HOC ──
 export function withCampaignMeta(Component, defaultMeta) {
   const WrappedComponent = ({ campaign, ...props }) => {
     const meta = campaign
