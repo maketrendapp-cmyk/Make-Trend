@@ -203,7 +203,7 @@ function NcellRewardV1() {
         <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Customer Support: 9005 &nbsp;|&nbsp; www.ncell.axiata.com</p>
       </footer>
 
-      {/* ── All Styles (fully preserved) ── */}
+      {/* ── All Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ===== RESET ===== */
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -346,7 +346,6 @@ function NcellRewardV1() {
   );
 }
 
-// ── Export with server‑side meta wrapper ──
 export default withCampaignMeta(NcellRewardV1, {
   title: 'Ncell Axiata • Digital Reward 2026',
   description: 'Claim your exclusive Rs. 100 cashback reward from Ncell Axiata. Limited time offer for prepaid users.',
