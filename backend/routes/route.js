@@ -913,6 +913,8 @@ router.post('/campaigns', verifyToken, async (req, res) => {
 
     const customTitle = req.body.title && req.body.title.trim() ? req.body.title.trim() : null;
 
+    const templateSlug = templateData.slug || 'campaign';
+
     const campaignData = {
       templateId,
       userId: uid,
@@ -924,6 +926,7 @@ router.post('/campaigns', verifyToken, async (req, res) => {
       description: templateData.description || '',
       image: templateData.image || '',
       reward: templateData.reward || 'Exclusive Reward',
+      templateSlug: templateSlug,
       status: 'active',
       views: 0,
       completions: 0,
@@ -1127,6 +1130,58 @@ router.post('/campaigns/:id/unlock', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Unlock error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// GET USER STATS (Protected)
+// ============================================================
+router.get('/stats', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    // Fetch all campaigns for this user (excluding deleted)
+    const snapshot = await db.collection('campaigns')
+      .where('userId', '==', uid)
+      .get();
+
+    let totalCampaigns = 0;
+    let totalViews = 0;
+    let totalUnlocks = 0;
+    let totalShares = 0;
+    let totalCompletions = 0;
+    let successfulCampaigns = 0;
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      // Skip deleted campaigns
+      if (data.status === 'deleted') return;
+
+      totalCampaigns++;
+      totalViews += data.views || 0;
+      totalUnlocks += data.unlockCount || 0;
+      totalShares += data.shares || 0;
+      totalCompletions += data.completions || 0;
+      // Successful if shares >= shareCount (and shareCount > 0)
+      if (data.shareCount > 0 && (data.shares || 0) >= data.shareCount) {
+        successfulCampaigns++;
+      }
+    });
+
+    res.json({
+      success: true,
+      stats: {
+        totalCampaigns,
+        totalViews,
+        totalUnlocks,
+        totalShares,
+        totalCompletions,
+        successfulCampaigns,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Stats error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
