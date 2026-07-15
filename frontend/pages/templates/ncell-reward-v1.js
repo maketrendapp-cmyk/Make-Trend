@@ -1,10 +1,9 @@
 // pages/templates/ncell-reward-v1.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import Head from 'next/head';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 
-function NcellRewardV1({ campaign }) {
+function NcellRewardV1() {
   const router = useRouter();
   const { id } = router.query;
 
@@ -48,171 +47,163 @@ function NcellRewardV1({ campaign }) {
   };
 
   return (
-    <>
-      {/* ── Head with ALL external resources ── */}
-      <Head>
-        <title>Ncell Axiata • Reward Verification Portal</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-        {/* Additional meta tags from withCampaignMeta will be merged automatically */}
-      </Head>
-
-      {/* ── Your full UI (unchanged) ── */}
-      <div className="page-wrapper">
-        <header className="site-header">
-          <div className="header-logo">
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Ncell_logo.svg/2560px-Ncell_logo.svg.png"
-              alt="Ncell Axiata Limited"
-              loading="eager"
-              width="140"
-              height="38"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src =
-                  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50"%3E%3Crect fill="%23702082" width="200" height="50" rx="8"/%3E%3Ctext x="100" y="32" text-anchor="middle" fill="white" font-size="18" font-weight="bold"%3ENcell%3C/text%3E%3C/svg%3E';
-              }}
-            />
-          </div>
-          <div className="header-badge">
-            <span className="pulse-dot"></span> Official Campaign
-          </div>
-        </header>
-
-        <section className="hero-section">
-          <div className="hero-content">
-            <div className="hero-icon"><i className="fas fa-gift"></i></div>
-            <h1>Digital Reward Program 2026</h1>
-            <p>Celebrating our valued prepaid users across Nepal with an exclusive instant cashback reward.</p>
-            <div className="hero-badge-row">
-              <span><i className="fas fa-bolt"></i> Instant</span>
-              <span><i className="fas fa-shield-halved"></i> Secure</span>
-              <span><i className="fas fa-users"></i> Exclusive</span>
-            </div>
-          </div>
-        </section>
-
-        <main className="main-card-wrapper">
-          <div className="reward-card">
-            <div className="step-indicator">
-              <div className={`step-dot ${step >= 2 ? 'completed' : 'active'}`}>
-                {step > 1 ? <i className="fas fa-check"></i> : 1}
-              </div>
-              <div className={`step-dot ${step >= 3 ? 'completed' : step === 2 ? 'active' : ''}`}>
-                {step > 2 ? <i className="fas fa-check"></i> : 2}
-              </div>
-              <div className={`step-dot ${step >= 3 ? 'active' : ''}`}>
-                {step > 3 ? <i className="fas fa-check"></i> : 3}
-              </div>
-            </div>
-
-            {step === 1 && (
-              <div className="panel">
-                <div className="text-center">
-                  <span className="reward-tag">Limited Time Promotion</span>
-                  <div className="cash-amount"><span className="currency">Rs.</span>100</div>
-                  <p className="benefit-text">
-                    Congratulations! Your Ncell profile has been pre-selected for an instant <strong>Rs. 100 main balance cashback</strong>. Verify your number to claim.
-                  </p>
-                </div>
-                <div className="input-group">
-                  <div className={`input-wrapper ${error ? 'error' : ''}`}>
-                    <span className="prefix">
-                      <img src="https://flagcdn.com/w20/np.png" alt="Nepal" width="22" height="15" />
-                      +977
-                    </span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      placeholder="98XXXXXXXX"
-                      maxLength="10"
-                      value={mobileNumber}
-                      onChange={handleMobileChange}
-                      onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleClaim()}
-                    />
-                  </div>
-                  {error && <p className="error-msg">{error}</p>}
-                </div>
-                <button className="btn-primary" onClick={handleClaim} disabled={isLoading}>
-                  {isLoading ? 'Verifying...' : 'Continue to Claim'} <i className="fas fa-arrow-right"></i>
-                </button>
-                <div className="trust-badges">
-                  <span><i className="fas fa-user-shield"></i> Verified</span>
-                  <span><i className="fas fa-bolt"></i> Instant</span>
-                  <span><i className="fas fa-lock"></i> Encrypted</span>
-                </div>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="panel text-center">
-                <div className="loading-spinner"></div>
-                <h3>Verifying MSISDN</h3>
-                <p>Checking eligibility with Axiata Central Systems…</p>
-                <div className="loading-dots">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="panel text-center">
-                <div className="success-icon"><i className="fas fa-check"></i></div>
-                <h2>Reward Confirmed!</h2>
-                <p>The <strong>Rs. 100 Cashback</strong> has been approved for</p>
-                <p className="confirmed-number">{confirmedNumber}</p>
-                <div className="ref-box">
-                  Reference ID: <strong>NC-TXN-2026-{refSuffix}</strong>
-                </div>
-                <p className="note-text">Your cashback will reflect in your main balance within <strong>15 minutes</strong>.</p>
-                <button className="btn-outline" onClick={handleContinueToReward}>
-                  <i className="fas fa-gift"></i> Continue to Reward
-                </button>
-              </div>
-            )}
-          </div>
-        </main>
-
-        <div className="trust-cards">
-          <div><i className="fas fa-bolt"></i><span>Instant Processing</span></div>
-          <div><i className="fas fa-shield-halved"></i><span>Safe & Secure</span></div>
-          <div><i className="fas fa-headset"></i><span>24/7 Support</span></div>
-          <div><i className="fas fa-circle-check"></i><span>Ncell Official</span></div>
-        </div>
-
-        <div className="info-sections">
-          <div className="info-block">
-            <h3><i className="fas fa-circle-info"></i> Campaign Overview</h3>
-            <p>The Ncell Axiata <strong>"Digital First" Reward Campaign 2026</strong> is designed to encourage prepaid users to verify their mobile identities and transition towards digital self-service. This promotion is strictly limited to verified Ncell Prepaid users within Nepal.</p>
-          </div>
-          <div className="info-block">
-            <h3><i className="fas fa-file-contract"></i> Terms & Conditions</h3>
-            <ul>
-              <li>The <strong>Rs. 100 cashback</strong> is a one-time reward per unique mobile number and is credited to the main balance.</li>
-              <li>Eligibility is determined automatically based on account activity, tenure, and registration validity.</li>
-              <li>Cashback funds can be used for voice calls, SMS, data packages, and other standard Ncell services.</li>
-              <li>Verification requires a <strong>valid 10-digit Ncell number</strong> starting with '98' or '97'.</li>
-              <li>Ncell Axiata Limited reserves the right to modify or terminate this offer at any time.</li>
-            </ul>
-          </div>
-        </div>
-
-        <footer className="site-footer">
+    <div className="page-wrapper">
+      {/* ── Header ── */}
+      <header className="site-header">
+        <div className="header-logo">
           <img
             src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Ncell_logo.svg/2560px-Ncell_logo.svg.png"
-            alt="Ncell Logo"
-            width="120"
-            height="28"
+            alt="Ncell Axiata Limited"
+            loading="eager"
+            width="140"
+            height="38"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src =
+                'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50"%3E%3Crect fill="%23702082" width="200" height="50" rx="8"/%3E%3Ctext x="100" y="32" text-anchor="middle" fill="white" font-size="18" font-weight="bold"%3ENcell%3C/text%3E%3C/svg%3E';
+            }}
           />
-          <p>© 2026 Ncell Axiata Limited. All Rights Reserved. Ncell Axiata Limited is the first private sector mobile service provider in Nepal, committed to delivering world-class mobile connectivity and digital services to millions of Nepali users.</p>
-          <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Customer Support: 9005 &nbsp;|&nbsp; www.ncell.axiata.com</p>
-        </footer>
+        </div>
+        <div className="header-badge">
+          <span className="pulse-dot"></span> Official Campaign
+        </div>
+      </header>
+
+      {/* ── Hero ── */}
+      <section className="hero-section">
+        <div className="hero-content">
+          <div className="hero-icon"><i className="fas fa-gift"></i></div>
+          <h1>Digital Reward Program 2026</h1>
+          <p>Celebrating our valued prepaid users across Nepal with an exclusive instant cashback reward.</p>
+          <div className="hero-badge-row">
+            <span><i className="fas fa-bolt"></i> Instant</span>
+            <span><i className="fas fa-shield-halved"></i> Secure</span>
+            <span><i className="fas fa-users"></i> Exclusive</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Main Card ── */}
+      <main className="main-card-wrapper">
+        <div className="reward-card">
+          <div className="step-indicator">
+            <div className={`step-dot ${step >= 2 ? 'completed' : 'active'}`}>
+              {step > 1 ? <i className="fas fa-check"></i> : 1}
+            </div>
+            <div className={`step-dot ${step >= 3 ? 'completed' : step === 2 ? 'active' : ''}`}>
+              {step > 2 ? <i className="fas fa-check"></i> : 2}
+            </div>
+            <div className={`step-dot ${step >= 3 ? 'active' : ''}`}>
+              {step > 3 ? <i className="fas fa-check"></i> : 3}
+            </div>
+          </div>
+
+          {step === 1 && (
+            <div className="panel">
+              <div className="text-center">
+                <span className="reward-tag">Limited Time Promotion</span>
+                <div className="cash-amount"><span className="currency">Rs.</span>100</div>
+                <p className="benefit-text">
+                  Congratulations! Your Ncell profile has been pre-selected for an instant <strong>Rs. 100 main balance cashback</strong>. Verify your number to claim.
+                </p>
+              </div>
+              <div className="input-group">
+                <div className={`input-wrapper ${error ? 'error' : ''}`}>
+                  <span className="prefix">
+                    <img src="https://flagcdn.com/w20/np.png" alt="Nepal" width="22" height="15" />
+                    +977
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="98XXXXXXXX"
+                    maxLength="10"
+                    value={mobileNumber}
+                    onChange={handleMobileChange}
+                    onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleClaim()}
+                  />
+                </div>
+                {error && <p className="error-msg">{error}</p>}
+              </div>
+              <button className="btn-primary" onClick={handleClaim} disabled={isLoading}>
+                {isLoading ? 'Verifying...' : 'Continue to Claim'} <i className="fas fa-arrow-right"></i>
+              </button>
+              <div className="trust-badges">
+                <span><i className="fas fa-user-shield"></i> Verified</span>
+                <span><i className="fas fa-bolt"></i> Instant</span>
+                <span><i className="fas fa-lock"></i> Encrypted</span>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="panel text-center">
+              <div className="loading-spinner"></div>
+              <h3>Verifying MSISDN</h3>
+              <p>Checking eligibility with Axiata Central Systems…</p>
+              <div className="loading-dots">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="panel text-center">
+              <div className="success-icon"><i className="fas fa-check"></i></div>
+              <h2>Reward Confirmed!</h2>
+              <p>The <strong>Rs. 100 Cashback</strong> has been approved for</p>
+              <p className="confirmed-number">{confirmedNumber}</p>
+              <div className="ref-box">
+                Reference ID: <strong>NC-TXN-2026-{refSuffix}</strong>
+              </div>
+              <p className="note-text">Your cashback will reflect in your main balance within <strong>15 minutes</strong>.</p>
+              <button className="btn-outline" onClick={handleContinueToReward}>
+                <i className="fas fa-gift"></i> Continue to Reward
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* ── Trust Cards ── */}
+      <div className="trust-cards">
+        <div><i className="fas fa-bolt"></i><span>Instant Processing</span></div>
+        <div><i className="fas fa-shield-halved"></i><span>Safe & Secure</span></div>
+        <div><i className="fas fa-headset"></i><span>24/7 Support</span></div>
+        <div><i className="fas fa-circle-check"></i><span>Ncell Official</span></div>
       </div>
 
-      {/* ── All styles (fully intact) ── */}
+      {/* ── Info Sections ── */}
+      <div className="info-sections">
+        <div className="info-block">
+          <h3><i className="fas fa-circle-info"></i> Campaign Overview</h3>
+          <p>The Ncell Axiata <strong>"Digital First" Reward Campaign 2026</strong> is designed to encourage prepaid users to verify their mobile identities and transition towards digital self-service. This promotion is strictly limited to verified Ncell Prepaid users within Nepal.</p>
+        </div>
+        <div className="info-block">
+          <h3><i className="fas fa-file-contract"></i> Terms & Conditions</h3>
+          <ul>
+            <li>The <strong>Rs. 100 cashback</strong> is a one-time reward per unique mobile number and is credited to the main balance.</li>
+            <li>Eligibility is determined automatically based on account activity, tenure, and registration validity.</li>
+            <li>Cashback funds can be used for voice calls, SMS, data packages, and other standard Ncell services.</li>
+            <li>Verification requires a <strong>valid 10-digit Ncell number</strong> starting with '98' or '97'.</li>
+            <li>Ncell Axiata Limited reserves the right to modify or terminate this offer at any time.</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* ── Footer ── */}
+      <footer className="site-footer">
+        <img
+          src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Ncell_logo.svg/2560px-Ncell_logo.svg.png"
+          alt="Ncell Logo"
+          width="120"
+          height="28"
+        />
+        <p>© 2026 Ncell Axiata Limited. All Rights Reserved. Ncell Axiata Limited is the first private sector mobile service provider in Nepal, committed to delivering world-class mobile connectivity and digital services to millions of Nepali users.</p>
+        <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Customer Support: 9005 &nbsp;|&nbsp; www.ncell.axiata.com</p>
+      </footer>
+
+      {/* ── All Styles (fully preserved) ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ===== RESET ===== */
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -351,7 +342,7 @@ function NcellRewardV1({ campaign }) {
           .step-indicator::before { top: 50%; left: 18px; right: 18px; }
         }
       `}} />
-    </>
+    </div>
   );
 }
 
