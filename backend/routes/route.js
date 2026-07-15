@@ -782,27 +782,46 @@ router.get('/templates/:id', async (req, res) => {
 
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
 // GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
+// GET USER'S CAMPAIGNS (Protected – paginated)
 router.get('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || 25;
+    const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
+    const lastId = req.query.lastId || null;
 
-    const snapshot = await db.collection('campaigns')
+    let query = db.collection('campaigns')
       .where('userId', '==', uid)
       .orderBy('createdAt', 'desc')
-      .limit(limit)
-      .get();
+      .orderBy('id', 'desc') // tie-breaker for unique ordering
+      .limit(limit);
 
+    if (lastCreatedAt && lastId) {
+      // Firestore Timestamp from JS Date
+      const lastTimestamp = admin.firestore.Timestamp.fromDate(lastCreatedAt);
+      query = query.startAfter(lastTimestamp, lastId);
+    }
+
+    const snapshot = await query.get();
     const campaigns = [];
+    let lastDoc = null;
     snapshot.forEach(doc => {
       const data = doc.data();
-      // Only exclude documents marked as 'deleted'
       if (data.status !== 'deleted') {
         campaigns.push({ id: doc.id, ...data });
+        lastDoc = doc;
       }
     });
 
-    res.json({ success: true, campaigns });
+    const hasMore = campaigns.length === limit; // if we got 'limit' items, there might be more
+
+    res.json({
+      success: true,
+      campaigns,
+      hasMore,
+      lastCreatedAt: lastDoc ? lastDoc.data().createdAt.toMillis() : null,
+      lastId: lastDoc ? lastDoc.id : null,
+    });
   } catch (error) {
     console.error('Get campaigns error:', error);
     res.status(500).json({ success: false, error: error.message });
