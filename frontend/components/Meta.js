@@ -9,7 +9,7 @@ export default function Meta({ title, description, image, url }) {
 
   return (
     <Head>
-      {/* ── Global Resources ── */}
+      {/* Global Resources */}
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
@@ -23,7 +23,7 @@ export default function Meta({ title, description, image, url }) {
       />
       <link rel="icon" href="/favicon.ico" />
 
-      {/* ── Dynamic Meta Tags ── */}
+      {/* Dynamic Meta Tags */}
       <title>{siteTitle}</title>
       <meta name="description" content={metaDesc} />
       <meta property="og:title" content={siteTitle} />
