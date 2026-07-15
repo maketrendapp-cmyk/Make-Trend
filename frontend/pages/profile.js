@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import {
-  FiSettings, FiLock, FiCreditCard, FiHelpCircle,
+  FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
   FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy
 } from 'react-icons/fi';
@@ -13,16 +13,12 @@ import { FaCrown } from 'react-icons/fa';
 
 export default function Profile() {
   const router = useRouter();
-  const { user, logout } = useAuth(); // still needed for logout and profile state
+  const { user, logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({
     totalCampaigns: 0,
     totalViews: 0,
     totalUnlocks: 0,
-    totalShares: 0,
-    totalCompletions: 0,
-    activeCampaigns: 0,
-    successfulCampaigns: 0,
   });
   const [loading, setLoading] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -52,21 +48,13 @@ export default function Profile() {
   const fetchProfile = async () => {
     try {
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        console.warn('⏳ No Firebase user logged in');
-        return;
-      }
-      console.log('👤 Firebase user:', firebaseUser.uid);
+      if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      console.log('✅ Token obtained');
-
       const url = `${API_BASE}/api/auth/me`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      console.log('🔵 Profile API response:', data);
-
       if (data.success && data.user) {
         setProfile({
           uid: data.user.uid || firebaseUser.uid,
@@ -79,7 +67,6 @@ export default function Profile() {
           referralCode: data.user.referralCode || '',
         });
       } else {
-        console.warn('⚠️ Profile API returned success=false or missing user:', data);
         // fallback to Firebase Auth
         setProfile({
           uid: firebaseUser.uid,
@@ -93,8 +80,6 @@ export default function Profile() {
         });
       }
     } catch (error) {
-      console.error('❌ Profile fetch error:', error);
-      // fallback
       const firebaseUser = auth.currentUser;
       if (firebaseUser) {
         setProfile({
@@ -111,63 +96,41 @@ export default function Profile() {
     }
   };
 
-  // ── Fetch campaigns ──
-  const fetchCampaignsStats = async () => {
+  // ── Fetch stats from new /api/stats endpoint ──
+  const fetchStats = async () => {
     try {
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        console.warn('⏳ No Firebase user for campaigns');
-        return;
-      }
+      if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const url = `${API_BASE}/api/campaigns`;
+      const url = `${API_BASE}/api/stats`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      console.log('🟢 Campaigns API response:', data);
-
       if (data.success) {
-        if (data.stats) {
-          setStats(data.stats);
-        } else {
-          // manual fallback
-          const campaigns = data.campaigns || [];
-          let totalCampaigns = 0, totalViews = 0, totalUnlocks = 0,
-              totalShares = 0, totalCompletions = 0, activeCampaigns = 0, successfulCampaigns = 0;
-          campaigns.forEach(c => {
-            if (c.status === 'deleted') return;
-            totalCampaigns++;
-            totalViews += c.views || 0;
-            totalUnlocks += c.unlockCount || 0;
-            totalShares += c.shares || 0;
-            totalCompletions += c.completions || 0;
-            if (c.status === 'active') activeCampaigns++;
-            if (c.shareCount > 0 && (c.shares || 0) >= c.shareCount) successfulCampaigns++;
-          });
-          setStats({ totalCampaigns, totalViews, totalUnlocks, totalShares, totalCompletions, activeCampaigns, successfulCampaigns });
-        }
-      } else {
-        console.warn('⚠️ Campaigns API returned success=false:', data);
+        setStats({
+          totalCampaigns: data.stats.totalCampaigns || 0,
+          totalViews: data.stats.totalViews || 0,
+          totalUnlocks: data.stats.totalUnlocks || 0,
+        });
       }
     } catch (error) {
-      console.error('❌ Campaigns fetch error:', error);
+      // silent fail
     }
   };
 
   useEffect(() => {
-    // Wait for Firebase auth to be ready
     const unsubscribe = auth.onAuthStateChanged(firebaseUser => {
       if (firebaseUser) {
         setLoading(true);
-        Promise.all([fetchProfile(), fetchCampaignsStats()])
+        Promise.all([fetchProfile(), fetchStats()])
           .finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
     });
     return () => unsubscribe();
-  }, []); // runs once
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -175,7 +138,7 @@ export default function Profile() {
       setShowLogoutModal(false);
       router.push('/');
     } catch (error) {
-      console.error('Logout error:', error);
+      // silent
     }
   };
 
@@ -196,16 +159,17 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
+  // ✅ Quick Actions – removed Billing & Subscription, Logout is only in header
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
-    { icon: FiCreditCard, label: 'Billing & Subscription', href: '/billing' },
     { icon: FiHelpCircle, label: 'Support', href: '/support' },
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
   ];
 
+  // ✅ Explore – replaced "Platform" with "Follow Us"
   const exploreOptions = [
-    { icon: FiGrid, label: 'Platform', href: '/platform' },
+    { icon: FiGrid, label: 'Follow Us', href: '/follow' },
     { icon: FiInfo, label: 'About Make Trend', href: '/about' },
     { icon: FiDownload, label: 'Download App', href: '/download' },
     { icon: FiAlertCircle, label: 'Rules to Follow', href: '/rules' },
@@ -216,6 +180,65 @@ export default function Profile() {
     { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
   ];
 
+  // ── Skeleton Loader ──
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-24 h-24 rounded-full bg-gray-200" />
+              <div className="flex-1 text-center sm:text-left w-full">
+                <div className="h-6 w-48 bg-gray-200 rounded mb-2" />
+                <div className="h-4 w-32 bg-gray-200 rounded mb-1" />
+                <div className="h-3 w-40 bg-gray-200 rounded" />
+              </div>
+              <div className="w-24 h-10 bg-gray-200 rounded-lg" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center animate-pulse">
+                <div className="flex justify-center mb-2"><div className="w-6 h-6 bg-gray-200 rounded" /></div>
+                <div className="h-7 w-12 bg-gray-200 rounded mx-auto mb-1" />
+                <div className="h-3 w-20 bg-gray-200 rounded mx-auto" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
+            <div className="h-6 w-32 bg-gray-200 rounded mb-4" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-12 bg-gray-200 rounded-xl" />)}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
+            <div className="h-6 w-40 bg-gray-200 rounded mb-4" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 bg-gray-200 rounded" />
+                <div><div className="h-3 w-24 bg-gray-200 rounded mb-1" /><div className="h-7 w-12 bg-gray-200 rounded" /></div>
+              </div>
+              <div className="w-24 h-10 bg-gray-200 rounded-lg" />
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 animate-pulse">
+            <div className="h-6 w-32 bg-gray-200 rounded mb-4" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-gray-200 rounded-xl" />)}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
+            <div className="h-6 w-40 bg-gray-200 rounded mb-4" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {[1, 2].map(i => <div key={i} className="h-12 bg-gray-200 rounded-xl" />)}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Actual Page ──
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -304,9 +327,7 @@ export default function Profile() {
                 <div className="flex justify-center mb-2">
                   <stat.icon className="w-6 h-6 text-purple-600" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {loading ? '...' : stat.value}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                 <p className="text-sm text-gray-500">{stat.label}</p>
               </div>
             ))}
@@ -325,13 +346,6 @@ export default function Profile() {
                 </div>
               </Link>
             ))}
-            <button
-              onClick={() => setShowLogoutModal(true)}
-              className="flex items-center gap-3 px-4 py-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors text-red-600 border border-transparent hover:border-red-200 hover:shadow-sm group"
-            >
-              <FiLogOut className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
-              <span className="text-sm font-medium">Logout</span>
-            </button>
           </div>
         </div>
 
@@ -344,9 +358,7 @@ export default function Profile() {
                 <FiUsers className="w-6 h-6 text-green-500" />
                 <div>
                   <p className="text-sm text-gray-500">Total Friend Referrals</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {loading ? '...' : displayUser.referrals}
-                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{displayUser.referrals}</p>
                 </div>
               </div>
               <Link href="/refer-earn">
