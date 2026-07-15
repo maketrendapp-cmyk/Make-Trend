@@ -783,25 +783,29 @@ router.get('/templates/:id', async (req, res) => {
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
 // GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
 // ============================================================
-// GET USER'S CAMPAIGNS (Paginated) – Protected
+// GET USER'S CAMPAIGNS (Paginated, Cap=25) – Protected
 // ============================================================
 router.get('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const limit = parseInt(req.query.limit) || 25;
+
+    // ── Parse limit, cap at 25 ──
+    let limit = parseInt(req.query.limit) || 25;
+    if (isNaN(limit) || limit < 1) limit = 25;
+    if (limit > 25) limit = 25; // 🔒 hard cap – never more than 25
+
     const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
     const lastId = req.query.lastId || null;
 
-    // ── Build query: fetch only non‑deleted campaigns ──
-    // Use 'in' filter (equality) to avoid inequality ordering restrictions
+    // ── Base query: exclude deleted using 'in' filter ──
     let query = db.collection('campaigns')
       .where('userId', '==', uid)
-      .where('status', 'in', ['active', 'paused'])   // exclude deleted
+      .where('status', 'in', ['active', 'paused'])
       .orderBy('createdAt', 'desc')
       .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
       .limit(limit);
 
-    // ── Apply cursor if provided ──
+    // ── Apply cursor ──
     if (lastCreatedAt && lastId) {
       const lastTimestamp = admin.firestore.Timestamp.fromDate(lastCreatedAt);
       query = query.startAfter(lastTimestamp, lastId);
