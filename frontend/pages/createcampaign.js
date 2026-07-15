@@ -284,20 +284,23 @@ export default function CreateCampaign() {
     );
   }
 
-  // ── Error state ──
+  // ── Error state (with Meta) ──
   if (error) {
     return (
-      <main className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <div className="text-5xl mb-4">😕</div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Template not found</h2>
-        <p className="text-gray-500">{error}</p>
-        <button
-          onClick={() => router.push('/create')}
-          className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
-        >
-          Browse Templates
-        </button>
-      </main>
+      <>
+        <Meta title="Template Not Found" />
+        <main className="max-w-4xl mx-auto px-4 py-16 text-center">
+          <div className="text-5xl mb-4">😕</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Template not found</h2>
+          <p className="text-gray-500">{error}</p>
+          <button
+            onClick={() => router.push('/create')}
+            className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            Browse Templates
+          </button>
+        </main>
+      </>
     );
   }
 
@@ -307,30 +310,30 @@ export default function CreateCampaign() {
     return (
       <>
         <Meta title="Campaign Created!" />
-        <main className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
-          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+        <main className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
+          <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 sm:px-8 py-6 sm:py-8">
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4 sm:px-6 sm:py-5">
               <div className="flex items-center gap-3 text-white">
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
                   🎉
                 </div>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold">Campaign Created!</h1>
-                  <p className="text-purple-100 text-sm">Your campaign is ready to be shared with the world.</p>
+                  <h1 className="text-xl sm:text-2xl font-bold">Campaign Created!</h1>
+                  <p className="text-purple-100 text-xs">Your campaign is ready to share.</p>
                 </div>
               </div>
             </div>
 
             {/* Body */}
-            <div className="p-6 sm:p-8 space-y-8">
+            <div className="p-4 sm:p-6 space-y-4">
               {/* Preview Card */}
               <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Preview</h2>
-                <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                <h2 className="text-sm font-semibold text-gray-600 mb-2">Preview</h2>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
                     {/* Image */}
-                    <div className="sm:w-56 h-48 sm:h-auto bg-gray-200 flex-shrink-0">
+                    <div className="sm:w-40 h-32 sm:h-auto bg-gray-200 flex-shrink-0">
                       {template?.image ? (
                         <img
                           src={template.image}
@@ -338,33 +341,33 @@ export default function CreateCampaign() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">
+                        <div className="w-full h-full flex items-center justify-center text-3xl text-gray-300">
                           🎯
                         </div>
                       )}
                     </div>
                     {/* Details */}
-                    <div className="flex-1 p-5 space-y-3">
-                      <h3 className="text-xl font-bold text-gray-900">{campaignTitle}</h3>
+                    <div className="flex-1 p-3 space-y-1">
+                      <h3 className="text-base font-bold text-gray-900">{campaignTitle}</h3>
                       {campaignDescription && (
-                        <p className="text-gray-600 text-sm">{campaignDescription}</p>
+                        <p className="text-gray-600 text-xs">{campaignDescription}</p>
                       )}
-                      <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-xs font-medium border border-amber-200">
+                      <div className="flex flex-wrap gap-1">
+                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-amber-200">
                           🎁 {campaignReward}
                         </span>
                         {shareCountEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-200">
+                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-blue-200">
                             📢 {shareCount} shares
                           </span>
                         )}
                         {tasksEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-xs font-medium border border-purple-200">
+                          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-purple-200">
                             📋 {tasks.length} tasks
                           </span>
                         )}
                         {finalUrlEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium border border-green-200">
+                          <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-medium border border-green-200">
                             🔗 Redirect
                           </span>
                         )}
@@ -376,13 +379,13 @@ export default function CreateCampaign() {
 
               {/* Copy URL */}
               <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Share Your Campaign</h2>
-                <div className="flex flex-col sm:flex-row items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-600 mb-2">Share Link</h2>
+                <div className="flex flex-col sm:flex-row items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
                   <input
                     type="text"
                     value={fullUrl}
                     readOnly
-                    className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-gray-700 truncate"
+                    className="flex-1 w-full bg-transparent outline-none text-xs font-mono text-gray-700 truncate"
                   />
                   <button
                     onClick={() => {
@@ -390,31 +393,32 @@ export default function CreateCampaign() {
                       setMessage('✅ Link copied!');
                       setTimeout(() => setMessage(''), 3000);
                     }}
-                    className="flex-shrink-0 w-full sm:w-auto px-6 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                    className="flex-shrink-0 w-full sm:w-auto px-4 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 shadow-sm"
                   >
                     Copy Link
                   </button>
                 </div>
-                {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+                {/* Success message after copy */}
+                {message && <p className="mt-1 text-xs text-green-600 text-center">{message}</p>}
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
+              {/* Actions - aligned in one row */}
+              <div className="flex flex-wrap gap-2 justify-center pt-2 border-t border-gray-200">
                 <button
                   onClick={() => router.push(campaignUrl)}
-                  className="inline-flex items-center justify-center px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 shadow-sm"
                 >
                   👁️ View Campaign
                 </button>
                 <button
                   onClick={() => router.push('/stats')}
-                  className="inline-flex items-center justify-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-all duration-200"
                 >
                   📊 View Stats
                 </button>
                 <button
                   onClick={() => router.push('/create')}
-                  className="inline-flex items-center justify-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-all duration-200"
                 >
                   ✨ Create Another
                 </button>
