@@ -10,7 +10,6 @@ import {
   FaInstagram,
   FaLink,
   FaCheckCircle,
-  FaClock,
   FaShareAlt,
   FaCopy,
   FaRocket,
@@ -35,10 +34,16 @@ export default function CampaignShare() {
   const [isSharing, setIsSharing] = useState(false);
   const [sharesComplete, setSharesComplete] = useState(false);
   const [shareProgress, setShareProgress] = useState(0);
-  const [shareAttempt, setShareAttempt] = useState(0);
+  const [shareAttempt, setShareAttempt] = useState(0); // 0,1,2,3
   const [showClaimModal, setShowClaimModal] = useState(false);
-  const [claimCountdown, setClaimCountdown] = useState(5);
+  const [claimCountdown, setClaimCountdown] = useState(2);
+  // Verification state
+  const [verifying, setVerifying] = useState(false);
+  const [verifyingType, setVerifyingType] = useState(''); // 'message', 'post', 'copy'
+  const [verifyingCountdown, setVerifyingCountdown] = useState(0);
+  const [toastMessage, setToastMessage] = useState('');
 
+  const timerRef = useRef(null);
   const claimTimerRef = useRef(null);
 
   // ── Fetch Campaign + Template ──
@@ -49,7 +54,6 @@ export default function CampaignShare() {
   const fetchCampaignAndTemplate = async () => {
     try {
       setLoading(true);
-      // 1) Fetch campaign
       const campaignRes = await fetch(`${API_BASE}/campaigns/${id}`);
       if (!campaignRes.ok) {
         if (campaignRes.status === 404) {
@@ -74,27 +78,25 @@ export default function CampaignShare() {
       setShares(currentShares);
       setShareProgress(Math.min((currentShares / (count || 1)) * 100, 100));
 
-      // If shareCount is 0, mark as complete immediately
       if (count === 0) {
         setSharesComplete(true);
-        setShareAttempt(2);
-        // Auto-show claim modal after a short delay
-        setTimeout(() => {
-          setShowClaimModal(true);
-        }, 800);
+        setShareAttempt(3); // already at max
+        setTimeout(() => setShowClaimModal(true), 800);
       } else {
-        // Normal logic
         if (currentShares >= count) {
           setSharesComplete(true);
-          setShareAttempt(2);
+          setShareAttempt(3);
         } else {
-          if (currentShares === 0) setShareAttempt(0);
-          else if (currentShares < count / 2) setShareAttempt(1);
-          else setShareAttempt(2);
+          // Determine attempt based on progress
+          const progressRatio = currentShares / count;
+          if (progressRatio === 0) setShareAttempt(0);
+          else if (progressRatio < 0.25) setShareAttempt(1);
+          else if (progressRatio < 0.75) setShareAttempt(2);
+          else setShareAttempt(3);
         }
       }
 
-      // 2) Fetch template to get slug (with fallback)
+      // Fetch template slug
       let slug = 'campaign';
       if (camp.templateId) {
         try {
@@ -109,11 +111,7 @@ export default function CampaignShare() {
           console.warn('Template fetch failed, using fallback:', err);
         }
       }
-      // Fallback: if still 'campaign', try to use campaign.templateSlug if exists
-      if (slug === 'campaign' && camp.templateSlug) {
-        slug = camp.templateSlug;
-      }
-      // Final fallback: generate from title
+      if (slug === 'campaign' && camp.templateSlug) slug = camp.templateSlug;
       if (slug === 'campaign' && camp.title) {
         slug = camp.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       }
@@ -127,7 +125,7 @@ export default function CampaignShare() {
     }
   };
 
-  // ── Claim modal countdown ──
+  // ── Claim modal countdown (2s) ──
   useEffect(() => {
     if (showClaimModal && claimCountdown > 0) {
       claimTimerRef.current = setInterval(() => {
@@ -144,60 +142,124 @@ export default function CampaignShare() {
     return () => clearInterval(claimTimerRef.current);
   }, [showClaimModal, claimCountdown]);
 
-  // ── Handle Share ──
-  const handleShare = async (platform, type) => {
-    if (isSharing || sharesComplete) return;
+  // ── Verification timer ──
+  useEffect(() => {
+    if (verifying && verifyingCountdown > 0) {
+      timerRef.current = setInterval(() => {
+        setVerifyingCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            // Complete verification
+            finishVerification();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [verifying, verifyingCountdown]);
 
-    // If shareCount is 0, we shouldn't be here, but just in case
+  // ── Handle share click ──
+  const handleShare = (platform, type) => {
+    if (isSharing || verifying || sharesComplete) return;
     if (shareCount === 0) return;
-
-    const shouldCount = shareAttempt >= 1;
-    setIsSharing(true);
 
     const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
     const title = campaign?.title || 'Check this out!';
     const description = campaign?.description || '';
     const fullText = description ? `${title}\n${description}\n\n${shareUrl}` : `${title}\n\n${shareUrl}`;
 
+    // Special handling for Instagram: copy link and show toast
+    if (platform === 'instagram') {
+      copyLinkOnly(shareUrl);
+      setToastMessage('📋 Link copied! Share with your friends.');
+      setTimeout(() => setToastMessage(''), 3000);
+      return;
+    }
+
     // Open share dialog
-    if (type === 'forward') {
+    if (type === 'message') {
       const forwardUrls = {
         whatsapp: `https://wa.me/?text=${encodeURIComponent(fullText)}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
         messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
-        instagram: `https://www.instagram.com/`, // Fallback to Instagram app
       };
       window.open(forwardUrls[platform], '_blank');
-    } else {
+    } else if (type === 'post') {
       const postUrls = {
         facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(title)}`,
         twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`,
-        copy: shareUrl,
       };
-      if (platform === 'copy') {
-        await copyLink();
-      } else {
-        window.open(postUrls[platform], '_blank');
-      }
+      window.open(postUrls[platform], '_blank');
+    } else if (type === 'copy') {
+      copyLinkOnly(shareUrl);
+      // Copy is handled separately with a 7-second delay and +1 increment
+      startVerification('copy', 7);
+      return;
     }
 
-    // Increment shares if this is a counting share
-    if (shouldCount) {
-      let increment = 0;
-      if (shareAttempt === 1) {
-        increment = Math.ceil(shareCount / 2);
-      } else if (shareAttempt === 2) {
-        increment = shareCount - shares;
-      }
-      if (increment > 0) {
-        await incrementShares(increment);
-      }
-      if (shareAttempt < 2) setShareAttempt(shareAttempt + 1);
+    // Start verification for message/post (6 seconds)
+    startVerification('share', 6);
+  };
+
+  // ── Copy link (just copy, no increment) ──
+  const copyLinkOnly = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 3000);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 3000);
+    }
+  };
+
+  // ── Start verification ──
+  const startVerification = (type, duration) => {
+    setVerifying(true);
+    setVerifyingType(type);
+    setVerifyingCountdown(duration);
+  };
+
+  // ── Finish verification ──
+  const finishVerification = () => {
+    setVerifying(false);
+    setVerifyingType('');
+    setVerifyingCountdown(0);
+
+    // Determine increment based on type
+    let increment = 0;
+    if (verifyingType === 'copy') {
+      increment = 1; // copy adds 1
     } else {
+      // message/post: based on attempt
+      if (shareAttempt === 0) increment = 0; // first share adds 0
+      else if (shareAttempt === 1) increment = Math.ceil(shareCount * 0.25);
+      else if (shareAttempt === 2) increment = Math.ceil(shareCount * 0.5);
+      else if (shareAttempt === 3) increment = Math.ceil(shareCount * 0.25);
+      // if shareAttempt is 3 and not complete, it will add remaining
+      if (increment > 0) {
+        // Ensure we don't exceed target
+        const remaining = shareCount - shares;
+        if (increment > remaining) increment = remaining;
+      }
+      // Advance attempt (only if this is a message/post share)
+      if (shareAttempt < 3) setShareAttempt(shareAttempt + 1);
+    }
+
+    if (increment > 0) {
+      incrementShares(increment);
+    } else if (increment === 0 && shareAttempt === 0) {
+      // First share adds 0, just advance attempt
       setShareAttempt(1);
     }
-
-    setIsSharing(false);
   };
 
   // ── Increment shares ──
@@ -213,29 +275,13 @@ export default function CampaignShare() {
         const newShares = Math.min(shares + amount, shareCount);
         setShares(newShares);
         setShareProgress(Math.min((newShares / shareCount) * 100, 100));
-        if (newShares >= shareCount) setSharesComplete(true);
+        if (newShares >= shareCount) {
+          setSharesComplete(true);
+          setShareAttempt(3);
+        }
       }
     } catch (err) {
       console.error('Error recording share:', err);
-    }
-  };
-
-  // ── Copy Link ──
-  const copyLink = async () => {
-    const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 3000);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = shareUrl;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 3000);
     }
   };
 
@@ -243,7 +289,6 @@ export default function CampaignShare() {
   const handleClaim = () => {
     if (!sharesComplete || isCompleting) return;
     setShowClaimModal(true);
-    // Disable scroll on body
     document.body.style.overflow = 'hidden';
   };
 
@@ -260,7 +305,6 @@ export default function CampaignShare() {
   const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const remaining = Math.max(shareCount - shares, 0);
 
-  // Platforms: forward (message) and post (publish)
   const forwardPlatforms = [
     { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
     { id: 'telegram', label: 'Telegram', icon: FaTelegram, color: 'bg-blue-500 hover:bg-blue-600' },
@@ -325,9 +369,6 @@ export default function CampaignShare() {
 
   const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
   const isComplete = sharesComplete;
-
-  // If shareCount is 0, we already show the modal, so the rest is just a placeholder.
-  // But we still render the page; the modal will be open.
 
   return (
     <>
@@ -400,7 +441,7 @@ export default function CampaignShare() {
             </div>
           </div>
 
-          {/* ── Share Link with Copy Button (only if shareCount > 0) ── */}
+          {/* ── Share Link with Copy Button ── */}
           {shareCount > 0 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 mb-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
@@ -414,22 +455,31 @@ export default function CampaignShare() {
                   className="flex-1 bg-transparent outline-none text-sm font-mono text-gray-600 truncate"
                 />
                 <button
-                  onClick={copyLink}
-                  disabled={isSharing || isComplete}
+                  onClick={() => handleShare('copy', 'copy')}
+                  disabled={verifying || isSharing || isComplete}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
                     isCopied
                       ? 'bg-green-500 text-white'
+                      : verifying && verifyingType === 'copy'
+                      ? 'bg-amber-500 text-white'
                       : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.97]'
                   }`}
                 >
-                  <FaCopy className="w-3.5 h-3.5" />
-                  {isCopied ? 'Copied!' : 'Copy'}
+                  {verifying && verifyingType === 'copy' ? (
+                    <>Verifying {verifyingCountdown}s</>
+                  ) : isCopied ? (
+                    '✅ Copied!'
+                  ) : (
+                    <>
+                      <FaCopy className="w-3.5 h-3.5" /> Copy
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── Share Platforms (only if shareCount > 0) ── */}
+          {/* ── Share Platforms ── */}
           {shareCount > 0 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7">
               {/* Forward / Message */}
@@ -442,8 +492,8 @@ export default function CampaignShare() {
                   return (
                     <button
                       key={platform.id}
-                      onClick={() => handleShare(platform.id, 'forward')}
-                      disabled={isSharing || isComplete}
+                      onClick={() => handleShare(platform.id, 'message')}
+                      disabled={verifying || isSharing || isComplete}
                       className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
                     >
                       <Icon className="w-5 h-5" />
@@ -464,7 +514,7 @@ export default function CampaignShare() {
                     <button
                       key={platform.id}
                       onClick={() => handleShare(platform.id, 'post')}
-                      disabled={isSharing || isComplete}
+                      disabled={verifying || isSharing || isComplete}
                       className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
                     >
                       <Icon className="w-5 h-5" />
@@ -474,11 +524,25 @@ export default function CampaignShare() {
                 })}
               </div>
 
+              {verifying && verifyingType !== 'copy' && (
+                <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3 text-amber-700">
+                  <span className="animate-pulse">⏳</span>
+                  <span>Verifying share... {verifyingCountdown}s</span>
+                </div>
+              )}
+
+              {toastMessage && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm">
+                  {toastMessage}
+                </div>
+              )}
+
               {!isComplete && (
                 <p className="mt-4 text-sm text-gray-500 text-center">
                   {shareAttempt === 0 && 'Open any share to start (0% counted)'}
-                  {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount/2)} shares (50% progress)`}
-                  {shareAttempt === 2 && `One more share to complete!`}
+                  {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount*0.25)} shares (25% progress)`}
+                  {shareAttempt === 2 && `Share again to add ${Math.ceil(shareCount*0.5)} shares (75% progress)`}
+                  {shareAttempt === 3 && `One more share to complete!`}
                 </p>
               )}
             </div>
@@ -504,14 +568,11 @@ export default function CampaignShare() {
                   Processing...
                 </span>
               ) : (
-                <>
-                  <FaRocket className="w-5 h-5" />
-                  🎁 Claim
-                </>
+                <>🎁 Claim</>
               )}
             </button>
 
-            {/* Helper text below the button */}
+            {/* Helper text */}
             {shareCount > 0 && !isComplete && (
               <p className="mt-2 text-center text-xs text-gray-400">
                 {remaining} share{remaining > 1 ? 's' : ''} remaining
@@ -531,10 +592,10 @@ export default function CampaignShare() {
         </div>
       </div>
 
-      {/* ── Professional Claim Success Modal ── */}
+      {/* ── Professional Claim Success Modal (2s countdown) ── */}
       {showClaimModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl animate-scaleIn border border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl animate-scaleIn border border-gray-100 my-8">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center animate-bounce-in">
               <FaCheckCircle className="w-10 h-10 text-green-500" />
             </div>
@@ -549,7 +610,7 @@ export default function CampaignShare() {
               <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 rounded-full"
-                  style={{ width: `${((5 - claimCountdown) / 5) * 100}%` }}
+                  style={{ width: `${((2 - claimCountdown) / 2) * 100}%` }}
                 />
               </div>
             </div>
