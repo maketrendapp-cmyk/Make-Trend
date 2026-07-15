@@ -73,40 +73,42 @@ export default function Create() {
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
 
-  // ── Fetch templates ──
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`${API_BASE}/templates`);
-        if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
-        const data = await res.json();
-        if (data.success) {
-          setTemplates(data.templates || []);
-          if (highlightSlug) {
-            const found = data.templates.find(t => t.slug === highlightSlug);
-            if (found) {
-              setHighlightedId(found.id);
-              highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
-            }
+  // ── Memoized Fetch Function (Avoids full page refreshes on Retries) ──
+  const fetchTemplates = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`${API_BASE}/templates`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
+      const data = await res.json();
+      if (data.success) {
+        setTemplates(data.templates || []);
+        if (highlightSlug) {
+          const found = data.templates.find(t => t.slug === highlightSlug);
+          if (found) {
+            setHighlightedId(found.id);
+            highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
           }
-        } else {
-          throw new Error(data.error || 'Failed to fetch templates');
         }
-      } catch (err) {
-        setError(err.message);
-        console.error('Fetch error:', err);
-      } finally {
-        setLoading(false);
+      } else {
+        throw new Error(data.error || 'Failed to fetch templates');
       }
-    };
+    } catch (err) {
+      setError(err.message);
+      console.error('Fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [highlightSlug]);
+
+  // ── Fetch templates on mount or deep link change ──
+  useEffect(() => {
     fetchTemplates();
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [highlightSlug]);
+  }, [fetchTemplates]);
 
   useEffect(() => {
     if (highlightedId) {
@@ -219,7 +221,8 @@ export default function Create() {
           <h2 className="text-lg font-bold text-slate-900 mb-1">Failed to load templates</h2>
           <p className="text-slate-500 text-xs mb-5">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            type="button"
+            onClick={fetchTemplates}
             className="w-full py-2.5 bg-primary text-white rounded-xl font-bold shadow-md shadow-primary/25 hover:bg-primary/95 transition active:scale-95"
           >
             Try Again
@@ -258,6 +261,7 @@ export default function Create() {
             </h1>
           </div>
           <button 
+            type="button"
             onClick={() => router.push('/logout')}
             className="text-xs font-bold text-slate-500 hover:text-slate-800 transition"
           >
@@ -281,6 +285,7 @@ export default function Create() {
               />
             </div>
             <button
+              type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`p-2 border rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-[0_1px_5px_rgba(0,0,0,0.02)] ${
                 showFilters || selectedCategory || selectedPlatform 
@@ -301,6 +306,7 @@ export default function Create() {
           {/* Quick Filter Pill Row */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
             <button
+              type="button"
               onClick={() => handleQuickFilter('All')}
               className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all ${
                 !selectedCategory 
@@ -313,6 +319,7 @@ export default function Create() {
             {categories.filter(c => c !== 'All' && c).map((cat) => (
               <button
                 key={cat}
+                type="button"
                 onClick={() => handleQuickFilter(cat)}
                 className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all capitalize ${
                   selectedCategory === cat 
@@ -413,7 +420,7 @@ export default function Create() {
                       
                       {/* Condensed Meta & Details Block */}
                       <div className="p-3 bg-white">
-                        <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1 bg-white">
                           {template.platform && (
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
                               {template.platform}
@@ -433,19 +440,21 @@ export default function Create() {
                           {template.title}
                         </h3>
                         
-                        <p className="text-slate-500 text-[11px] line-clamp-1 mb-2.5 leading-snug">
+                        <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
                           {template.description || 'Launch your custom campaign with this template.'}
                         </p>
 
                         {/* Symmetrical Dual Buttons - Matches normal card layout sizing */}
                         <div className="grid grid-cols-2 gap-2">
                           <button
+                            type="button"
                             onClick={() => handlePreview(template.slug)}
                             className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
                           >
                             <Icons.Eye /> Preview
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleUseTemplate(template.slug)}
                             className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
                           >
@@ -461,10 +470,11 @@ export default function Create() {
 
               {/* Slider Dots */}
               {featuredTemplates.length > 1 && (
-                <div className="absolute bottom-1/3.5 right-3 flex gap-1 z-20">
+                <div className="absolute bottom-28 right-3 flex gap-1 z-20">
                   {featuredTemplates.map((_, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => goToSlide(idx)}
                       className={`h-1 rounded-full transition-all ${
                         idx === carouselIndex ? 'bg-primary w-3' : 'bg-slate-300 w-1'
@@ -511,6 +521,7 @@ export default function Create() {
             <h3 className="text-xs font-bold text-slate-900 mb-0.5">No templates match</h3>
             <p className="text-[11px] text-slate-500 mb-3 max-w-xs mx-auto">Try resetting filters to view all templates.</p>
             <button 
+              type="button"
               onClick={clearFilters} 
               className="px-3.5 py-1.5 bg-primary/10 text-primary font-bold rounded-lg text-xs hover:bg-primary/20 transition-colors"
             >
@@ -580,7 +591,7 @@ export default function Create() {
                   {/* Information & Actions Row (Compact) */}
                   <div className="p-3 flex-grow flex flex-col justify-between">
                     <div>
-                      <div className="flex items-start justify-between gap-1.5">
+                      <div className="flex items-start justify-between gap-1.5 bg-white">
                         <h3 className="font-bold text-slate-950 text-xs leading-snug line-clamp-1 group-hover:text-primary transition-colors">
                           {template.title}
                         </h3>
@@ -596,7 +607,7 @@ export default function Create() {
                       </p>
 
                       {/* Info Pills */}
-                      <div className="mt-1.5 flex items-center justify-between gap-1 flex-wrap">
+                      <div className="mt-1 flex items-center justify-between gap-1 flex-wrap">
                         <div className="flex flex-wrap gap-1">
                           {template.hashtags && template.hashtags.length > 0 ? (
                             template.hashtags.slice(0, 1).map((tag, i) => (
@@ -622,7 +633,7 @@ export default function Create() {
                       </div>
 
                       {template.reward && (
-                        <div className="mt-1.5 text-[10px] font-extrabold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100/60 px-1.5 py-0.5 rounded-lg w-fit">
+                        <div className="mt-1 text-[10px] font-extrabold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100/60 px-1.5 py-0.5 rounded-lg w-fit">
                           <Icons.Gift /> {template.reward}
                         </div>
                       )}
@@ -631,12 +642,14 @@ export default function Create() {
                     {/* Symmetrical Dual Actions (Exactly matches Featured button sizes!) */}
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
                       <button
+                        type="button"
                         onClick={() => handlePreview(template.slug)}
                         className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
                       >
                         <Icons.Eye /> Preview
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleUseTemplate(template.slug)}
                         className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
                       >
