@@ -1,49 +1,40 @@
-// frontend/components/Meta.js
+// components/Meta.js
 import Head from 'next/head';
-import { useRouter } from 'next/router';
 
-export default function Meta({ 
-  title, 
-  description, 
-  image, 
-  type = 'website',
-  keywords = 'viral campaigns, social media growth, share to unlock'
-}) {
-  const router = useRouter();
-  const canonicalUrl = `https://maketrend.com${router.asPath}`;
-
-  // Fallback values if not provided (DeepSeek-style branding)
-  const siteTitle = 'MakeTrend - Viral Campaign Builder';
-  const fullTitle = title ? `${title} | MakeTrend` : siteTitle;
-  const fullDescription = description || 'Create share-to-unlock campaigns for Instagram, YouTube, TikTok, and more. Grow your social media in 2 minutes.';
-  const fullImage = image || '/images/og-default.jpg'; // We'll set a default OG image later
+export default function Meta({ title, description, image, url }) {
+  const siteTitle = title ? `${title} | Make Trend` : 'Make Trend';
+  const metaDesc = description || 'Create and share trending campaigns with Make Trend.';
+  const metaImage = image || 'https://maketrend.vercel.app/og-default.jpg';
+  const metaUrl = url || 'https://maketrend.vercel.app';
 
   return (
     <Head>
-      {/* Basic SEO */}
-      <title>{fullTitle}</title>
-      <meta name="description" content={fullDescription} />
-      <meta name="keywords" content={keywords} />
-      <link rel="canonical" href={canonicalUrl} />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-      {/* Open Graph / Social Media (Facebook, LinkedIn, Discord) */}
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={fullDescription} />
-      <meta property="og:image" content={fullImage} />
-      <meta property="og:url" content={canonicalUrl} />
-      <meta property="og:type" content={type} />
-      <meta property="og:site_name" content="MakeTrend" />
-
-      {/* Twitter Card */}
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={fullDescription} />
-      <meta name="twitter:image" content={fullImage} />
-
-      {/* Theme Color (DeepSeek uses #ffffff for light mode) */}
-      <meta name="theme-color" content="#ffffff" />
+      {/* ── Global Resources (deduplicated by Next.js) ── */}
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet"
+      />
+      <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      />
       <link rel="icon" href="/favicon.ico" />
+
+      {/* ── Dynamic Meta Tags ── */}
+      <title>{siteTitle}</title>
+      <meta name="description" content={metaDesc} />
+      <meta property="og:title" content={siteTitle} />
+      <meta property="og:description" content={metaDesc} />
+      <meta property="og:image" content={metaImage} />
+      <meta property="og:url" content={metaUrl} />
+      <meta property="og:type" content="website" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={siteTitle} />
+      <meta name="twitter:description" content={metaDesc} />
+      <meta name="twitter:image" content={metaImage} />
     </Head>
   );
 }
