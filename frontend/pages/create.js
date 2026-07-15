@@ -10,15 +10,17 @@ export default function Create() {
   const router = useRouter();
   const { slug: highlightSlug } = router.query;
 
+  // ── State ──
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
+
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
 
@@ -27,16 +29,9 @@ export default function Create() {
     const fetchTemplates = async () => {
       try {
         setLoading(true);
+        setError(null);
         const res = await fetch(`${API_BASE}/templates`);
-        if (!res.ok) {
-          if (res.status === 500) {
-            console.warn('Backend error');
-            setTemplates([]);
-            setLoading(false);
-            return;
-          }
-          throw new Error(`HTTP ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
         const data = await res.json();
         if (data.success) {
           setTemplates(data.templates || []);
@@ -44,63 +39,60 @@ export default function Create() {
             const found = data.templates.find(t => t.slug === highlightSlug);
             if (found) {
               setHighlightedId(found.id);
-              highlightTimeoutRef.current = setTimeout(() => {
-                setHighlightedId(null);
-              }, 3000);
+              highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
             }
           }
         } else {
-          setError(data.error || 'Failed to fetch templates');
+          throw new Error(data.error || 'Failed to fetch templates');
         }
       } catch (err) {
+        setError(err.message);
         console.error('Fetch error:', err);
-        setError('Could not load templates. Please try again later.');
       } finally {
         setLoading(false);
       }
     };
     fetchTemplates();
-
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
   }, [highlightSlug]);
 
-  // ── Scroll to highlighted template ──
   useEffect(() => {
     if (highlightedId) {
       const el = document.getElementById(`template-${highlightedId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [highlightedId]);
 
-  // ── Auto-slide carousel ──
-  const highlightedTemplates = useMemo(() => templates.filter(t => t.isHighlight === true), [templates]);
+  const { featuredTemplates, regularTemplates } = useMemo(() => {
+    const featured = templates.filter(t => t.isHighlight === true);
+    const regular = templates.filter(t => !t.isHighlight);
+    return { featuredTemplates: featured, regularTemplates: regular };
+  }, [templates]);
 
+  // ── Carousel auto‑slide ──
   useEffect(() => {
-    if (highlightedTemplates.length > 1) {
+    if (featuredTemplates.length > 1) {
       carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex((prev) => (prev + 1) % highlightedTemplates.length);
-      }, 4000);
+        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
+      }, 5000);
     }
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [highlightedTemplates.length]);
+  }, [featuredTemplates.length]);
 
-  const goToSlide = (index) => {
+  const goToSlide = useCallback((index) => {
     setCarouselIndex(index);
-    // Reset timer to avoid jumping immediately after manual interaction
     if (carouselIntervalRef.current) {
       clearInterval(carouselIntervalRef.current);
       carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex((prev) => (prev + 1) % highlightedTemplates.length);
-      }, 4000);
+        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
+      }, 5000);
     }
-  };
+  }, [featuredTemplates.length]);
 
   // ── Filters ──
   const categories = useMemo(() => {
@@ -114,8 +106,6 @@ export default function Create() {
     templates.forEach(t => { if (t.platform) plats.add(t.platform); });
     return ['All', ...Array.from(plats)];
   }, [templates]);
-
-  const regularTemplates = useMemo(() => templates.filter(t => !t.isHighlight), [templates]);
 
   const filteredRegular = useMemo(() => {
     let filtered = [...regularTemplates];
@@ -150,6 +140,7 @@ export default function Create() {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedPlatform('');
+    setShowFilters(false);
   }, []);
 
   const platformColors = {
@@ -169,7 +160,10 @@ export default function Create() {
           <div className="text-5xl mb-4">😕</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
           <p className="text-gray-500">{error}</p>
-          <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition">
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition"
+          >
             Retry
           </button>
         </main>
@@ -177,7 +171,6 @@ export default function Create() {
     );
   }
 
-  // ── Empty state ──
   if (!loading && templates.length === 0) {
     return (
       <>
@@ -273,24 +266,23 @@ export default function Create() {
         </div>
 
         {/* ── Featured Templates Carousel ── */}
-        {highlightedTemplates.length > 0 && (
+        {featuredTemplates.length > 0 && (
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
               <span>⭐ Featured Templates</span>
               <span className="text-xs font-normal text-gray-400">(auto‑play)</span>
             </h2>
 
-            {/* Carousel Container */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 shadow-sm">
               <div
                 className="flex transition-transform duration-700 ease-in-out"
                 style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
               >
-                {highlightedTemplates.map((template) => (
+                {featuredTemplates.map((template) => (
                   <div key={template.id} className="w-full flex-shrink-0 p-6 sm:p-8">
                     <div className="flex flex-col sm:flex-row gap-6 items-center">
-                      {/* Image */}
-                      <div className="w-full sm:w-56 h-56 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0 shadow-md">
+                      {/* Image – fully rounded, object-cover, fixed height */}
+                      <div className="w-full sm:w-64 h-64 sm:h-64 rounded-2xl overflow-hidden bg-gray-200 flex-shrink-0 shadow-lg">
                         {template.image ? (
                           <img
                             src={template.image}
@@ -301,7 +293,6 @@ export default function Create() {
                           <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">🎨</div>
                         )}
                       </div>
-
                       {/* Details */}
                       <div className="flex-1 space-y-2 text-center sm:text-left">
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
@@ -353,10 +344,9 @@ export default function Create() {
                 ))}
               </div>
 
-              {/* Dots */}
-              {highlightedTemplates.length > 1 && (
+              {featuredTemplates.length > 1 && (
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
-                  {highlightedTemplates.map((_, idx) => (
+                  {featuredTemplates.map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => goToSlide(idx)}
@@ -377,7 +367,7 @@ export default function Create() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden animate-pulse">
-                <div className="aspect-[4/3] bg-gray-200" />
+                <div className="w-full h-48 bg-gray-200" />
                 <div className="p-4 space-y-2">
                   <div className="h-4 bg-gray-200 rounded w-3/4" />
                   <div className="h-3 bg-gray-200 rounded w-1/2" />
@@ -412,8 +402,8 @@ export default function Create() {
                       : 'border-border hover:border-primary/30'
                   }`}
                 >
-                  {/* Image */}
-                  <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
+                  {/* Image – fixed height, object-cover, rounded top corners */}
+                  <div className="w-full h-48 bg-gray-100 relative overflow-hidden">
                     {template.image ? (
                       <img
                         src={template.image}
@@ -429,9 +419,9 @@ export default function Create() {
                         ⭐ Featured
                       </div>
                     )}
-                    {template.plan && template.plan !== 'free' && (
+                    {template.plan === 'pro' && (
                       <div className="absolute top-2 right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                        {template.plan.toUpperCase()}
+                        PRO
                       </div>
                     )}
                     <div className="absolute bottom-2 left-2">
@@ -469,6 +459,11 @@ export default function Create() {
                         {template.hashtags.length > 3 && (
                           <span className="text-[10px] text-gray-400">+{template.hashtags.length - 3}</span>
                         )}
+                      </div>
+                    )}
+                    {template.reward && (
+                      <div className="mt-2 text-xs text-amber-600 font-medium flex items-center gap-1">
+                        🎁 {template.reward}
                       </div>
                     )}
 
