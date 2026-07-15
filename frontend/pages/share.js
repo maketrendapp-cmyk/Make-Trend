@@ -35,12 +35,10 @@ export default function CampaignShare() {
   const [isSharing, setIsSharing] = useState(false);
   const [sharesComplete, setSharesComplete] = useState(false);
   const [shareProgress, setShareProgress] = useState(0);
-  const [cooldown, setCooldown] = useState(0);
+  const [shareAttempt, setShareAttempt] = useState(0);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimCountdown, setClaimCountdown] = useState(5);
-  const [shareAttempt, setShareAttempt] = useState(0);
 
-  const cooldownRef = useRef(null);
   const claimTimerRef = useRef(null);
 
   // ── Fetch Campaign + Template ──
@@ -70,17 +68,30 @@ export default function CampaignShare() {
 
       const camp = campaignData.campaign;
       setCampaign(camp);
-      setShareCount(camp.shareCount || 3);
+      const count = camp.shareCount || 0;
+      setShareCount(count);
       const currentShares = camp.shares || 0;
       setShares(currentShares);
-      setShareProgress(Math.min((currentShares / (camp.shareCount || 3)) * 100, 100));
-      if (camp.shareCount > 0 && currentShares >= camp.shareCount) {
+      setShareProgress(Math.min((currentShares / (count || 1)) * 100, 100));
+
+      // If shareCount is 0, mark as complete immediately
+      if (count === 0) {
         setSharesComplete(true);
         setShareAttempt(2);
+        // Auto-show claim modal after a short delay
+        setTimeout(() => {
+          setShowClaimModal(true);
+        }, 800);
       } else {
-        if (currentShares === 0) setShareAttempt(0);
-        else if (currentShares < (camp.shareCount || 3) / 2) setShareAttempt(1);
-        else setShareAttempt(2);
+        // Normal logic
+        if (currentShares >= count) {
+          setSharesComplete(true);
+          setShareAttempt(2);
+        } else {
+          if (currentShares === 0) setShareAttempt(0);
+          else if (currentShares < count / 2) setShareAttempt(1);
+          else setShareAttempt(2);
+        }
       }
 
       // 2) Fetch template to get slug (with fallback)
@@ -116,22 +127,6 @@ export default function CampaignShare() {
     }
   };
 
-  // ── Cooldown timer (3 seconds) ──
-  useEffect(() => {
-    if (cooldown > 0) {
-      cooldownRef.current = setInterval(() => {
-        setCooldown((prev) => {
-          if (prev <= 1) {
-            clearInterval(cooldownRef.current);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(cooldownRef.current);
-  }, [cooldown]);
-
   // ── Claim modal countdown ──
   useEffect(() => {
     if (showClaimModal && claimCountdown > 0) {
@@ -151,7 +146,10 @@ export default function CampaignShare() {
 
   // ── Handle Share ──
   const handleShare = async (platform, type) => {
-    if (isSharing || sharesComplete || cooldown > 0) return;
+    if (isSharing || sharesComplete) return;
+
+    // If shareCount is 0, we shouldn't be here, but just in case
+    if (shareCount === 0) return;
 
     const shouldCount = shareAttempt >= 1;
     setIsSharing(true);
@@ -167,7 +165,7 @@ export default function CampaignShare() {
         whatsapp: `https://wa.me/?text=${encodeURIComponent(fullText)}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
         messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
-        instagram_dm: `https://www.instagram.com/`,
+        instagram: `https://www.instagram.com/`, // Fallback to Instagram app
       };
       window.open(forwardUrls[platform], '_blank');
     } else {
@@ -199,7 +197,6 @@ export default function CampaignShare() {
       setShareAttempt(1);
     }
 
-    setCooldown(3); // 3‑second cooldown
     setIsSharing(false);
   };
 
@@ -246,10 +243,13 @@ export default function CampaignShare() {
   const handleClaim = () => {
     if (!sharesComplete || isCompleting) return;
     setShowClaimModal(true);
+    // Disable scroll on body
+    document.body.style.overflow = 'hidden';
   };
 
   const handleRedirect = () => {
     setShowClaimModal(false);
+    document.body.style.overflow = 'auto';
     if (campaign?.finalUrl) {
       window.location.href = campaign.finalUrl;
     } else {
@@ -257,14 +257,15 @@ export default function CampaignShare() {
     }
   };
 
-  const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 0;
+  const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const remaining = Math.max(shareCount - shares, 0);
 
+  // Platforms: forward (message) and post (publish)
   const forwardPlatforms = [
     { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
     { id: 'telegram', label: 'Telegram', icon: FaTelegram, color: 'bg-blue-500 hover:bg-blue-600' },
     { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
-    { id: 'instagram_dm', label: 'Instagram DM', icon: FaInstagram, color: 'bg-pink-500 hover:bg-pink-600' },
+    { id: 'instagram', label: 'Instagram', icon: FaInstagram, color: 'bg-pink-500 hover:bg-pink-600' },
   ];
 
   const postPlatforms = [
@@ -325,6 +326,9 @@ export default function CampaignShare() {
   const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
   const isComplete = sharesComplete;
 
+  // If shareCount is 0, we already show the modal, so the rest is just a placeholder.
+  // But we still render the page; the modal will be open.
+
   return (
     <>
       <Meta title={`${campaign.title || 'Campaign'} - Share`} />
@@ -372,9 +376,11 @@ export default function CampaignShare() {
                     🎁 {campaign.reward}
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
-                  📤 {shares}/{shareCount} shares
-                </span>
+                {shareCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
+                    📤 {shares}/{shareCount} shares
+                  </span>
+                )}
                 {isComplete && (
                   <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
                     ✅ Complete
@@ -382,146 +388,150 @@ export default function CampaignShare() {
                 )}
               </div>
 
-              <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+              {shareCount > 0 && (
+                <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
+                    <span>complete</span>
+                  </span>
+                  <span>{shares}/{shareCount} shares</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Share Link with Copy Button (only if shareCount > 0) ── */}
+          {shareCount > 0 && (
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
+                <FaLink className="text-purple-500" /> Share Link
+              </h2>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                <input
+                  type="text"
+                  value={shareUrl}
+                  readOnly
+                  className="flex-1 bg-transparent outline-none text-sm font-mono text-gray-600 truncate"
+                />
+                <button
+                  onClick={copyLink}
+                  disabled={isSharing || isComplete}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                    isCopied
+                      ? 'bg-green-500 text-white'
+                      : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.97]'
+                  }`}
+                >
+                  <FaCopy className="w-3.5 h-3.5" />
+                  {isCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Share Platforms (only if shareCount > 0) ── */}
+          {shareCount > 0 && (
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7">
+              {/* Forward / Message */}
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                <FaPaperPlane className="text-purple-500" /> Share via Message
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                {forwardPlatforms.map((platform) => {
+                  const Icon = platform.icon;
+                  return (
+                    <button
+                      key={platform.id}
+                      onClick={() => handleShare(platform.id, 'forward')}
+                      disabled={isSharing || isComplete}
+                      className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {platform.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Post / Publish */}
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                <FaShareAlt className="text-purple-500" /> Post / Publish
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {postPlatforms.map((platform) => {
+                  const Icon = platform.icon;
+                  return (
+                    <button
+                      key={platform.id}
+                      onClick={() => handleShare(platform.id, 'post')}
+                      disabled={isSharing || isComplete}
+                      className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {platform.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {!isComplete && (
+                <p className="mt-4 text-sm text-gray-500 text-center">
+                  {shareAttempt === 0 && 'Open any share to start (0% counted)'}
+                  {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount/2)} shares (50% progress)`}
+                  {shareAttempt === 2 && `One more share to complete!`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Claim Button ── */}
+          <div className="mt-6">
+            <button
+              onClick={handleClaim}
+              disabled={!isComplete || isCompleting}
+              className={`w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
+                isComplete && !isCompleting
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {isCompleting ? (
                 <span className="flex items-center gap-2">
-                  <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
-                  <span>complete</span>
+                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Processing...
                 </span>
-                <span>{shares}/{shareCount} shares</span>
-              </div>
-            </div>
-          </div>
+              ) : (
+                <>
+                  <FaRocket className="w-5 h-5" />
+                  🎁 Claim
+                </>
+              )}
+            </button>
 
-          {/* ── Share Link with Copy Button ── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
-              <FaLink className="text-purple-500" /> Share Link
-            </h2>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-              <input
-                type="text"
-                value={shareUrl}
-                readOnly
-                className="flex-1 bg-transparent outline-none text-sm font-mono text-gray-600 truncate"
-              />
-              <button
-                onClick={copyLink}
-                disabled={isSharing || isComplete}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
-                  isCopied
-                    ? 'bg-green-500 text-white'
-                    : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.97]'
-                }`}
-              >
-                <FaCopy className="w-3.5 h-3.5" />
-                {isCopied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          {/* ── Share Platforms ── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7">
-            {/* Forward / Message */}
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-              <FaPaperPlane className="text-purple-500" /> Share via Message
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-              {forwardPlatforms.map((platform) => {
-                const Icon = platform.icon;
-                return (
-                  <button
-                    key={platform.id}
-                    onClick={() => handleShare(platform.id, 'forward')}
-                    disabled={isSharing || isComplete || cooldown > 0}
-                    className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    {platform.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Post / Publish */}
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-              <FaShareAlt className="text-purple-500" /> Post / Publish
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {postPlatforms.map((platform) => {
-                const Icon = platform.icon;
-                return (
-                  <button
-                    key={platform.id}
-                    onClick={() => handleShare(platform.id, 'post')}
-                    disabled={isSharing || isComplete || cooldown > 0}
-                    className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    {platform.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {cooldown > 0 && (
-              <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3 text-amber-700">
-                <FaClock className="w-5 h-5 animate-pulse" />
-                <span>Please wait <strong>{cooldown}s</strong> before sharing again</span>
-              </div>
-            )}
-
-            {!isComplete && (
-              <p className="mt-4 text-sm text-gray-500 text-center">
-                {shareAttempt === 0 && 'Open any share to start (0% counted)'}
-                {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount/2)} shares (50% progress)`}
-                {shareAttempt === 2 && `One more share to complete!`}
+            {/* Helper text below the button */}
+            {shareCount > 0 && !isComplete && (
+              <p className="mt-2 text-center text-xs text-gray-400">
+                {remaining} share{remaining > 1 ? 's' : ''} remaining
               </p>
             )}
-
-            {/* ── Claim Button (always shows "Claim") ── */}
-            <div className="mt-6">
-              <button
-                onClick={handleClaim}
-                disabled={!isComplete || isCompleting}
-                className={`w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
-                  isComplete && !isCompleting
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {isCompleting ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Processing...
-                  </span>
-                ) : (
-                  <>
-                    <FaRocket className="w-5 h-5" />
-                    Claim
-                  </>
-                )}
-              </button>
-
-              {/* Helper text below the button */}
-              {!isComplete && shareCount > 0 && (
-                <p className="mt-2 text-center text-xs text-gray-400">
-                  {remaining} share{remaining > 1 ? 's' : ''} remaining
-                </p>
-              )}
-              {isComplete && (
-                <p className="mt-2 text-center text-xs text-green-600 font-medium">
-                  ✅ All shares completed – claim your reward!
-                </p>
-              )}
-            </div>
+            {isComplete && shareCount > 0 && (
+              <p className="mt-2 text-center text-xs text-green-600 font-medium">
+                ✅ All shares completed – claim your reward!
+              </p>
+            )}
+            {shareCount === 0 && (
+              <p className="mt-2 text-center text-xs text-green-600 font-medium">
+                No shares required – claim your reward now!
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ── Professional Claim Success Modal (centered card, not full overlay) ── */}
+      {/* ── Professional Claim Success Modal ── */}
       {showClaimModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl animate-scaleIn border border-gray-100">
