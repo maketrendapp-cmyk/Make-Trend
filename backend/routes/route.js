@@ -782,10 +782,7 @@ router.get('/templates/:id', async (req, res) => {
 
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
 // GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
-// ============================================================
-// GET USER'S CAMPAIGNS (Paginated) – Protected
-// ============================================================
-// ============================================================
+// // ============================================================
 // GET USER'S CAMPAIGNS (Paginated) – Protected
 // ============================================================
 router.get('/campaigns', verifyToken, async (req, res) => {
@@ -795,9 +792,10 @@ router.get('/campaigns', verifyToken, async (req, res) => {
     const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
     const lastId = req.query.lastId || null;
 
-    // ── Base query ──
+    // ── Build query: fetch ONLY non‑deleted campaigns ──
     let query = db.collection('campaigns')
       .where('userId', '==', uid)
+      .where('status', '!=', 'deleted')   // ✅ exclude deleted at the source
       .orderBy('createdAt', 'desc')
       .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
       .limit(limit);
@@ -812,18 +810,12 @@ router.get('/campaigns', verifyToken, async (req, res) => {
     const campaigns = [];
     let lastDoc = null;
 
-    // ── Loop through snapshot ──
     snapshot.forEach(doc => {
-      const data = doc.data();
-      // Store the last document (even if deleted) for pagination cursor
+      campaigns.push({ id: doc.id, ...doc.data() });
       lastDoc = doc;
-      // Only include non‑deleted in the response
-      if (data.status !== 'deleted') {
-        campaigns.push({ id: doc.id, ...data });
-      }
     });
 
-    // ── hasMore: if we fetched exactly 'limit' documents, there might be more ──
+    // ── hasMore: if we fetched exactly 'limit' docs, there are more ──
     const hasMore = snapshot.size === limit;
 
     res.json({
