@@ -18,7 +18,9 @@ export default function Create() {
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const highlightTimeoutRef = useRef(null);
+  const carouselIntervalRef = useRef(null);
 
   // ── Fetch templates ──
   useEffect(() => {
@@ -38,12 +40,10 @@ export default function Create() {
         const data = await res.json();
         if (data.success) {
           setTemplates(data.templates || []);
-          // If highlightSlug is present, find and highlight that template
           if (highlightSlug) {
             const found = data.templates.find(t => t.slug === highlightSlug);
             if (found) {
               setHighlightedId(found.id);
-              // After 3 seconds, remove highlight
               highlightTimeoutRef.current = setTimeout(() => {
                 setHighlightedId(null);
               }, 3000);
@@ -63,6 +63,7 @@ export default function Create() {
 
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
   }, [highlightSlug]);
 
@@ -75,6 +76,31 @@ export default function Create() {
       }
     }
   }, [highlightedId]);
+
+  // ── Auto-slide carousel ──
+  const highlightedTemplates = useMemo(() => templates.filter(t => t.isHighlight === true), [templates]);
+
+  useEffect(() => {
+    if (highlightedTemplates.length > 1) {
+      carouselIntervalRef.current = setInterval(() => {
+        setCarouselIndex((prev) => (prev + 1) % highlightedTemplates.length);
+      }, 4000);
+    }
+    return () => {
+      if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
+    };
+  }, [highlightedTemplates.length]);
+
+  const goToSlide = (index) => {
+    setCarouselIndex(index);
+    // Reset timer to avoid jumping immediately after manual interaction
+    if (carouselIntervalRef.current) {
+      clearInterval(carouselIntervalRef.current);
+      carouselIntervalRef.current = setInterval(() => {
+        setCarouselIndex((prev) => (prev + 1) % highlightedTemplates.length);
+      }, 4000);
+    }
+  };
 
   // ── Filters ──
   const categories = useMemo(() => {
@@ -89,11 +115,7 @@ export default function Create() {
     return ['All', ...Array.from(plats)];
   }, [templates]);
 
-  const { highlightedTemplates, regularTemplates } = useMemo(() => {
-    const highlighted = templates.filter(t => t.isHighlight === true);
-    const regular = templates.filter(t => !t.isHighlight);
-    return { highlightedTemplates: highlighted, regularTemplates: regular };
-  }, [templates]);
+  const regularTemplates = useMemo(() => templates.filter(t => !t.isHighlight), [templates]);
 
   const filteredRegular = useMemo(() => {
     let filtered = [...regularTemplates];
@@ -250,69 +272,102 @@ export default function Create() {
           </div>
         </div>
 
-        {/* ── Highlighted Templates Carousel ── */}
+        {/* ── Featured Templates Carousel ── */}
         {highlightedTemplates.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
+          <div className="mb-10">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
               <span>⭐ Featured Templates</span>
-              <span className="text-xs font-normal text-gray-400">(scroll to see more)</span>
+              <span className="text-xs font-normal text-gray-400">(auto‑play)</span>
             </h2>
-            <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <div className="flex gap-4 w-max">
+
+            {/* Carousel Container */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 shadow-sm">
+              <div
+                className="flex transition-transform duration-700 ease-in-out"
+                style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+              >
                 {highlightedTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="w-64 flex-shrink-0 bg-white rounded-xl border border-border shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
-                  >
-                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
-                      {template.image ? (
-                        <img
-                          src={template.image}
-                          alt={template.title}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">🎨</div>
-                      )}
-                      <div className="absolute bottom-2 left-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
-                          {template.platform ? template.platform.toUpperCase() : 'ALL'}
-                        </span>
+                  <div key={template.id} className="w-full flex-shrink-0 p-6 sm:p-8">
+                    <div className="flex flex-col sm:flex-row gap-6 items-center">
+                      {/* Image */}
+                      <div className="w-full sm:w-56 h-56 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0 shadow-md">
+                        {template.image ? (
+                          <img
+                            src={template.image}
+                            alt={template.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">🎨</div>
+                        )}
                       </div>
-                      <div className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <span>👥</span> {template.usageCount || 0}
-                      </div>
-                      <div className="absolute top-2 left-2 bg-yellow-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                        ⭐ Featured
-                      </div>
-                      {template.plan && template.plan !== 'free' && (
-                        <div className="absolute top-2 right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                          {template.plan.toUpperCase()}
+
+                      {/* Details */}
+                      <div className="flex-1 space-y-2 text-center sm:text-left">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <h3 className="text-2xl font-bold text-gray-900">{template.title}</h3>
+                          {template.plan === 'pro' && (
+                            <span className="bg-purple-600 text-white text-xs font-bold px-3 py-0.5 rounded-full">PRO</span>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold text-gray-900 text-sm truncate">{template.title}</h3>
-                      <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{template.description || 'No description.'}</p>
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          onClick={() => handlePreview(template.slug)}
-                          className="flex-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 py-1 rounded-lg transition"
-                        >
-                          👁️ Preview
-                        </button>
-                        <button
-                          onClick={() => handleUseTemplate(template.slug)}
-                          className="flex-1 text-xs font-medium text-white bg-primary hover:bg-primary/90 py-1 rounded-lg transition"
-                        >
-                          ✨ Use
-                        </button>
+                        <p className="text-gray-600 text-sm">{template.description || 'No description available.'}</p>
+
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                          {template.reward && (
+                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full text-xs font-medium border border-amber-200">
+                              🎁 {template.reward}
+                            </span>
+                          )}
+                          {template.category && (
+                            <span className="bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full text-xs font-medium">
+                              {template.category}
+                            </span>
+                          )}
+                          {template.platform && (
+                            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full shadow-sm ${platformColors[template.platform] || 'bg-gray-600 text-white'}`}>
+                              {template.platform.toUpperCase()}
+                            </span>
+                          )}
+                          <span className="bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
+                            👥 {template.usageCount || 0}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 pt-3 justify-center sm:justify-start">
+                          <button
+                            onClick={() => handlePreview(template.slug)}
+                            className="px-4 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
+                          >
+                            👁️ Preview
+                          </button>
+                          <button
+                            onClick={() => handleUseTemplate(template.slug)}
+                            className="px-4 py-1.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition shadow-sm"
+                          >
+                            ✨ Use This Template
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Dots */}
+              {highlightedTemplates.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+                  {highlightedTemplates.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => goToSlide(idx)}
+                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                        idx === carouselIndex ? 'bg-primary w-6' : 'bg-gray-300 hover:bg-gray-400'
+                      }`}
+                      aria-label={`Go to slide ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
