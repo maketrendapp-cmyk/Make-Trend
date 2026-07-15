@@ -6,17 +6,13 @@ import {
   FiRocket,
   FiTrendingUp,
   FiUsers,
-  FiEye,
-  FiUnlock,
-  FiShare2,
-  FiCheckCircle,
   FiChevronRight,
 } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-// ── Emoji mapping for categories (used in carousel) ──
+// ── Emoji mapping for categories ──
 const categoryEmojis = {
   giveaway: '🎁',
   simcard: '📱',
@@ -62,7 +58,7 @@ export default function Home() {
   useEffect(() => {
     if (featuredTemplates.length > 1) {
       carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
+        setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
       }, 5000);
     }
     return () => {
@@ -70,15 +66,18 @@ export default function Home() {
     };
   }, [featuredTemplates.length]);
 
-  const goToSlide = useCallback((index) => {
-    setCarouselIndex(index);
-    if (carouselIntervalRef.current) {
-      clearInterval(carouselIntervalRef.current);
-      carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
-      }, 5000);
-    }
-  }, [featuredTemplates.length]);
+  const goToSlide = useCallback(
+    (index) => {
+      setCarouselIndex(index);
+      if (carouselIntervalRef.current) {
+        clearInterval(carouselIntervalRef.current);
+        carouselIntervalRef.current = setInterval(() => {
+          setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
+        }, 5000);
+      }
+    },
+    [featuredTemplates.length]
+  );
 
   const handleUseTemplate = (slug) => {
     router.push(`/createcampaign?slug=${slug}`);
@@ -118,7 +117,8 @@ export default function Home() {
               </span>
             </h1>
             <p className="mt-4 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto">
-              Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2 minutes.
+              Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2
+              minutes.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <button
@@ -183,7 +183,7 @@ export default function Home() {
 
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[1, 2, 3].map(i => (
+                {[1, 2, 3].map((i) => (
                   <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
                     <div className="w-full aspect-video bg-slate-200" />
                     <div className="p-3 space-y-2">
@@ -229,7 +229,11 @@ export default function Home() {
                           <div>
                             <div className="flex flex-wrap items-center gap-1.5 mb-1">
                               {template.platform && (
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                                <span
+                                  className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                                    platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
+                                  }`}
+                                >
                                   {template.platform}
                                 </span>
                               )}
@@ -347,14 +351,20 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Footer (inline, since global layout has no footer) ── */}
+        {/* ── Footer ── */}
         <footer className="border-t border-slate-200/60 py-6 px-4 bg-white/50">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <span>© {new Date().getFullYear()} Make Trend. All rights reserved.</span>
             <div className="flex gap-4">
-              <a href="/terms" className="hover:text-slate-700 transition">Terms</a>
-              <a href="/privacy" className="hover:text-slate-700 transition">Privacy</a>
-              <a href="/support" className="hover:text-slate-700 transition">Support</a>
+              <a href="/terms" className="hover:text-slate-700 transition">
+                Terms
+              </a>
+              <a href="/privacy" className="hover:text-slate-700 transition">
+                Privacy
+              </a>
+              <a href="/support" className="hover:text-slate-700 transition">
+                Support
+              </a>
             </div>
           </div>
         </footer>
