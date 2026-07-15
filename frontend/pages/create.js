@@ -1,4 +1,3 @@
-
 // pages/create.js
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
@@ -6,6 +5,22 @@ import Meta from '../components/Meta';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
+
+// ── Emoji mapping for categories ──
+const categoryEmojis = {
+  giveaway: '🎁',
+  simcard: '📱',
+  contest: '🏆',
+  growth: '📈',
+  engagement: '💬',
+  followers: '👥',
+  views: '👁️',
+  likes: '❤️',
+  tiktok: '🎵',
+  instagram: '📸',
+  youtube: '▶️',
+  default: '✨',
+};
 
 export default function Create() {
   const router = useRouter();
@@ -21,14 +36,12 @@ export default function Create() {
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  
-  // New state to allow refetching without reloading the window
-  const [retryCount, setRetryCount] = useState(0); 
+  const [retryCount, setRetryCount] = useState(0);
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
 
-  // ── Fetch templates (Restored original safe structure) ──
+  // ── Fetch templates ──
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
@@ -56,14 +69,12 @@ export default function Create() {
         setLoading(false);
       }
     };
-    
     fetchTemplates();
-    
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [highlightSlug, retryCount]); // retryCount added to cleanly refetch
+  }, [highlightSlug, retryCount]);
 
   useEffect(() => {
     if (highlightedId) {
@@ -165,6 +176,11 @@ export default function Create() {
     }
   };
 
+  // ── Helper to get emoji for category ──
+  const getCategoryEmoji = (cat) => {
+    return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
+  };
+
   // ── Error state ──
   if (error) {
     return (
@@ -207,30 +223,13 @@ export default function Create() {
     <>
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
-        
-        {/* ── Header ── */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-              <span className="bg-primary/10 text-primary p-1 rounded-lg">✨</span>
-              Make Trend
-            </h1>
-          </div>
-          <button 
-            type="button"
-            onClick={() => router.push('/logout')}
-            className="text-xs font-bold text-slate-500 hover:text-slate-800 transition"
-          >
-            Logout
-          </button>
-        </div>
 
         {/* ── Search & Quick Filters ── */}
         <div className="mb-5 space-y-2.5">
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -246,12 +245,12 @@ export default function Create() {
               type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`p-2 border rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-sm ${
-                showFilters || selectedCategory || selectedPlatform 
-                  ? 'bg-primary/10 border-primary/20 text-primary' 
+                showFilters || selectedCategory || selectedPlatform
+                  ? 'bg-primary/10 border-primary/20 text-primary'
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
               <span className="hidden sm:inline">Filters</span>
@@ -263,26 +262,20 @@ export default function Create() {
             </button>
           </div>
 
+          {/* ── Dynamic Quick Filter Pills ── */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-            <button
-              type="button"
-              onClick={() => handleQuickFilter('All')}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all ${
-                !selectedCategory ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              🔥 All
-            </button>
-            {categories.filter(c => c !== 'All' && c).map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => handleQuickFilter(cat)}
                 className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap transition-all capitalize ${
-                  selectedCategory === cat ? 'bg-primary text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+                  (cat === 'All' && !selectedCategory) || selectedCategory === cat
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
                 }`}
               >
-                {cat === 'giveaway' ? '🎁' : cat === 'simcard' ? '🚀' : '✨'} {cat}
+                {cat === 'All' ? '🔥 All' : `${getCategoryEmoji(cat)} ${cat}`}
               </button>
             ))}
           </div>
@@ -326,42 +319,33 @@ export default function Create() {
 
             <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
               <div
-                className="flex transition-transform duration-700 ease-out"
+                className="flex transition-transform duration-700 ease-in-out"
                 style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
               >
                 {featuredTemplates.map((template) => (
                   <div key={template.id} className="w-full flex-shrink-0">
                     <div className="flex flex-col">
-                      
-                      {/* Standard Tailwind Aspect Ratio & Blur Fitting */}
-                      <div className="w-full aspect-video relative bg-slate-950 overflow-hidden">
-                        {template.image && (
-                          <div className="absolute inset-0 select-none pointer-events-none scale-110 filter blur-xl opacity-40">
-                            <img src={template.image} className="w-full h-full object-cover" alt="" />
-                          </div>
-                        )}
+                      <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
                         {template.image ? (
                           <img
                             src={template.image}
                             alt={template.title}
-                            className="relative w-full h-full object-contain z-10 mx-auto"
+                            className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
                             <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
                           </div>
                         )}
-
-                        <div className="absolute top-2.5 left-2.5 flex gap-1 z-20">
+                        <div className="absolute top-2.5 left-2.5 flex gap-1 z-10">
                           <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                             ⭐ Featured
                           </span>
                         </div>
                       </div>
-                      
-                      {/* Condensed Details Block */}
+
                       <div className="p-3 bg-white">
-                        <div className="flex flex-wrap items-center gap-1.5 mb-1 bg-white">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
                           {template.platform && (
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
                               {template.platform}
@@ -375,12 +359,10 @@ export default function Create() {
                         <h3 className="text-sm font-black leading-tight text-slate-950 mb-0.5">
                           {template.title}
                         </h3>
-                        
                         <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
                           {template.description || 'Launch your campaign with this template.'}
                         </p>
 
-                        {/* Symmetrical Dual Buttons - Exactly the same size as grid items! */}
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
@@ -400,13 +382,11 @@ export default function Create() {
                           </button>
                         </div>
                       </div>
-
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Slider Dots (Safely positioned) */}
               {featuredTemplates.length > 1 && (
                 <div className="absolute bottom-24 right-3 flex gap-1 z-20">
                   {featuredTemplates.map((_, idx) => (
@@ -458,9 +438,9 @@ export default function Create() {
             <span className="text-2xl mb-1.5 block">🔍</span>
             <h3 className="text-xs font-bold text-slate-900 mb-0.5">No templates match</h3>
             <p className="text-[11px] text-slate-500 mb-3 max-w-xs mx-auto">Try resetting filters to view all templates.</p>
-            <button 
+            <button
               type="button"
-              onClick={clearFilters} 
+              onClick={clearFilters}
               className="px-3.5 py-1.5 bg-primary/10 text-primary font-bold rounded-lg text-xs hover:bg-primary/20 transition-colors"
             >
               Reset Filters
@@ -478,27 +458,20 @@ export default function Create() {
                     isHighlighted ? 'border-primary ring-4 ring-primary/10' : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
                   }`}
                 >
-                  
-                  {/* Fitted Image Frame (Standard aspect-video) */}
-                  <div className="w-full aspect-video bg-slate-950 relative overflow-hidden">
-                    {template.image && (
-                      <div className="absolute inset-0 select-none pointer-events-none scale-110 filter blur-xl opacity-40">
-                        <img src={template.image} className="w-full h-full object-cover" alt="" />
-                      </div>
-                    )}
+                  <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
                     {template.image ? (
                       <img
                         src={template.image}
                         alt={template.title}
-                        className="relative w-full h-full object-contain z-10 mx-auto"
+                        className="w-full h-full object-cover"
                         loading="lazy"
                       />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
                         <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
                       </div>
                     )}
-                    
+
                     <div className="absolute top-2 inset-x-2 flex justify-between items-start pointer-events-none z-20">
                       <div className="flex flex-col gap-0.5">
                         {template.isHighlight && (
@@ -507,7 +480,6 @@ export default function Create() {
                           </span>
                         )}
                       </div>
-                      
                       {template.platform && (
                         <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
                           {template.platform}
@@ -516,15 +488,13 @@ export default function Create() {
                     </div>
                   </div>
 
-                  {/* Compact Info Segment */}
                   <div className="p-3 flex-grow flex flex-col justify-between">
                     <div>
-                      <div className="flex items-start justify-between gap-1.5 bg-white">
+                      <div className="flex items-start justify-between gap-1.5">
                         <h3 className="font-bold text-slate-950 text-xs leading-snug line-clamp-1 group-hover:text-primary transition-colors">
                           {template.title}
                         </h3>
                       </div>
-                      
                       <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-1 leading-relaxed">
                         {template.description || 'Customizable layout built to match social trends.'}
                       </p>
@@ -543,7 +513,6 @@ export default function Create() {
                             </span>
                           )}
                         </div>
-
                         <div className="text-[10px] font-extrabold text-slate-400 flex items-center">
                           👥 {template.usageCount || 0}
                         </div>
@@ -556,7 +525,6 @@ export default function Create() {
                       )}
                     </div>
 
-                    {/* Symmetrical Dual Actions Row */}
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
                       <button
                         type="button"
@@ -576,7 +544,6 @@ export default function Create() {
                       </button>
                     </div>
                   </div>
-
                 </div>
               );
             })}
