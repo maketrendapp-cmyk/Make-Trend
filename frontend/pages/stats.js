@@ -16,6 +16,7 @@ import {
   FiEdit2,
   FiTrash2,
   FiClock,
+  FiLink,
 } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
@@ -48,6 +49,7 @@ export default function Stats() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [copiedCampaignId, setCopiedCampaignId] = useState(null);
 
   // ===== FETCH CAMPAIGNS & STATS =====
   const fetchCampaigns = useCallback(async () => {
@@ -508,8 +510,19 @@ export default function Stats() {
                       )}
                     </div>
 
-                    {/* Right: Edit/Delete buttons */}
+                    {/* Right: Copy, Edit, Delete buttons */}
                     <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          const shareUrl = `${window.location.origin}/${camp.templateSlug || 'campaign'}/${camp.id}`;
+                          navigator.clipboard.writeText(shareUrl);
+                          setCopiedCampaignId(camp.id);
+                          setTimeout(() => setCopiedCampaignId(null), 2000);
+                        }}
+                        className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100 transition-all duration-200 text-xs sm:text-sm"
+                      >
+                        <FiLink className="w-3.5 h-3.5" /> {copiedCampaignId === camp.id ? 'Copied!' : 'Copy URL'}
+                      </button>
                       <button
                         onClick={() => handleEditCampaign(camp)}
                         className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 text-xs sm:text-sm"
