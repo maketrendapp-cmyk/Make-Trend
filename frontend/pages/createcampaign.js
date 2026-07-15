@@ -307,83 +307,102 @@ export default function CreateCampaign() {
     return (
       <>
         <Meta title="Campaign Created!" />
-        <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            {/* ── Preview Card ── */}
-            <div className="p-6 sm:p-8 border-b border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">🎉 Campaign Created!</h2>
-              <p className="text-gray-500 mb-6">Here's a preview of how your campaign will look when shared.</p>
-
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-                <div className="flex flex-col sm:flex-row gap-6">
-                  {/* Image */}
-                  <div className="sm:w-48 h-48 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0">
-                    {template?.image ? (
-                      <img src={template.image} alt={campaignTitle} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
-                        🎯
-                      </div>
-                    )}
-                  </div>
-                  {/* Details */}
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900">{campaignTitle}</h3>
-                    {campaignDescription && (
-                      <p className="text-gray-600 text-sm mt-1">{campaignDescription}</p>
-                    )}
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-xs font-medium border border-amber-200">
-                        🎁 {campaignReward}
-                      </span>
-                      {shareCountEnabled && (
-                        <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-200">
-                          📢 {shareCount} shares
-                        </span>
-                      )}
-                      {tasksEnabled && (
-                        <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-xs font-medium border border-purple-200">
-                          📋 {tasks.length} tasks
-                        </span>
-                      )}
-                      {finalUrlEnabled && (
-                        <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium border border-green-200">
-                          🔗 Redirect
-                        </span>
-                      )}
-                    </div>
-                  </div>
+        <main className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 sm:px-8 py-6 sm:py-8">
+              <div className="flex items-center gap-3 text-white">
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl">
+                  🎉
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold">Campaign Created!</h1>
+                  <p className="text-purple-100 text-sm">Your campaign is ready to be shared with the world.</p>
                 </div>
               </div>
             </div>
 
-            {/* ── Share URL ── */}
-            <div className="p-6 sm:p-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Share Your Campaign</h3>
-              <div className="flex flex-col sm:flex-row items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                <input
-                  type="text"
-                  value={fullUrl}
-                  readOnly
-                  className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-gray-700 truncate"
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(fullUrl);
-                    setMessage('✅ Link copied!');
-                    setTimeout(() => setMessage(''), 3000);
-                  }}
-                  className="flex-shrink-0 px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-all duration-200 text-sm shadow-sm hover:shadow-md"
-                >
-                  Copy Link
-                </button>
+            {/* Body */}
+            <div className="p-6 sm:p-8 space-y-8">
+              {/* Preview Card */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Preview</h2>
+                <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="flex flex-col sm:flex-row">
+                    {/* Image */}
+                    <div className="sm:w-56 h-48 sm:h-auto bg-gray-200 flex-shrink-0">
+                      {template?.image ? (
+                        <img
+                          src={template.image}
+                          alt={campaignTitle}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">
+                          🎯
+                        </div>
+                      )}
+                    </div>
+                    {/* Details */}
+                    <div className="flex-1 p-5 space-y-3">
+                      <h3 className="text-xl font-bold text-gray-900">{campaignTitle}</h3>
+                      {campaignDescription && (
+                        <p className="text-gray-600 text-sm">{campaignDescription}</p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-xs font-medium border border-amber-200">
+                          🎁 {campaignReward}
+                        </span>
+                        {shareCountEnabled && (
+                          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-200">
+                            📢 {shareCount} shares
+                          </span>
+                        )}
+                        {tasksEnabled && (
+                          <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-xs font-medium border border-purple-200">
+                            📋 {tasks.length} tasks
+                          </span>
+                        )}
+                        {finalUrlEnabled && (
+                          <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium border border-green-200">
+                            🔗 Redirect
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
 
-              <div className="mt-6 flex flex-wrap gap-3 justify-center sm:justify-start">
+              {/* Copy URL */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Share Your Campaign</h2>
+                <div className="flex flex-col sm:flex-row items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <input
+                    type="text"
+                    value={fullUrl}
+                    readOnly
+                    className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-gray-700 truncate"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(fullUrl);
+                      setMessage('✅ Link copied!');
+                      setTimeout(() => setMessage(''), 3000);
+                    }}
+                    className="flex-shrink-0 w-full sm:w-auto px-6 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    Copy Link
+                  </button>
+                </div>
+                {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => router.push(campaignUrl)}
-                  className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="inline-flex items-center justify-center px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   👁️ View Campaign
                 </button>
