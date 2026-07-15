@@ -9,7 +9,7 @@ export default function Meta({ title, description, image, url }) {
 
   return (
     <Head>
-      {/* ── Global Resources (deduplicated by Next.js) ── */}
+      {/* ── Global Resources ── */}
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
