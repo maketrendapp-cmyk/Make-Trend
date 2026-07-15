@@ -32,7 +32,6 @@ export default function Stats() {
     totalUnlocks: 0,
     totalShares: 0,
     totalCompletions: 0,
-    activeCampaigns: 0,
     successfulCampaigns: 0,
   });
   const [statsLoading, setStatsLoading] = useState(true);
@@ -51,95 +50,74 @@ export default function Stats() {
   const [message, setMessage] = useState('');
   const [copiedCampaignId, setCopiedCampaignId] = useState(null);
 
-  // ===== FETCH CAMPAIGNS & STATS =====
+  // ===== FETCH CAMPAIGN LIST =====
   const fetchCampaigns = useCallback(async () => {
     try {
-      setStatsLoading(true);
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        setStatsLoading(false);
-        return;
-      }
+      if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
       const res = await fetch(`${API_BASE}/campaigns`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Server error (${res.status}): ${errorText}`);
-      }
-
+      if (!res.ok) throw new Error(`Server error (${res.status})`);
       const data = await res.json();
       if (data.success) {
         setCampaigns(data.campaigns || []);
-        if (data.stats) {
-          setStats(data.stats);
-        } else {
-          // fallback
-          const campaigns = data.campaigns || [];
-          const totalViews = campaigns.reduce((s, c) => s + (c.views || 0), 0);
-          const totalUnlocks = campaigns.reduce((s, c) => s + (c.unlockCount || 0), 0);
-          const totalShares = campaigns.reduce((s, c) => s + (c.shares || 0), 0);
-          const totalCompletions = campaigns.reduce((s, c) => s + (c.completions || 0), 0);
-          const successfulCampaigns = campaigns.filter(
-            (c) => c.shareCount > 0 && c.shares >= c.shareCount
-          ).length;
-          setStats({
-            totalCampaigns: campaigns.length,
-            totalViews,
-            totalUnlocks,
-            totalShares,
-            totalCompletions,
-            activeCampaigns: campaigns.filter((c) => c.status === 'active').length,
-            successfulCampaigns,
-          });
-        }
-      } else {
-        throw new Error(data.error || 'Unknown API error');
       }
     } catch (error) {
       console.error('❌ fetchCampaigns error:', error.message);
+    }
+  }, []);
+
+  // ===== FETCH STATS FROM NEW ENDPOINT =====
+  const fetchStats = useCallback(async () => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return;
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${API_BASE}/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server error (${res.status})`);
+      const data = await res.json();
+      if (data.success) {
+        setStats(data.stats);
+      }
+    } catch (error) {
+      console.error('❌ fetchStats error:', error.message);
     } finally {
       setStatsLoading(false);
     }
   }, []);
 
+  // ===== LOAD DATA =====
   useEffect(() => {
     if (isAuthenticated && !needsCompletion) {
-      fetchCampaigns();
+      setStatsLoading(true);
+      Promise.all([fetchCampaigns(), fetchStats()])
+        .finally(() => setStatsLoading(false));
     } else {
       setStatsLoading(false);
     }
-  }, [isAuthenticated, needsCompletion, fetchCampaigns]);
+  }, [isAuthenticated, needsCompletion, fetchCampaigns, fetchStats]);
 
-  // ===== ROBUST DATE FORMATTER (local time) =====
+  // ===== ROBUST DATE FORMATTER =====
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      // Firestore Timestamp (has seconds and nanoseconds)
       if (timestamp.seconds !== undefined) {
         date = new Date(timestamp.seconds * 1000);
-      }
-      // Firebase v9 modular SDK Timestamp (has _seconds and _nanoseconds)
-      else if (timestamp._seconds !== undefined) {
+      } else if (timestamp._seconds !== undefined) {
         date = new Date(timestamp._seconds * 1000);
-      }
-      // ISO string or number (milliseconds)
-      else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
         date = new Date(timestamp);
-      }
-      // If it's already a Date object
-      else if (timestamp instanceof Date) {
+      } else if (timestamp instanceof Date) {
         date = timestamp;
-      }
-      // fallback: try to parse as ISO
-      else {
+      } else {
         date = new Date(timestamp);
       }
       if (isNaN(date.getTime())) return 'N/A';
-      // Use toLocaleString for local time display
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -185,6 +163,7 @@ export default function Stats() {
         setMessage('✅ Campaign deleted successfully!');
         setTimeout(() => setMessage(''), 3000);
         await fetchCampaigns();
+        await fetchStats(); // refresh stats after deletion
       } else {
         alert(data.error || 'Failed to delete campaign');
       }
@@ -228,6 +207,7 @@ export default function Stats() {
       if (data.success) {
         setMessage('✅ Campaign updated successfully!');
         await fetchCampaigns();
+        await fetchStats();
         setTimeout(() => {
           setShowEditModal(false);
           document.body.style.overflow = 'unset';
