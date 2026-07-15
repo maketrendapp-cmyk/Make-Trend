@@ -782,7 +782,9 @@ router.get('/templates/:id', async (req, res) => {
 
 // GET USER'S CAMPAIGNS (Protected – shows only own campaigns)
 // GET USER'S CAMPAIGNS (Root collection – all campaigns except deleted)
-// GET USER'S CAMPAIGNS (Protected – paginated)
+// ============================================================
+// GET USER'S CAMPAIGNS (Paginated) – Protected
+// ============================================================
 router.get('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -790,14 +792,15 @@ router.get('/campaigns', verifyToken, async (req, res) => {
     const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
     const lastId = req.query.lastId || null;
 
+    // ── Base query ──
     let query = db.collection('campaigns')
       .where('userId', '==', uid)
       .orderBy('createdAt', 'desc')
-      .orderBy('id', 'desc') // tie-breaker for unique ordering
+      .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
       .limit(limit);
 
+    // ── Apply cursor if provided ──
     if (lastCreatedAt && lastId) {
-      // Firestore Timestamp from JS Date
       const lastTimestamp = admin.firestore.Timestamp.fromDate(lastCreatedAt);
       query = query.startAfter(lastTimestamp, lastId);
     }
@@ -805,6 +808,7 @@ router.get('/campaigns', verifyToken, async (req, res) => {
     const snapshot = await query.get();
     const campaigns = [];
     let lastDoc = null;
+
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.status !== 'deleted') {
@@ -813,7 +817,7 @@ router.get('/campaigns', verifyToken, async (req, res) => {
       }
     });
 
-    const hasMore = campaigns.length === limit; // if we got 'limit' items, there might be more
+    const hasMore = campaigns.length === limit;
 
     res.json({
       success: true,
@@ -823,7 +827,7 @@ router.get('/campaigns', verifyToken, async (req, res) => {
       lastId: lastDoc ? lastDoc.id : null,
     });
   } catch (error) {
-    console.error('Get campaigns error:', error);
+    console.error('❌ Get campaigns error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
