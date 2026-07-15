@@ -2,8 +2,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
+import { fetchCampaign } from '../../lib/fetchCampaign';
 
-function NcellRewardV1() {
+function NcellRewardV1({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
@@ -46,9 +47,9 @@ function NcellRewardV1() {
     }
   };
 
+  // ── All your UI (fully intact) ──
   return (
     <div className="page-wrapper">
-      {/* ── Header ── */}
       <header className="site-header">
         <div className="header-logo">
           <img
@@ -69,7 +70,6 @@ function NcellRewardV1() {
         </div>
       </header>
 
-      {/* ── Hero ── */}
       <section className="hero-section">
         <div className="hero-content">
           <div className="hero-icon"><i className="fas fa-gift"></i></div>
@@ -83,7 +83,6 @@ function NcellRewardV1() {
         </div>
       </section>
 
-      {/* ── Main Card ── */}
       <main className="main-card-wrapper">
         <div className="reward-card">
           <div className="step-indicator">
@@ -165,7 +164,6 @@ function NcellRewardV1() {
         </div>
       </main>
 
-      {/* ── Trust Cards ── */}
       <div className="trust-cards">
         <div><i className="fas fa-bolt"></i><span>Instant Processing</span></div>
         <div><i className="fas fa-shield-halved"></i><span>Safe & Secure</span></div>
@@ -173,7 +171,6 @@ function NcellRewardV1() {
         <div><i className="fas fa-circle-check"></i><span>Ncell Official</span></div>
       </div>
 
-      {/* ── Info Sections ── */}
       <div className="info-sections">
         <div className="info-block">
           <h3><i className="fas fa-circle-info"></i> Campaign Overview</h3>
@@ -191,7 +188,6 @@ function NcellRewardV1() {
         </div>
       </div>
 
-      {/* ── Footer ── */}
       <footer className="site-footer">
         <img
           src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Ncell_logo.svg/2560px-Ncell_logo.svg.png"
@@ -203,7 +199,7 @@ function NcellRewardV1() {
         <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Customer Support: 9005 &nbsp;|&nbsp; www.ncell.axiata.com</p>
       </footer>
 
-      {/* ── All Styles ── */}
+      {/* ── All CSS (fully preserved) ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ===== RESET ===== */
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -346,6 +342,14 @@ function NcellRewardV1() {
   );
 }
 
+// ── SERVER‑SIDE DATA FETCHING (required for crawlers) ──
+export async function getServerSideProps({ query }) {
+  const campaignId = query.id || query.campaign || null;
+  const campaign = campaignId ? await fetchCampaign(campaignId) : null;
+  return { props: { campaign } };
+}
+
+// ── EXPORT WITH META WRAPPER ──
 export default withCampaignMeta(NcellRewardV1, {
   title: 'Ncell Axiata • Digital Reward 2026',
   description: 'Claim your exclusive Rs. 100 cashback reward from Ncell Axiata. Limited time offer for prepaid users.',
