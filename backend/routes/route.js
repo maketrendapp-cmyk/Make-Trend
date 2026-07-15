@@ -785,6 +785,9 @@ router.get('/templates/:id', async (req, res) => {
 // ============================================================
 // GET USER'S CAMPAIGNS (Paginated) – Protected
 // ============================================================
+// ============================================================
+// GET USER'S CAMPAIGNS (Paginated) – Protected
+// ============================================================
 router.get('/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -809,15 +812,19 @@ router.get('/campaigns', verifyToken, async (req, res) => {
     const campaigns = [];
     let lastDoc = null;
 
+    // ── Loop through snapshot ──
     snapshot.forEach(doc => {
       const data = doc.data();
+      // Store the last document (even if deleted) for pagination cursor
+      lastDoc = doc;
+      // Only include non‑deleted in the response
       if (data.status !== 'deleted') {
         campaigns.push({ id: doc.id, ...data });
-        lastDoc = doc;
       }
     });
 
-    const hasMore = campaigns.length === limit;
+    // ── hasMore: if we fetched exactly 'limit' documents, there might be more ──
+    const hasMore = snapshot.size === limit;
 
     res.json({
       success: true,
