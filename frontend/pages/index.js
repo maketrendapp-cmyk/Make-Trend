@@ -116,14 +116,14 @@ export default function Home() {
   const carouselIntervalRef = useRef(null);
   const touchStartXRef = useRef(0);
 
-  // ── Fade‑up hooks for each section ──
+  // ── Fade‑up hooks ──
   const heroFade = useFadeUp(0.1);
   const statsFade = useFadeUp(0.1);
   const carouselFade = useFadeUp(0.1);
   const featuresFade = useFadeUp(0.1);
   const ctaFade = useFadeUp(0.1);
 
-  // ── Stats targets ──
+  // ── Stats ──
   const stats = [
     { label: 'Campaigns Created', target: 5000, suffix: '+' },
     { label: 'Total Shares', target: 10000, suffix: 'K+' },
@@ -137,7 +137,7 @@ export default function Home() {
   const counter4 = useCounter(1200);
   const counters = [counter1, counter2, counter3, counter4];
 
-  // ── Fetch featured templates ──
+  // ── Fetch featured ──
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
@@ -259,62 +259,73 @@ export default function Home() {
         >
           {featuredTemplates.map((template) => (
             <div key={template.id} className="w-full flex-shrink-0">
-              <div className="flex flex-col sm:flex-row p-4 sm:p-6 gap-4 sm:gap-6">
-                <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
-                  {template.image ? (
-                    <img
-                      src={template.image}
-                      alt={template.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">🎨</div>
-                  )}
-                </div>
-                <div className="flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                      {template.platform && (
-                        <span
-                          className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
-                            platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
-                          }`}
-                        >
-                          {template.platform}
-                        </span>
-                      )}
-                      <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded flex items-center">
-                        👥 {template.usageCount || 0} uses
-                      </span>
-                      {template.category && (
-                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                          {getCategoryEmoji(template.category)} {template.category}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-900">{template.title}</h3>
-                    <p className="text-slate-500 text-sm mt-1 line-clamp-2">
-                      {template.description || 'Launch your campaign with this template.'}
-                    </p>
-                    {template.reward && (
-                      <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-lg w-fit">
-                        🎁 {template.reward}
-                      </div>
+              {/* ── Inner container for each slide ── */}
+              <div className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                  <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                    {template.image ? (
+                      <img
+                        src={template.image}
+                        alt={template.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">🎨</div>
                     )}
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => router.push(`/${template.slug}`)}
-                      className="px-4 py-1.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition"
-                    >
-                      👁️ Preview
-                    </button>
-                    <button
-                      onClick={() => handleUseTemplate(template.slug)}
-                      className="px-4 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition shadow-sm"
-                    >
-                      ✨ Use Template
-                    </button>
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                        {template.platform && (
+                          <span
+                            className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                              platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
+                            }`}
+                          >
+                            {template.platform}
+                          </span>
+                        )}
+                        <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded flex items-center">
+                          👥 {template.usageCount || 0} uses
+                        </span>
+                        {template.category && (
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                            {getCategoryEmoji(template.category)} {template.category}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-2xl font-bold text-slate-900">{template.title}</h3>
+                      <p className="text-slate-500 text-sm mt-1 line-clamp-2">
+                        {template.description || 'Launch your campaign with this template.'}
+                      </p>
+                      {template.reward && (
+                        <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-lg w-fit">
+                          🎁 {template.reward}
+                        </div>
+                      )}
+                    </div>
+                    {/* ── Buttons (exact match with create.js) ── */}
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => router.push(`/${template.slug}`)}
+                        className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Preview
+                      </button>
+                      <button
+                        onClick={() => handleUseTemplate(template.slug)}
+                        className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl py-2 transition shadow-sm active:scale-95"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                        Use Template
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -354,6 +365,14 @@ export default function Home() {
         )}
       </div>
     );
+  };
+
+  // ── Helper to format numbers with suffix ──
+  const formatNumber = (value, label) => {
+    if (label === 'Total Shares') {
+      return (value / 1000).toFixed(1) + 'K';
+    }
+    return value + '+';
   };
 
   return (
@@ -402,7 +421,7 @@ export default function Home() {
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none" />
         </section>
 
-        {/* ── Stats with Animated Counters ── */}
+        {/* ── Stats with polished numbers ── */}
         <section
           ref={statsFade.ref}
           className={`border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6 transition-all duration-700 ${
@@ -412,11 +431,16 @@ export default function Home() {
           <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             {stats.map((stat, index) => {
               const { count, ref } = counters[index];
-              const displayValue = stat.label === 'Total Shares' ? (count / 1000).toFixed(1) + 'K' : count + stat.suffix;
+              const displayValue = formatNumber(count, stat.label);
               return (
-                <div key={index} ref={ref} className="transition-opacity duration-500">
-                  <p className="text-2xl font-extrabold text-slate-900">{displayValue}</p>
-                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{stat.label}</p>
+                <div key={index} ref={ref} className="group">
+                  <p className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent transition-all duration-500 group-hover:scale-105">
+                    {displayValue}
+                  </p>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mt-0.5">
+                    {stat.label}
+                  </p>
+                  <div className="w-12 h-0.5 mx-auto mt-1 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-full transition-all duration-500 group-hover:w-16" />
                 </div>
               );
             })}
