@@ -13,6 +13,53 @@ import {
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
+// ── Custom hook for animated counter ──
+function useCounter(target, duration = 2000, startOnView = true) {
+  const [count, setCount] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!startOnView) {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+    return () => observer.disconnect();
+  }, [startOnView]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    let startTime;
+    const step = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+      setCount(Math.floor(eased * target));
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        setCount(target);
+      }
+    };
+    requestAnimationFrame(step);
+  }, [target, duration, isVisible]);
+
+  return { count, ref };
+}
+
+// ── Emoji mapping ──
 const getCategoryEmoji = (cat) => {
   const emojis = {
     giveaway: '🎁',
@@ -49,13 +96,28 @@ export default function Home() {
   const carouselIntervalRef = useRef(null);
   const touchStartXRef = useRef(0);
 
-  // ── Fetch highlighted templates (no frontend limit) ──
+  // ── Stats targets ──
+  const stats = [
+    { label: 'Campaigns Created', target: 5000, suffix: '+' },
+    { label: 'Total Shares', target: 10000, suffix: 'K+' },
+    { label: 'Templates', target: 500, suffix: '+' },
+    { label: 'Active Users', target: 1200, suffix: '+' },
+  ];
+
+  // ── Animated counters ──
+  const counter1 = useCounter(5000);
+  const counter2 = useCounter(10000);
+  const counter3 = useCounter(500);
+  const counter4 = useCounter(1200);
+
+  const counters = [counter1, counter2, counter3, counter4];
+
+  // ── Fetch featured templates ──
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
         setLoading(true);
         setError(null);
-        // 🔥 No limit parameter – backend uses its own default and cap
         const res = await fetch(`${API_BASE}/templates?highlight=true`);
         if (!res.ok) throw new Error('Failed to fetch featured templates');
         const data = await res.json();
@@ -310,25 +372,19 @@ export default function Home() {
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none" />
         </section>
 
-        {/* ── Stats ── */}
+        {/* ── Stats with Animated Counters ── */}
         <section className="border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6">
           <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-extrabold text-slate-900">500+</p>
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Campaigns Created</p>
-            </div>
-            <div>
-              <p className="text-2xl font-extrabold text-slate-900">10K+</p>
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Shares</p>
-            </div>
-            <div>
-              <p className="text-2xl font-extrabold text-slate-900">50+</p>
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Templates</p>
-            </div>
-            <div>
-              <p className="text-2xl font-extrabold text-slate-900">1.2K+</p>
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Active Users</p>
-            </div>
+            {stats.map((stat, index) => {
+              const { count, ref } = counters[index];
+              const displayValue = stat.label === 'Total Shares' ? (count / 1000).toFixed(1) + 'K' : count + stat.suffix;
+              return (
+                <div key={index} ref={ref} className="transition-opacity duration-500">
+                  <p className="text-2xl font-extrabold text-slate-900">{displayValue}</p>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{stat.label}</p>
+                </div>
+              );
+            })}
           </div>
         </section>
 
