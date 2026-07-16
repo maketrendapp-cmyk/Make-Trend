@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import {
-  FiRocket,
+  FiZap,
   FiTrendingUp,
   FiUsers,
   FiChevronRight,
@@ -296,7 +296,7 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
                 <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FiRocket />
+                  <FiZap />
                 </div>
                 <h3 className="font-bold text-slate-900">Launch in Minutes</h3>
                 <p className="text-slate-500 text-sm mt-1">
