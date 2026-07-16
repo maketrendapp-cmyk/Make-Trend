@@ -1,3 +1,4 @@
+
 // pages/index.js
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
@@ -12,21 +13,6 @@ import {
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-const categoryEmojis = {
-  giveaway: '🎁',
-  simcard: '📱',
-  contest: '🏆',
-  growth: '📈',
-  engagement: '💬',
-  followers: '👥',
-  views: '👁️',
-  likes: '❤️',
-  tiktok: '🎵',
-  instagram: '📸',
-  youtube: '▶️',
-  default: '✨',
-};
-
 export default function Home() {
   const router = useRouter();
   const [featuredTemplates, setFeaturedTemplates] = useState([]);
@@ -34,11 +20,11 @@ export default function Home() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const carouselIntervalRef = useRef(null);
 
+  // ── Fetch featured templates ──
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
         const res = await fetch(`${API_BASE}/templates?highlight=true&limit=20`);
-        if (!res.ok) throw new Error('Failed to fetch featured templates');
         const data = await res.json();
         if (data.success) {
           setFeaturedTemplates(data.templates || []);
@@ -52,6 +38,7 @@ export default function Home() {
     fetchFeatured();
   }, []);
 
+  // ── Carousel auto-slide ──
   useEffect(() => {
     if (featuredTemplates.length > 1) {
       carouselIntervalRef.current = setInterval(() => {
@@ -63,18 +50,15 @@ export default function Home() {
     };
   }, [featuredTemplates.length]);
 
-  const goToSlide = useCallback(
-    (index) => {
-      setCarouselIndex(index);
-      if (carouselIntervalRef.current) {
-        clearInterval(carouselIntervalRef.current);
-        carouselIntervalRef.current = setInterval(() => {
-          setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-        }, 5000);
-      }
-    },
-    [featuredTemplates.length]
-  );
+  const goToSlide = useCallback((index) => {
+    setCarouselIndex(index);
+    if (carouselIntervalRef.current) {
+      clearInterval(carouselIntervalRef.current);
+      carouselIntervalRef.current = setInterval(() => {
+        setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
+      }, 5000);
+    }
+  }, [featuredTemplates.length]);
 
   const handleUseTemplate = (slug) => {
     router.push(`/createcampaign?slug=${slug}`);
@@ -86,10 +70,6 @@ export default function Home() {
     youtube: 'bg-[#FF0000] text-white',
     facebook: 'bg-[#1877F2] text-white',
     all: 'bg-slate-800 text-white',
-  };
-
-  const getCategoryEmoji = (cat) => {
-    return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
   return (
@@ -112,8 +92,7 @@ export default function Home() {
               </span>
             </h1>
             <p className="mt-4 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto">
-              Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2
-              minutes.
+              Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2 minutes.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <button
@@ -156,7 +135,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Featured Carousel ── */}
+        {/* ── Featured Templates Carousel (simplified) ── */}
         <section className="py-16 px-4">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -203,37 +182,22 @@ export default function Home() {
                       <div className="flex flex-col sm:flex-row p-4 sm:p-6 gap-4 sm:gap-6">
                         <div className="w-full sm:w-48 h-40 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
                           {template.image ? (
-                            <img
-                              src={template.image}
-                              alt={template.title}
-                              className="w-full h-full object-cover"
-                            />
+                            <img src={template.image} alt={template.title} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">
-                              🎨
-                            </div>
+                            <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">🎨</div>
                           )}
                         </div>
                         <div className="flex-1 flex flex-col justify-between">
                           <div>
                             <div className="flex flex-wrap items-center gap-1.5 mb-1">
                               {template.platform && (
-                                <span
-                                  className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
-                                    platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
-                                  }`}
-                                >
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
                                   {template.platform}
                                 </span>
                               )}
                               <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded flex items-center">
                                 👥 {template.usageCount || 0} uses
                               </span>
-                              {template.category && (
-                                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                                  {getCategoryEmoji(template.category)} {template.category}
-                                </span>
-                              )}
                             </div>
                             <h3 className="text-xl font-bold text-slate-900">{template.title}</h3>
                             <p className="text-slate-500 text-sm mt-0.5 line-clamp-2">
