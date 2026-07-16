@@ -13,7 +13,6 @@ import {
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-// ── Emoji mapping ──
 const getCategoryEmoji = (cat) => {
   const emojis = {
     giveaway: '🎁',
@@ -44,22 +43,29 @@ export default function Home() {
   const router = useRouter();
   const [featuredTemplates, setFeaturedTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const carouselIntervalRef = useRef(null);
+  const touchStartXRef = useRef(0);
 
-  // ── Fetch only highlighted templates ──
+  // ── Fetch highlighted templates (no frontend limit) ──
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${API_BASE}/templates?highlight=true&limit=20`);
+        setError(null);
+        // 🔥 No limit parameter – backend uses its own default and cap
+        const res = await fetch(`${API_BASE}/templates?highlight=true`);
         if (!res.ok) throw new Error('Failed to fetch featured templates');
         const data = await res.json();
         if (data.success) {
           setFeaturedTemplates(data.templates || []);
+        } else {
+          throw new Error(data.error || 'Invalid response');
         }
       } catch (err) {
+        setError(err.message);
         console.error('Featured fetch error:', err);
       } finally {
         setLoading(false);
@@ -68,12 +74,12 @@ export default function Home() {
     fetchFeatured();
   }, []);
 
-  // ── Carousel auto‑slide ──
+  // ── Carousel auto‑slide (2 seconds) ──
   useEffect(() => {
     if (featuredTemplates.length > 1 && !isHovering) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-      }, 5000);
+      }, 2000);
     }
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
@@ -92,6 +98,22 @@ export default function Home() {
     setCarouselIndex((prev) => (prev - 1 + featuredTemplates.length) % featuredTemplates.length);
   }, [featuredTemplates.length]);
 
+  const handleTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartXRef.current - touchEndX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        nextSlide();
+      } else {
+        prevSlide();
+      }
+    }
+  };
+
   const handleUseTemplate = (slug) => {
     router.push(`/createcampaign?slug=${slug}`);
   };
@@ -100,20 +122,30 @@ export default function Home() {
   const renderCarousel = () => {
     if (loading) {
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
-              <div className="w-full aspect-video bg-slate-200" />
-              <div className="p-3 space-y-2">
-                <div className="h-3 bg-slate-200 rounded w-2/3" />
-                <div className="h-2.5 bg-slate-200 rounded w-1/2" />
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="h-8 bg-slate-200 rounded-lg" />
-                  <div className="h-8 bg-slate-200 rounded-lg" />
-                </div>
-              </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
+          <div className="w-full aspect-video bg-slate-200" />
+          <div className="p-4 space-y-2">
+            <div className="h-4 bg-slate-200 rounded w-2/3" />
+            <div className="h-3 bg-slate-200 rounded w-1/2" />
+            <div className="flex gap-2 mt-2">
+              <div className="h-8 w-16 bg-slate-200 rounded" />
+              <div className="h-8 w-16 bg-slate-200 rounded" />
             </div>
-          ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-red-200">
+          <p className="text-red-500">Failed to load featured templates: {error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
+          >
+            Retry
+          </button>
         </div>
       );
     }
@@ -131,9 +163,11 @@ export default function Home() {
         className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm"
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         <div
-          className="flex transition-transform duration-700 ease-in-out"
+          className="flex transition-transform duration-500 ease-in-out"
           style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
         >
           {featuredTemplates.map((template) => (
@@ -203,18 +237,6 @@ export default function Home() {
 
         {featuredTemplates.length > 1 && (
           <>
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
-              {featuredTemplates.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goToSlide(idx)}
-                  className={`h-2 rounded-full transition-all ${
-                    idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-2'
-                  }`}
-                  aria-label={`Go to slide ${idx + 1}`}
-                />
-              ))}
-            </div>
             <button
               onClick={prevSlide}
               className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
@@ -229,6 +251,18 @@ export default function Home() {
             >
               <FiChevronRight className="w-5 h-5 text-slate-700" />
             </button>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+              {featuredTemplates.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => goToSlide(idx)}
+                  className={`h-2 rounded-full transition-all ${
+                    idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-2'
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
           </>
         )}
       </div>
