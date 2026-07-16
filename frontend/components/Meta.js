@@ -9,7 +9,7 @@ export default function Meta({ title, description, image, url }) {
 
   return (
     <Head>
-      {/* ── SEO Tags ── */}
+      {/* ── Page Title ── */}
       <title>{siteTitle}</title>
       <meta name="description" content={metaDesc} />
 
