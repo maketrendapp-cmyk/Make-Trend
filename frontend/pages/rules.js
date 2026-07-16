@@ -68,8 +68,8 @@ export default function Rules() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-20 sm:py-28">
+      {/* ── Hero (compact) ── */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-12 sm:py-16">
         <div className="absolute inset-0 opacity-10">
           <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
             <circle cx="200" cy="200" r="300" fill="white" />
@@ -78,23 +78,23 @@ export default function Rules() {
           </svg>
         </div>
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-4">
-            <FiShield className="w-20 h-20 text-white" />
+          <div className="flex justify-center mb-3">
+            <FiShield className="w-14 h-14 text-white" />
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight">
             Our Community Rules
           </h1>
-          <p className="mt-4 text-xl max-w-3xl mx-auto text-indigo-100">
+          <p className="mt-2 text-lg max-w-3xl mx-auto text-indigo-100">
             We believe in fair, transparent, and safe interactions. These rules help us keep Make Trend a trusted place for creators and participants alike.
           </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
             <Link href="/create">
-              <span className="inline-flex items-center gap-2 px-6 py-3 bg-white text-purple-600 font-bold rounded-xl hover:bg-indigo-50 transition shadow-lg cursor-pointer">
+              <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-purple-600 font-bold rounded-xl hover:bg-indigo-50 transition shadow-lg cursor-pointer text-sm">
                 Explore Templates <FiChevronRight className="w-4 h-4" />
               </span>
             </Link>
             <Link href={user ? '/profile' : '/login'}>
-              <span className="inline-flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm text-white font-medium rounded-xl hover:bg-white/30 transition border border-white/20 cursor-pointer">
+              <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/20 backdrop-blur-sm text-white font-medium rounded-xl hover:bg-white/30 transition border border-white/20 cursor-pointer text-sm">
                 {user ? 'Your Profile' : 'Get Started'} <FiChevronRight className="w-4 h-4" />
               </span>
             </Link>
@@ -103,13 +103,13 @@ export default function Rules() {
       </section>
 
       {/* ── Why Rules Matter ── */}
-      <section className="py-12 bg-gray-50 border-b border-gray-200">
+      <section className="py-10 bg-gray-50 border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex items-center justify-center gap-3 text-purple-600">
-            <FiInfo className="w-6 h-6" />
-            <h2 className="text-2xl font-bold text-gray-900">Why We Have Rules</h2>
+            <FiInfo className="w-5 h-5" />
+            <h2 className="text-xl font-bold text-gray-900">Why We Have Rules</h2>
           </div>
-          <p className="mt-4 text-gray-600 text-lg leading-relaxed">
+          <p className="mt-2 text-gray-600 text-base leading-relaxed">
             Make Trend is built on trust. Every campaign, share, and completion depends on genuine participation.
             These rules protect our community from abuse and ensure that everyone has a positive experience.
           </p>
@@ -117,16 +117,16 @@ export default function Rules() {
       </section>
 
       {/* ── Rules Grid ── */}
-      <section className="py-16 bg-white">
+      <section className="py-12 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">What We Stand For</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">What We Stand For</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {rules.map((rule, idx) => (
-              <div key={idx} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-md transition flex items-start gap-4">
-                <div className="mt-1 flex-shrink-0">{rule.icon}</div>
+              <div key={idx} className="bg-gray-50 rounded-xl p-5 border border-gray-100 hover:shadow-md transition flex items-start gap-3">
+                <div className="mt-0.5 flex-shrink-0">{rule.icon}</div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{rule.title}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{rule.description}</p>
+                  <h3 className="text-base font-semibold text-gray-900">{rule.title}</h3>
+                  <p className="text-gray-600 text-sm mt-0.5">{rule.description}</p>
                 </div>
               </div>
             ))}
@@ -135,22 +135,22 @@ export default function Rules() {
       </section>
 
       {/* ── Consequences ── */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-12 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
-            <FiAlertCircle className="w-8 h-8 text-red-600" />
-            <h2 className="text-2xl font-bold text-gray-900">Consequences of Violation</h2>
+          <div className="flex items-center gap-3 mb-5">
+            <FiAlertCircle className="w-6 h-6 text-red-600" />
+            <h2 className="text-xl font-bold text-gray-900">Consequences of Violation</h2>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
-            <ul className="space-y-3 text-gray-700">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sm:p-6">
+            <ul className="space-y-2.5 text-gray-700">
               {consequences.map((item, idx) => (
                 <li key={idx} className="flex items-start gap-3">
-                  <FiXCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span>{item}</span>
+                  <FiXCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">{item}</span>
                 </li>
               ))}
             </ul>
-            <p className="mt-6 text-sm text-gray-500 border-t border-gray-100 pt-6">
+            <p className="mt-4 text-sm text-gray-500 border-t border-gray-100 pt-4">
               We reserve the right to take any action we deem appropriate to protect our community, including reporting illegal activity to authorities.
             </p>
           </div>
@@ -158,22 +158,22 @@ export default function Rules() {
       </section>
 
       {/* ── Reporting Violations ── */}
-      <section className="py-16 bg-white">
+      <section className="py-12 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <FiFlag className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900">Report a Violation</h2>
-          <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
+          <FiFlag className="w-10 h-10 text-purple-600 mx-auto mb-3" />
+          <h2 className="text-xl font-bold text-gray-900">Report a Violation</h2>
+          <p className="mt-1 text-gray-600 max-w-2xl mx-auto text-sm">
             If you encounter a campaign or user that violates these rules, please report it immediately. We take all reports seriously and will investigate promptly.
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-4">
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
             <Link href="/support">
-              <span className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition cursor-pointer">
+              <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition cursor-pointer text-sm">
                 Go to Support <FiChevronRight className="w-4 h-4" />
               </span>
             </Link>
             <a
               href="mailto:support@maketrend.com"
-              className="inline-flex items-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition text-sm"
             >
               <FiMail className="w-4 h-4" /> Email Us
             </a>
@@ -182,7 +182,7 @@ export default function Rules() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="bg-gray-50 border-t border-gray-200 py-8">
+      <footer className="bg-gray-50 border-t border-gray-200 py-6">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Make Trend. All rights reserved.</p>
           <div className="flex gap-4 mt-2 sm:mt-0">
