@@ -25,6 +25,8 @@ const TOP_NAV_ONLY_PAGES = [
   '/rules',
   '/terms',
   '/privacy',
+'/follow',
+'/download',
 ];
 
 function MyApp({ Component, pageProps }) {
