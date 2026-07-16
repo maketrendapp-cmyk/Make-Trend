@@ -1,19 +1,17 @@
-// pages/index.js
+// pages/index.js – with Meta only
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import Meta from '../components/Meta';
 
 export default function Home() {
   const router = useRouter();
 
   return (
     <>
-      <Head>
-        <title>Make Trend – Create & Share Viral Campaigns</title>
-        <meta
-          name="description"
-          content="Launch share‑to‑unlock campaigns for Instagram, TikTok, YouTube, and more. Grow your audience in minutes."
-        />
-      </Head>
+      <Meta
+        title="Make Trend – Create & Share Viral Campaigns"
+        description="Launch share‑to‑unlock campaigns for Instagram, TikTok, YouTube, and more. Grow your audience in minutes."
+      />
       <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-white to-gray-50/80 px-4">
         <div className="max-w-2xl text-center">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 leading-tight">
