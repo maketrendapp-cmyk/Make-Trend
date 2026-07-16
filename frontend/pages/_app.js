@@ -18,6 +18,7 @@ const NO_LAYOUT_PAGES = [
 // Task & Share pages (standalone – no navbar/bottom nav/menu)
   '/tasks',
   '/share',
+'/about',
 ];
 
 function MyApp({ Component, pageProps }) {
