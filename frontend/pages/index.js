@@ -7,12 +7,13 @@ import {
   FiTrendingUp,
   FiUsers,
   FiChevronRight,
+  FiChevronLeft,
 } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-// ── Safe emoji mapping ──
+// ── Emoji mapping ──
 const getCategoryEmoji = (cat) => {
   const emojis = {
     giveaway: '🎁',
@@ -44,6 +45,7 @@ export default function Home() {
   const [featuredTemplates, setFeaturedTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
   const carouselIntervalRef = useRef(null);
 
   // ── Fetch featured templates ──
@@ -67,7 +69,7 @@ export default function Home() {
 
   // ── Carousel auto‑slide ──
   useEffect(() => {
-    if (featuredTemplates.length > 1) {
+    if (featuredTemplates.length > 1 && !isHovering) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
       }, 5000);
@@ -75,27 +77,29 @@ export default function Home() {
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [featuredTemplates.length]);
+  }, [featuredTemplates.length, isHovering]);
 
   const goToSlide = useCallback(
     (index) => {
       setCarouselIndex(index);
-      if (carouselIntervalRef.current) {
-        clearInterval(carouselIntervalRef.current);
-        carouselIntervalRef.current = setInterval(() => {
-          setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-        }, 5000);
-      }
     },
-    [featuredTemplates.length]
+    []
   );
+
+  const nextSlide = useCallback(() => {
+    setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
+  }, [featuredTemplates.length]);
+
+  const prevSlide = useCallback(() => {
+    setCarouselIndex((prev) => (prev - 1 + featuredTemplates.length) % featuredTemplates.length);
+  }, [featuredTemplates.length]);
 
   const handleUseTemplate = (slug) => {
     router.push(`/createcampaign?slug=${slug}`);
   };
 
-  // ── Safe render of templates ──
-  const renderTemplates = () => {
+  // ── Safe render ──
+  const renderCarousel = () => {
     if (loading) {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -125,26 +129,38 @@ export default function Home() {
     }
 
     return (
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div
+        className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         <div
           className="flex transition-transform duration-700 ease-in-out"
           style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
         >
-          {featuredTemplates.map((template, index) => (
-            <div key={template.id || index} className="w-full flex-shrink-0">
+          {featuredTemplates.map((template) => (
+            <div key={template.id} className="w-full flex-shrink-0">
               <div className="flex flex-col sm:flex-row p-4 sm:p-6 gap-4 sm:gap-6">
-                <div className="w-full sm:w-48 h-40 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
+                <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
                   {template.image ? (
-                    <img src={template.image} alt={template.title} className="w-full h-full object-cover" />
+                    <img
+                      src={template.image}
+                      alt={template.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">🎨</div>
+                    <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">🎨</div>
                   )}
                 </div>
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-1.5 mb-1">
                       {template.platform && (
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                            platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
+                          }`}
+                        >
                           {template.platform}
                         </span>
                       )}
@@ -157,8 +173,8 @@ export default function Home() {
                         </span>
                       )}
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900">{template.title}</h3>
-                    <p className="text-slate-500 text-sm mt-0.5 line-clamp-2">
+                    <h3 className="text-2xl font-bold text-slate-900">{template.title}</h3>
+                    <p className="text-slate-500 text-sm mt-1 line-clamp-2">
                       {template.description || 'Launch your campaign with this template.'}
                     </p>
                     {template.reward && (
@@ -186,19 +202,41 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        {/* Dots */}
         {featuredTemplates.length > 1 && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
             {featuredTemplates.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => goToSlide(idx)}
-                className={`h-1.5 rounded-full transition-all ${
-                  idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-1.5'
+                className={`h-2 rounded-full transition-all ${
+                  idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-2'
                 }`}
                 aria-label={`Go to slide ${idx + 1}`}
               />
             ))}
           </div>
+        )}
+
+        {/* Arrows */}
+        {featuredTemplates.length > 1 && (
+          <>
+            <button
+              onClick={prevSlide}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
+              aria-label="Previous"
+            >
+              <FiChevronLeft className="w-5 h-5 text-slate-700" />
+            </button>
+            <button
+              onClick={nextSlide}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
+              aria-label="Next"
+            >
+              <FiChevronRight className="w-5 h-5 text-slate-700" />
+            </button>
+          </>
         )}
       </div>
     );
@@ -272,7 +310,9 @@ export default function Home() {
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">⭐ Featured Templates</h2>
+                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  <span>⭐ Featured Templates</span>
+                </h2>
                 <p className="text-slate-500 text-sm mt-0.5">Hand‑picked templates to get you started</p>
               </div>
               <button
@@ -282,7 +322,7 @@ export default function Home() {
                 View all <FiChevronRight className="w-4 h-4" />
               </button>
             </div>
-            {renderTemplates()}
+            {renderCarousel()}
           </div>
         </section>
 
