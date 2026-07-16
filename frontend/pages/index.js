@@ -1,7 +1,7 @@
-// pages/index.js – with Meta only
-import Head from 'next/head';
+// pages/index.js – with Meta + icons
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
+import { FiChevronRight } from 'react-icons/fi';
 
 export default function Home() {
   const router = useRouter();
@@ -22,9 +22,9 @@ export default function Home() {
           </p>
           <button
             onClick={() => router.push('/create')}
-            className="mt-8 px-6 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
+            className="mt-8 px-6 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition inline-flex items-center gap-2"
           >
-            Get Started
+            Get Started <FiChevronRight className="w-5 h-5" />
           </button>
         </div>
       </main>
