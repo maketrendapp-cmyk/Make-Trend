@@ -8,16 +8,21 @@ import {
   FiUsers,
   FiChevronRight,
   FiChevronLeft,
+  FiSearch,
+  FiArrowRight,
+  FiRocket,
+  FiEdit,
+  FiShare2,
 } from 'react-icons/fi';
+import { FaRocket, FaChartLine, FaUserFriends } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-// ── Custom hook: fade-up on scroll ──
+// ── Custom hooks ──
 function useFadeUp(threshold = 0.1) {
   const ref = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
-
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -31,16 +36,13 @@ function useFadeUp(threshold = 0.1) {
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, [threshold]);
-
   return { ref, isVisible };
 }
 
-// ── Custom hook: animated counter ──
 function useCounter(target, duration = 2000, startOnView = true) {
   const [count, setCount] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef(null);
-
   useEffect(() => {
     if (!startOnView) {
       setIsVisible(true);
@@ -58,7 +60,6 @@ function useCounter(target, duration = 2000, startOnView = true) {
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, [startOnView]);
-
   useEffect(() => {
     if (!isVisible) return;
     let startTime;
@@ -75,11 +76,10 @@ function useCounter(target, duration = 2000, startOnView = true) {
     };
     requestAnimationFrame(step);
   }, [target, duration, isVisible]);
-
   return { count, ref };
 }
 
-// ── Emoji mapping ──
+// ── Emoji mapping for categories ──
 const getCategoryEmoji = (cat) => {
   const emojis = {
     giveaway: '🎁',
@@ -113,6 +113,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const carouselIntervalRef = useRef(null);
   const touchStartXRef = useRef(0);
 
@@ -130,14 +131,13 @@ export default function Home() {
     { label: 'Templates', target: 500, suffix: '+' },
     { label: 'Active Users', target: 1200, suffix: '+' },
   ];
-
   const counter1 = useCounter(5000);
   const counter2 = useCounter(10000);
   const counter3 = useCounter(500);
   const counter4 = useCounter(1200);
   const counters = [counter1, counter2, counter3, counter4];
 
-  // ── Fetch featured ──
+  // ── Fetch featured templates ──
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
@@ -205,6 +205,16 @@ export default function Home() {
     router.push(`/createcampaign?slug=${slug}`);
   };
 
+  // ── Search handler ──
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/create?search=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      router.push('/create');
+    }
+  };
+
   // ── Render carousel ──
   const renderCarousel = () => {
     if (loading) {
@@ -259,7 +269,6 @@ export default function Home() {
         >
           {featuredTemplates.map((template) => (
             <div key={template.id} className="w-full flex-shrink-0">
-              {/* ── Inner container for each slide ── */}
               <div className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                   <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
@@ -304,7 +313,6 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                    {/* ── Buttons (exact match with create.js) ── */}
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         onClick={() => router.push(`/${template.slug}`)}
@@ -367,11 +375,8 @@ export default function Home() {
     );
   };
 
-  // ── Helper to format numbers with suffix ──
   const formatNumber = (value, label) => {
-    if (label === 'Total Shares') {
-      return (value / 1000).toFixed(1) + 'K';
-    }
+    if (label === 'Total Shares') return (value / 1000).toFixed(1) + 'K';
     return value + '+';
   };
 
@@ -389,7 +394,12 @@ export default function Home() {
             heroFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="max-w-6xl mx-auto text-center">
+          <div className="absolute inset-0 opacity-30 pointer-events-none">
+            <div className="absolute top-10 left-10 w-64 h-64 bg-purple-200/20 rounded-full blur-3xl" />
+            <div className="absolute bottom-10 right-10 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl" />
+          </div>
+
+          <div className="max-w-6xl mx-auto text-center relative z-10">
             <div className="inline-block mb-4 px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full tracking-wider uppercase">
               🚀 Launch viral campaigns in minutes
             </div>
@@ -402,12 +412,32 @@ export default function Home() {
             <p className="mt-4 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto">
               Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2 minutes.
             </p>
+
+            {/* ── Search Bar ── */}
+            <div className="max-w-xl mx-auto mt-8">
+              <form onSubmit={handleSearch} className="flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition focus-within:ring-2 focus-within:ring-purple-300 focus-within:border-purple-400">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search templates, rewards..."
+                  className="flex-1 bg-transparent px-6 py-3 text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+                />
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-2.5 rounded-full mr-1 transition text-sm"
+                >
+                  <FiSearch className="w-4 h-4" /> Search
+                </button>
+              </form>
+            </div>
+
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <button
                 onClick={() => router.push('/create')}
                 className="px-6 py-3 bg-purple-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2"
               >
-                Browse Templates <FiChevronRight className="w-4 h-4" />
+                Browse All Templates <FiChevronRight className="w-4 h-4" />
               </button>
               <button
                 onClick={() => router.push('/about')}
@@ -421,7 +451,7 @@ export default function Home() {
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none" />
         </section>
 
-        {/* ── Stats with polished numbers ── */}
+        {/* ── Stats ── */}
         <section
           ref={statsFade.ref}
           className={`border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6 transition-all duration-700 ${
@@ -447,7 +477,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Featured Templates Carousel ── */}
+        {/* ── Featured Carousel ── */}
         <section
           ref={carouselFade.ref}
           className={`py-16 px-4 transition-all duration-700 ${
@@ -473,13 +503,41 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ── How It Works ── */}
+        <section className="py-16 px-4 bg-white/80">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">How It Works</h2>
+            <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
+              Launch your first campaign in three simple steps.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
+                  <FiRocket className="w-8 h-8" />
+                </div>
+                <h3 className="font-bold text-slate-900">1. Choose a Template</h3>
+                <p className="text-slate-500 text-sm mt-1">Pick from our library of professionally designed templates.</p>
+              </div>
+              <div className="text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
+                  <FiEdit className="w-8 h-8" />
+                </div>
+                <h3 className="font-bold text-slate-900">2. Customise & Launch</h3>
+                <p className="text-slate-500 text-sm mt-1">Customise the title, description, reward, and features.</p>
+              </div>
+              <div className="text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
+                  <FiShare2 className="w-8 h-8" />
+                </div>
+                <h3 className="font-bold text-slate-900">3. Share & Grow</h3>
+                <p className="text-slate-500 text-sm mt-1">Share your unique link and watch your metrics climb.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── Why Make Trend ── */}
-        <section
-          ref={featuresFade.ref}
-          className={`py-16 px-4 bg-white/80 transition-all duration-700 ${
-            featuresFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
-        >
+        <section className="py-16 px-4 bg-gray-50/50">
           <div className="max-w-6xl mx-auto">
             <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">Why Make Trend?</h2>
             <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
@@ -533,7 +591,7 @@ export default function Home() {
               onClick={() => router.push('/create')}
               className="mt-6 px-8 py-3 bg-white text-purple-700 font-bold rounded-xl shadow-lg hover:shadow-xl hover:bg-gray-50 transition-all inline-flex items-center gap-2"
             >
-              Get Started for Free <FiChevronRight className="w-5 h-5" />
+              Get Started for Free <FiArrowRight className="w-5 h-5" />
             </button>
           </div>
         </section>
