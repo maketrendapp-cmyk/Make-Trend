@@ -1212,6 +1212,71 @@ router.get('/stats', verifyToken, async (req, res) => {
   }
 });
 
+
+// ============================================================
+// COMMENTS (Public – no authentication required)
+// ============================================================
+
+// GET latest 5 comments
+router.get('/comments', async (req, res) => {
+  try {
+    const snapshot = await db.collection('comments')
+      .orderBy('createdAt', 'desc')
+      .limit(5)
+      .get();
+
+    const comments = [];
+    snapshot.forEach(doc => {
+      comments.push({ id: doc.id, ...doc.data() });
+    });
+
+    res.json({ success: true, comments });
+  } catch (error) {
+    console.error('❌ Get comments error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST a new comment (no login required)
+router.post('/comments', async (req, res) => {
+  try {
+    const { name, comment, rating } = req.body;
+
+    // ── Validation ──
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ success: false, error: 'Name must be at least 2 characters' });
+    }
+    if (!comment || comment.trim().length < 3) {
+      return res.status(400).json({ success: false, error: 'Comment must be at least 3 characters' });
+    }
+    const ratingNum = Number(rating);
+    if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      return res.status(400).json({ success: false, error: 'Rating must be a whole number between 1 and 5' });
+    }
+
+    // ── Security: sanitise input (basic XSS protection) ──
+    const sanitisedName = name.trim().replace(/[<>]/g, '');
+    const sanitisedComment = comment.trim().replace(/[<>]/g, '');
+
+    // ── Prepare document ──
+    const commentData = {
+      name: sanitisedName,
+      comment: sanitisedComment,
+      rating: ratingNum,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('comments').add(commentData);
+    const newComment = { id: docRef.id, ...commentData };
+
+    // ── Return the newly created comment ──
+    res.status(201).json({ success: true, comment: newComment });
+  } catch (error) {
+    console.error('❌ Post comment error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ============================================================
 // ===================== EXPORT =====================
 // ============================================================
