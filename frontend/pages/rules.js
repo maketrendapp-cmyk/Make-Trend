@@ -1,9 +1,25 @@
 // pages/rules.js
 import React from 'react';
 import Link from 'next/link';
-import { FiChevronRight, FiAlertCircle, FiShield, FiXCircle, FiCheckCircle, FiLock, FiFlag, FiInfo } from 'react-icons/fi';
+import { useAuth } from '../components/AuthScreen';
+import {
+  FiChevronRight,
+  FiAlertCircle,
+  FiShield,
+  FiXCircle,
+  FiCheckCircle,
+  FiFlag,
+  FiInfo,
+  FiHome,
+  FiPlusCircle,
+  FiUser,
+  FiBookOpen,
+  FiMail,
+} from 'react-icons/fi';
 
 export default function Rules() {
+  const { user } = useAuth();
+
   const rules = [
     {
       icon: <FiXCircle className="w-5 h-5 text-red-500" />,
@@ -56,8 +72,34 @@ export default function Rules() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* ── Top Navigation ── */}
+      <nav className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center gap-2 text-xl font-extrabold text-primary">
+              <FiShield className="w-6 h-6" />
+              <span>Make Trend</span>
+            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/" className="hidden sm:flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
+                <FiHome className="w-4 h-4" /> Home
+              </Link>
+              <Link href="/create" className="hidden sm:flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
+                <FiPlusCircle className="w-4 h-4" /> Create
+              </Link>
+              <Link href="/about" className="hidden sm:flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
+                <FiBookOpen className="w-4 h-4" /> About
+              </Link>
+              <Link href={user ? '/profile' : '/login'} className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
+                <FiUser className="w-4 h-4" /> {user ? 'Profile' : 'Login'}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-16 sm:py-20">
+      <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-20 sm:py-28">
         <div className="absolute inset-0 opacity-10">
           <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
             <circle cx="200" cy="200" r="300" fill="white" />
@@ -67,46 +109,50 @@ export default function Rules() {
         </div>
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex justify-center mb-4">
-            <FiShield className="w-16 h-16 text-white" />
+            <FiShield className="w-20 h-20 text-white" />
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight">
-            Rules to Follow
+            Our Community Rules
           </h1>
           <p className="mt-4 text-xl max-w-3xl mx-auto text-indigo-100">
-            Keep Make Trend safe, fair, and trustworthy for everyone.
+            We believe in fair, transparent, and safe interactions. These rules help us keep Make Trend a trusted place for creators and participants alike.
           </p>
-          <div className="mt-6">
-            <Link href="/profile">
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <Link href="/create">
+              <span className="inline-flex items-center gap-2 px-6 py-3 bg-white text-purple-600 font-bold rounded-xl hover:bg-indigo-50 transition shadow-lg cursor-pointer">
+                Explore Templates <FiChevronRight className="w-4 h-4" />
+              </span>
+            </Link>
+            <Link href={user ? '/profile' : '/login'}>
               <span className="inline-flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm text-white font-medium rounded-xl hover:bg-white/30 transition border border-white/20 cursor-pointer">
-                Back to Profile <FiChevronRight className="w-4 h-4" />
+                {user ? 'Your Profile' : 'Get Started'} <FiChevronRight className="w-4 h-4" />
               </span>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* ── Introduction ── */}
+      {/* ── Why Rules Matter ── */}
       <section className="py-12 bg-gray-50 border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex items-center justify-center gap-3 text-purple-600">
             <FiInfo className="w-6 h-6" />
-            <h2 className="text-2xl font-bold text-gray-900">Our Commitment</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Why We Have Rules</h2>
           </div>
           <p className="mt-4 text-gray-600 text-lg leading-relaxed">
-            Make Trend is designed to help creators and marketers build genuine engagement.
-            To maintain a positive environment, we require all users to adhere to these rules.
-            Violations may result in account restrictions or permanent bans.
+            Make Trend is built on trust. Every campaign, share, and completion depends on genuine participation.
+            These rules protect our community from abuse and ensure that everyone has a positive experience.
           </p>
         </div>
       </section>
 
-      {/* ── Rules List ── */}
+      {/* ── Rules Grid ── */}
       <section className="py-16 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Prohibited & Encouraged Behaviour</h2>
-          <div className="space-y-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">What We Stand For</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {rules.map((rule, idx) => (
-              <div key={idx} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-sm transition flex items-start gap-4">
+              <div key={idx} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-md transition flex items-start gap-4">
                 <div className="mt-1 flex-shrink-0">{rule.icon}</div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{rule.title}</h3>
@@ -146,37 +192,36 @@ export default function Rules() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <FiFlag className="w-12 h-12 text-purple-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900">Report a Violation</h2>
-          <p className="mt-2 text-gray-600">
-            If you encounter a campaign or user that violates these rules, please report it immediately.
+          <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
+            If you encounter a campaign or user that violates these rules, please report it immediately. We take all reports seriously and will investigate promptly.
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap justify-center gap-4">
             <Link href="/support">
               <span className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition cursor-pointer">
                 Go to Support <FiChevronRight className="w-4 h-4" />
               </span>
             </Link>
-          </div>
-          <p className="mt-4 text-sm text-gray-400">
-            You can also contact us directly at{' '}
-            <a href="mailto:support@maketrend.com" className="text-purple-600 hover:underline">
-              support@maketrend.com
+            <a
+              href="mailto:support@maketrend.com"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition"
+            >
+              <FiMail className="w-4 h-4" /> Email Us
             </a>
-          </p>
+          </div>
         </div>
       </section>
 
-      {/* ── Legal Reference ── */}
-      <section className="py-8 bg-gray-50 border-t border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
-          <p>
-            These rules are part of our{' '}
-            <Link href="/terms"><span className="text-purple-600 hover:underline cursor-pointer">Terms & Conditions</span></Link>
-            {' '}and{' '}
-            <Link href="/privacy"><span className="text-purple-600 hover:underline cursor-pointer">Privacy Policy</span></Link>
-            . By using Make Trend, you agree to abide by them.
-          </p>
+      {/* ── Footer ── */}
+      <footer className="bg-gray-50 border-t border-gray-200 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center text-sm text-gray-500">
+          <p>© {new Date().getFullYear()} Make Trend. All rights reserved.</p>
+          <div className="flex gap-4 mt-2 sm:mt-0">
+            <Link href="/terms"><span className="hover:text-primary cursor-pointer">Terms</span></Link>
+            <Link href="/privacy"><span className="hover:text-primary cursor-pointer">Privacy</span></Link>
+            <Link href="/rules"><span className="hover:text-primary cursor-pointer">Rules</span></Link>
+          </div>
         </div>
-      </section>
+      </footer>
     </div>
   );
 }
