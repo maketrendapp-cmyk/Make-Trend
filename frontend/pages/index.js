@@ -13,7 +13,29 @@ import {
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
 
-// ── Custom hook for animated counter ──
+// ── Custom hook: fade-up on scroll ──
+function useFadeUp(threshold = 0.1) {
+  const ref = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [threshold]);
+
+  return { ref, isVisible };
+}
+
+// ── Custom hook: animated counter ──
 function useCounter(target, duration = 2000, startOnView = true) {
   const [count, setCount] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
@@ -33,9 +55,7 @@ function useCounter(target, duration = 2000, startOnView = true) {
       },
       { threshold: 0.3 }
     );
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
+    if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, [startOnView]);
 
@@ -45,7 +65,7 @@ function useCounter(target, duration = 2000, startOnView = true) {
     const step = (timestamp) => {
       if (!startTime) startTime = timestamp;
       const progress = Math.min((timestamp - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
       setCount(Math.floor(eased * target));
       if (progress < 1) {
         requestAnimationFrame(step);
@@ -96,6 +116,13 @@ export default function Home() {
   const carouselIntervalRef = useRef(null);
   const touchStartXRef = useRef(0);
 
+  // ── Fade‑up hooks for each section ──
+  const heroFade = useFadeUp(0.1);
+  const statsFade = useFadeUp(0.1);
+  const carouselFade = useFadeUp(0.1);
+  const featuresFade = useFadeUp(0.1);
+  const ctaFade = useFadeUp(0.1);
+
   // ── Stats targets ──
   const stats = [
     { label: 'Campaigns Created', target: 5000, suffix: '+' },
@@ -104,12 +131,10 @@ export default function Home() {
     { label: 'Active Users', target: 1200, suffix: '+' },
   ];
 
-  // ── Animated counters ──
   const counter1 = useCounter(5000);
   const counter2 = useCounter(10000);
   const counter3 = useCounter(500);
   const counter4 = useCounter(1200);
-
   const counters = [counter1, counter2, counter3, counter4];
 
   // ── Fetch featured templates ──
@@ -339,7 +364,12 @@ export default function Home() {
       />
       <main className="min-h-screen bg-gradient-to-b from-white to-gray-50/80">
         {/* ── Hero ── */}
-        <section className="relative overflow-hidden px-4 pt-12 pb-16 sm:pt-20 sm:pb-24">
+        <section
+          ref={heroFade.ref}
+          className={`relative overflow-hidden px-4 pt-12 pb-16 sm:pt-20 sm:pb-24 transition-all duration-700 ${
+            heroFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
           <div className="max-w-6xl mx-auto text-center">
             <div className="inline-block mb-4 px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full tracking-wider uppercase">
               🚀 Launch viral campaigns in minutes
@@ -373,7 +403,12 @@ export default function Home() {
         </section>
 
         {/* ── Stats with Animated Counters ── */}
-        <section className="border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6">
+        <section
+          ref={statsFade.ref}
+          className={`border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6 transition-all duration-700 ${
+            statsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
           <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             {stats.map((stat, index) => {
               const { count, ref } = counters[index];
@@ -389,7 +424,12 @@ export default function Home() {
         </section>
 
         {/* ── Featured Templates Carousel ── */}
-        <section className="py-16 px-4">
+        <section
+          ref={carouselFade.ref}
+          className={`py-16 px-4 transition-all duration-700 ${
+            carouselFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -410,7 +450,12 @@ export default function Home() {
         </section>
 
         {/* ── Why Make Trend ── */}
-        <section className="py-16 px-4 bg-white/80">
+        <section
+          ref={featuresFade.ref}
+          className={`py-16 px-4 bg-white/80 transition-all duration-700 ${
+            featuresFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
           <div className="max-w-6xl mx-auto">
             <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">Why Make Trend?</h2>
             <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
@@ -449,7 +494,12 @@ export default function Home() {
         </section>
 
         {/* ── CTA ── */}
-        <section className="py-16 px-4">
+        <section
+          ref={ctaFade.ref}
+          className={`py-16 px-4 transition-all duration-700 ${
+            ctaFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
           <div className="max-w-4xl mx-auto bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl p-8 sm:p-12 text-center text-white shadow-xl">
             <h2 className="text-3xl font-bold">Ready to Make Your Trend?</h2>
             <p className="mt-2 text-purple-100 max-w-2xl mx-auto">
