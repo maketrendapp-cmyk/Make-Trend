@@ -23,6 +23,8 @@ const NO_LAYOUT_PAGES = [
 const TOP_NAV_ONLY_PAGES = [
   '/about',
   '/rules',
+  '/terms',
+  '/privacy',
 ];
 
 function MyApp({ Component, pageProps }) {
@@ -44,7 +46,7 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
-  // ── Top navbar only (about, rules) ──
+  // ── Top navbar only (about, rules, terms, privacy) ──
   if (isTopNavOnly) {
     return (
       <AuthProvider>
