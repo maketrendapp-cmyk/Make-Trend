@@ -1,5 +1,4 @@
 // pages/index.js
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import {
@@ -9,63 +8,8 @@ import {
   FiChevronRight,
 } from 'react-icons/fi';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-const API_BASE = BACKEND_URL + '/api';
-
-// ── Safe fallback for categories ──
-const getCategoryEmoji = (cat) => {
-  const emojis = {
-    giveaway: '🎁',
-    simcard: '📱',
-    contest: '🏆',
-    growth: '📈',
-    engagement: '💬',
-    followers: '👥',
-    views: '👁️',
-    likes: '❤️',
-    tiktok: '🎵',
-    instagram: '📸',
-    youtube: '▶️',
-    default: '✨',
-  };
-  return emojis[cat?.toLowerCase()] || emojis.default;
-};
-
-const platformBadgeStyles = {
-  tiktok: 'bg-black text-white',
-  instagram: 'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white',
-  youtube: 'bg-[#FF0000] text-white',
-  facebook: 'bg-[#1877F2] text-white',
-  all: 'bg-slate-800 text-white',
-};
-
 export default function Home() {
   const router = useRouter();
-  const [featuredTemplates, setFeaturedTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // ── Fetch featured templates ──
-  useEffect(() => {
-    const fetchFeatured = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/templates?highlight=true&limit=20`);
-        if (!res.ok) throw new Error('Failed to fetch featured templates');
-        const data = await res.json();
-        if (data.success) {
-          setFeaturedTemplates(data.templates || []);
-        }
-      } catch (err) {
-        console.error('Featured fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFeatured();
-  }, []);
-
-  const handleUseTemplate = (slug) => {
-    router.push(`/createcampaign?slug=${slug}`);
-  };
 
   return (
     <>
@@ -127,120 +71,6 @@ export default function Home() {
               <p className="text-2xl font-extrabold text-slate-900">1.2K+</p>
               <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Active Users</p>
             </div>
-          </div>
-        </section>
-
-        {/* ── Featured Templates (Simple Grid – No Carousel) ── */}
-        <section className="py-16 px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">⭐ Featured Templates</h2>
-                <p className="text-slate-500 text-sm mt-0.5">Hand‑picked templates to get you started</p>
-              </div>
-              <button
-                onClick={() => router.push('/create')}
-                className="text-sm font-semibold text-purple-600 hover:underline flex items-center gap-1"
-              >
-                View all <FiChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
-                    <div className="w-full aspect-video bg-slate-200" />
-                    <div className="p-3 space-y-2">
-                      <div className="h-3 bg-slate-200 rounded w-2/3" />
-                      <div className="h-2.5 bg-slate-200 rounded w-1/2" />
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <div className="h-8 bg-slate-200 rounded-lg" />
-                        <div className="h-8 bg-slate-200 rounded-lg" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : featuredTemplates.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
-                <p className="text-slate-500">No featured templates available yet.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {featuredTemplates.map((template) => (
-                  <div
-                    key={template.id || `template-${Math.random()}`}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col"
-                  >
-                    <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
-                      {template.image ? (
-                        <img
-                          src={template.image}
-                          alt={template.title || 'Template'}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">🎨</div>
-                      )}
-                      <div className="absolute top-2 left-2 flex gap-1 z-10">
-                        <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                          ⭐ Featured
-                        </span>
-                      </div>
-                      {template.platform && (
-                        <div className="absolute top-2 right-2">
-                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
-                            {template.platform}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3 flex-grow flex flex-col justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                          <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded flex items-center">
-                            👥 {template.usageCount || 0} uses
-                          </span>
-                          {template.category && (
-                            <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                              {getCategoryEmoji(template.category)} {template.category}
-                            </span>
-                          )}
-                        </div>
-                        <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-1">
-                          {template.title || 'Untitled Template'}
-                        </h3>
-                        <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-2 leading-relaxed">
-                          {template.description || 'Customizable layout built to match social trends.'}
-                        </p>
-                        {template.reward && (
-                          <div className="mt-1 text-[10px] font-extrabold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-lg w-fit">
-                            🎁 {template.reward}
-                          </div>
-                        )}
-                      </div>
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
-                        <button
-                          onClick={() => router.push(`/${template.slug}`)}
-                          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                          Preview
-                        </button>
-                        <button
-                          onClick={() => handleUseTemplate(template.slug)}
-                          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl py-2 transition shadow-sm active:scale-95"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                          Use
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </section>
 
