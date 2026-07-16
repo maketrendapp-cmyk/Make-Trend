@@ -24,22 +24,24 @@ const categoryEmojis = {
 
 export default function Create() {
   const router = useRouter();
-  const { slug: highlightSlug } = router.query;
+  const { slug: highlightSlug, search: querySearch, category: queryCategory, platform: queryPlatform } = router.query;
 
   // ── State ──
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [searchQuery, setSearchQuery] = useState(querySearch || '');
+  const [selectedCategory, setSelectedCategory] = useState(queryCategory || '');
+  const [selectedPlatform, setSelectedPlatform] = useState(queryPlatform || '');
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
 
+  // ── Refs ──
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
 
   // ── Fetch templates ──
   useEffect(() => {
@@ -52,13 +54,6 @@ export default function Create() {
         const data = await res.json();
         if (data.success) {
           setTemplates(data.templates || []);
-          if (highlightSlug) {
-            const found = data.templates.find(t => t.slug === highlightSlug);
-            if (found) {
-              setHighlightedId(found.id);
-              highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
-            }
-          }
         } else {
           throw new Error(data.error || 'Failed to fetch templates');
         }
@@ -74,58 +69,59 @@ export default function Create() {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [highlightSlug, retryCount]);
+  }, [retryCount]);
 
+  // ── Handle highlight from URL ──
   useEffect(() => {
-    if (highlightedId) {
-      const el = document.getElementById(`template-${highlightedId}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [highlightedId]);
-
-  const { featuredTemplates, regularTemplates } = useMemo(() => {
-    const featured = templates.filter(t => t.isHighlight === true);
-    const regular = templates.filter(t => !t.isHighlight);
-    return { featuredTemplates: featured, regularTemplates: regular };
-  }, [templates]);
-
-  // ── Carousel auto-slide ──
-  useEffect(() => {
-    if (featuredTemplates.length > 1) {
-      carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
-      }, 5000);
+    if (highlightSlug && templates.length > 0) {
+      const found = templates.find(t => t.slug === highlightSlug);
+      if (found) {
+        setHighlightedId(found.id);
+        highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
+        // Scroll to the template after a short delay
+        setTimeout(() => {
+          const el = document.getElementById(`template-${found.id}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
     }
     return () => {
-      if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
     };
-  }, [featuredTemplates.length]);
+  }, [highlightSlug, templates]);
 
-  const goToSlide = useCallback((index) => {
-    setCarouselIndex(index);
-    if (carouselIntervalRef.current) {
-      clearInterval(carouselIntervalRef.current);
-      carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
-      }, 5000);
-    }
-  }, [featuredTemplates.length]);
+  // ── Sync URL with state (shallow) ──
+  const updateURL = useCallback((params) => {
+    const query = { ...router.query, ...params };
+    // Remove empty values
+    Object.keys(query).forEach(key => {
+      if (query[key] === '' || query[key] === null || query[key] === undefined) {
+        delete query[key];
+      }
+    });
+    router.replace({ pathname: '/create', query }, undefined, { shallow: true });
+  }, [router]);
 
-  // ── Filters ──
-  const categories = useMemo(() => {
-    const cats = new Set();
-    templates.forEach(t => { if (t.category) cats.add(t.category); });
-    return ['All', ...Array.from(cats)];
-  }, [templates]);
+  // Debounced search update
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      updateURL({ search: searchQuery || undefined });
+    }, 400);
+    return () => clearTimeout(searchTimeoutRef.current);
+  }, [searchQuery, updateURL]);
 
-  const platforms = useMemo(() => {
-    const plats = new Set();
-    templates.forEach(t => { if (t.platform) plats.add(t.platform); });
-    return ['All', ...Array.from(plats)];
-  }, [templates]);
+  // Update URL for category and platform immediately
+  useEffect(() => {
+    updateURL({
+      category: selectedCategory || undefined,
+      platform: selectedPlatform || undefined,
+    });
+  }, [selectedCategory, selectedPlatform, updateURL]);
 
-  const filteredRegular = useMemo(() => {
-    let filtered = [...regularTemplates];
+  // ── Filtering (applies to all templates) ──
+  const filteredAll = useMemo(() => {
+    let filtered = [...templates];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(t =>
@@ -143,8 +139,50 @@ export default function Create() {
       filtered = filtered.filter(t => t.platform === selectedPlatform);
     }
     return filtered;
-  }, [regularTemplates, searchQuery, selectedCategory, selectedPlatform]);
+  }, [templates, searchQuery, selectedCategory, selectedPlatform]);
 
+  const { featuredTemplates, regularTemplates } = useMemo(() => {
+    const featured = filteredAll.filter(t => t.isHighlight === true);
+    const regular = filteredAll.filter(t => !t.isHighlight);
+    return { featuredTemplates: featured, regularTemplates: regular };
+  }, [filteredAll]);
+
+  // ── Carousel auto‑slide (2 seconds) ──
+  useEffect(() => {
+    if (featuredTemplates.length > 1) {
+      carouselIntervalRef.current = setInterval(() => {
+        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
+      }, 2000);
+    }
+    return () => {
+      if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
+    };
+  }, [featuredTemplates.length]);
+
+  const goToSlide = useCallback((index) => {
+    setCarouselIndex(index);
+    if (carouselIntervalRef.current) {
+      clearInterval(carouselIntervalRef.current);
+      carouselIntervalRef.current = setInterval(() => {
+        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
+      }, 2000);
+    }
+  }, [featuredTemplates.length]);
+
+  // ── Filters dropdown options ──
+  const categories = useMemo(() => {
+    const cats = new Set();
+    templates.forEach(t => { if (t.category) cats.add(t.category); });
+    return ['All', ...Array.from(cats)];
+  }, [templates]);
+
+  const platforms = useMemo(() => {
+    const plats = new Set();
+    templates.forEach(t => { if (t.platform) plats.add(t.platform); });
+    return ['All', ...Array.from(plats)];
+  }, [templates]);
+
+  // ── Handlers ──
   const handlePreview = useCallback((slug) => {
     router.push(`/${slug}`);
   }, [router]);
@@ -176,10 +214,29 @@ export default function Create() {
     }
   };
 
-  // ── Helper to get emoji for category ──
   const getCategoryEmoji = (cat) => {
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
+
+  // ── Copy URL functions ──
+  const copyCurrentURL = useCallback(() => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      alert('URL copied to clipboard!');
+    }).catch(() => {
+      alert('Failed to copy URL.');
+    });
+  }, []);
+
+  const copyTemplateURL = useCallback((slug) => {
+    const base = window.location.origin + window.location.pathname;
+    const url = `${base}?slug=${slug}`;
+    navigator.clipboard.writeText(url).then(() => {
+      alert(`Link to "${slug}" copied!`);
+    }).catch(() => {
+      alert('Failed to copy link.');
+    });
+  }, []);
 
   // ── Error state ──
   if (error) {
@@ -224,7 +281,7 @@ export default function Create() {
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
-        {/* ── Search & Quick Filters ── */}
+        {/* ── Search, Filters & Copy URL ── */}
         <div className="mb-5 space-y-2.5">
           <div className="flex gap-2">
             <div className="flex-1 relative">
@@ -259,6 +316,16 @@ export default function Create() {
                   {(selectedCategory ? 1 : 0) + (selectedPlatform ? 1 : 0)}
                 </span>
               )}
+            </button>
+            <button
+              type="button"
+              onClick={copyCurrentURL}
+              className="p-2 border border-slate-200 bg-white rounded-xl text-slate-700 hover:bg-slate-50 transition flex items-center justify-center shadow-sm"
+              aria-label="Copy current URL"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
             </button>
           </div>
 
@@ -307,7 +374,7 @@ export default function Create() {
         </div>
 
         {/* ── Featured Templates Spotlight ── */}
-        {featuredTemplates.length > 0 && !searchQuery && !selectedCategory && !selectedPlatform && (
+        {featuredTemplates.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-1 mb-2 px-0.5">
               <span className="text-amber-500 text-sm">★</span>
@@ -319,7 +386,7 @@ export default function Create() {
 
             <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
               <div
-                className="flex transition-transform duration-700 ease-in-out"
+                className="flex transition-transform duration-500 ease-in-out"
                 style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
               >
                 {featuredTemplates.map((template) => (
@@ -412,7 +479,7 @@ export default function Create() {
             {searchQuery || selectedCategory || selectedPlatform ? 'Search Results' : 'All Templates'}
           </h2>
           <span className="text-[10px] text-slate-400 font-bold">
-            Showing {filteredRegular.length} templates
+            Showing {regularTemplates.length} templates
           </span>
         </div>
 
@@ -433,7 +500,7 @@ export default function Create() {
               </div>
             ))}
           </div>
-        ) : filteredRegular.length === 0 ? (
+        ) : regularTemplates.length === 0 ? (
           <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm px-4">
             <span className="text-2xl mb-1.5 block">🔍</span>
             <h3 className="text-xs font-bold text-slate-900 mb-0.5">No templates match</h3>
@@ -448,7 +515,7 @@ export default function Create() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {filteredRegular.map((template) => {
+            {regularTemplates.map((template) => {
               const isHighlighted = highlightedId === template.id;
               return (
                 <div
@@ -480,11 +547,24 @@ export default function Create() {
                           </span>
                         )}
                       </div>
-                      {template.platform && (
-                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
-                          {template.platform}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {template.platform && (
+                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                            {template.platform}
+                          </span>
+                        )}
+                        {/* Copy template URL button */}
+                        <button
+                          type="button"
+                          onClick={() => copyTemplateURL(template.slug)}
+                          className="pointer-events-auto p-1 bg-white/80 backdrop-blur-sm rounded-md hover:bg-white transition shadow-sm text-slate-600"
+                          aria-label="Copy link to this template"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
