@@ -8,30 +8,34 @@ import Menu from '../components/Menu';
 import '../styles/globals.css';
 
 // ============================================================
-// PAGES THAT SHOULD NOT HAVE THE GLOBAL LAYOUT
-// Add any template or standalone page paths here
+// PAGES WITH NO LAYOUT AT ALL (standalone pages)
 // ============================================================
 const NO_LAYOUT_PAGES = [
   '/templates/ncell-reward-v1',
-  '/ncell-reward-v1', // if you're using a rewrite
-  
-// Task & Share pages (standalone – no navbar/bottom nav/menu)
+  '/ncell-reward-v1',
   '/tasks',
   '/share',
-'/about',
-'/rules',
+];
+
+// ============================================================
+// PAGES WITH ONLY TOP NAVBAR (no bottom nav, no menu)
+// ============================================================
+const TOP_NAV_ONLY_PAGES = [
+  '/about',
+  '/rules',
 ];
 
 function MyApp({ Component, pageProps }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
 
-  // Check if the current page should have no layout
-  const isNoLayout = NO_LAYOUT_PAGES.some((path) =>
-    router.pathname.startsWith(path)
-  );
+  const pathname = router.pathname;
 
-  // If it's a template or standalone page, render without layout
+  // Check if current page matches any of the lists
+  const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
+  const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
+
+  // ── No layout (templates, tasks, share) ──
   if (isNoLayout) {
     return (
       <AuthProvider>
@@ -40,7 +44,19 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
-  // Otherwise, render the full layout (navbar, bottom nav, menu)
+  // ── Top navbar only (about, rules) ──
+  if (isTopNavOnly) {
+    return (
+      <AuthProvider>
+        <div className="min-h-screen bg-bg">
+          <Navbar />
+          <Component {...pageProps} />
+        </div>
+      </AuthProvider>
+    );
+  }
+
+  // ── Full layout (default) ──
   return (
     <AuthProvider>
       <div className="min-h-screen bg-bg pb-20 md:pb-0">
