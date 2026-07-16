@@ -26,22 +26,36 @@ export default function Create() {
   const router = useRouter();
   const { slug: highlightSlug, search: querySearch, category: queryCategory, platform: queryPlatform } = router.query;
 
-  // ── State ──
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // ── Local state (initialised from URL) ──
   const [searchQuery, setSearchQuery] = useState(querySearch || '');
   const [selectedCategory, setSelectedCategory] = useState(queryCategory || '');
   const [selectedPlatform, setSelectedPlatform] = useState(queryPlatform || '');
   const [showFilters, setShowFilters] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
+  const [copyToast, setCopyToast] = useState(false);
 
   // ── Refs ──
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  const isInternalUpdate = useRef(false);
+
+  // ── Sync local state with URL changes (back/forward, direct reload) ──
+  useEffect(() => {
+    // Avoid resetting state when we are the ones who changed the URL
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
+    setSearchQuery(querySearch || '');
+    setSelectedCategory(queryCategory || '');
+    setSelectedPlatform(queryPlatform || '');
+  }, [querySearch, queryCategory, queryPlatform]);
 
   // ── Fetch templates ──
   useEffect(() => {
@@ -78,7 +92,6 @@ export default function Create() {
       if (found) {
         setHighlightedId(found.id);
         highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
-        // Scroll to the template after a short delay
         setTimeout(() => {
           const el = document.getElementById(`template-${found.id}`);
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -90,7 +103,7 @@ export default function Create() {
     };
   }, [highlightSlug, templates]);
 
-  // ── Sync URL with state (shallow) ──
+  // ── Update URL (shallow) and mark as internal ──
   const updateURL = useCallback((params) => {
     const query = { ...router.query, ...params };
     // Remove empty values
@@ -99,10 +112,11 @@ export default function Create() {
         delete query[key];
       }
     });
+    isInternalUpdate.current = true;
     router.replace({ pathname: '/create', query }, undefined, { shallow: true });
   }, [router]);
 
-  // Debounced search update
+  // ── Debounced search URL update ──
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
@@ -111,7 +125,7 @@ export default function Create() {
     return () => clearTimeout(searchTimeoutRef.current);
   }, [searchQuery, updateURL]);
 
-  // Update URL for category and platform immediately
+  // ── Update URL for category/platform (immediate) ──
   useEffect(() => {
     updateURL({
       category: selectedCategory || undefined,
@@ -141,13 +155,14 @@ export default function Create() {
     return filtered;
   }, [templates, searchQuery, selectedCategory, selectedPlatform]);
 
+  // Split into featured and regular
   const { featuredTemplates, regularTemplates } = useMemo(() => {
     const featured = filteredAll.filter(t => t.isHighlight === true);
     const regular = filteredAll.filter(t => !t.isHighlight);
     return { featuredTemplates: featured, regularTemplates: regular };
   }, [filteredAll]);
 
-  // ── Carousel auto‑slide (2 seconds) ──
+  // ── Carousel auto‑slide (2 sec) ──
   useEffect(() => {
     if (featuredTemplates.length > 1) {
       carouselIntervalRef.current = setInterval(() => {
@@ -218,11 +233,12 @@ export default function Create() {
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
-  // ── Copy URL functions ──
+  // ── Copy URL with toast ──
   const copyCurrentURL = useCallback(() => {
     const url = window.location.href;
     navigator.clipboard.writeText(url).then(() => {
-      alert('URL copied to clipboard!');
+      setCopyToast(true);
+      setTimeout(() => setCopyToast(false), 2000);
     }).catch(() => {
       alert('Failed to copy URL.');
     });
@@ -232,7 +248,8 @@ export default function Create() {
     const base = window.location.origin + window.location.pathname;
     const url = `${base}?slug=${slug}`;
     navigator.clipboard.writeText(url).then(() => {
-      alert(`Link to "${slug}" copied!`);
+      setCopyToast(true);
+      setTimeout(() => setCopyToast(false), 2000);
     }).catch(() => {
       alert('Failed to copy link.');
     });
@@ -281,6 +298,14 @@ export default function Create() {
       <Meta title="Choose a Template" description="Select a template to launch your campaign." />
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
+        {/* ── Toast notification ── */}
+        {copyToast && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-2.5 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 animate-fade-in-down">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            Copied! Share now
+          </div>
+        )}
+
         {/* ── Search, Filters & Copy URL ── */}
         <div className="mb-5 space-y-2.5">
           <div className="flex gap-2">
@@ -320,12 +345,12 @@ export default function Create() {
             <button
               type="button"
               onClick={copyCurrentURL}
-              className="p-2 border border-slate-200 bg-white rounded-xl text-slate-700 hover:bg-slate-50 transition flex items-center justify-center shadow-sm"
-              aria-label="Copy current URL"
+              className="px-3 py-2 bg-primary text-white rounded-xl text-xs font-bold shadow-sm hover:opacity-95 transition flex items-center gap-1.5 active:scale-95 whitespace-nowrap"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
               </svg>
+              Copy URL
             </button>
           </div>
 
@@ -547,17 +572,16 @@ export default function Create() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 pointer-events-auto">
                         {template.platform && (
                           <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
                             {template.platform}
                           </span>
                         )}
-                        {/* Copy template URL button */}
                         <button
                           type="button"
                           onClick={() => copyTemplateURL(template.slug)}
-                          className="pointer-events-auto p-1 bg-white/80 backdrop-blur-sm rounded-md hover:bg-white transition shadow-sm text-slate-600"
+                          className="p-1 bg-white/80 backdrop-blur-sm rounded-md hover:bg-white transition shadow-sm text-slate-600"
                           aria-label="Copy link to this template"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
