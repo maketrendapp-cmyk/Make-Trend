@@ -10,10 +10,6 @@ import {
   FiCheckCircle,
   FiFlag,
   FiInfo,
-  FiHome,
-  FiPlusCircle,
-  FiUser,
-  FiBookOpen,
   FiMail,
 } from 'react-icons/fi';
 
@@ -72,32 +68,6 @@ export default function Rules() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ── Top Navigation ── */}
-      <nav className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2 text-xl font-extrabold text-primary">
-              <FiShield className="w-6 h-6" />
-              <span>Make Trend</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link href="/" className="hidden sm:flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
-                <FiHome className="w-4 h-4" /> Home
-              </Link>
-              <Link href="/create" className="hidden sm:flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
-                <FiPlusCircle className="w-4 h-4" /> Create
-              </Link>
-              <Link href="/about" className="hidden sm:flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
-                <FiBookOpen className="w-4 h-4" /> About
-              </Link>
-              <Link href={user ? '/profile' : '/login'} className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition">
-                <FiUser className="w-4 h-4" /> {user ? 'Profile' : 'Login'}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-20 sm:py-28">
         <div className="absolute inset-0 opacity-10">
