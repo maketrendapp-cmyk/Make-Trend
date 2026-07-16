@@ -19,6 +19,7 @@ const NO_LAYOUT_PAGES = [
   '/tasks',
   '/share',
 '/about',
+'/rules',
 ];
 
 function MyApp({ Component, pageProps }) {
