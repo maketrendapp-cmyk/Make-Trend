@@ -48,12 +48,13 @@ export default function Home() {
   const [isHovering, setIsHovering] = useState(false);
   const carouselIntervalRef = useRef(null);
 
-  // ── Fetch featured templates ──
+  // ── Fetch only highlighted templates ──
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
+        setLoading(true);
         const res = await fetch(`${API_BASE}/templates?highlight=true&limit=20`);
-        if (!res.ok) throw new Error('Failed to fetch');
+        if (!res.ok) throw new Error('Failed to fetch featured templates');
         const data = await res.json();
         if (data.success) {
           setFeaturedTemplates(data.templates || []);
@@ -79,12 +80,9 @@ export default function Home() {
     };
   }, [featuredTemplates.length, isHovering]);
 
-  const goToSlide = useCallback(
-    (index) => {
-      setCarouselIndex(index);
-    },
-    []
-  );
+  const goToSlide = useCallback((index) => {
+    setCarouselIndex(index);
+  }, []);
 
   const nextSlide = useCallback(() => {
     setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
@@ -98,7 +96,7 @@ export default function Home() {
     router.push(`/createcampaign?slug=${slug}`);
   };
 
-  // ── Safe render ──
+  // ── Render carousel ──
   const renderCarousel = () => {
     if (loading) {
       return (
@@ -203,25 +201,20 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Dots */}
-        {featuredTemplates.length > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
-            {featuredTemplates.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => goToSlide(idx)}
-                className={`h-2 rounded-full transition-all ${
-                  idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-2'
-                }`}
-                aria-label={`Go to slide ${idx + 1}`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Arrows */}
         {featuredTemplates.length > 1 && (
           <>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+              {featuredTemplates.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => goToSlide(idx)}
+                  className={`h-2 rounded-full transition-all ${
+                    idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-2'
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
             <button
               onClick={prevSlide}
               className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
