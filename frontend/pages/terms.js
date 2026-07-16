@@ -1,13 +1,16 @@
 // pages/terms.js
 import React from 'react';
 import Link from 'next/link';
-import { FiChevronRight, FiBook, FiAlertCircle, FiShield } from 'react-icons/fi';
+import { useAuth } from '../components/AuthScreen';
+import { FiBook, FiChevronRight, FiAlertCircle, FiMail } from 'react-icons/fi';
 
 export default function Terms() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-white">
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-16 sm:py-20">
+      {/* ── Hero (compact, like rules page) ── */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-12 sm:py-16">
         <div className="absolute inset-0 opacity-10">
           <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
             <circle cx="200" cy="200" r="300" fill="white" />
@@ -15,20 +18,25 @@ export default function Terms() {
             <circle cx="500" cy="500" r="200" fill="white" opacity="0.5" />
           </svg>
         </div>
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-4">
-            <FiBook className="w-16 h-16 text-white" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex justify-center mb-3">
+            <FiBook className="w-14 h-14 text-white" />
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight">
             Terms & Conditions
           </h1>
-          <p className="mt-4 text-lg text-indigo-100">
+          <p className="mt-2 text-lg max-w-3xl mx-auto text-indigo-100">
             Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
-          <div className="mt-6">
-            <Link href="/profile">
-              <span className="inline-flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm text-white font-medium rounded-xl hover:bg-white/30 transition border border-white/20 cursor-pointer">
-                Back to Profile <FiChevronRight className="w-4 h-4" />
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <Link href="/create">
+              <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-purple-600 font-bold rounded-xl hover:bg-indigo-50 transition shadow-lg cursor-pointer text-sm">
+                Explore Templates <FiChevronRight className="w-4 h-4" />
+              </span>
+            </Link>
+            <Link href={user ? '/profile' : '/login'}>
+              <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/20 backdrop-blur-sm text-white font-medium rounded-xl hover:bg-white/30 transition border border-white/20 cursor-pointer text-sm">
+                {user ? 'Your Profile' : 'Get Started'} <FiChevronRight className="w-4 h-4" />
               </span>
             </Link>
           </div>
@@ -188,14 +196,14 @@ export default function Terms() {
         </div>
       </section>
 
-      {/* ── Footer / Back to Profile ── */}
-      <footer className="bg-gray-900 text-gray-400 py-6">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm">
+      {/* ── Footer ── */}
+      <footer className="bg-gray-50 border-t border-gray-200 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Make Trend. All rights reserved.</p>
-          <div className="flex justify-center gap-6 text-xs mt-2">
-            <Link href="/terms"><span className="hover:text-white cursor-pointer">Terms</span></Link>
-            <Link href="/privacy"><span className="hover:text-white cursor-pointer">Privacy</span></Link>
-            <Link href="/support"><span className="hover:text-white cursor-pointer">Support</span></Link>
+          <div className="flex gap-4 mt-2 sm:mt-0">
+            <Link href="/terms"><span className="hover:text-primary cursor-pointer">Terms</span></Link>
+            <Link href="/privacy"><span className="hover:text-primary cursor-pointer">Privacy</span></Link>
+            <Link href="/rules"><span className="hover:text-primary cursor-pointer">Rules</span></Link>
           </div>
         </div>
       </footer>
