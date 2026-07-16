@@ -10,7 +10,6 @@ import {
   FiChevronLeft,
   FiSearch,
   FiArrowRight,
-  FiRocket,
   FiEdit,
   FiShare2,
 } from 'react-icons/fi';
@@ -513,7 +512,7 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FiRocket className="w-8 h-8" />
+                  <FaRocket className="w-8 h-8" />
                 </div>
                 <h3 className="font-bold text-slate-900">1. Choose a Template</h3>
                 <p className="text-slate-500 text-sm mt-1">Pick from our library of professionally designed templates.</p>
