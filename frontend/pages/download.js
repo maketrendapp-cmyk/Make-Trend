@@ -1,179 +1,295 @@
 // pages/download.js
-import React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { FiChevronRight, FiSmartphone, FiZap, FiShield, FiUsers, FiDownload, FiStar, FiTrendingUp } from 'react-icons/fi';
-import { FaApple, FaGooglePlay } from 'react-icons/fa';
+import { useAuth } from '../components/AuthScreen';
+import Meta from '../components/Meta';
+import {
+  FiDownload,
+  FiCheckCircle,
+  FiInfo,
+  FiArrowLeft,
+  FiSmartphone,
+  FiAlertCircle,
+} from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Download() {
-  const features = [
-    {
-      icon: <FiZap className="w-6 h-6" />,
-      title: 'Launch in Seconds',
-      description: 'Create and share campaigns from anywhere – directly from your phone.',
-    },
-    {
-      icon: <FiSmartphone className="w-6 h-6" />,
-      title: 'Real‑Time Notifications',
-      description: 'Get instant alerts when your campaign gets shared, unlocked, or completed.',
-    },
-    {
-      icon: <FiShield className="w-6 h-6" />,
-      title: 'Secure & Private',
-      description: 'Your data is encrypted. Log in with biometrics for extra security.',
-    },
-    {
-      icon: <FiUsers className="w-6 h-6" />,
-      title: 'Connect with Creators',
-      description: 'Discover trending campaigns and collaborate with other creators on the go.',
-    },
-  ];
+  const { user } = useAuth();
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('info'); // 'info' | 'success' | 'error'
+  const [platform, setPlatform] = useState('');
+
+  // ── Detect platform ──
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    if (/android/i.test(ua)) setPlatform('android');
+    else if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) setPlatform('ios');
+    else if (/windows/i.test(ua)) setPlatform('windows');
+    else setPlatform('other');
+  }, []);
+
+  // ── Check if already installed ──
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    setIsInstalled(isStandalone);
+  }, []);
+
+  // ── Listen for PWA install prompt ──
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // When app is installed
+    const installedHandler = () => {
+      setIsInstalled(true);
+      setIsInstallable(false);
+      setToastMessage('🎉 Make Trend is now installed on your device!');
+      setToastType('success');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
+    };
+    window.addEventListener('appinstalled', installedHandler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+    };
+  }, []);
+
+  // ── Install handler ──
+  const handleInstall = useCallback(async () => {
+    if (!deferredPrompt) {
+      // If no prompt, show instructions
+      setToastMessage('Open this page in Chrome or Edge to install the app.');
+      setToastType('info');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
+      return;
+    }
+
+    try {
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      if (result.outcome === 'accepted') {
+        setIsInstalled(true);
+        setIsInstallable(false);
+        setToastMessage('✅ Make Trend is now installed on your device!');
+        setToastType('success');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 4000);
+      } else {
+        setToastMessage('Installation cancelled. You can try again anytime.');
+        setToastType('info');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }
+      setDeferredPrompt(null);
+    } catch (err) {
+      console.error('Install error:', err);
+      setToastMessage('Something went wrong. Please try again.');
+      setToastType('error');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
+    }
+  }, [deferredPrompt]);
+
+  // ── Get platform instructions ──
+  const getInstructions = () => {
+    if (isInstalled) return null;
+    switch (platform) {
+      case 'android':
+        return {
+          title: '📱 Install on Android',
+          steps: [
+            'Open Chrome browser',
+            'Tap the "Add to Home Screen" banner at the bottom',
+            'Or tap the menu (⋮) → "Install app"',
+            'Tap "Install" to add to your home screen',
+          ],
+        };
+      case 'ios':
+        return {
+          title: '📱 Install on iPhone/iPad',
+          steps: [
+            'Open Safari browser',
+            'Tap the Share button (📤) at the bottom',
+            'Scroll down and tap "Add to Home Screen"',
+            'Tap "Add" – the app will appear on your home screen',
+          ],
+        };
+      default:
+        return {
+          title: '💻 Install on Desktop',
+          steps: [
+            'Open Chrome, Edge, or Firefox',
+            'Look for the install icon (📥) in the address bar',
+            'Click it and select "Install"',
+            'Make Trend will be added to your apps list',
+          ],
+        };
+    }
+  };
+
+  const instructions = getInstructions();
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-20 sm:py-28">
-        <div className="absolute inset-0 opacity-10">
-          <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-            <circle cx="200" cy="200" r="300" fill="white" />
-            <circle cx="800" cy="700" r="350" fill="white" />
-            <circle cx="500" cy="500" r="200" fill="white" opacity="0.5" />
-          </svg>
-        </div>
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-4">
-            <FiSmartphone className="w-16 h-16 text-white" />
+    <>
+      <Meta
+        title="Install Make Trend App"
+        description="Install Make Trend on your device for a faster, offline-ready, native-like experience."
+        image="https://maketrend.vercel.app/og-download.jpg"
+        url="https://maketrend.vercel.app/download"
+      />
+
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 py-12 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto">
+          {/* ── Header ── */}
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-3xl shadow-lg mb-4">
+              <FiDownload className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-3">
+              Install Make Trend
+            </h1>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Get the best experience with our native-like app on your device.
+              Faster, offline-ready, and always accessible.
+            </p>
           </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight">
-            Download the App
-          </h1>
-          <p className="mt-4 text-xl max-w-3xl mx-auto text-indigo-100">
-            Take Make Trend with you everywhere. Create, track, and share campaigns on the go.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link href="/profile">
-              <span className="inline-flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm text-white font-medium rounded-xl hover:bg-white/30 transition border border-white/20 cursor-pointer">
-                Back to Profile <FiChevronRight className="w-4 h-4" />
-              </span>
+
+          {/* ── Status Card ── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 text-center">
+            {isInstalled ? (
+              <div className="flex items-center justify-center gap-3 text-green-600">
+                <FiCheckCircle className="w-8 h-8" />
+                <span className="text-lg font-bold">✓ App is already installed!</span>
+              </div>
+            ) : isInstallable ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center gap-3 text-purple-600">
+                  <FiDownload className="w-8 h-8" />
+                  <span className="text-lg font-bold">Ready to install!</span>
+                </div>
+                <button
+                  onClick={handleInstall}
+                  className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl hover:shadow-lg transition-all hover:-translate-y-0.5 active:scale-95"
+                >
+                  <FiDownload className="w-5 h-5" />
+                  Install Now
+                </button>
+                <p className="text-xs text-gray-400 mt-2">
+                  Tap the button above to add Make Trend to your home screen.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-3 text-gray-500">
+                <FiInfo className="w-6 h-6" />
+                <span className="text-sm">
+                  {platform === 'ios'
+                    ? 'Open this page in Safari to install'
+                    : platform === 'android'
+                    ? 'Open this page in Chrome to install'
+                    : 'Your browser may not support installation'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Instructions (if not installed) ── */}
+          {!isInstalled && instructions && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">{instructions.title}</h2>
+              <ol className="space-y-3 text-gray-700">
+                {instructions.steps.map((step, idx) => (
+                  <li key={idx} className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-sm font-bold">
+                      {idx + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {/* ── Features Grid ── */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
+              <FiSmartphone className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+              <h3 className="font-bold text-gray-900 text-sm">Native Feel</h3>
+              <p className="text-xs text-gray-500">Full-screen, app-like experience</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
+              <FiDownload className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+              <h3 className="font-bold text-gray-900 text-sm">Always Accessible</h3>
+              <p className="text-xs text-gray-500">One tap from your home screen</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
+              <FiCheckCircle className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+              <h3 className="font-bold text-gray-900 text-sm">Offline Ready</h3>
+              <p className="text-xs text-gray-500">Works even without internet</p>
+            </div>
+          </div>
+
+          {/* ── Back Button ── */}
+          <div className="text-center">
+            <Link href={user ? '/profile' : '/'}>
+              <button className="inline-flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
+                <FiArrowLeft className="w-4 h-4" />
+                {user ? 'Back to Profile' : 'Back to Home'}
+              </button>
             </Link>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* ── Features ── */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Why Get the App?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, idx) => (
-              <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition text-center">
-                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  {feature.icon}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900">{feature.title}</h3>
-                <p className="text-gray-500 text-sm mt-2">{feature.description}</p>
+      {/* ── Toast / Bubble Notification ── */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4"
+          >
+            <div
+              className={`
+                flex items-center gap-3 p-4 rounded-2xl shadow-xl border
+                ${
+                  toastType === 'success'
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : toastType === 'error'
+                    ? 'bg-red-50 border-red-200 text-red-800'
+                    : 'bg-blue-50 border-blue-200 text-blue-800'
+                }
+              `}
+            >
+              <div className="flex-shrink-0">
+                {toastType === 'success' && <FiCheckCircle className="w-6 h-6 text-green-600" />}
+                {toastType === 'error' && <FiAlertCircle className="w-6 h-6 text-red-600" />}
+                {toastType === 'info' && <FiInfo className="w-6 h-6 text-blue-600" />}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Download Buttons & QR ── */}
-      <section className="py-16 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            {/* Left: Store Buttons */}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Get the App</h2>
-              <p className="mt-2 text-gray-500">
-                Available for iOS and Android. Scan the QR code or click a button below to download.
-              </p>
-              <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                <a
-                  href="#"
-                  className="inline-flex items-center justify-center gap-3 px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition shadow-sm"
-                >
-                  <FaApple className="w-6 h-6" />
-                  <div className="text-left">
-                    <span className="block text-xs">Download on the</span>
-                    <span className="block text-sm font-semibold">App Store</span>
-                  </div>
-                </a>
-                <a
-                  href="#"
-                  className="inline-flex items-center justify-center gap-3 px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition shadow-sm"
-                >
-                  <FaGooglePlay className="w-6 h-6" />
-                  <div className="text-left">
-                    <span className="block text-xs">Get it on</span>
-                    <span className="block text-sm font-semibold">Google Play</span>
-                  </div>
-                </a>
-              </div>
-              <p className="mt-4 text-sm text-gray-400 flex items-center gap-1">
-                <FiDownload className="w-4 h-4" />
-                Coming soon – stay tuned!
-              </p>
+              <p className="text-sm font-medium flex-1">{toastMessage}</p>
+              <button
+                onClick={() => setShowToast(false)}
+                className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"
+              >
+                ✕
+              </button>
             </div>
-            {/* Right: QR Code Placeholder */}
-            <div className="flex flex-col items-center">
-              <div className="w-48 h-48 bg-gray-200 rounded-2xl border-4 border-gray-300 flex items-center justify-center text-gray-400 text-sm">
-                <div className="text-center">
-                  <FiSmartphone className="w-12 h-12 mx-auto text-gray-400" />
-                  <span className="mt-1 block">QR Code</span>
-                  <span className="text-xs">(coming soon)</span>
-                </div>
-              </div>
-              <p className="mt-3 text-sm text-gray-500">Scan to download</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Testimonial / Trust ── */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-4">
-            <FiStar className="w-8 h-8 text-yellow-500" />
-            <FiStar className="w-8 h-8 text-yellow-500" />
-            <FiStar className="w-8 h-8 text-yellow-500" />
-            <FiStar className="w-8 h-8 text-yellow-500" />
-            <FiStar className="w-8 h-8 text-yellow-500" />
-          </div>
-          <p className="text-lg text-gray-700 italic max-w-2xl mx-auto">
-            “Make Trend has completely changed how I launch campaigns. Having it on my phone makes it even better.”
-          </p>
-          <p className="mt-2 text-sm text-gray-500">— A happy creator</p>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section className="py-16 bg-gradient-to-r from-purple-600 to-indigo-600">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
-          <h2 className="text-3xl font-bold">Ready to Go Mobile?</h2>
-          <p className="mt-4 text-lg text-indigo-100">
-            Join the community and start building your audience from anywhere.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link href="/create">
-              <span className="inline-flex items-center gap-2 px-8 py-4 bg-white text-purple-700 font-semibold rounded-xl hover:bg-gray-100 transition shadow-lg cursor-pointer">
-                Start Creating <FiChevronRight className="w-5 h-5" />
-              </span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="bg-gray-900 text-gray-400 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm">
-          <p>© {new Date().getFullYear()} Make Trend. All rights reserved.</p>
-          <div className="flex justify-center gap-6 text-xs mt-2">
-            <Link href="/terms"><span className="hover:text-white cursor-pointer">Terms</span></Link>
-            <Link href="/privacy"><span className="hover:text-white cursor-pointer">Privacy</span></Link>
-            <Link href="/support"><span className="hover:text-white cursor-pointer">Support</span></Link>
-          </div>
-        </div>
-      </footer>
-    </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
