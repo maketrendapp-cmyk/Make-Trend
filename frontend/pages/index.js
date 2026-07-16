@@ -1,4 +1,5 @@
 // pages/index.js
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import {
@@ -8,8 +9,200 @@ import {
   FiChevronRight,
 } from 'react-icons/fi';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+const API_BASE = BACKEND_URL + '/api';
+
+// ── Safe emoji mapping ──
+const getCategoryEmoji = (cat) => {
+  const emojis = {
+    giveaway: '🎁',
+    simcard: '📱',
+    contest: '🏆',
+    growth: '📈',
+    engagement: '💬',
+    followers: '👥',
+    views: '👁️',
+    likes: '❤️',
+    tiktok: '🎵',
+    instagram: '📸',
+    youtube: '▶️',
+    default: '✨',
+  };
+  return emojis[cat?.toLowerCase()] || emojis.default;
+};
+
+const platformBadgeStyles = {
+  tiktok: 'bg-black text-white',
+  instagram: 'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white',
+  youtube: 'bg-[#FF0000] text-white',
+  facebook: 'bg-[#1877F2] text-white',
+  all: 'bg-slate-800 text-white',
+};
+
 export default function Home() {
   const router = useRouter();
+  const [featuredTemplates, setFeaturedTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const carouselIntervalRef = useRef(null);
+
+  // ── Fetch featured templates ──
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/templates?highlight=true&limit=20`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        if (data.success) {
+          setFeaturedTemplates(data.templates || []);
+        }
+      } catch (err) {
+        console.error('Featured fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFeatured();
+  }, []);
+
+  // ── Carousel auto‑slide ──
+  useEffect(() => {
+    if (featuredTemplates.length > 1) {
+      carouselIntervalRef.current = setInterval(() => {
+        setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
+      }, 5000);
+    }
+    return () => {
+      if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
+    };
+  }, [featuredTemplates.length]);
+
+  const goToSlide = useCallback(
+    (index) => {
+      setCarouselIndex(index);
+      if (carouselIntervalRef.current) {
+        clearInterval(carouselIntervalRef.current);
+        carouselIntervalRef.current = setInterval(() => {
+          setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
+        }, 5000);
+      }
+    },
+    [featuredTemplates.length]
+  );
+
+  const handleUseTemplate = (slug) => {
+    router.push(`/createcampaign?slug=${slug}`);
+  };
+
+  // ── Safe render of templates ──
+  const renderTemplates = () => {
+    if (loading) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
+              <div className="w-full aspect-video bg-slate-200" />
+              <div className="p-3 space-y-2">
+                <div className="h-3 bg-slate-200 rounded w-2/3" />
+                <div className="h-2.5 bg-slate-200 rounded w-1/2" />
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="h-8 bg-slate-200 rounded-lg" />
+                  <div className="h-8 bg-slate-200 rounded-lg" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (featuredTemplates.length === 0) {
+      return (
+        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+          <p className="text-slate-500">No featured templates available yet.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div
+          className="flex transition-transform duration-700 ease-in-out"
+          style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+        >
+          {featuredTemplates.map((template) => (
+            <div key={template.id || `template-${Math.random()}`} className="w-full flex-shrink-0">
+              <div className="flex flex-col sm:flex-row p-4 sm:p-6 gap-4 sm:gap-6">
+                <div className="w-full sm:w-48 h-40 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
+                  {template.image ? (
+                    <img src={template.image} alt={template.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">🎨</div>
+                  )}
+                </div>
+                <div className="flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                      {template.platform && (
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                          {template.platform}
+                        </span>
+                      )}
+                      <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded flex items-center">
+                        👥 {template.usageCount || 0} uses
+                      </span>
+                      {template.category && (
+                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                          {getCategoryEmoji(template.category)} {template.category}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900">{template.title}</h3>
+                    <p className="text-slate-500 text-sm mt-0.5 line-clamp-2">
+                      {template.description || 'Launch your campaign with this template.'}
+                    </p>
+                    {template.reward && (
+                      <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-lg w-fit">
+                        🎁 {template.reward}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => router.push(`/${template.slug}`)}
+                      className="px-4 py-1.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition"
+                    >
+                      👁️ Preview
+                    </button>
+                    <button
+                      onClick={() => handleUseTemplate(template.slug)}
+                      className="px-4 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition shadow-sm"
+                    >
+                      ✨ Use Template
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {featuredTemplates.length > 1 && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+            {featuredTemplates.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => goToSlide(idx)}
+                className={`h-1.5 rounded-full transition-all ${
+                  idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-1.5'
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -71,6 +264,25 @@ export default function Home() {
               <p className="text-2xl font-extrabold text-slate-900">1.2K+</p>
               <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Active Users</p>
             </div>
+          </div>
+        </section>
+
+        {/* ── Featured Templates Carousel ── */}
+        <section className="py-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">⭐ Featured Templates</h2>
+                <p className="text-slate-500 text-sm mt-0.5">Hand‑picked templates to get you started</p>
+              </div>
+              <button
+                onClick={() => router.push('/create')}
+                className="text-sm font-semibold text-purple-600 hover:underline flex items-center gap-1"
+              >
+                View all <FiChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+            {renderTemplates()}
           </div>
         </section>
 
