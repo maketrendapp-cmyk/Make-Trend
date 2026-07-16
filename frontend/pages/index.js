@@ -130,8 +130,8 @@ export default function Home() {
           className="flex transition-transform duration-700 ease-in-out"
           style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
         >
-          {featuredTemplates.map((template) => (
-            <div key={template.id || `template-${Math.random()}`} className="w-full flex-shrink-0">
+          {featuredTemplates.map((template, index) => (
+            <div key={template.id || index} className="w-full flex-shrink-0">
               <div className="flex flex-col sm:flex-row p-4 sm:p-6 gap-4 sm:gap-6">
                 <div className="w-full sm:w-48 h-40 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
                   {template.image ? (
