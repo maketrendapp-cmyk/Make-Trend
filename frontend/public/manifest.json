@@ -5,7 +5,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#7C3AED",
+  "theme_color": "#4F46E5",
   "orientation": "portrait",
   "categories": ["social", "business", "marketing"],
   "icons": [
