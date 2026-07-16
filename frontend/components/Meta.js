@@ -9,28 +9,18 @@ export default function Meta({ title, description, image, url }) {
 
   return (
     <Head>
-      {/* Global Resources (fonts, icons, viewport) */}
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap"
-        rel="stylesheet"
-      />
-      <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-      />
-      <link rel="icon" href="/favicon.ico" />
-
-      {/* Dynamic SEO & Open Graph tags */}
+      {/* ── SEO Tags ── */}
       <title>{siteTitle}</title>
       <meta name="description" content={metaDesc} />
+
+      {/* ── Open Graph (OG) Tags ── */}
       <meta property="og:title" content={siteTitle} />
       <meta property="og:description" content={metaDesc} />
       <meta property="og:image" content={metaImage} />
       <meta property="og:url" content={metaUrl} />
       <meta property="og:type" content="website" />
+
+      {/* ── Twitter Card Tags ── */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={siteTitle} />
       <meta name="twitter:description" content={metaDesc} />
