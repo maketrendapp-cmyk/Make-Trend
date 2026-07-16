@@ -6,17 +6,30 @@ export default function Document() {
     <Html lang="en">
       <Head>
         {/* ── PWA / Manifest ── */}
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#7C3AED" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <meta name="theme-color" content="#4F46E5" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="application-name" content="Make Trend" />
         <meta name="apple-mobile-web-app-title" content="Make Trend" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-TileColor" content="#7C3AED" />
+        <meta name="msapplication-TileColor" content="#4F46E5" />
 
-        {/* ── Fonts & Icons ── */}
+        {/* ── Favicons ── */}
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48x48.png" />
+        
+        {/* ── Apple Touch Icons ── */}
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/apple-touch-icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/icons/apple-touch-icon-167x167.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180x180.png" />
+        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#4F46E5" />
+
+        {/* ── Fonts ── */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
         <link
@@ -27,7 +40,6 @@ export default function Document() {
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         />
-        <link rel="icon" href="/favicon.ico" />
       </Head>
       <body>
         <Main />
