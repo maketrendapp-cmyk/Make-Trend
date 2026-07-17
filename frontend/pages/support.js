@@ -4,7 +4,18 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import Link from 'next/link';
-import { FiSend, FiChevronRight, FiImage, FiX, FiCheckCircle, FiClock, FiAlertCircle } from 'react-icons/fi';
+import Meta from '../components/Meta';
+import {
+  FiSend,
+  FiChevronRight,
+  FiImage,
+  FiX,
+  FiCheckCircle,
+  FiClock,
+  FiAlertCircle,
+  FiUser,
+  FiMail,
+} from 'react-icons/fi';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
@@ -131,7 +142,6 @@ export default function Support() {
       const createData = await createRes.json();
       if (createData.success) {
         setSuccess('Report submitted successfully!');
-        // Refresh tickets from context
         await refetchSupportTickets();
         setTitle('');
         setDescription('');
@@ -148,6 +158,56 @@ export default function Support() {
     }
   };
 
+  // ── Robust date formatter ──
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+
+    try {
+      let date;
+
+      // ── Handle different timestamp types ──
+      if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else if (typeof timestamp === 'object') {
+        // ── Firestore Timestamp (from Admin SDK or client) ──
+        if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+          date = timestamp.toDate();
+        } else if (timestamp.seconds !== undefined) {
+          date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+        } else if (timestamp._seconds !== undefined) {
+          date = new Date(timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1e6);
+        } else {
+          // ── Fallback: try to parse as Date ──
+          date = new Date(timestamp);
+        }
+      } else {
+        return 'N/A';
+      }
+
+      // ── Validate date ──
+      if (!(date instanceof Date) || isNaN(date.getTime())) {
+        return 'N/A';
+      }
+
+      // ── Return formatted string ──
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch (error) {
+      console.warn('Date formatting error:', error);
+      return 'N/A';
+    }
+  };
+
   // ── Status badge ──
   const statusBadge = (status) => {
     const styles = {
@@ -161,205 +221,239 @@ export default function Support() {
       resolved: <FiCheckCircle className="w-3.5 h-3.5" />,
     };
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.open}`}>
+      <span
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
+          styles[status] || styles.open
+        }`}
+      >
         {icons[status] || icons.open}
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
   };
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    try {
-      let date;
-      if (timestamp.toDate) date = timestamp.toDate();
-      else if (timestamp.seconds) date = new Date(timestamp.seconds * 1000);
-      else date = new Date(timestamp);
-      if (isNaN(date.getTime())) return 'N/A';
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return 'N/A';
-    }
-  };
-
+  // ── Loading state ──
   if (loading || !dataLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <>
+        <Meta title="Support | Make Trend" />
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-14 w-14 border-4 border-purple-600 border-t-transparent mx-auto"></div>
+            <p className="mt-4 text-gray-600 font-medium">Loading...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
-  const displayUser = contextProfile || {
-    username: 'User',
-    fullname: 'User',
-    email: user?.email || 'user@example.com',
-    avatar: user?.photoURL || '',
+  // ── Display user ──
+  const displayUser = {
+    username: contextProfile?.username || 'User',
+    fullname: contextProfile?.fullname || contextProfile?.name || 'User',
+    email: contextProfile?.email || user?.email || 'user@example.com',
+    avatar: contextProfile?.avatar || contextProfile?.profilePic || user?.photoURL || '',
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-
-        {/* ── Header ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Support</h1>
-              <p className="text-gray-500 text-sm">Submit a report or view your previous tickets</p>
-            </div>
-            <Link href="/profile">
-              <button className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-1">
-                Back to Profile <FiChevronRight className="w-4 h-4" />
-              </button>
-            </Link>
-          </div>
-        </div>
-
-        {/* ── User Info Box ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
-              {displayUser.avatar ? (
-                <img src={displayUser.avatar} alt={displayUser.fullname} className="w-full h-full object-cover" />
-              ) : (
-                displayUser.fullname?.charAt(0).toUpperCase() || 'U'
-              )}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900">{displayUser.fullname || displayUser.username || 'User'}</p>
-              <p className="text-gray-500 text-sm">@{displayUser.username || 'user'}</p>
-              <p className="text-gray-400 text-sm">{displayUser.email}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Submit Report Box ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Submit a Report</h2>
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
-              {success}
-            </div>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
-                placeholder="Brief summary of the issue"
-                required
-                disabled={submitting}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows="4"
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
-                placeholder="Provide details about your issue..."
-                required
-                disabled={submitting}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Optional Image</label>
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm flex items-center gap-2"
-                  disabled={submitting}
-                >
-                  <FiImage className="w-4 h-4" />
-                  Choose Image
+    <>
+      <Meta
+        title="Support | Make Trend"
+        description="Get help with Make Trend. Submit a support ticket or view your previous requests."
+      />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* ── Header ── */}
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3">
+                  <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Support</span>
+                </h1>
+                <p className="text-gray-500 text-sm mt-0.5">Submit a report or view your previous tickets</p>
+              </div>
+              <Link href="/profile">
+                <button className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-800 text-sm font-medium transition-colors">
+                  Back to Profile <FiChevronRight className="w-4 h-4" />
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                  disabled={submitting}
-                />
-                {imagePreview && (
-                  <div className="relative inline-block">
-                    <img src={imagePreview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-                    <button
-                      type="button"
-                      onClick={removeImage}
-                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"
-                    >
-                      <FiX className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+              </Link>
+            </div>
+          </div>
+
+          {/* ── User Info Box ── */}
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center text-2xl font-bold text-purple-600 overflow-hidden border-2 border-white shadow-md">
+                {displayUser.avatar ? (
+                  <img src={displayUser.avatar} alt={displayUser.fullname} className="w-full h-full object-cover" />
+                ) : (
+                  displayUser.fullname?.charAt(0).toUpperCase() || 'U'
                 )}
               </div>
-              <p className="mt-1 text-xs text-gray-400">JPEG, PNG, WEBP, GIF up to 5MB</p>
+              <div>
+                <p className="font-semibold text-gray-900 text-lg">{displayUser.fullname}</p>
+                <p className="text-gray-500 text-sm flex items-center gap-1">
+                  <FiUser className="w-3.5 h-3.5" /> @{displayUser.username}
+                </p>
+                <p className="text-gray-400 text-sm flex items-center gap-1">
+                  <FiMail className="w-3.5 h-3.5" /> {displayUser.email}
+                </p>
+              </div>
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition disabled:opacity-50"
-            >
-              <FiSend className="w-4 h-4" />
-              {submitting ? 'Submitting...' : 'Submit Report'}
-            </button>
-          </form>
-        </div>
+          {/* ── Submit Report Box ── */}
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">📝 Submit a Report</h2>
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-2">
+                <span className="text-red-500 text-lg">⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+            {success && (
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-start gap-2 animate-fadeIn">
+                <span className="text-green-500 text-lg">✅</span>
+                <span>{success}</span>
+              </div>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                  placeholder="Brief summary of the issue"
+                  required
+                  disabled={submitting}
+                />
+              </div>
 
-        {/* ── Previous Reports ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Previous Reports ({tickets.length})
-          </h2>
-          {tickets.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>No reports submitted yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {tickets.map((ticket) => (
-                <div key={ticket.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-sm transition">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-gray-900">{ticket.title}</h3>
-                        {statusBadge(ticket.status)}
-                      </div>
-                      <p className="text-gray-600 text-sm mt-1 whitespace-pre-wrap">{ticket.description}</p>
-                      {ticket.image && (
-                        <div className="mt-2">
-                          <img src={ticket.image} alt="Attachment" className="max-w-full max-h-40 rounded-lg border border-gray-200" />
-                        </div>
-                      )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows="4"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition resize-y"
+                  placeholder="Provide details about your issue..."
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Optional Image</label>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition text-sm font-medium"
+                    disabled={submitting}
+                  >
+                    <FiImage className="w-4 h-4" />
+                    Choose Image
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageChange}
+                    disabled={submitting}
+                  />
+                  {imagePreview && (
+                    <div className="relative inline-block">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-20 h-20 object-cover rounded-xl border-2 border-gray-200 shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition shadow-md"
+                      >
+                        <FiX className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div className="text-right text-xs text-gray-400 whitespace-nowrap">
-                      {formatDate(ticket.createdAt)}
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">JPEG, PNG, WEBP, GIF up to 5MB</p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FiSend className="w-5 h-5" />
+                {submitting ? 'Submitting...' : 'Submit Report'}
+              </button>
+            </form>
+          </div>
+
+          {/* ── Previous Reports ── */}
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 backdrop-blur-sm">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              📋 Previous Reports
+              <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                {tickets.length}
+              </span>
+            </h2>
+            {tickets.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                <div className="text-5xl mb-3">📭</div>
+                <p className="font-medium">No reports submitted yet.</p>
+                <p className="text-sm">Your tickets will appear here once you create one.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {tickets.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="border border-gray-200 rounded-2xl p-5 hover:shadow-lg transition-all duration-200 bg-white/50"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-gray-900 text-lg">{ticket.title}</h3>
+                          {statusBadge(ticket.status)}
+                        </div>
+                        <p className="text-gray-600 text-sm mt-1 whitespace-pre-wrap">{ticket.description}</p>
+                        {ticket.image && (
+                          <div className="mt-3">
+                            <img
+                              src={ticket.image}
+                              alt="Attachment"
+                              className="max-w-full max-h-48 rounded-xl border border-gray-200 shadow-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right text-xs text-gray-400 whitespace-nowrap mt-2 sm:mt-0">
+                        {formatDate(ticket.createdAt)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
+    </>
   );
 }
