@@ -1704,6 +1704,52 @@ app.post('/api/comments', async (req, res) => {
   }
 });
 
+
+// backend/server.js – add this endpoint
+
+// ── Set HttpOnly cookie with Firebase token ──
+app.post('/api/auth/set-session', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Token required' });
+    }
+
+    // ── Verify the token ──
+    const decoded = await admin.auth().verifyIdToken(token);
+    if (!decoded) {
+      return res.status(401).json({ success: false, error: 'Invalid token' });
+    }
+
+    // ── Set HttpOnly cookie ──
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: '/',
+    });
+
+    // ── Also get user profile from Firestore ──
+    const userDoc = await db.collection('users').doc(decoded.uid).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    res.json({
+      success: true,
+      user: {
+        uid: decoded.uid,
+        email: decoded.email,
+        displayName: decoded.name || '',
+        photoURL: decoded.picture || '',
+        ...userData,
+      },
+    });
+  } catch (error) {
+    console.error('Set session error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ============================================================
 // 17. CLOUDINARY UPLOAD
 // ============================================================
