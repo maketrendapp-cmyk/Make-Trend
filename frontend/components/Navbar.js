@@ -71,16 +71,18 @@ export default function Navbar() {
         `}
       >
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-          <div className="flex h-14 sm:h-16 items-center justify-between gap-1 sm:gap-2">
+          <div className="flex h-14 sm:h-16 items-center justify-between">
             
-            {/* ── Logo (Mobile Optimized) ── */}
-            <Link href="/" className="flex items-center gap-1.5 sm:gap-2 group flex-shrink-0">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all group-hover:scale-105">
-                <span className="text-white text-[10px] sm:text-sm font-black">MT</span>
-              </div>
-              <span className="text-base sm:text-xl font-extrabold tracking-tight">
+            {/* ── Logo ── */}
+            <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
+              <img 
+                src="/favicon.ico" 
+                alt="Make Trend" 
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl shadow-md group-hover:shadow-lg transition-all group-hover:scale-105"
+              />
+              <span className="text-base sm:text-xl font-extrabold tracking-tight whitespace-nowrap">
                 <span className="text-purple-600">Make</span>
-                <span className="text-gray-900 group-hover:text-purple-600/80 transition hidden xs:inline">Trend</span>
+                <span className="text-gray-900 group-hover:text-purple-600/80 transition">Trend</span>
               </span>
             </Link>
 
@@ -103,7 +105,7 @@ export default function Navbar() {
               ))}
             </div>
 
-            {/* ── Right side: Auth / User (Mobile Optimized) ── */}
+            {/* ── Right side: Auth / User ── */}
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {isAuthenticated ? (
                 <div className="flex items-center gap-1 sm:gap-2">
@@ -111,7 +113,7 @@ export default function Navbar() {
                   <Link
                     href="/profile"
                     className="
-                      flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2
+                      flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2
                       bg-gradient-to-r from-purple-50 to-indigo-50 
                       border border-purple-200/50 rounded-lg sm:rounded-xl 
                       hover:from-purple-100 hover:to-indigo-100 
@@ -119,10 +121,10 @@ export default function Navbar() {
                       shadow-sm hover:shadow-md
                     "
                   >
-                    <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[8px] sm:text-xs font-bold shadow-sm flex-shrink-0">
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold shadow-sm flex-shrink-0">
                       {user?.fullname?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
-                    <span className="text-[10px] sm:text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[60px] sm:max-w-[100px]">
+                    <span className="text-xs sm:text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[70px] sm:max-w-[120px]">
                       @{user?.username || user?.fullname?.split(' ')[0]?.toLowerCase() || 'user'}
                     </span>
                   </Link>
@@ -131,8 +133,8 @@ export default function Navbar() {
                   <button
                     onClick={handleLogout}
                     className="
-                      flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 
-                      text-[10px] sm:text-sm font-medium text-gray-600 
+                      flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 sm:py-2 
+                      text-xs sm:text-sm font-medium text-gray-600 
                       hover:text-red-600 hover:bg-red-50 
                       rounded-lg sm:rounded-xl transition-all duration-200
                       border border-transparent hover:border-red-200
@@ -147,8 +149,8 @@ export default function Navbar() {
                   <Link
                     href="/auth/login"
                     className="
-                      px-2 sm:px-4 py-1.5 sm:py-2 
-                      text-[10px] sm:text-sm font-medium text-gray-600 
+                      px-3 sm:px-4 py-1.5 sm:py-2 
+                      text-xs sm:text-sm font-medium text-gray-600 
                       hover:text-gray-900 hover:bg-gray-100 
                       rounded-lg sm:rounded-xl transition-all duration-200
                       whitespace-nowrap
@@ -159,16 +161,16 @@ export default function Navbar() {
                   <Link
                     href="/auth/register"
                     className="
-                      flex items-center gap-1 px-3 sm:px-5 py-1.5 sm:py-2.5 
+                      flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2.5 
                       bg-gradient-to-r from-purple-600 to-indigo-600 
                       text-white font-semibold rounded-lg sm:rounded-xl 
                       hover:from-purple-700 hover:to-indigo-700 
                       transition-all duration-200 shadow-md hover:shadow-lg 
                       hover:-translate-y-0.5 active:scale-95
-                      text-[10px] sm:text-sm whitespace-nowrap
+                      text-xs sm:text-sm whitespace-nowrap
                     "
                   >
-                    <FiUser className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <FiUser className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     <span>Get Started</span>
                   </Link>
                 </div>
@@ -177,7 +179,7 @@ export default function Navbar() {
               {/* ── Mobile Menu Button ── */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0"
+                className="md:hidden p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0 ml-0.5"
                 aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
@@ -256,15 +258,6 @@ export default function Navbar() {
           </div>
         </div>
       </div>
-
-      {/* ── Tailwind custom breakpoint for extra small screens ── */}
-      <style jsx>{`
-        @media (min-width: 400px) {
-          .xs\\:inline {
-            display: inline;
-          }
-        }
-      `}</style>
     </>
   );
 }
