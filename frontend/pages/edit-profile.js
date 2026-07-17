@@ -9,7 +9,7 @@ const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onr
 
 export default function EditProfile() {
   const router = useRouter();
-  const { user, profile: contextProfile, refreshUser, dataLoaded } = useAuth();
+  const { user, profile: contextProfile, refreshUser, dataLoaded, refetchProfile } = useAuth();
   const [loading, setLoading] = useState(!dataLoaded);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -29,6 +29,10 @@ export default function EditProfile() {
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
 
+  // Track if fields have changed from original values
+  const [usernameChanged, setUsernameChanged] = useState(false);
+  const [emailChanged, setEmailChanged] = useState(false);
+
   // Debounce timers
   const usernameTimer = useRef(null);
   const emailTimer = useRef(null);
@@ -47,6 +51,22 @@ export default function EditProfile() {
     }
   }, [contextProfile, dataLoaded]);
 
+  // ── Track if username changed ──
+  useEffect(() => {
+    if (contextProfile) {
+      const originalUsername = contextProfile.username || '';
+      setUsernameChanged(username !== originalUsername);
+    }
+  }, [username, contextProfile]);
+
+  // ── Track if email changed ──
+  useEffect(() => {
+    if (contextProfile) {
+      const originalEmail = contextProfile.email || '';
+      setEmailChanged(email !== originalEmail);
+    }
+  }, [email, contextProfile]);
+
   // ── Redirect if not authenticated ──
   useEffect(() => {
     if (dataLoaded && !user) {
@@ -57,7 +77,7 @@ export default function EditProfile() {
   // ── Check username availability ──
   useEffect(() => {
     clearTimeout(usernameTimer.current);
-    if (username.length < 3) {
+    if (!usernameChanged || username.length < 3) {
       setUsernameAvailable(null);
       return;
     }
@@ -67,8 +87,7 @@ export default function EditProfile() {
         const res = await fetch(`${API_BASE}/auth/check-username?username=${encodeURIComponent(username)}`);
         const data = await res.json();
         if (data.success) {
-          const currentUsername = contextProfile?.username || '';
-          setUsernameAvailable(data.available || (username === currentUsername));
+          setUsernameAvailable(data.available);
         } else {
           setUsernameAvailable(false);
         }
@@ -79,12 +98,12 @@ export default function EditProfile() {
       }
     }, 500);
     return () => clearTimeout(usernameTimer.current);
-  }, [username, contextProfile?.username]);
+  }, [username, usernameChanged]);
 
   // ── Check email availability ──
   useEffect(() => {
     clearTimeout(emailTimer.current);
-    if (!email || !email.includes('@')) {
+    if (!emailChanged || !email || !email.includes('@')) {
       setEmailAvailable(null);
       return;
     }
@@ -94,8 +113,7 @@ export default function EditProfile() {
         const res = await fetch(`${API_BASE}/auth/check-email?email=${encodeURIComponent(email)}`);
         const data = await res.json();
         if (data.success) {
-          const currentEmail = contextProfile?.email || '';
-          setEmailAvailable(data.exists ? (email === currentEmail) : true);
+          setEmailAvailable(data.exists ? false : true);
         } else {
           setEmailAvailable(false);
         }
@@ -106,7 +124,7 @@ export default function EditProfile() {
       }
     }, 500);
     return () => clearTimeout(emailTimer.current);
-  }, [email, contextProfile?.email]);
+  }, [email, emailChanged]);
 
   // ── Avatar upload handler ──
   const handleAvatarChange = (e) => {
@@ -147,12 +165,12 @@ export default function EditProfile() {
       setSaving(false);
       return;
     }
-    if (usernameAvailable === false) {
+    if (usernameChanged && usernameAvailable === false) {
       setError('Username is already taken.');
       setSaving(false);
       return;
     }
-    if (emailAvailable === false) {
+    if (emailChanged && emailAvailable === false) {
       setError('Email is already registered.');
       setSaving(false);
       return;
@@ -182,7 +200,12 @@ export default function EditProfile() {
       }
 
       // 2) Update profile
-      const payload = { username, fullname: fullName, email, avatar: avatarUrl };
+      const payload = {
+        username: username.trim().toLowerCase(),
+        fullname: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        avatar: avatarUrl,
+      };
       const updateRes = await fetch(`${API_BASE}/auth/profile`, {
         method: 'PUT',
         headers: {
@@ -192,9 +215,12 @@ export default function EditProfile() {
         body: JSON.stringify(payload),
       });
       const updateData = await updateRes.json();
+
       if (updateData.success) {
         setSuccess('Profile updated successfully!');
+        // ── Refresh both auth user AND global profile ──
         await refreshUser();
+        await refetchProfile();
         setTimeout(() => router.push('/profile'), 1500);
       } else {
         setError(updateData.error || 'Update failed');
@@ -323,7 +349,9 @@ export default function EditProfile() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:ring-2 transition ${
-                      usernameAvailable === true && username.length >= 3
+                      !usernameChanged
+                        ? 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                        : usernameAvailable === true && username.length >= 3
                         ? 'border-green-500 focus:ring-green-200'
                         : usernameAvailable === false && username.length >= 3
                         ? 'border-red-500 focus:ring-red-200'
@@ -333,15 +361,15 @@ export default function EditProfile() {
                     disabled={saving}
                     placeholder="john_doe"
                   />
-                  {isCheckingUsername && (
+                  {!usernameChanged ? (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">(unchanged)</span>
+                  ) : isCheckingUsername ? (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
-                  )}
-                  {!isCheckingUsername && username.length >= 3 && usernameAvailable === true && (
+                  ) : username.length >= 3 && usernameAvailable === true ? (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
-                  )}
-                  {!isCheckingUsername && username.length >= 3 && usernameAvailable === false && (
+                  ) : username.length >= 3 && usernameAvailable === false ? (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
-                  )}
+                  ) : null}
                 </div>
                 <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
               </div>
@@ -353,9 +381,11 @@ export default function EditProfile() {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value.trim())}
+                    onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
                     className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:ring-2 transition ${
-                      emailAvailable === true && email.includes('@')
+                      !emailChanged
+                        ? 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                        : emailAvailable === true && email.includes('@')
                         ? 'border-green-500 focus:ring-green-200'
                         : emailAvailable === false && email.includes('@')
                         ? 'border-red-500 focus:ring-red-200'
@@ -365,15 +395,15 @@ export default function EditProfile() {
                     disabled={saving}
                     placeholder="you@example.com"
                   />
-                  {isCheckingEmail && (
+                  {!emailChanged ? (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">(unchanged)</span>
+                  ) : isCheckingEmail ? (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
-                  )}
-                  {!isCheckingEmail && email.includes('@') && emailAvailable === true && (
+                  ) : email.includes('@') && emailAvailable === true ? (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
-                  )}
-                  {!isCheckingEmail && email.includes('@') && emailAvailable === false && (
+                  ) : email.includes('@') && emailAvailable === false ? (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
-                  )}
+                  ) : null}
                 </div>
                 <p className="mt-1 text-xs text-gray-400">Changing your email will update your login credentials.</p>
               </div>
