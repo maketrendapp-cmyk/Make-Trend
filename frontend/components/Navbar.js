@@ -1,4 +1,4 @@
-//components/Navbar.js
+// components/Navbar.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
@@ -77,8 +77,8 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* ── Home + Auth Buttons (Tightly Packed) ── */}
-            <div className="flex items-center gap-0.5 sm:gap-1">
+            {/* ── Home + Auth Buttons (NO SPACE) ── */}
+            <div className="flex items-center">
               {/* Home Button */}
               <Link
                 href="/"
@@ -90,6 +90,7 @@ export default function Navbar() {
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }
                   flex-shrink-0
+                  mr-0.5 sm:mr-1
                 `}
               >
                 <FiHome className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -109,6 +110,7 @@ export default function Navbar() {
                       transition-all duration-200 group
                       shadow-sm hover:shadow-md
                       flex-shrink-0
+                      mx-0.5 sm:mx-1
                     "
                   >
                     <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold shadow-sm flex-shrink-0">
@@ -128,6 +130,7 @@ export default function Navbar() {
                       rounded-lg sm:rounded-xl transition-all duration-200
                       border border-transparent hover:border-red-200
                       flex-shrink-0
+                      ml-0.5 sm:ml-1
                     "
                   >
                     <FiLogOut className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -146,6 +149,7 @@ export default function Navbar() {
                     hover:-translate-y-0.5 active:scale-95
                     text-sm sm:text-base whitespace-nowrap
                     flex-shrink-0
+                    mx-0.5 sm:mx-1
                   "
                 >
                   <FiUser className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -154,10 +158,10 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* ── Menu Button ── */}
+            {/* ── Menu Button (NO SPACE) ── */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0 -mr-1"
+              className="md:hidden p-2 sm:p-2.5 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0 -mr-1"
               aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? (
