@@ -78,7 +78,7 @@ export default function Navbar() {
             </Link>
 
             {/* ── Home + Auth Buttons (Tightly Packed) ── */}
-            <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="flex items-center gap-0.5 sm:gap-1">
               {/* Home Button */}
               <Link
                 href="/"
@@ -157,7 +157,7 @@ export default function Navbar() {
             {/* ── Menu Button ── */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 sm:p-2.5 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0"
+              className="md:hidden p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0 -mr-1"
               aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? (
