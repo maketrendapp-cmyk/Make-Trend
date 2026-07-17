@@ -125,10 +125,9 @@ export function AuthProvider({ children }) {
           }
         } catch {}
 
-        // Load global data (templates + comments + user data)
+        // Load global data
         await loadAllData();
 
-        // Existing auth logic
         const profileData = await fetchUserProfile(firebaseUser);
         if (profileData) {
           setUser(profileData);
@@ -355,7 +354,6 @@ export function AuthProvider({ children }) {
 
   // --- CONTEXT VALUE ---
   const value = {
-    // Auth
     user,
     loading,
     isAuthenticated,
@@ -369,7 +367,6 @@ export function AuthProvider({ children }) {
     logout,
     resetPassword,
     refreshUser,
-    // Global data (from useAppData)
     templates,
     featuredTemplates,
     profile,
@@ -410,7 +407,6 @@ export default function AuthScreen({ onSuccess }) {
     user,
   } = useAuth();
 
-  // State
   const [email, setEmail] = useState('');
   const [emailExists, setEmailExists] = useState(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -439,7 +435,6 @@ export default function AuthScreen({ onSuccess }) {
   const emailTimerRef = useRef(null);
   const usernameTimerRef = useRef(null);
 
-  // Check for social completion
   useEffect(() => {
     if (user && user.completed === false && !needsSocialCompletion) {
       setSocialUser(user);
@@ -449,7 +444,6 @@ export default function AuthScreen({ onSuccess }) {
     }
   }, [user, needsSocialCompletion]);
 
-  // Email check
   useEffect(() => {
     if (email.length > 3 && email.includes('@') && !needsSocialCompletion) {
       clearTimeout(emailTimerRef.current);
@@ -478,7 +472,6 @@ export default function AuthScreen({ onSuccess }) {
     return () => clearTimeout(emailTimerRef.current);
   }, [email, needsSocialCompletion]);
 
-  // Username check
   const usernameToCheck = needsSocialCompletion ? socialUsername : username;
   const isRegisterMode = (emailExists === false && email.length > 3) || needsSocialCompletion;
 
@@ -507,7 +500,6 @@ export default function AuthScreen({ onSuccess }) {
     return () => clearTimeout(usernameTimerRef.current);
   }, [isRegisterMode, usernameToCheck]);
 
-  // Password strength
   useEffect(() => {
     if (!password) { setPasswordStrength(0); return; }
     let score = 0;
@@ -518,7 +510,6 @@ export default function AuthScreen({ onSuccess }) {
     setPasswordStrength(score);
   }, [password]);
 
-  // Social login handler
   const handleSocialLogin = async (provider) => {
     setError('');
     const result = await socialLogin(provider);
@@ -538,7 +529,6 @@ export default function AuthScreen({ onSuccess }) {
     }
   };
 
-  // Social completion handler
   const handleSocialCompletion = async (e) => {
     e.preventDefault();
     setError('');
@@ -592,14 +582,12 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(false);
   };
 
-  // Email/password form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
     if (emailExists === true) {
-      // Login
       const result = await login(email, password);
       if (result.success) {
         onSuccess?.();
@@ -607,7 +595,6 @@ export default function AuthScreen({ onSuccess }) {
         setError(result.error || 'Login failed.');
       }
     } else {
-      // Register
       if (fullname.length < 2) {
         setError('Full name must be at least 2 characters.');
         setIsSubmitting(false);
@@ -666,7 +653,6 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(false);
   };
 
-  // Avatar handler for registration (only local preview)
   const handleAvatarChange = (e, type = 'register') => {
     const file = e.target.files[0];
     if (!file) return;
@@ -694,7 +680,6 @@ export default function AuthScreen({ onSuccess }) {
     reader.readAsDataURL(file);
   };
 
-  // Reset password
   const handleResetPassword = async () => {
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address.');
@@ -710,14 +695,11 @@ export default function AuthScreen({ onSuccess }) {
     }
   };
 
-  // ============================================================
-  // RENDER: SOCIAL COMPLETION
-  // ============================================================
+  // ── SOCIAL COMPLETION RENDER ──
   if (needsSocialCompletion) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
-
           <div className="flex flex-col items-center mb-6">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
               {socialAvatarPreview ? (
@@ -821,14 +803,10 @@ export default function AuthScreen({ onSuccess }) {
     );
   }
 
-  // ============================================================
-  // RENDER: MAIN LOGIN/REGISTER FLOW
-  // ============================================================
+  // ── MAIN LOGIN/REGISTER RENDER ──
   return (
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
-
-        {/* ===== HERO TITLE ===== */}
         <div className="text-center mb-4">
           <h1 className="hero-title">
             <span className="make-word">MAKE</span>
@@ -836,7 +814,6 @@ export default function AuthScreen({ onSuccess }) {
           </h1>
         </div>
 
-        {/* ===== AVATAR SECTION (only in register mode) ===== */}
         {emailExists === false && email.length > 3 && (
           <div className="flex flex-col items-center mb-3 animate-slideDown">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
@@ -856,7 +833,6 @@ export default function AuthScreen({ onSuccess }) {
           </div>
         )}
 
-        {/* ===== SUBTITLE ===== */}
         <div className="text-center mb-3">
           <p className="text-sm text-gray-400">
             {emailExists === true ? 'Welcome back! Enter your password.' :
@@ -865,7 +841,6 @@ export default function AuthScreen({ onSuccess }) {
           </p>
         </div>
 
-        {/* ===== ERROR / SUCCESS ===== */}
         {error && (
           <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-slideDown">
             {error}
@@ -877,9 +852,7 @@ export default function AuthScreen({ onSuccess }) {
           </div>
         )}
 
-        {/* ===== FORM ===== */}
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* EMAIL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
             <div className="relative">
@@ -921,7 +894,6 @@ export default function AuthScreen({ onSuccess }) {
             )}
           </div>
 
-          {/* LOGIN PASSWORD */}
           {emailExists === true && (
             <div className="animate-slideDown">
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -947,7 +919,6 @@ export default function AuthScreen({ onSuccess }) {
             </div>
           )}
 
-          {/* REGISTER FIELDS */}
           {emailExists === false && email.length > 3 && (
             <div className="space-y-3 animate-slideDown">
               <div>
@@ -1072,7 +1043,6 @@ export default function AuthScreen({ onSuccess }) {
             </div>
           )}
 
-          {/* SUBMIT BUTTON */}
           {emailExists !== null && email.length > 3 && (
             <button
               type="submit"
@@ -1094,13 +1064,11 @@ export default function AuthScreen({ onSuccess }) {
           )}
         </form>
 
-        {/* ===== DIVIDER ===== */}
         <div className="relative my-5">
           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
           <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">Or continue with</span></div>
         </div>
 
-        {/* ===== SOCIAL BUTTONS ===== */}
         <div className="flex gap-3">
           <button
             onClick={() => handleSocialLogin('google')}
@@ -1127,7 +1095,6 @@ export default function AuthScreen({ onSuccess }) {
           </button>
         </div>
 
-        {/* ===== SWITCH LINKS ===== */}
         {emailExists === false && email.length > 3 && (
           <p className="mt-4 text-center text-xs text-gray-400">
             Already have an account?{' '}
@@ -1154,7 +1121,6 @@ export default function AuthScreen({ onSuccess }) {
         )}
       </div>
 
-      {/* ===== CSS STYLES ===== */}
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -1166,8 +1132,6 @@ export default function AuthScreen({ onSuccess }) {
         }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         .animate-slideDown { animation: slideDown 0.3s ease-out; }
-
-        /* ===== HERO TITLE ===== */
         .hero-title {
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           font-size: clamp(32px, 6vw, 60px);
@@ -1182,7 +1146,6 @@ export default function AuthScreen({ onSuccess }) {
           align-items: center;
           gap: 0.2em;
         }
-
         .make-word {
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
           -webkit-background-clip: text;
@@ -1190,7 +1153,6 @@ export default function AuthScreen({ onSuccess }) {
           color: transparent;
           text-shadow: 0 2px 40px rgba(15, 52, 96, 0.15);
         }
-
         .trend-word {
           background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 40%, #fd79a8 70%, #fdcb6e 100%);
           -webkit-background-clip: text;
@@ -1198,7 +1160,6 @@ export default function AuthScreen({ onSuccess }) {
           color: transparent;
           filter: drop-shadow(0 4px 30px rgba(108, 92, 231, 0.25));
         }
-
         @media (max-width: 480px) {
           .hero-title {
             font-size: clamp(26px, 9vw, 34px);
