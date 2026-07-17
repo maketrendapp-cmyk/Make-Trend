@@ -1,4 +1,3 @@
-
 // components/AuthScreen.js
 // ============================================================
 // COMPLETE – AuthProvider (full original logic) + Premium UI
@@ -760,9 +759,8 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       <>
         <Meta title="Success | Make Trend" />
         <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white relative overflow-hidden">
-          {/* Neon cosmic background animations */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/20 rounded-full filter blur-[120px] animate-pulse z-0"></div>
-          <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-blue-600/10 rounded-full filter blur-[100px] z-0"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/20 rounded-full filter blur-[120px] animate-pulse z-0" />
+          <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-blue-600/10 rounded-full filter blur-[100px] z-0" />
           
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -787,7 +785,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       <>
         <Meta title="Complete Profile | Make Trend" />
         <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-slate-950 text-white relative overflow-hidden">
-          {/* Visual Mesh Blobs */}
           <div className="absolute top-[-10%] right-[-10%] w-[450px] h-[450px] bg-purple-700/25 rounded-full filter blur-[130px] opacity-70 animate-pulse duration-[8s]" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[450px] h-[450px] bg-indigo-700/20 rounded-full filter blur-[130px] opacity-70 animate-pulse duration-[10s]" />
 
