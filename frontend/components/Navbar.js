@@ -19,7 +19,7 @@ import {
 
 export default function Navbar() {
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, profile: contextProfile } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -50,6 +50,30 @@ export default function Navbar() {
 
   const isActive = (path) => router.pathname === path;
 
+  // ── Get display name from contextProfile OR user ──
+  const displayName = contextProfile?.fullname || 
+                      contextProfile?.name || 
+                      user?.fullName || 
+                      user?.fullname || 
+                      user?.displayName || 
+                      'User';
+
+  // ── Get username from contextProfile OR user ──
+  const displayUsername = contextProfile?.username || 
+                          user?.username || 
+                          user?.email?.split('@')[0] || 
+                          'user';
+
+  // ── Get avatar from contextProfile OR user ──
+  const avatarUrl = contextProfile?.avatar || 
+                    contextProfile?.profilePic || 
+                    user?.photoURL || 
+                    user?.avatar || 
+                    null;
+
+  // ── First letter for fallback ──
+  const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
+
   return (
     <>
       <nav
@@ -77,7 +101,7 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* ── Home + Auth Buttons (NO SPACE) ── */}
+            {/* ── Home + Auth Buttons ── */}
             <div className="flex items-center">
               {/* Home Button */}
               <Link
@@ -113,11 +137,27 @@ export default function Navbar() {
                       mx-0.5 sm:mx-1
                     "
                   >
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold shadow-sm flex-shrink-0">
-                      {user?.fullname?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex-shrink-0 shadow-sm border-2 border-white">
+                      {avatarUrl ? (
+                        <img 
+                          src={avatarUrl} 
+                          alt={displayName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // ── If image fails to load, show fallback ──
+                            e.target.style.display = 'none';
+                            e.target.parentElement.className = 'w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold';
+                            e.target.parentElement.textContent = firstLetter;
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold">
+                          {firstLetter}
+                        </div>
+                      )}
                     </div>
                     <span className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[80px] sm:max-w-[130px]">
-                      @{user?.username || user?.fullname?.split(' ')[0]?.toLowerCase() || 'user'}
+                      @{displayUsername}
                     </span>
                   </Link>
 
@@ -158,7 +198,7 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* ── Menu Button (NO SPACE) ── */}
+            {/* ── Menu Button ── */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="md:hidden p-2 sm:p-2.5 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0 -mr-1"
