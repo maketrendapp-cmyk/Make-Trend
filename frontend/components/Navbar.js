@@ -77,12 +77,12 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* ── Home Button (Always Visible) ── */}
+            {/* ── Home Button (Text Always Visible) ── */}
             <Link
               href="/"
               className={`
-                flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5
-                rounded-lg sm:rounded-xl text-sm font-medium transition-all duration-200
+                flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5
+                rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-all duration-200
                 ${isActive('/')
                   ? 'bg-purple-100 text-purple-700 shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -91,7 +91,7 @@ export default function Navbar() {
               `}
             >
               <FiHome className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden xs:inline">Home</span>
+              <span>Home</span>
             </Link>
 
             {/* ── Right side: Auth / User ── */}
@@ -124,7 +124,7 @@ export default function Navbar() {
                     onClick={handleLogout}
                     className="
                       hidden sm:flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 
-                      text-sm font-medium text-gray-600 
+                      text-sm sm:text-base font-medium text-gray-600 
                       hover:text-red-600 hover:bg-red-50 
                       rounded-lg sm:rounded-xl transition-all duration-200
                       border border-transparent hover:border-red-200
@@ -137,7 +137,7 @@ export default function Navbar() {
                 </>
               ) : (
                 <Link
-                  href="/auth/login"
+                  href="/login"
                   className="
                     flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 
                     bg-gradient-to-r from-purple-600 to-indigo-600 
@@ -217,7 +217,7 @@ export default function Navbar() {
               </button>
             ) : (
               <Link
-                href="/auth/login"
+                href="/login"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 w-full"
               >
@@ -227,15 +227,6 @@ export default function Navbar() {
           </div>
         </div>
       </div>
-
-      {/* ── Extra small screen breakpoint for Home text ── */}
-      <style jsx>{`
-        @media (min-width: 400px) {
-          .xs\\:inline {
-            display: inline;
-          }
-        }
-      `}</style>
     </>
   );
 }
