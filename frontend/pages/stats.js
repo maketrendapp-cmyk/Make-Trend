@@ -142,22 +142,26 @@ export default function Stats() {
       return;
     }
 
-    // If data is already loaded from context, use it
+    // ✅ If data is already loaded from context, use it and SKIP fetching
     if (dataLoaded && contextCampaigns && contextCampaigns.length > 0) {
       setCampaigns(contextCampaigns);
-      // Update stats from context
       if (contextStats) {
         setStats(contextStats);
       }
       setStatsLoading(false);
-      // Reset pagination for infinite scroll
       setHasMore(true);
       setLastCreatedAt(null);
       setLastId(null);
+      return; // 🔥 IMPORTANT: Stop here, don't fetch!
+    }
+
+    // ✅ If data is loaded but user has no campaigns
+    if (dataLoaded && contextCampaigns && contextCampaigns.length === 0) {
+      setStatsLoading(false);
       return;
     }
 
-    // Otherwise, fetch initial page from API
+    // ✅ Only fetch if data is not loaded yet (first visit)
     setStatsLoading(true);
     setHasMore(true);
     setLastCreatedAt(null);
@@ -214,7 +218,6 @@ export default function Stats() {
         setCampaigns(campaigns.filter((c) => c.id !== campaignId));
         setMessage('✅ Campaign deleted successfully!');
         setTimeout(() => setMessage(''), 3000);
-        // Re‑fetch campaigns and reset pagination
         setHasMore(true);
         setLastCreatedAt(null);
         setLastId(null);
@@ -261,7 +264,6 @@ export default function Stats() {
       const data = await res.json();
       if (data.success) {
         setMessage('✅ Campaign updated successfully!');
-        // Refresh campaign list
         setHasMore(true);
         setLastCreatedAt(null);
         setLastId(null);
@@ -375,9 +377,9 @@ export default function Stats() {
   }
 
   // ============================================================
-  // SKELETON LOADING (only if auth loading or data not loaded)
+  // SKELETON LOADING (only if auth loading)
   // ============================================================
-  if (loading || !dataLoaded) {
+  if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 animate-pulse">
