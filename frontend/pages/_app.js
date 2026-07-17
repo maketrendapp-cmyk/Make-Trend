@@ -1,10 +1,11 @@
 // pages/_app.js
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AuthProvider } from '../components/AuthScreen';
 import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
+import Cookies from 'cookies';
 import '../styles/globals.css';
 
 // ============================================================
@@ -25,13 +26,42 @@ const TOP_NAV_ONLY_PAGES = [
   '/rules',
   '/terms',
   '/privacy',
-'/follow',
-'/download',
-'/contact',
-'/login',
+  '/follow',
+  '/download',
+  '/contact',
+  '/login',
 ];
 
-function MyApp({ Component, pageProps }) {
+// ── SSR: read token from cookie ──
+MyApp.getInitialProps = async (ctx) => {
+  let initialUser = null;
+  const { req } = ctx;
+
+  if (req) {
+    try {
+      const cookies = new Cookies(req);
+      const token = cookies.get('token') || null;
+
+      if (token) {
+        // ── Optionally verify the token here ──
+        // For best security, verify with Firebase Admin SDK.
+        // But even without verification, the client will verify on mount.
+        // We'll just trust the cookie and pass the token – the client will validate.
+        initialUser = { token };
+      }
+    } catch (err) {
+      console.warn('Cookie read error:', err);
+    }
+  }
+
+  return {
+    initialUser,
+    // ── Preserve any existing pageProps ──
+    ...(ctx.ctx?.query || {}),
+  };
+};
+
+function MyApp({ Component, pageProps, initialUser }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
 
@@ -44,7 +74,7 @@ function MyApp({ Component, pageProps }) {
   // ── No layout (templates, tasks, share) ──
   if (isNoLayout) {
     return (
-      <AuthProvider>
+      <AuthProvider initialUser={initialUser}>
         <Component {...pageProps} />
       </AuthProvider>
     );
@@ -53,7 +83,7 @@ function MyApp({ Component, pageProps }) {
   // ── Top navbar only (about, rules, terms, privacy) ──
   if (isTopNavOnly) {
     return (
-      <AuthProvider>
+      <AuthProvider initialUser={initialUser}>
         <div className="min-h-screen bg-bg">
           <Navbar />
           <Component {...pageProps} />
@@ -64,7 +94,7 @@ function MyApp({ Component, pageProps }) {
 
   // ── Full layout (default) ──
   return (
-    <AuthProvider>
+    <AuthProvider initialUser={initialUser}>
       <div className="min-h-screen bg-bg pb-20 md:pb-0">
         <Navbar />
         <Component {...pageProps} />
