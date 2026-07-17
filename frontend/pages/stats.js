@@ -19,21 +19,24 @@ import {
   FiLink,
   FiLogIn,
   FiArrowRight,
+  FiTrendingUp,
+  FiUsers,
 } from 'react-icons/fi';
+import { FaRocket, FaChartLine } from 'react-icons/fa';
 
 export default function Stats() {
   const router = useRouter();
-  const { 
-    user, 
-    isAuthenticated, 
-    needsCompletion, 
-    loading, 
-    refreshUser, 
-    campaigns: contextCampaigns, 
+  const {
+    user,
+    isAuthenticated,
+    needsCompletion,
+    loading,
+    refreshUser,
+    campaigns: contextCampaigns,
     stats: contextStats,
-    dataLoaded 
+    dataLoaded,
   } = useAuth();
-  
+
   const [campaigns, setCampaigns] = useState(contextCampaigns || []);
   const [stats, setStats] = useState(contextStats || {
     totalCampaigns: 0,
@@ -95,79 +98,117 @@ export default function Stats() {
     }
   };
 
-  // ===== FETCH CAMPAIGNS (with pagination) =====
-  const fetchCampaigns = useCallback(async (isInitial = false) => {
-    if (!isInitial && !hasMore) return;
-    if (loadingMore) return;
-    setLoadingMore(true);
+  // ===== FETCH CAMPAIGNS (with pagination + dedup) =====
+  const fetchCampaigns = useCallback(
+    async (isInitial = false) => {
+      if (!isInitial && !hasMore) return;
+      if (loadingMore) return;
+      setLoadingMore(true);
 
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) { setLoadingMore(false); return; }
-      const token = await firebaseUser.getIdToken();
-      let url = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns?limit=25`;
-      if (!isInitial && lastCreatedAt && lastId) {
-        url += `&lastCreatedAt=${lastCreatedAt}&lastId=${lastId}`;
-      }
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Server error (${res.status})`);
-      const data = await res.json();
-      if (data.success) {
-        if (isInitial) {
-          setCampaigns(data.campaigns || []);
-        } else {
-          setCampaigns(prev => [...prev, ...(data.campaigns || [])]);
+      try {
+        const firebaseUser = auth.currentUser;
+        if (!firebaseUser) {
+          setLoadingMore(false);
+          return;
         }
-        setHasMore(data.hasMore || false);
-        if (data.lastCreatedAt && data.lastId) {
-          setLastCreatedAt(data.lastCreatedAt);
-          setLastId(data.lastId);
-        } else {
-          setHasMore(false);
+        const token = await firebaseUser.getIdToken();
+        let url = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns?limit=25`;
+        if (!isInitial && lastCreatedAt && lastId) {
+          url += `&lastCreatedAt=${lastCreatedAt}&lastId=${lastId}`;
         }
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`Server error (${res.status})`);
+        const data = await res.json();
+        if (data.success) {
+          if (isInitial) {
+            setCampaigns(data.campaigns || []);
+          } else {
+            // ── Deduplicate ──
+            setCampaigns((prev) => {
+              const existingIds = new Set(prev.map((c) => c.id));
+              const newCampaigns = (data.campaigns || []).filter((c) => !existingIds.has(c.id));
+              return [...prev, ...newCampaigns];
+            });
+          }
+          setHasMore(data.hasMore || false);
+          if (data.lastCreatedAt && data.lastId) {
+            setLastCreatedAt(data.lastCreatedAt);
+            setLastId(data.lastId);
+          } else {
+            setHasMore(false);
+          }
+        }
+      } catch (error) {
+        console.error('❌ fetchCampaigns error:', error.message);
+      } finally {
+        setLoadingMore(false);
       }
-    } catch (error) {
-      console.error('❌ fetchCampaigns error:', error.message);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [hasMore, lastCreatedAt, lastId, loadingMore]);
+    },
+    [hasMore, lastCreatedAt, lastId, loadingMore]
+  );
 
-  // ===== LOAD INITIAL DATA – use context if available, otherwise fetch =====
+  // ===== LOAD INITIAL DATA – use context if available =====
   useEffect(() => {
     if (!isAuthenticated || needsCompletion) {
       setStatsLoading(false);
       return;
     }
 
-    // ✅ If data is already loaded from context, use it and SKIP fetching
+    // If data is already loaded from context, use it
     if (dataLoaded && contextCampaigns && contextCampaigns.length > 0) {
       setCampaigns(contextCampaigns);
       if (contextStats) {
         setStats(contextStats);
       }
       setStatsLoading(false);
-      setHasMore(true);
-      setLastCreatedAt(null);
-      setLastId(null);
-      return; // 🔥 IMPORTANT: Stop here, don't fetch!
+
+      // ── Set pagination cursor from the last item ──
+      const lastCampaign = contextCampaigns[contextCampaigns.length - 1];
+      if (lastCampaign && lastCampaign.id) {
+        let createdAtMillis = null;
+        const ts = lastCampaign.createdAt;
+        if (ts) {
+          if (typeof ts === 'object' && ts !== null) {
+            if (typeof ts.toMillis === 'function') {
+              createdAtMillis = ts.toMillis();
+            } else if (ts._seconds !== undefined) {
+              createdAtMillis = ts._seconds * 1000 + (ts._nanoseconds || 0) / 1e6;
+            } else if (ts.seconds !== undefined) {
+              createdAtMillis = ts.seconds * 1000 + (ts.nanoseconds || 0) / 1e6;
+            }
+          } else if (typeof ts === 'number') {
+            createdAtMillis = ts;
+          } else if (ts instanceof Date) {
+            createdAtMillis = ts.getTime();
+          }
+        }
+        setLastCreatedAt(createdAtMillis);
+        setLastId(lastCampaign.id);
+      } else {
+        setLastCreatedAt(null);
+        setLastId(null);
+      }
+
+      // ── Only enable "hasMore" if we have exactly 25 items ──
+      setHasMore(contextCampaigns.length === 25);
+      return;
     }
 
-    // ✅ If data is loaded but user has no campaigns
+    // If data is loaded but user has no campaigns
     if (dataLoaded && contextCampaigns && contextCampaigns.length === 0) {
       setStatsLoading(false);
       return;
     }
 
-    // ✅ Only fetch if data is not loaded yet (first visit)
+    // Otherwise, fetch initial page from API
     setStatsLoading(true);
     setHasMore(true);
     setLastCreatedAt(null);
     setLastId(null);
     fetchCampaigns(true).finally(() => setStatsLoading(false));
-  }, [isAuthenticated, needsCompletion, dataLoaded, contextCampaigns, contextStats]);
+  }, [isAuthenticated, needsCompletion, dataLoaded, contextCampaigns, contextStats, fetchCampaigns]);
 
   // ===== INFINITE SCROLL OBSERVER =====
   useEffect(() => {
@@ -207,12 +248,18 @@ export default function Stats() {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
     try {
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) { alert('You must be logged in'); return; }
+      if (!firebaseUser) {
+        alert('You must be logged in');
+        return;
+      }
       const token = await firebaseUser.getIdToken();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${campaignId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${campaignId}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       const data = await res.json();
       if (data.success) {
         setCampaigns(campaigns.filter((c) => c.id !== campaignId));
@@ -252,14 +299,17 @@ export default function Stats() {
         features: editForm.features,
       };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${editingCampaign.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${editingCampaign.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await res.json();
       if (data.success) {
@@ -324,19 +374,19 @@ export default function Stats() {
     return (
       <>
         <Meta title="Dashboard" description="Track your campaign performance." />
-        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FiBarChart2 className="w-10 h-10 text-purple-600" />
+        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-purple-50 via-white to-indigo-50">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 text-center transform transition-all hover:scale-[1.02] duration-300">
+            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <FiBarChart2 className="w-12 h-12 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Your Stats</h2>
-            <p className="text-gray-500 text-sm mb-6">
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Track Your Stats</h2>
+            <p className="text-gray-500 text-sm mb-6 max-w-xs mx-auto">
               Sign in to view your campaign analytics, track performance, and manage your campaigns.
             </p>
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => router.push('/login')}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 shadow-md"
               >
                 <FiLogIn className="w-5 h-5" />
                 Sign In
@@ -388,7 +438,7 @@ export default function Stats() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 animate-pulse">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100">
+            <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <div className="h-8 w-8 bg-gray-200 rounded-full mb-3" />
               <div className="h-7 w-12 bg-gray-200 rounded mb-1" />
               <div className="h-4 w-20 bg-gray-200 rounded" />
@@ -397,7 +447,7 @@ export default function Stats() {
         </div>
         <div className="space-y-4 animate-pulse">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between gap-3">
                 <div className="flex-1">
                   <div className="h-5 w-48 bg-gray-200 rounded mb-1" />
@@ -426,16 +476,19 @@ export default function Stats() {
       <Meta title="Dashboard" description="Manage your campaigns and track performance." />
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-3xl p-6 shadow-sm border border-purple-100/50">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 flex items-center gap-3">
+              <FiBarChart2 className="text-purple-600" />
+              Dashboard
+            </h1>
             <p className="text-gray-500 text-sm mt-0.5">Overview of all your campaigns</p>
           </div>
           <button
             onClick={handleCreateCampaign}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md text-sm whitespace-nowrap"
+            className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-200 shadow-md text-sm whitespace-nowrap"
           >
-            <FiPlusCircle className="w-4 h-4" />
+            <FiPlusCircle className="w-5 h-5" />
             New Campaign
           </button>
         </div>
@@ -450,13 +503,15 @@ export default function Stats() {
           ].map((stat, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-2xl p-5 border border-gray-200/60 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1"
+              className="bg-white rounded-2xl p-5 border border-gray-200/60 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group"
             >
               <div className="flex items-center gap-3 mb-3">
-                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-${stat.color}-50 text-${stat.color}-600`}>
+                <div
+                  className={`inline-flex items-center justify-center w-11 h-11 rounded-xl bg-${stat.color}-50 text-${stat.color}-600 group-hover:scale-110 transition-transform duration-300`}
+                >
                   <stat.icon className="w-5 h-5" />
                 </div>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-3xl font-extrabold text-gray-900">{stat.value}</p>
               </div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{stat.label}</p>
             </div>
@@ -465,9 +520,9 @@ export default function Stats() {
 
         {/* ── Success Stats ── */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-100/60">
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-100/60 shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center gap-3">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-green-100 text-green-700">
+              <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-green-100 text-green-700">
                 <FiCheckCircle className="w-5 h-5" />
               </div>
               <div>
@@ -476,9 +531,9 @@ export default function Stats() {
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-5 border border-indigo-100/60">
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-5 border border-indigo-100/60 shadow-sm hover:shadow-md transition-all duration-200">
             <div className="flex items-center gap-3">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700">
+              <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700">
                 <FiAward className="w-5 h-5" />
               </div>
               <div>
@@ -489,43 +544,57 @@ export default function Stats() {
           </div>
         </div>
 
-        {/* ── CAMPAIGN LIST (infinite scroll) ── */}
+        {/* ── CAMPAIGN LIST ── */}
         <div className="space-y-4">
           {campaigns.length === 0 && !statsLoading ? (
-            <div className="text-center py-12 px-4 bg-white rounded-2xl border border-gray-100">
-              <div className="text-5xl mb-4">📭</div>
-              <p className="text-gray-500 text-sm">You haven't created any campaigns yet.</p>
+            <div className="text-center py-16 px-4 bg-white rounded-3xl border border-gray-100 shadow-sm">
+              <div className="text-6xl mb-4">🚀</div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">No campaigns yet</h3>
+              <p className="text-gray-500 text-sm mb-6">Start your first campaign and watch your metrics grow.</p>
               <button
                 onClick={handleCreateCampaign}
-                className="mt-4 px-6 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-all duration-200 text-sm"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-200 shadow-md"
               >
-                Create Your First Campaign
+                <FiPlusCircle className="w-5 h-5" />
+                Create Campaign
               </button>
             </div>
           ) : (
             <>
-              {campaigns.map((camp) => {
+              {campaigns.map((camp, index) => {
                 const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
                 return (
                   <div
                     key={camp.id}
-                    className="bg-white rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-md transition-all duration-200 p-5 relative overflow-hidden"
+                    className="bg-white rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-xl transition-all duration-300 p-5 relative overflow-hidden animate-fadeInUp"
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                      isSuccessful ? 'bg-green-500' : camp.status === 'active' ? 'bg-blue-500' : 'bg-gray-300'
-                    }`}></div>
+                    {/* Status bar */}
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-1 ${
+                        isSuccessful
+                          ? 'bg-gradient-to-b from-green-400 to-emerald-500'
+                          : camp.status === 'active'
+                          ? 'bg-gradient-to-b from-blue-400 to-indigo-500'
+                          : 'bg-gray-300'
+                      }`}
+                    />
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                          <p className="font-semibold text-gray-900 text-base sm:text-lg truncate">
                             {camp.title || 'Untitled Campaign'}
                           </p>
-                          <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
-                            camp.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                            camp.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-500'
-                          }`}>
+                          <span
+                            className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
+                              camp.status === 'active'
+                                ? 'bg-blue-100 text-blue-700'
+                                : camp.status === 'paused'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}
+                          >
                             {camp.status || 'Active'}
                           </span>
                           {isSuccessful && (
@@ -583,7 +652,8 @@ export default function Stats() {
                           }}
                           className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100 transition-all duration-200 text-xs sm:text-sm"
                         >
-                          <FiLink className="w-3.5 h-3.5" /> {copiedCampaignId === camp.id ? 'Copied!' : 'Copy URL'}
+                          <FiLink className="w-3.5 h-3.5" />{' '}
+                          {copiedCampaignId === camp.id ? 'Copied!' : 'Copy URL'}
                         </button>
                         <button
                           onClick={() => handleEditCampaign(camp)}
@@ -605,12 +675,16 @@ export default function Stats() {
 
               {/* ── Loader for infinite scroll ── */}
               {hasMore && (
-                <div ref={loaderRef} className="py-4 text-center">
+                <div ref={loaderRef} className="py-6 text-center">
                   {loadingMore ? (
                     <div className="inline-flex items-center gap-2 text-sm text-gray-500">
-                      <svg className="animate-spin h-4 w-4 text-purple-600" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
                       </svg>
                       Loading more...
                     </div>
@@ -624,15 +698,15 @@ export default function Stats() {
         </div>
       </main>
 
-      {/* ── EDIT MODAL (unchanged) ── */}
+      {/* ── EDIT MODAL ── */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-3xl">
               <h2 className="text-xl font-bold text-gray-900">Edit Campaign</h2>
               <button
                 onClick={closeModal}
-                className="p-2 rounded-lg hover:bg-gray-100 transition"
+                className="p-2 rounded-full hover:bg-gray-100 transition"
               >
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -642,10 +716,13 @@ export default function Stats() {
 
             <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
               {message && (
-                <div className={`p-3 rounded-xl text-sm ${
-                  message.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' :
-                  'bg-red-50 border border-red-200 text-red-700'
-                }`}>
+                <div
+                  className={`p-3 rounded-xl text-sm ${
+                    message.includes('✅')
+                      ? 'bg-green-50 border border-green-200 text-green-700'
+                      : 'bg-red-50 border border-red-200 text-red-700'
+                  }`}
+                >
                   {message}
                 </div>
               )}
@@ -655,7 +732,7 @@ export default function Stats() {
                 <input
                   type="text"
                   value={editForm.title}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
                   className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                   placeholder="Campaign title"
                 />
@@ -668,10 +745,12 @@ export default function Stats() {
                     <input
                       type="checkbox"
                       checked={editForm.features.shareCount}
-                      onChange={(e) => setEditForm(prev => ({
-                        ...prev,
-                        features: { ...prev.features, shareCount: e.target.checked }
-                      }))}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          features: { ...prev.features, shareCount: e.target.checked },
+                        }))
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-200 rounded-full peer peer-checked:bg-purple-600 transition-all duration-200"></div>
@@ -682,7 +761,7 @@ export default function Stats() {
                   <input
                     type="number"
                     value={editForm.shareCount}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, shareCount: Number(e.target.value) }))}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, shareCount: Number(e.target.value) }))}
                     min="1"
                     max="9999"
                     className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
@@ -698,10 +777,12 @@ export default function Stats() {
                     <input
                       type="checkbox"
                       checked={editForm.features.tasks}
-                      onChange={(e) => setEditForm(prev => ({
-                        ...prev,
-                        features: { ...prev.features, tasks: e.target.checked }
-                      }))}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          features: { ...prev.features, tasks: e.target.checked },
+                        }))
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-200 rounded-full peer peer-checked:bg-purple-600 transition-all duration-200"></div>
@@ -753,10 +834,12 @@ export default function Stats() {
                     <input
                       type="checkbox"
                       checked={editForm.features.finalUrl}
-                      onChange={(e) => setEditForm(prev => ({
-                        ...prev,
-                        features: { ...prev.features, finalUrl: e.target.checked }
-                      }))}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          features: { ...prev.features, finalUrl: e.target.checked },
+                        }))
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-200 rounded-full peer peer-checked:bg-purple-600 transition-all duration-200"></div>
@@ -767,7 +850,7 @@ export default function Stats() {
                   <input
                     type="url"
                     value={editForm.finalUrl}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, finalUrl: e.target.value }))}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, finalUrl: e.target.value }))}
                     className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                     placeholder="https://your-site.com/thank-you"
                   />
@@ -778,7 +861,7 @@ export default function Stats() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 disabled:opacity-50"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -803,6 +886,13 @@ export default function Stats() {
         @keyframes slideUp {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.4s ease-out forwards;
         }
       `}</style>
     </>
