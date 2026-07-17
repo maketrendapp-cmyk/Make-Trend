@@ -12,7 +12,15 @@ const API_BASE = BACKEND_URL + '/api';
 export default function CreateCampaign() {
   const router = useRouter();
   const { slug } = router.query;
-  const { user, isAuthenticated, loading: authLoading, refreshUser } = useAuth();
+  const { 
+    user, 
+    isAuthenticated, 
+    loading: authLoading, 
+    refreshUser, 
+    templates,
+    refetchCampaigns,
+    refetchStats 
+  } = useAuth();
 
   // ── State ──
   const [template, setTemplate] = useState(null);
@@ -40,38 +48,28 @@ export default function CreateCampaign() {
   // ── Storage key per template slug ──
   const storageKey = `createCampaign_${slug || 'new'}`;
 
-  // ── Load template ──
+  // ── Load template from global context ──
   useEffect(() => {
-    if (slug && isAuthenticated) {
-      fetchTemplate();
-    }
-  }, [slug, isAuthenticated]);
-
-  const fetchTemplate = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_BASE}/templates/slug/${slug}`);
-      if (!res.ok) throw new Error('Template not found');
-      const data = await res.json();
-      if (data.success) {
-        setTemplate(data.template);
+    if (slug && isAuthenticated && templates.length > 0) {
+      const found = templates.find(t => t.slug === slug);
+      if (found) {
+        setTemplate(found);
         // Pre‑fill from template
-        setCampaignTitle(data.template.title || '');
-        setCampaignDescription(data.template.description || '');
-        setCampaignReward(data.template.reward || 'Exclusive Reward');
+        setCampaignTitle(found.title || '');
+        setCampaignDescription(found.description || '');
+        setCampaignReward(found.reward || 'Exclusive Reward');
         setError('');
         // Load saved form from localStorage
         loadSavedForm();
+        setLoading(false);
       } else {
         setError('Template not found');
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error fetching template:', err);
-      setError('Failed to load template');
-    } finally {
+    } else if (!isAuthenticated) {
       setLoading(false);
     }
-  };
+  }, [slug, isAuthenticated, templates]);
 
   // ── Load saved form from localStorage ──
   const loadSavedForm = () => {
@@ -262,8 +260,11 @@ export default function CreateCampaign() {
         const url = `/${slug}/${cId}`;
         setCampaignUrl(url);
         setMessage('✅ Campaign created successfully!');
-        // Clear saved form after success (optional)
+        // Clear saved form after success
         localStorage.removeItem(storageKey);
+        // 🔥 Update global state so stats page shows new campaign instantly
+        await refetchCampaigns();
+        await refetchStats();
       } else {
         setMessage(data.error || 'Failed to create campaign');
       }
@@ -304,7 +305,7 @@ export default function CreateCampaign() {
     );
   }
 
-  // ── Success Screen (Scaled Up by ~15%) ──
+  // ── Success Screen ──
   if (campaignUrl) {
     const fullUrl = `${window.location.origin}${campaignUrl}`;
     return (
@@ -312,7 +313,7 @@ export default function CreateCampaign() {
         <Meta title="Campaign Created!" />
         <main className="min-h-screen flex items-center justify-center px-4 py-5 bg-gradient-to-b from-gray-50 to-white">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            {/* Header – scaled up */}
+            {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 sm:px-7 sm:py-5">
               <div className="flex items-center gap-4 text-white">
                 <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-2xl flex-shrink-0">
@@ -325,14 +326,13 @@ export default function CreateCampaign() {
               </div>
             </div>
 
-            {/* Body – scaled up padding and spacing */}
+            {/* Body */}
             <div className="p-5 sm:p-6 space-y-5">
               {/* Preview Card */}
               <div>
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Preview</h2>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
-                    {/* Image – scaled up */}
                     <div className="sm:w-48 h-40 sm:h-auto bg-gray-200 flex-shrink-0">
                       {template?.image ? (
                         <img
@@ -346,7 +346,6 @@ export default function CreateCampaign() {
                         </div>
                       )}
                     </div>
-                    {/* Details – scaled up */}
                     <div className="flex-1 p-4 space-y-2">
                       <h3 className="text-lg font-bold text-gray-900">{campaignTitle}</h3>
                       {campaignDescription && (
@@ -377,7 +376,7 @@ export default function CreateCampaign() {
                 </div>
               </div>
 
-              {/* Copy URL – scaled up */}
+              {/* Copy URL */}
               <div>
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Share Link</h2>
                 <div className="flex flex-col sm:flex-row items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
@@ -401,7 +400,7 @@ export default function CreateCampaign() {
                 {message && <p className="mt-2 text-sm text-green-600 text-center">{message}</p>}
               </div>
 
-              {/* Actions – scaled up */}
+              {/* Actions */}
               <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200">
                 <button
                   onClick={() => router.push(campaignUrl)}
