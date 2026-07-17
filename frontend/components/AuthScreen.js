@@ -26,8 +26,6 @@ import {
   FiUserPlus,
   FiCheckCircle,
   FiAlertCircle,
-  FiArrowRight,
-  FiGlobe,
   FiZap,
   FiTrendingUp,
   FiUsers,
@@ -409,7 +407,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI – FULL‑PAGE SPLIT‑SCREEN
+// AUTH SCREEN UI – FULL‑PAGE SPLIT‑SCREEN, ANIMATED, COMPACT
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
@@ -874,7 +872,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     );
   }
 
-  // ── MAIN SPLIT‑SCREEN LAYOUT ──
+  // ─── MAIN SPLIT‑SCREEN LAYOUT ───
   return (
     <>
       <Meta
@@ -884,50 +882,59 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
           : "Create your Make Trend account and start launching viral campaigns."
         }
       />
-      <div className="min-h-screen flex flex-col lg:flex-row bg-white">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-white overflow-hidden">
 
-        {/* ─── LEFT HERO ─── */}
-        <div className="flex-1 bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-800 text-white p-8 lg:p-12 flex flex-col justify-between min-h-[40vh] lg:min-h-screen">
-          <div>
-            <div className="flex items-center gap-2 mb-8">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl font-bold">MT</div>
-              <span className="text-xl font-bold tracking-tight">Make Trend</span>
-            </div>
+        {/* ─── LEFT HERO ─── (compact, no logo, no extra text) */}
+        <motion.div
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className="flex-1 bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-800 text-white p-8 lg:p-12 flex flex-col justify-center min-h-[40vh] lg:min-h-screen relative overflow-hidden"
+        >
+          {/* subtle decorative circles */}
+          <div className="absolute -top-20 -right-20 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl" />
+
+          <div className="relative z-10 max-w-md">
             <h1 className="text-4xl lg:text-5xl font-extrabold leading-tight mb-4">
               {emailExists === true ? 'Welcome Back!' : 'Join the Movement'}
             </h1>
-            <p className="text-purple-200 text-lg max-w-md">
+            <p className="text-purple-200 text-lg max-w-md mb-6">
               {emailExists === true
-                ? 'Sign in to your account and continue building viral campaigns.'
-                : 'Create an account and launch your first campaign in minutes.'
+                ? 'Sign in to continue building viral campaigns.'
+                : 'Create your account and launch your first campaign in minutes.'
               }
             </p>
-          </div>
-
-          <div className="hidden lg:block space-y-4">
-            <div className="flex items-center gap-3 text-purple-200">
-              <FiZap className="w-6 h-6 text-purple-300" />
-              <span>Launch campaigns in under 60 seconds</span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-purple-200">
+                <FiZap className="w-5 h-5 text-purple-300 flex-shrink-0" />
+                <span>Launch campaigns in under 60 seconds</span>
+              </div>
+              <div className="flex items-center gap-3 text-purple-200">
+                <FiTrendingUp className="w-5 h-5 text-purple-300 flex-shrink-0" />
+                <span>Real‑time analytics & insights</span>
+              </div>
+              <div className="flex items-center gap-3 text-purple-200">
+                <FiUsers className="w-5 h-5 text-purple-300 flex-shrink-0" />
+                <span>Used by 1,200+ creators worldwide</span>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-purple-200">
-              <FiTrendingUp className="w-6 h-6 text-purple-300" />
-              <span>Real‑time analytics & insights</span>
-            </div>
-            <div className="flex items-center gap-3 text-purple-200">
-              <FiUsers className="w-6 h-6 text-purple-300" />
-              <span>Used by 1,200+ creators worldwide</span>
-            </div>
-            <div className="pt-6 text-sm text-purple-300 border-t border-purple-500/30">
+            <div className="mt-8 text-sm text-purple-300 border-t border-purple-500/30 pt-4">
               ⭐ Built by Rocky Axis
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* ─── RIGHT FORM ─── */}
-        <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-white">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
+          className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-white"
+        >
           <div className="w-full max-w-md">
 
-            {/* ── Mobile hero title ── */}
+            {/* ── Mobile heading (only visible on small screens) ── */}
             <div className="lg:hidden text-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
                 {emailExists === true ? 'Welcome Back' : 'Create Account'}
@@ -939,7 +946,12 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 
             {/* ── Avatar (register mode) ── */}
             {emailExists === false && email.length > 3 && (
-              <div className="flex flex-col items-center mb-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+                className="flex flex-col items-center mb-4"
+              >
                 <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-purple-200 bg-gray-100 flex items-center justify-center shadow-sm">
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
@@ -951,21 +963,29 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   Upload Profile Picture
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
                 </label>
-              </div>
+              </motion.div>
             )}
 
             {/* ── Error / Reset messages ── */}
             {error && (
-              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 flex items-start gap-2">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 flex items-start gap-2"
+              >
                 <FiAlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
-              </div>
+              </motion.div>
             )}
             {resetSent && (
-              <div className="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-600 flex items-start gap-2">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-600 flex items-start gap-2"
+              >
                 <FiCheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>✅ Password reset link sent!</span>
-              </div>
+              </motion.div>
             )}
 
             {/* ── Form ── */}
@@ -1015,7 +1035,12 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 
               {/* Login password */}
               {emailExists === true && (
-                <div className="animate-fadeIn">
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
                   <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -1039,12 +1064,17 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                       {showPassword ? '🙈' : '👁️'}
                     </button>
                   </div>
-                </div>
+                </motion.div>
               )}
 
               {/* Register fields */}
               {emailExists === false && email.length > 3 && (
-                <div className="space-y-4 animate-fadeIn">
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ duration: 0.4 }}
+                  className="space-y-4 overflow-hidden"
+                >
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                     <div className="relative">
@@ -1173,18 +1203,20 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                       disabled={isSubmitting}
                     />
                   </div>
-                </div>
+                </motion.div>
               )}
 
               {/* Submit */}
               {emailExists !== null && email.length > 3 && (
-                <button
+                <motion.button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Processing...' : emailExists === true ? 'Log In' : 'Create Account'}
-                </button>
+                </motion.button>
               )}
               {emailExists === null && email.length > 3 && (
                 <button
@@ -1250,7 +1282,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
               ) : null}
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <style jsx>{`
