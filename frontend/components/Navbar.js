@@ -12,8 +12,6 @@ import {
   FiX,
   FiMail,
   FiDownload,
-  FiHeart,
-  FiTrendingUp,
   FiInfo,
   FiShield,
   FiBook,
@@ -51,7 +49,6 @@ export default function Navbar() {
     { href: '/privacy', label: 'Privacy', icon: <FiShield className="w-4 h-4" /> },
   ];
 
-  // ── Navigation links for desktop (filtered) ──
   const desktopNavLinks = [
     { href: '/', label: 'Home' },
     { href: '/create', label: 'Create' },
@@ -73,17 +70,17 @@ export default function Navbar() {
           }
         `}
       >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
+        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+          <div className="flex h-14 sm:h-16 items-center justify-between gap-1 sm:gap-2">
             
-            {/* ── Logo ── */}
-            <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all group-hover:scale-105">
-                <span className="text-white text-sm font-black">MT</span>
+            {/* ── Logo (Mobile Optimized) ── */}
+            <Link href="/" className="flex items-center gap-1.5 sm:gap-2 group flex-shrink-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all group-hover:scale-105">
+                <span className="text-white text-[10px] sm:text-sm font-black">MT</span>
               </div>
-              <span className="text-xl font-extrabold tracking-tight">
+              <span className="text-base sm:text-xl font-extrabold tracking-tight">
                 <span className="text-purple-600">Make</span>
-                <span className="text-gray-900 group-hover:text-purple-600/80 transition">Trend</span>
+                <span className="text-gray-900 group-hover:text-purple-600/80 transition hidden xs:inline">Trend</span>
               </span>
             </Link>
 
@@ -106,26 +103,26 @@ export default function Navbar() {
               ))}
             </div>
 
-            {/* ── Right side: Auth / User ── */}
-            <div className="flex items-center gap-3">
+            {/* ── Right side: Auth / User (Mobile Optimized) ── */}
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {isAuthenticated ? (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 sm:gap-2">
                   {/* User Profile Button */}
                   <Link
                     href="/profile"
                     className="
-                      flex items-center gap-2 px-4 py-2 
+                      flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2
                       bg-gradient-to-r from-purple-50 to-indigo-50 
-                      border border-purple-200/50 rounded-xl 
+                      border border-purple-200/50 rounded-lg sm:rounded-xl 
                       hover:from-purple-100 hover:to-indigo-100 
                       transition-all duration-200 group
                       shadow-sm hover:shadow-md
                     "
                   >
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                    <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[8px] sm:text-xs font-bold shadow-sm flex-shrink-0">
                       {user?.fullname?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
-                    <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition">
+                    <span className="text-[10px] sm:text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[60px] sm:max-w-[100px]">
                       @{user?.username || user?.fullname?.split(' ')[0]?.toLowerCase() || 'user'}
                     </span>
                   </Link>
@@ -134,25 +131,27 @@ export default function Navbar() {
                   <button
                     onClick={handleLogout}
                     className="
-                      flex items-center gap-1.5 px-3.5 py-2 
-                      text-sm font-medium text-gray-600 
+                      flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 
+                      text-[10px] sm:text-sm font-medium text-gray-600 
                       hover:text-red-600 hover:bg-red-50 
-                      rounded-xl transition-all duration-200
+                      rounded-lg sm:rounded-xl transition-all duration-200
                       border border-transparent hover:border-red-200
                     "
                   >
-                    <FiLogOut className="w-4 h-4" />
-                    <span className="hidden sm:inline">Logout</span>
+                    <FiLogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="hidden xs:inline">Logout</span>
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
                   <Link
                     href="/auth/login"
                     className="
-                      px-4 py-2 text-sm font-medium text-gray-600 
+                      px-2 sm:px-4 py-1.5 sm:py-2 
+                      text-[10px] sm:text-sm font-medium text-gray-600 
                       hover:text-gray-900 hover:bg-gray-100 
-                      rounded-xl transition-all duration-200
+                      rounded-lg sm:rounded-xl transition-all duration-200
+                      whitespace-nowrap
                     "
                   >
                     Log in
@@ -160,17 +159,17 @@ export default function Navbar() {
                   <Link
                     href="/auth/register"
                     className="
-                      flex items-center gap-1.5 px-5 py-2.5 
+                      flex items-center gap-1 px-3 sm:px-5 py-1.5 sm:py-2.5 
                       bg-gradient-to-r from-purple-600 to-indigo-600 
-                      text-white font-semibold rounded-xl 
+                      text-white font-semibold rounded-lg sm:rounded-xl 
                       hover:from-purple-700 hover:to-indigo-700 
                       transition-all duration-200 shadow-md hover:shadow-lg 
                       hover:-translate-y-0.5 active:scale-95
-                      text-sm
+                      text-[10px] sm:text-sm whitespace-nowrap
                     "
                   >
-                    <FiUser className="w-4 h-4" />
-                    Get Started
+                    <FiUser className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span>Get Started</span>
                   </Link>
                 </div>
               )}
@@ -178,13 +177,13 @@ export default function Navbar() {
               {/* ── Mobile Menu Button ── */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200"
+                className="md:hidden p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0"
                 aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
-                  <FiX className="w-6 h-6" />
+                  <FiX className="w-5 h-5 sm:w-6 sm:h-6" />
                 ) : (
-                  <FiMenu className="w-6 h-6" />
+                  <FiMenu className="w-5 h-5 sm:w-6 sm:h-6" />
                 )}
               </button>
             </div>
@@ -196,23 +195,23 @@ export default function Navbar() {
       {/* ── Mobile Menu ── */}
       <div
         className={`
-          md:hidden fixed inset-x-0 top-16 z-40 
+          md:hidden fixed inset-x-0 top-14 sm:top-16 z-40 
           bg-white/95 backdrop-blur-lg border-b border-gray-200
           shadow-xl transition-all duration-300 ease-in-out
           ${isMobileMenuOpen 
-            ? 'max-h-[calc(100vh-4rem)] opacity-100 translate-y-0' 
+            ? 'max-h-[calc(100vh-3.5rem)] opacity-100 translate-y-0' 
             : 'max-h-0 opacity-0 -translate-y-4 overflow-hidden'
           }
         `}
       >
-        <div className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-4rem)]">
+        <div className="p-3 sm:p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setIsMobileMenuOpen(false)}
               className={`
-                flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
+                flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium transition-all duration-200
                 ${isActive(link.href)
                   ? 'bg-purple-100 text-purple-700 shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -231,7 +230,7 @@ export default function Navbar() {
             {isAuthenticated ? (
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 w-full"
+                className="flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 w-full"
               >
                 <FiLogOut className="w-4 h-4" />
                 Logout
@@ -241,14 +240,14 @@ export default function Navbar() {
                 <Link
                   href="/auth/login"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-center px-4 py-3 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all duration-200 w-full"
+                  className="flex items-center justify-center px-4 py-3 rounded-lg sm:rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all duration-200 w-full"
                 >
                   Log in
                 </Link>
                 <Link
                   href="/auth/register"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 w-full"
+                  className="flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg sm:rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 w-full"
                 >
                   Get Started
                 </Link>
@@ -257,6 +256,15 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* ── Tailwind custom breakpoint for extra small screens ── */}
+      <style jsx>{`
+        @media (min-width: 400px) {
+          .xs\\:inline {
+            display: inline;
+          }
+        }
+      `}</style>
     </>
   );
 }
