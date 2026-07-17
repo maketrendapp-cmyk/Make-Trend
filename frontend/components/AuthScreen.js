@@ -1,6 +1,6 @@
 // components/AuthScreen.js
 // ============================================================
-// COMPLETE – AuthProvider + SSR support (initialUser from cookie)
+// CENTERED LOGIN/REGISTER – No hero, full viewport, clean
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -33,6 +33,22 @@ import { FaGoogle, FaFacebook } from 'react-icons/fa';
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
 // ============================================================
+// SET SESSION COOKIE (for faster server-side detection)
+// ============================================================
+async function setSessionCookie(token) {
+  try {
+    await fetch(`${API_BASE}/auth/set-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    // Silent fail – Firebase client auth still works
+  }
+}
+
+// ============================================================
 // BACKEND API HELPER
 // ============================================================
 async function apiRequest(endpoint, options = {}, token = null) {
@@ -49,16 +65,15 @@ async function apiRequest(endpoint, options = {}, token = null) {
 }
 
 // ============================================================
-// AUTH CONTEXT
+// AUTH CONTEXT (FULL – PRESERVED)
 // ============================================================
 const AuthContext = createContext();
 
-export function AuthProvider({ children, initialUser = null }) {
-  // --- AUTH STATE (with SSR support) ---
-  // If SSR gave us a token, we assume user is logged in until Firebase confirms.
-  const [user, setUser] = useState(initialUser?.token ? { uid: 'pending' } : null);
-  const [loading, setLoading] = useState(!initialUser); // If no SSR user, show loading
-  const [isAuthenticated, setIsAuthenticated] = useState(!!initialUser);
+export function AuthProvider({ children }) {
+  // --- AUTH STATE ---
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
 
@@ -121,11 +136,10 @@ export function AuthProvider({ children, initialUser = null }) {
     }
   }, []);
 
-  // --- AUTH STATE LISTENER (runs once on mount) ---
+  // --- AUTH STATE LISTENER ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true); // We'll set loading true while verifying
-
+      setLoading(true);
       if (firebaseUser) {
         try {
           const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
@@ -139,7 +153,6 @@ export function AuthProvider({ children, initialUser = null }) {
           }
         } catch {}
 
-        // Load global data
         await loadAllData();
 
         const profileData = await fetchUserProfile(firebaseUser);
@@ -182,6 +195,11 @@ export function AuthProvider({ children, initialUser = null }) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
+
+      // ── Set cookie for faster detection on next load ──
+      const token = await firebaseUser.getIdToken();
+      await setSessionCookie(token);
+
       const profileData = await fetchUserProfile(firebaseUser);
       if (profileData) {
         setUser(profileData);
@@ -209,6 +227,10 @@ export function AuthProvider({ children, initialUser = null }) {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
       const token = await firebaseUser.getIdToken();
+
+      // ── Set cookie for faster detection on next load ──
+      await setSessionCookie(token);
+
       const data = await apiRequest('/auth/register', {
         method: 'POST',
         body: { uid: firebaseUser.uid, username, fullname, email, avatar: avatarUrl || '', referralCode, deviceFingerprint: 'web' },
@@ -251,6 +273,11 @@ export function AuthProvider({ children, initialUser = null }) {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+
+      // ── Set cookie for faster detection on next load ──
+      const token = await firebaseUser.getIdToken();
+      await setSessionCookie(token);
+
       try {
         const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
         if (data.banned) {
@@ -312,11 +339,21 @@ export function AuthProvider({ children, initialUser = null }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           await loadAllData();
+
+          // ── Set cookie for faster detection on next load ──
+          const newToken = await firebaseUser.getIdToken();
+          await setSessionCookie(newToken);
+
           return { success: true };
         } else {
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true });
           setIsAuthenticated(true);
           setNeedsCompletion(false);
+
+          // ── Set cookie for faster detection on next load ──
+          const newToken = await firebaseUser.getIdToken();
+          await setSessionCookie(newToken);
+
           return { success: true };
         }
       } else {
@@ -335,8 +372,6 @@ export function AuthProvider({ children, initialUser = null }) {
       setIsAuthenticated(false);
       setNeedsCompletion(false);
       clearUserData();
-      // Clear the cookie (optional – backend should also handle)
-      document.cookie = 'token=; path=/; max-age=0';
       return { success: true };
     } catch {
       return { success: false, error: 'Logout failed' };
@@ -409,7 +444,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI – CENTERED LOGIN/REGISTER
+// AUTH SCREEN UI – CENTERED FORM (NO HERO)
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
@@ -871,7 +906,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     );
   }
 
-  // ─── CENTERED FORM LAYOUT ───
+  // ─── CENTERED FORM LAYOUT (NO HERO) ───
   return (
     <>
       <Meta
