@@ -1,6 +1,7 @@
 // components/AuthScreen.js
 // ============================================================
 // FINAL UI: MAKE TREND Hero Title, Professional Design
+// Auth Context + UI Component (data fetching moved to lib/useAppData.js)
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -15,12 +16,13 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider,
 } from '../services/firebase';
+import { useAppData } from '../lib/useAppData';
 
-// ============================================================
-// BACKEND API HELPER
-// ============================================================
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
+// ============================================================
+// BACKEND API HELPER (for auth-related calls)
+// ============================================================
 async function apiRequest(endpoint, options = {}, token = null) {
   const url = `${API_BASE}${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
@@ -40,13 +42,34 @@ async function apiRequest(endpoint, options = {}, token = null) {
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
+  // --- AUTH STATE ---
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
 
-  // Upload Avatar
+  // --- ALL DATA FROM useAppData ---
+  const {
+    templates,
+    featuredTemplates,
+    profile,
+    campaigns,
+    supportTickets,
+    comments,
+    stats,
+    dataLoaded,
+    loadAllData,
+    refetchProfile,
+    refetchCampaigns,
+    refetchStats,
+    refetchSupportTickets,
+    refetchComments,
+    refetchTemplates,
+    clearUserData,
+  } = useAppData();
+
+  // --- Upload Avatar ---
   const uploadAvatar = async (file) => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) throw new Error('Not authenticated');
@@ -64,7 +87,7 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
-  // Fetch user profile
+  // --- Fetch user profile (for auth logic) ---
   const fetchUserProfile = useCallback(async (firebaseUser) => {
     try {
       const token = await firebaseUser.getIdToken();
@@ -75,7 +98,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Check profile status
+  // --- Check profile status ---
   const checkProfileStatus = useCallback(async (uid) => {
     try {
       const data = await apiRequest(`/auth/profile?uid=${uid}`);
@@ -85,7 +108,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Auth state listener
+  // --- AUTH STATE LISTENER ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
@@ -102,9 +125,13 @@ export function AuthProvider({ children }) {
           }
         } catch {}
 
-        const profile = await fetchUserProfile(firebaseUser);
-        if (profile) {
-          setUser(profile);
+        // Load global data (templates + comments + user data)
+        await loadAllData();
+
+        // Existing auth logic
+        const profileData = await fetchUserProfile(firebaseUser);
+        if (profileData) {
+          setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
         } else {
@@ -130,20 +157,21 @@ export function AuthProvider({ children }) {
         setUser(null);
         setIsAuthenticated(false);
         setNeedsCompletion(false);
+        clearUserData();
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [fetchUserProfile, checkProfileStatus]);
+  }, [fetchUserProfile, checkProfileStatus, loadAllData, clearUserData]);
 
-  // Login
+  // --- LOGIN ---
   const login = async (email, password) => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
-      const profile = await fetchUserProfile(firebaseUser);
-      if (profile) {
-        setUser(profile);
+      const profileData = await fetchUserProfile(firebaseUser);
+      if (profileData) {
+        setUser(profileData);
         setIsAuthenticated(true);
         setNeedsCompletion(false);
       } else {
@@ -151,6 +179,7 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(true);
         setNeedsCompletion(true);
       }
+      await loadAllData();
       return { success: true };
     } catch (error) {
       let message = 'Invalid email or password.';
@@ -161,7 +190,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Register
+  // --- REGISTER ---
   const register = async (email, password, fullname, username, avatarUrl, referralCode = '') => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -175,6 +204,7 @@ export function AuthProvider({ children }) {
         setUser({ uid: firebaseUser.uid, email, ...data.user, completed: true });
         setIsAuthenticated(true);
         setNeedsCompletion(false);
+        await loadAllData();
         return { success: true };
       } else {
         await firebaseUser.delete();
@@ -188,7 +218,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Social Login
+  // --- SOCIAL LOGIN ---
   const socialLogin = async (providerName) => {
     setIsSocialLoading(true);
     let provider;
@@ -217,11 +247,13 @@ export function AuthProvider({ children }) {
         }
       } catch {}
 
+      await loadAllData();
+
       const status = await checkProfileStatus(firebaseUser.uid);
       if (status.completed) {
-        const profile = await fetchUserProfile(firebaseUser);
-        if (profile) {
-          setUser(profile);
+        const profileData = await fetchUserProfile(firebaseUser);
+        if (profileData) {
+          setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           setIsSocialLoading(false);
@@ -250,7 +282,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Complete Social Profile
+  // --- COMPLETE SOCIAL PROFILE ---
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
     try {
       const firebaseUser = auth.currentUser;
@@ -261,11 +293,12 @@ export function AuthProvider({ children }) {
         body: { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', referralCode: '', deviceFingerprint: 'web' },
       }, token);
       if (data.success) {
-        const profile = await fetchUserProfile(firebaseUser);
-        if (profile) {
-          setUser(profile);
+        const profileData = await fetchUserProfile(firebaseUser);
+        if (profileData) {
+          setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
+          await loadAllData();
           return { success: true };
         } else {
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true });
@@ -281,20 +314,21 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Logout
+  // --- LOGOUT ---
   const logout = async () => {
     try {
       await signOut(auth);
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);
+      clearUserData();
       return { success: true };
     } catch {
       return { success: false, error: 'Logout failed' };
     }
   };
 
-  // Reset Password
+  // --- RESET PASSWORD ---
   const resetPassword = async (email) => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -308,18 +342,20 @@ export function AuthProvider({ children }) {
 
   const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
-      const profile = await fetchUserProfile(auth.currentUser);
-      if (profile) {
-        setUser(profile);
+      const profileData = await fetchUserProfile(auth.currentUser);
+      if (profileData) {
+        setUser(profileData);
         setIsAuthenticated(true);
         setNeedsCompletion(false);
-        return profile;
+        return profileData;
       }
     }
     return null;
   }, [fetchUserProfile]);
 
+  // --- CONTEXT VALUE ---
   const value = {
+    // Auth
     user,
     loading,
     isAuthenticated,
@@ -333,6 +369,21 @@ export function AuthProvider({ children }) {
     logout,
     resetPassword,
     refreshUser,
+    // Global data (from useAppData)
+    templates,
+    featuredTemplates,
+    profile,
+    campaigns,
+    supportTickets,
+    comments,
+    stats,
+    dataLoaded,
+    refetchProfile,
+    refetchCampaigns,
+    refetchStats,
+    refetchSupportTickets,
+    refetchComments,
+    refetchTemplates,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -345,7 +396,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI COMPONENT (FINAL)
+// AUTH SCREEN UI COMPONENT (FINAL – UNCHANGED)
 // ============================================================
 export default function AuthScreen({ onSuccess }) {
   const {
