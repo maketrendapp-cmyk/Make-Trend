@@ -14,7 +14,6 @@ import {
   FiLogIn,
   FiUser,
   FiAward,
-  FiTrendingUp,
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
@@ -31,30 +30,13 @@ export default function ReferEarn() {
     referrer: null,
   });
   const [copySuccess, setCopySuccess] = useState('');
+  const [shouldAnimate, setShouldAnimate] = useState(false);
 
   // ── Get username for welcome message ──
   const username = contextProfile?.username || user?.username || user?.email?.split('@')[0] || 'User';
   const displayName = contextProfile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
 
-  // ── Intersection Observer for scroll animations ──
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('opacity-100', 'translate-y-0');
-            entry.target.classList.remove('opacity-0', 'translate-y-8');
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
-    );
-
-    document.querySelectorAll('.fade-up').forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-
-  // ── Fetch referral data locally ──
+  // ── Fetch referral data ──
   useEffect(() => {
     const fetchReferrals = async () => {
       try {
@@ -82,27 +64,51 @@ export default function ReferEarn() {
         console.error('Fetch referrals error:', err);
       } finally {
         setLoading(false);
+        // ── Allow animations to start after content loads ──
+        setTimeout(() => setShouldAnimate(true), 100);
       }
     };
     fetchReferrals();
   }, []);
 
+  // ── Intersection Observer for scroll animations ──
+  useEffect(() => {
+    if (!shouldAnimate) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('opacity-100', 'translate-y-0');
+            entry.target.classList.remove('opacity-0', 'translate-y-8');
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    document.querySelectorAll('.fade-up').forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, [shouldAnimate]); // Re-run when animations are allowed
+
   const copyReferralCode = () => {
     const code = referralData.referralCode;
     if (!code) return;
-    navigator.clipboard.writeText(code).then(() => {
-      setCopySuccess('✅ Copied!');
-      setTimeout(() => setCopySuccess(''), 2000);
-    }).catch(() => {
-      const textArea = document.createElement('textarea');
-      textArea.value = code;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopySuccess('✅ Copied!');
-      setTimeout(() => setCopySuccess(''), 2000);
-    });
+    navigator.clipboard.writeText(code)
+      .then(() => {
+        setCopySuccess('✅ Copied!');
+        setTimeout(() => setCopySuccess(''), 2000);
+      })
+      .catch(() => {
+        const textArea = document.createElement('textarea');
+        textArea.value = code;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopySuccess('✅ Copied!');
+        setTimeout(() => setCopySuccess(''), 2000);
+      });
   };
 
   const formatDate = (timestamp) => {
@@ -221,6 +227,7 @@ export default function ReferEarn() {
     );
   }
 
+  // ── Main Content ──
   return (
     <>
       <Meta
@@ -376,7 +383,7 @@ export default function ReferEarn() {
                     </tr>
                   </thead>
                   <tbody>
-                    {referralData.referredUsers.map((ref, index) => (
+                    {referralData.referredUsers.map((ref) => (
                       <tr
                         key={ref.uid}
                         className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors duration-150"
