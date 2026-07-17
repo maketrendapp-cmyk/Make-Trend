@@ -1,6 +1,7 @@
+
 // components/AuthScreen.js
 // ============================================================
-// COMPLETE – AuthProvider (full original logic) + Compact UI
+// COMPLETE – AuthProvider (full original logic) + Premium UI
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -18,7 +19,7 @@ import {
 } from '../services/firebase';
 import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiMail,
   FiLock,
@@ -26,6 +27,12 @@ import {
   FiUserPlus,
   FiCheckCircle,
   FiAlertCircle,
+  FiArrowRight,
+  FiChevronLeft,
+  FiSparkles,
+  FiTrendingUp,
+  FiUsers,
+  FiAward
 } from 'react-icons/fi';
 import { FaGoogle, FaFacebook } from 'react-icons/fa';
 
@@ -391,6 +398,7 @@ export function AuthProvider({ children }) {
     refetchSupportTickets,
     refetchComments,
     refetchTemplates,
+    clearUserData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -403,7 +411,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI – ULTRA‑COMPACT, NO EXTRA SPACE, SMOOTH ANIMATION
+// AUTH SCREEN UI – PREMIUM GRAPHIC GLASSMORPHISM DESIGN
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
@@ -418,7 +426,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     user,
   } = useAuth();
 
-  // ── State (same as before) ──
+  // ── State ──
   const [email, setEmail] = useState('');
   const [emailExists, setEmailExists] = useState(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -468,7 +476,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     setTimeout(() => performRedirect(), 1500);
   };
 
-  // ── Effects (unchanged) ──
+  // ── Effects ──
   useEffect(() => {
     if (user && user.completed === false && !needsSocialCompletion) {
       setSocialUser(user);
@@ -687,7 +695,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       if (result.success) {
         if (avatarFile) {
           try {
-            const uploadedUrl = await uploadAvatar(avatarFile);
+            await uploadAvatar(avatarFile);
           } catch (err) {
             console.warn('Avatar upload after registration failed:', err);
           }
@@ -746,107 +754,119 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     }
   };
 
-  // ── Success overlay ──
+  // ── Success Screen ──
   if (showSuccess) {
     return (
       <>
         <Meta title="Success | Make Trend" />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-indigo-100">
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white relative overflow-hidden">
+          {/* Neon cosmic background animations */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/20 rounded-full filter blur-[120px] animate-pulse z-0"></div>
+          <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-blue-600/10 rounded-full filter blur-[100px] z-0"></div>
+          
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-            className="text-center"
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="text-center relative z-10 p-6 max-w-md"
           >
-            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <FiCheckCircle className="w-12 h-12 text-green-600" />
+            <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(16,185,129,0.15)]">
+              <FiCheckCircle className="w-10 h-10 text-emerald-400" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">{successMessage}</h2>
-            <p className="text-gray-500 mt-1">Redirecting...</p>
+            <h2 className="text-2xl font-black text-white tracking-tight">{successMessage}</h2>
+            <p className="text-slate-400 mt-2 text-sm">{"Preparing your modern workspace dashboard..."}</p>
           </motion.div>
         </div>
       </>
     );
   }
 
-  // ── Social completion screen ──
+  // ── Social Completion Screen ──
   if (needsSocialCompletion) {
     return (
       <>
         <Meta title="Complete Profile | Make Trend" />
-        <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-purple-50 via-white to-indigo-50">
-          <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl border border-white/50 backdrop-blur-sm">
+        <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-slate-950 text-white relative overflow-hidden">
+          {/* Visual Mesh Blobs */}
+          <div className="absolute top-[-10%] right-[-10%] w-[450px] h-[450px] bg-purple-700/25 rounded-full filter blur-[130px] opacity-70 animate-pulse duration-[8s]" />
+          <div className="absolute bottom-[-10%] left-[-10%] w-[450px] h-[450px] bg-indigo-700/20 rounded-full filter blur-[130px] opacity-70 animate-pulse duration-[10s]" />
+
+          <motion.div 
+            initial={{ y: 25, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md rounded-3xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl p-6 sm:p-8 shadow-2xl relative z-10"
+          >
             <div className="flex flex-col items-center mb-6">
-              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-500/30 bg-slate-800/80 flex items-center justify-center shadow-lg relative group">
                 {socialAvatarPreview ? (
                   <img src={socialAvatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <FiUser className="w-12 h-12 text-gray-400" />
+                  <FiUser className="w-10 h-10 text-slate-400" />
                 )}
               </div>
-              <label className="mt-2 cursor-pointer text-sm font-medium text-purple-600 hover:text-purple-800 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-purple-400">
-                Upload Profile Picture
+              <label className="mt-3 cursor-pointer text-xs font-bold text-purple-400 hover:text-purple-300 transition bg-purple-500/5 hover:bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-2">
+                {"Choose Custom Avatar"}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'social')} disabled={isSubmitting} />
               </label>
             </div>
 
-            <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Complete Your Profile</h2>
-            <p className="text-sm text-center text-gray-400 mb-6">One more step to get started</p>
+            <h2 className="text-xl font-black text-center text-white tracking-tight">{"Complete Profile"}</h2>
+            <p className="text-xs text-center text-slate-400 mt-1 mb-6">{"Finish setting up your credentials to enter Make Trend"}</p>
 
             {error && (
-              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600">
+              <div className="mb-4 rounded-xl bg-rose-500/10 border border-rose-500/20 px-4 py-2.5 text-xs font-semibold text-rose-400">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSocialCompletion} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{"Full Name *"}</label>
                 <input
                   type="text"
                   value={socialFullname}
                   onChange={(e) => setSocialFullname(e.target.value)}
-                  placeholder="John Doe"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                  placeholder="Enter full name"
+                  className="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
                   required
                   disabled={isSubmitting}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{"Username *"}</label>
                 <div className="relative">
                   <input
                     type="text"
                     value={socialUsername}
                     onChange={(e) => setSocialUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                    placeholder="john_doe"
-                    className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition ${
+                    placeholder="choose_username"
+                    className={`w-full rounded-xl bg-slate-950/80 border px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-4 transition ${
                       usernameAvailable === true && socialUsername.length >= 3
-                        ? 'border-green-500 focus:ring-green-200'
+                        ? 'border-emerald-500 focus:ring-emerald-500/10'
                         : usernameAvailable === false && socialUsername.length >= 3
-                        ? 'border-red-500 focus:ring-red-200'
-                        : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                        ? 'border-rose-500 focus:ring-rose-500/10'
+                        : 'border-slate-800 focus:border-purple-500 focus:ring-purple-500/10'
                     }`}
                     required
                     disabled={isSubmitting}
                   />
                   {isCheckingUsername && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 animate-pulse">⏳</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 animate-pulse">⏳</span>
                   )}
                   {!isCheckingUsername && socialUsername.length >= 3 && usernameAvailable === true && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-emerald-400 font-bold">✓ Available</span>
                   )}
                   {!isCheckingUsername && socialUsername.length >= 3 && usernameAvailable === false && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-rose-400 font-bold">✗ Taken</span>
                   )}
                 </div>
-                <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
+                <p className="mt-1.5 text-[10px] text-slate-500 font-medium">{"3-30 characters: lowercase letters, numbers, underscore."}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <div className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{"Email Address"}</label>
+                <div className="w-full rounded-xl bg-slate-950/40 border border-slate-900/60 px-4 py-2.5 text-sm text-slate-500 select-none">
                   {socialUser?.email || '—'}
                 </div>
               </div>
@@ -854,18 +874,18 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+                className="w-full rounded-xl bg-primary text-white py-3 text-xs font-black uppercase tracking-wider hover:opacity-95 transition shadow-lg shadow-primary/20 disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Complete Profile'}
+                {isSubmitting ? 'Finalizing Profile...' : 'Complete Profile'}
               </button>
             </form>
-          </div>
+          </motion.div>
         </div>
       </>
     );
   }
 
-  // ─── MAIN SPLIT‑SCREEN LAYOUT (ULTRA‑COMPACT) ───
+  // ─── MAIN COSMIC SPLIT-SCREEN LAYOUT ───
   return (
     <>
       <Meta
@@ -875,150 +895,212 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
           : "Create your Make Trend account and start launching viral campaigns."
         }
       />
-      <div className="min-h-screen flex flex-col lg:flex-row bg-white overflow-hidden">
+      <div className="min-h-screen flex flex-col lg:flex-row bg-slate-950 text-white overflow-hidden relative font-sans">
+        
+        {/* Animated Glowing Mesh Blobs (Global background) */}
+        <div className="absolute top-[-20%] left-[-20%] w-[500px] h-[500px] bg-purple-700/20 rounded-full filter blur-[150px] opacity-80 z-0 select-none pointer-events-none animate-pulse duration-[8s]" />
+        <div className="absolute bottom-[-25%] right-[-10%] w-[500px] h-[500px] bg-indigo-700/25 rounded-full filter blur-[150px] opacity-80 z-0 select-none pointer-events-none animate-pulse duration-[12s]" />
 
-        {/* ─── LEFT HERO ─── (minimal padding, compact) */}
+        {/* ─── LEFT HERO (Interactive Campaigns Hub Preview) ─── */}
         <motion.div
-          initial={{ opacity: 0, x: -30 }}
+          initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-          className="flex-1 bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-800 text-white p-4 lg:p-6 flex flex-col justify-center min-h-[20vh] lg:min-h-[50vh] relative overflow-hidden"
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex-1 p-6 sm:p-10 lg:p-14 flex flex-col justify-between min-h-[35vh] lg:min-h-screen relative z-10 lg:border-r lg:border-slate-900 bg-slate-950/30 backdrop-blur-sm"
         >
-          <div className="absolute -top-20 -right-20 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl" />
+          {/* Logo & Brand title */}
+          <div className="flex items-center gap-2">
+            <span className="bg-primary/20 border border-primary/30 text-primary p-2 rounded-xl text-sm shadow-[0_0_20px_rgba(110,68,255,0.1)]">
+              <FiSparkles className="w-4 h-4 animate-spin duration-[6s]" />
+            </span>
+            <span className="text-base font-black tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              Make Trend
+            </span>
+          </div>
 
-          <div className="relative z-10 max-w-md mx-auto lg:mx-0 text-center lg:text-left">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight mb-2">
-              {emailExists === true ? 'Welcome Back!' : 'Join the Movement'}
+          {/* Core Feature Focus */}
+          <div className="max-w-md my-auto pt-6 lg:pt-0">
+            <span className="text-[10px] font-black tracking-widest uppercase text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20 w-fit block mb-4">
+              {"⚡ Next-Gen Marketing Engine"}
+            </span>
+            
+            <h1 className="text-2xl sm:text-4xl font-black leading-none text-white tracking-tight mb-3">
+              {emailExists === true ? "Welcome back to the trend." : "Launch and go viral."}
             </h1>
-            <p className="text-purple-200 text-sm sm:text-base max-w-md">
+            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed mb-6">
               {emailExists === true
-                ? 'Sign in to continue building viral campaigns.'
-                : 'Create your account and launch your first campaign in minutes.'
+                ? "Sign in to customize rewards, analyze custom campaign KPIs, and launch templates on global social trends."
+                : "Create an account to browse conversion-optimized templates, build customized landing pages, and launch viral referral setups."
               }
             </p>
+
+            {/* Campaign Live KPIs Card Mockup (Shows actual value!) */}
+            <div className="hidden sm:block p-4 bg-slate-900/50 border border-slate-800/80 rounded-2xl backdrop-blur-md relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-all" />
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                  {"Live Analytics Demo"}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-800 border border-slate-700/50 px-2 py-0.5 rounded-lg">
+                  {"Real-Time"}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-slate-500 block">{"Total Reach"}</span>
+                  <div className="flex items-center gap-1">
+                    <FiTrendingUp className="text-emerald-400 w-3 h-3" />
+                    <span className="text-xs font-black text-white">{"1.2M+"}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-slate-500 block">{"Active Users"}</span>
+                  <div className="flex items-center gap-1">
+                    <FiUsers className="text-primary w-3 h-3 animate-pulse" />
+                    <span className="text-xs font-black text-white">{"85.4K"}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-slate-500 block">{"Rewards Won"}</span>
+                  <div className="flex items-center gap-1">
+                    <FiAward className="text-amber-400 w-3 h-3" />
+                    <span className="text-xs font-black text-white">{"4,210"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer branding */}
+          <div className="hidden lg:flex items-center justify-between text-slate-500 text-[11px] font-bold mt-6">
+            <span>{"© 2026 Make Trend Inc."}</span>
+            <div className="flex gap-4">
+              <span className="hover:text-slate-400 cursor-pointer">{"Privacy"}</span>
+              <span className="hover:text-slate-400 cursor-pointer">{"Terms"}</span>
+            </div>
           </div>
         </motion.div>
 
-        {/* ─── RIGHT FORM ─── (reduced padding, form moved up) */}
+        {/* ─── RIGHT FORM (Glassmorphic Container Overlay) ─── */}
         <motion.div
           initial={{ opacity: 0, y: 30, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.05, ease: [0.25, 0.1, 0.25, 1] }}
-          className="flex-1 flex items-center justify-center p-4 lg:p-6 bg-white"
+          transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="flex-1 flex items-center justify-center p-4 sm:p-8 relative z-10"
         >
-          <div className="w-full max-w-md">
-
-            {/* ── Mobile heading ── */}
-            <div className="lg:hidden text-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                {emailExists === true ? 'Welcome Back' : 'Create Account'}
+          <div className="w-full max-w-md bg-slate-900/40 border border-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+            
+            {/* Context Heading */}
+            <div className="text-center mb-6">
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                {emailExists === true ? "Sign In" : emailExists === false && email.length > 3 ? "Create Account" : "Access Hub"}
               </h2>
-              <p className="text-xs text-gray-500">
-                {emailExists === true ? 'Sign in to your account' : 'Start your journey with Make Trend'}
+              <p className="text-xs text-slate-400 mt-1">
+                {emailExists === true ? "Enter password to access your dashboard" : "Setup modern credentials to get started"}
               </p>
             </div>
 
-            {/* ── Avatar (register mode) ── */}
+            {/* Avatar Upload Frame on Register Mode */}
             {emailExists === false && email.length > 3 && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1 }}
-                className="flex flex-col items-center mb-3"
+                className="flex flex-col items-center mb-5"
               >
-                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-purple-200 bg-gray-100 flex items-center justify-center shadow-sm">
+                <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-500/30 bg-slate-950 flex items-center justify-center shadow-lg relative group">
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
-                    <FiUser className="w-10 h-10 text-gray-400" />
+                    <FiUser className="w-8 h-8 text-slate-500" />
                   )}
                 </div>
-                <label className="mt-1 cursor-pointer text-xs font-medium text-purple-600 hover:text-purple-800 transition border border-dashed border-gray-300 rounded-lg px-3 py-1 hover:border-purple-400">
-                  Upload Profile Picture
+                <label className="mt-2.5 cursor-pointer text-[10px] font-black uppercase tracking-wider text-purple-400 hover:text-purple-300 transition bg-purple-500/5 hover:bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-1.5">
+                  {"Upload Profile Picture"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
                 </label>
               </motion.div>
             )}
 
-            {/* ── Error / Reset messages ── */}
+            {/* Error notifications */}
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600 flex items-start gap-2"
+                className="mb-4 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-400 flex items-start gap-2"
               >
                 <FiAlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
               </motion.div>
             )}
+            
             {resetSent && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-600 flex items-start gap-2"
+                className="mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400 flex items-start gap-2"
               >
                 <FiCheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>✅ Password reset link sent!</span>
+                <span>{"Password reset verification link has been successfully dispatched!"}</span>
               </motion.div>
             )}
 
-            {/* ── Form ── */}
-            <form onSubmit={handleSubmit} className="space-y-3">
-              {/* Email */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Input: Email */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">{"Email Address"}</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                     <FiMail className="w-4 h-4" />
                   </div>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className={`w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 transition ${
+                    placeholder="name@company.com"
+                    className={`w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-white focus:outline-none focus:ring-4 transition ${
                       emailExists === true && email.length > 3
-                        ? 'border-green-500 focus:ring-green-200 bg-green-50'
+                        ? 'border-emerald-500/70 focus:ring-emerald-500/10'
                         : emailExists === false && email.length > 3
-                        ? 'border-purple-500 focus:ring-purple-200 bg-purple-50'
+                        ? 'border-purple-500/70 focus:ring-purple-500/10'
                         : emailError
-                        ? 'border-red-500 focus:ring-red-200'
-                        : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                        ? 'border-rose-500/70 focus:ring-rose-500/10'
+                        : 'border-slate-800 focus:border-purple-500 focus:ring-purple-500/10'
                     }`}
                     disabled={isSubmitting}
                     required
                   />
                   {isCheckingEmail && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">⏳</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 animate-pulse">⏳</span>
                   )}
                   {!isCheckingEmail && email.length > 3 && emailExists === true && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-medium">✓ Exists</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-emerald-400 font-bold">✓ Active</span>
                   )}
                   {!isCheckingEmail && email.length > 3 && emailExists === false && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-purple-600 font-medium">New ✨</span>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-purple-400 font-bold">New ✨</span>
                   )}
                 </div>
-                {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
+                {emailError && <p className="mt-1 text-[10px] text-rose-400 font-bold">{emailError}</p>}
+                
                 {emailExists === true && email.length > 3 && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Existing account — enter your password below.
-                    <button type="button" onClick={handleResetPassword} className="ml-1 text-purple-600 hover:underline font-medium">Forgot password?</button>
+                  <p className="mt-1.5 text-[10px] text-slate-500 font-medium">
+                    {"Verified account found. Enter your credentials."}
+                    <button type="button" onClick={handleResetPassword} className="ml-1 text-purple-400 hover:underline font-bold">{"Forgot Password?"}</button>
                   </p>
                 )}
               </div>
 
-              {/* Login password */}
+              {/* Password Container (Login Phase) */}
               {emailExists === true && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ duration: 0.3 }}
                   className="overflow-hidden"
                 >
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">{"Password"}</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                       <FiLock className="w-4 h-4" />
                     </div>
                     <input
@@ -1026,7 +1108,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
                       required
                       disabled={isSubmitting}
                       minLength={6}
@@ -1034,26 +1116,25 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
                     >
-                      {showPassword ? '🙈' : '👁️'}
+                      {showPassword ? "🙈" : "👁️"}
                     </button>
                   </div>
                 </motion.div>
               )}
 
-              {/* Register fields */}
+              {/* Extended Fields Container (Register Phase) */}
               {emailExists === false && email.length > 3 && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ duration: 0.4 }}
-                  className="space-y-3 overflow-hidden"
+                  className="space-y-4 overflow-hidden"
                 >
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Full Name *</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">{"Full Name *"}</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
                         <FiUser className="w-4 h-4" />
                       </div>
                       <input
@@ -1061,7 +1142,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                         value={fullname}
                         onChange={(e) => setFullname(e.target.value)}
                         placeholder="John Doe"
-                        className="w-full pl-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        className="w-full pl-10 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
                         required
                         disabled={isSubmitting}
                       />
@@ -1069,51 +1150,51 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Username *</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">{"Username *"}</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
                         <FiUserPlus className="w-4 h-4" />
                       </div>
                       <input
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                        placeholder="john_doe"
-                        className={`w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 transition ${
+                        placeholder="username"
+                        className={`w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950/80 border text-sm text-white focus:outline-none focus:ring-4 transition ${
                           usernameAvailable === true && username.length >= 3
-                            ? 'border-green-500 focus:ring-green-200'
+                            ? 'border-emerald-500/70 focus:ring-emerald-500/10'
                             : usernameAvailable === false && username.length >= 3
-                            ? 'border-red-500 focus:ring-red-200'
-                            : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                            ? 'border-rose-500/70 focus:ring-rose-500/10'
+                            : 'border-slate-800 focus:border-purple-500 focus:ring-purple-500/10'
                         }`}
                         required
                         disabled={isSubmitting}
                       />
                       {isCheckingUsername && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">⏳</span>
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 animate-pulse">⏳</span>
                       )}
                       {!isCheckingUsername && username.length >= 3 && usernameAvailable === true && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-medium">✓ Available</span>
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-emerald-400 font-bold">✓ Available</span>
                       )}
                       {!isCheckingUsername && username.length >= 3 && usernameAvailable === false && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-600 font-medium">✗ Taken</span>
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-rose-400 font-bold">✗ Taken</span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
+                    <p className="mt-1.5 text-[10px] text-slate-500 font-medium">{"3-30 characters: lowercase letters, numbers, underscore."}</p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Password *</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">{"Password *"}</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                         <FiLock className="w-4 h-4" />
                       </div>
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Minimum 6 characters"
-                        className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        placeholder="Choose unique key"
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
                         required
                         disabled={isSubmitting}
                         minLength={6}
@@ -1121,22 +1202,23 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                       >
-                        {showPassword ? '🙈' : '👁️'}
+                        {showPassword ? "🙈" : "👁️"}
                       </button>
                     </div>
+                    
                     {password.length > 0 && (
-                      <div className="mt-1">
-                        <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                      <div className="mt-1.5">
+                        <div className="h-1 w-full bg-slate-850 rounded-full overflow-hidden">
                           <div className={`h-full transition-all duration-300 rounded-full ${
-                            passwordStrength <= 1 ? 'bg-red-500 w-1/4' :
-                            passwordStrength === 2 ? 'bg-yellow-500 w-2/4' :
+                            passwordStrength <= 1 ? 'bg-rose-500 w-1/4' :
+                            passwordStrength === 2 ? 'bg-amber-500 w-2/4' :
                             passwordStrength === 3 ? 'bg-blue-500 w-3/4' :
-                            'bg-green-500 w-full'
+                            'bg-emerald-500 w-full'
                           }`} />
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-[10px] text-slate-500 mt-1 font-bold tracking-wide">
                           Strength: {['Weak', 'Fair', 'Good', 'Strong'][passwordStrength] || 'Weak'}
                         </p>
                       </div>
@@ -1144,118 +1226,121 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Confirm Password *</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">{"Confirm Password *"}</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                         <FiLock className="w-4 h-4" />
                       </div>
                       <input
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full pl-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        placeholder="Confirm password"
+                        className="w-full pl-10 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
                         required
                         disabled={isSubmitting}
                       />
                     </div>
                     {confirmPassword && password && confirmPassword !== password && (
-                      <p className="mt-1 text-xs text-red-500">Passwords do not match.</p>
+                      <p className="mt-1.5 text-[10px] text-rose-400 font-bold">Passwords do not match.</p>
                     )}
                     {confirmPassword && password && confirmPassword === password && (
-                      <p className="mt-1 text-xs text-green-600">✓ Passwords match.</p>
+                      <p className="mt-1.5 text-[10px] text-emerald-400 font-bold">✓ Passwords match.</p>
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Referral Code (optional)</label>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">{"Referral Code (optional)"}</label>
                     <input
                       type="text"
                       value={referralCode}
                       onChange={(e) => setReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                      placeholder="ENTER CODE"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 uppercase transition"
+                      placeholder="ENTER PROMO CODE"
+                      className="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2.5 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 uppercase transition font-bold placeholder:font-normal placeholder:normal-case"
                       disabled={isSubmitting}
                     />
                   </div>
                 </motion.div>
               )}
 
-              {/* Submit */}
+              {/* Submit Buttons */}
               {emailExists !== null && email.length > 3 && (
-                <motion.button
+                <button
                   type="submit"
                   disabled={isSubmitting}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="w-full py-3 bg-primary text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-primary/20 hover:opacity-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                 >
-                  {isSubmitting ? 'Processing...' : emailExists === true ? 'Log In' : 'Create Account'}
-                </motion.button>
+                  {isSubmitting ? 'Processing...' : emailExists === true ? 'Enter Dashboard' : 'Complete Setup'}
+                  <FiArrowRight />
+                </button>
               )}
+              
               {emailExists === null && email.length > 3 && (
                 <button
                   type="button"
                   disabled={isCheckingEmail}
-                  className="w-full py-2.5 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed text-sm"
+                  className="w-full py-3 bg-slate-850 text-slate-500 font-black text-xs uppercase tracking-wider rounded-xl cursor-not-allowed flex items-center justify-center gap-1.5"
                 >
-                  {isCheckingEmail ? 'Verifying...' : 'Enter email to continue'}
+                  {isCheckingEmail ? 'Verifying...' : 'Enter Email to Continue'}
                 </button>
               )}
             </form>
 
             {/* ── Divider ── */}
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-              <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-gray-400">Or continue with</span></div>
+            <div className="relative my-6 select-none">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800" /></div>
+              <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest"><span className="bg-slate-900/60 px-3 text-slate-500">{"Social Authorization"}</span></div>
             </div>
 
-            {/* ── Social buttons ── */}
-            <div className="flex gap-3">
+            {/* ── Social Login Row ── */}
+            <div className="grid grid-cols-2 gap-3">
               <button
+                type="button"
                 onClick={() => handleSocialLogin('google')}
                 disabled={isSocialLoading || isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-800/80 bg-slate-950/40 hover:bg-slate-900/40 hover:border-slate-800 rounded-xl text-xs font-bold text-slate-300 transition disabled:opacity-50"
               >
-                <FaGoogle className="w-4 h-4" />
+                <FaGoogle className="w-3.5 h-3.5 text-rose-500" />
                 Google
               </button>
               <button
+                type="button"
                 onClick={() => handleSocialLogin('facebook')}
                 disabled={isSocialLoading || isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-800/80 bg-slate-950/40 hover:bg-slate-900/40 hover:border-slate-800 rounded-xl text-xs font-bold text-slate-300 transition disabled:opacity-50"
               >
-                <FaFacebook className="w-4 h-4" />
+                <FaFacebook className="w-3.5 h-3.5 text-blue-500" />
                 Facebook
               </button>
             </div>
 
-            {/* ── Switch links ── */}
-            <div className="mt-3 text-center text-xs text-gray-400">
+            {/* ── Navigation Trigger Switch links ── */}
+            <div className="mt-5 text-center text-xs">
               {emailExists === false && email.length > 3 ? (
-                <>
-                  Already have an account?{' '}
+                <div className="text-slate-500 font-medium">
+                  {"Already have an account?"}{' '}
                   <button
                     type="button"
                     onClick={() => { setEmailExists(null); setPassword(''); setError(''); }}
-                    className="text-purple-600 hover:underline font-medium"
+                    className="text-purple-400 hover:text-purple-300 font-black hover:underline transition"
                   >
-                    Use a different email
+                    {"Change Email"}
                   </button>
-                </>
+                </div>
               ) : emailExists === true ? (
-                <>
-                  New here?{' '}
+                <div className="text-slate-500 font-medium">
+                  {"New to Make Trend?"}{' '}
                   <button
                     type="button"
                     onClick={() => { setEmailExists(null); setPassword(''); setFullname(''); setUsername(''); setError(''); }}
-                    className="text-purple-600 hover:underline font-medium"
+                    className="text-purple-400 hover:text-purple-300 font-black hover:underline transition"
                   >
-                    Create an account
+                    {"Create an Account"}
                   </button>
-                </>
+                </div>
               ) : null}
             </div>
+
           </div>
         </motion.div>
       </div>
