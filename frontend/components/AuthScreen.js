@@ -1,10 +1,13 @@
 // components/AuthScreen.js
 // ============================================================
 // FINAL UI: MAKE TREND Hero Title, Professional Design
+// FULL VIEWPORT – No navbar/bottom nav interference
 // Auth Context + UI Component (data fetching moved to lib/useAppData.js)
+// Meta tags for SEO, success animations, smart redirect
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/router';
 import {
   auth,
   onAuthStateChanged,
@@ -17,6 +20,8 @@ import {
   FacebookAuthProvider,
 } from '../services/firebase';
 import { useAppData } from '../lib/useAppData';
+import Meta from '../components/Meta';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
@@ -393,9 +398,10 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI COMPONENT (FINAL – UNCHANGED)
+// AUTH SCREEN UI COMPONENT (FULL VIEWPORT)
 // ============================================================
-export default function AuthScreen({ onSuccess }) {
+export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
+  const router = useRouter();
   const {
     login,
     register,
@@ -407,6 +413,7 @@ export default function AuthScreen({ onSuccess }) {
     user,
   } = useAuth();
 
+  // ── State ──
   const [email, setEmail] = useState('');
   const [emailExists, setEmailExists] = useState(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -432,9 +439,34 @@ export default function AuthScreen({ onSuccess }) {
   const [resetSent, setResetSent] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
 
+  // ── Success animation ──
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
   const emailTimerRef = useRef(null);
   const usernameTimerRef = useRef(null);
 
+  // ── Redirect logic ──
+  const performRedirect = useCallback(() => {
+    if (redirectTo && redirectTo !== '/login' && redirectTo !== '/register') {
+      router.push(redirectTo);
+    } else if (user && user.completed) {
+      router.push('/profile');
+    } else {
+      router.push('/');
+    }
+  }, [redirectTo, router, user]);
+
+  // ── Show success and redirect ──
+  const handleSuccess = (msg = 'Welcome to Make Trend! 🎉') => {
+    setSuccessMessage(msg);
+    setShowSuccess(true);
+    setTimeout(() => {
+      performRedirect();
+    }, 1500);
+  };
+
+  // ── Check for social completion on mount ──
   useEffect(() => {
     if (user && user.completed === false && !needsSocialCompletion) {
       setSocialUser(user);
@@ -444,6 +476,7 @@ export default function AuthScreen({ onSuccess }) {
     }
   }, [user, needsSocialCompletion]);
 
+  // ── Email check ──
   useEffect(() => {
     if (email.length > 3 && email.includes('@') && !needsSocialCompletion) {
       clearTimeout(emailTimerRef.current);
@@ -472,6 +505,7 @@ export default function AuthScreen({ onSuccess }) {
     return () => clearTimeout(emailTimerRef.current);
   }, [email, needsSocialCompletion]);
 
+  // ── Username check ──
   const usernameToCheck = needsSocialCompletion ? socialUsername : username;
   const isRegisterMode = (emailExists === false && email.length > 3) || needsSocialCompletion;
 
@@ -500,6 +534,7 @@ export default function AuthScreen({ onSuccess }) {
     return () => clearTimeout(usernameTimerRef.current);
   }, [isRegisterMode, usernameToCheck]);
 
+  // ── Password strength ──
   useEffect(() => {
     if (!password) { setPasswordStrength(0); return; }
     let score = 0;
@@ -510,6 +545,7 @@ export default function AuthScreen({ onSuccess }) {
     setPasswordStrength(score);
   }, [password]);
 
+  // ── Social login handler ──
   const handleSocialLogin = async (provider) => {
     setError('');
     const result = await socialLogin(provider);
@@ -522,13 +558,15 @@ export default function AuthScreen({ onSuccess }) {
         setNeedsSocialCompletion(true);
         setError('');
       } else {
-        onSuccess?.();
+        handleSuccess('Logged in successfully! 🎉');
+        if (onSuccess) onSuccess();
       }
     } else {
       setError(result.error || `Failed to sign in with ${provider}.`);
     }
   };
 
+  // ── Social completion handler ──
   const handleSocialCompletion = async (e) => {
     e.preventDefault();
     setError('');
@@ -575,26 +613,40 @@ export default function AuthScreen({ onSuccess }) {
     const result = await completeSocialProfile(socialFullname, socialUsername, avatarUrl);
     if (result.success) {
       setNeedsSocialCompletion(false);
-      onSuccess?.();
+      handleSuccess('Profile completed! 🎉');
+      if (onSuccess) onSuccess();
     } else {
       setError(result.error || 'Failed to complete profile.');
     }
     setIsSubmitting(false);
   };
 
+  // ── Email/password form submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
     if (emailExists === true) {
+      // Login
       const result = await login(email, password);
       if (result.success) {
-        onSuccess?.();
+        if (user && user.completed === false) {
+          // If profile not completed, set needsSocialCompletion to true
+          setSocialUser(user);
+          setSocialFullname(user.displayName || '');
+          setSocialAvatarPreview(user.photoURL || '');
+          setNeedsSocialCompletion(true);
+          setIsSubmitting(false);
+          return;
+        }
+        handleSuccess('Welcome back! 🎉');
+        if (onSuccess) onSuccess();
       } else {
         setError(result.error || 'Login failed.');
       }
     } else {
+      // Register
       if (fullname.length < 2) {
         setError('Full name must be at least 2 characters.');
         setIsSubmitting(false);
@@ -640,12 +692,12 @@ export default function AuthScreen({ onSuccess }) {
         if (avatarFile) {
           try {
             const uploadedUrl = await uploadAvatar(avatarFile);
-            onSuccess?.();
           } catch (err) {
             console.warn('Avatar upload after registration failed:', err);
           }
         }
-        onSuccess?.();
+        handleSuccess('Account created! 🎉');
+        if (onSuccess) onSuccess();
       } else {
         setError(result.error || 'Registration failed.');
       }
@@ -653,6 +705,7 @@ export default function AuthScreen({ onSuccess }) {
     setIsSubmitting(false);
   };
 
+  // ── Avatar handler ──
   const handleAvatarChange = (e, type = 'register') => {
     const file = e.target.files[0];
     if (!file) return;
@@ -667,6 +720,7 @@ export default function AuthScreen({ onSuccess }) {
       e.target.value = '';
       return;
     }
+    setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
       if (type === 'register') {
@@ -680,6 +734,7 @@ export default function AuthScreen({ onSuccess }) {
     reader.readAsDataURL(file);
   };
 
+  // ── Reset password ──
   const handleResetPassword = async () => {
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address.');
@@ -695,240 +750,50 @@ export default function AuthScreen({ onSuccess }) {
     }
   };
 
-  // ── SOCIAL COMPLETION RENDER ──
+  // ── RENDER: SOCIAL COMPLETION ──
   if (needsSocialCompletion) {
     return (
-      <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
-          <div className="flex flex-col items-center mb-6">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
-              {socialAvatarPreview ? (
-                <img src={socialAvatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                </svg>
-              )}
-            </div>
-            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-primary/50">
-              Upload Profile Picture
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'social')} disabled={isSubmitting} />
-            </label>
-          </div>
-
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Complete Your Profile</h2>
-          <p className="text-sm text-center text-gray-400 mb-6">One more step to get started</p>
-
-          {error && (
-            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-slideDown">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSocialCompletion} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-              <input
-                type="text"
-                value={socialFullname}
-                onChange={(e) => setSocialFullname(e.target.value)}
-                placeholder="John Doe"
-                className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={socialUsername}
-                  onChange={(e) => setSocialUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                  placeholder="john_doe"
-                  className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition ${
-                    usernameAvailable === true && socialUsername.length >= 3
-                      ? 'border-green-500 focus:ring-green-200'
-                      : usernameAvailable === false && socialUsername.length >= 3
-                      ? 'border-red-500 focus:ring-red-200'
-                      : 'border-border focus:border-primary focus:ring-primary/20'
-                  }`}
-                  required
-                  disabled={isSubmitting}
-                />
-                {isCheckingUsername && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                    <span className="animate-pulse">⏳</span>
-                  </span>
-                )}
-                {!isCheckingUsername && socialUsername.length >= 3 && usernameAvailable === true && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
-                )}
-                {!isCheckingUsername && socialUsername.length >= 3 && usernameAvailable === false && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
+      <>
+        <Meta
+          title="Complete Profile | Make Trend"
+          description="Complete your Make Trend profile to get started."
+        />
+        <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-purple-50 via-white to-indigo-50">
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl border border-white/50 backdrop-blur-sm transition-all duration-300 hover:shadow-xl">
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
+                {socialAvatarPreview ? (
+                  <img src={socialAvatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
                 )}
               </div>
-              <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
+              <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-primary/50">
+                Upload Profile Picture
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'social')} disabled={isSubmitting} />
+              </label>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <div className="w-full rounded-lg border border-border bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
-                {socialUser?.email || '—'}
+            <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Complete Your Profile</h2>
+            <p className="text-sm text-center text-gray-400 mb-6">One more step to get started</p>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-slideDown">
+                {error}
               </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50"
-            >
-              {isSubmitting ? 'Saving...' : 'Complete Profile'}
-            </button>
-
-            <p className="mt-4 text-center text-xs text-gray-400">
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={() => { setNeedsSocialCompletion(false); setSocialUser(null); setError(''); }}
-                className="text-primary hover:underline font-medium"
-              >
-                Back to login
-              </button>
-            </p>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // ── MAIN LOGIN/REGISTER RENDER ──
-  return (
-    <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-12 animate-fadeIn">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-border transition-all duration-300 hover:shadow-md">
-        <div className="text-center mb-4">
-          <h1 className="hero-title">
-            <span className="make-word">MAKE</span>
-            <span className="trend-word">TREND</span>
-          </h1>
-        </div>
-
-        {emailExists === false && email.length > 3 && (
-          <div className="flex flex-col items-center mb-3 animate-slideDown">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
-              {avatarPreview ? (
-                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                </svg>
-              )}
-            </div>
-            <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-primary/50">
-              Upload Profile Picture
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
-            </label>
-            <p className="text-sm text-gray-500 mt-2">Create your account in seconds</p>
-          </div>
-        )}
-
-        <div className="text-center mb-3">
-          <p className="text-sm text-gray-400">
-            {emailExists === true ? 'Welcome back! Enter your password.' :
-             emailExists === false && email.length > 3 ? 'Enter your details to get started' :
-             'Enter your email to get started'}
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-slideDown">
-            {error}
-          </div>
-        )}
-        {resetSent && (
-          <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-600 animate-slideDown">
-            ✅ Password reset link sent!
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-            <div className="relative">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition ${
-                  emailExists === true && email.length > 3
-                    ? 'border-green-500 focus:ring-green-200 bg-green-50'
-                    : emailExists === false && email.length > 3
-                    ? 'border-primary focus:ring-primary/20 bg-primary/5'
-                    : emailError
-                    ? 'border-red-500 focus:ring-red-200'
-                    : 'border-border focus:border-primary focus:ring-primary/20'
-                }`}
-                disabled={isSubmitting}
-                required
-              />
-              {isCheckingEmail && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                  <span className="animate-pulse">⏳</span>
-                </span>
-              )}
-              {!isCheckingEmail && email.length > 3 && emailExists === true && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Exists</span>
-              )}
-              {!isCheckingEmail && email.length > 3 && emailExists === false && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-primary font-medium">New ✨</span>
-              )}
-            </div>
-            {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
-            {emailExists === true && email.length > 3 && (
-              <p className="mt-1 text-xs text-gray-400">
-                Existing account — enter your password below.
-                <button type="button" onClick={handleResetPassword} className="ml-1 text-primary hover:underline">Forgot password?</button>
-              </p>
             )}
-          </div>
 
-          {emailExists === true && (
-            <div className="animate-slideDown">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 pr-10 transition"
-                  required
-                  disabled={isSubmitting}
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? '🙈' : '👁️'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {emailExists === false && email.length > 3 && (
-            <div className="space-y-3 animate-slideDown">
+            <form onSubmit={handleSocialCompletion} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                 <input
                   type="text"
-                  value={fullname}
-                  onChange={(e) => setFullname(e.target.value)}
+                  value={socialFullname}
+                  onChange={(e) => setSocialFullname(e.target.value)}
                   placeholder="John Doe"
-                  className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                   required
                   disabled={isSubmitting}
                 />
@@ -939,15 +804,15 @@ export default function AuthScreen({ onSuccess }) {
                 <div className="relative">
                   <input
                     type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    value={socialUsername}
+                    onChange={(e) => setSocialUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     placeholder="john_doe"
                     className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition ${
-                      usernameAvailable === true && username.length >= 3
+                      usernameAvailable === true && socialUsername.length >= 3
                         ? 'border-green-500 focus:ring-green-200'
-                        : usernameAvailable === false && username.length >= 3
+                        : usernameAvailable === false && socialUsername.length >= 3
                         ? 'border-red-500 focus:ring-red-200'
-                        : 'border-border focus:border-primary focus:ring-primary/20'
+                        : 'border-gray-300 focus:border-primary focus:ring-primary/20'
                     }`}
                     required
                     disabled={isSubmitting}
@@ -957,10 +822,10 @@ export default function AuthScreen({ onSuccess }) {
                       <span className="animate-pulse">⏳</span>
                     </span>
                   )}
-                  {!isCheckingUsername && username.length >= 3 && usernameAvailable === true && (
+                  {!isCheckingUsername && socialUsername.length >= 3 && usernameAvailable === true && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
                   )}
-                  {!isCheckingUsername && username.length >= 3 && usernameAvailable === false && (
+                  {!isCheckingUsername && socialUsername.length >= 3 && usernameAvailable === false && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
                   )}
                 </div>
@@ -968,14 +833,182 @@ export default function AuthScreen({ onSuccess }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <div className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
+                  {socialUser?.email || '—'}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Saving...' : 'Complete Profile'}
+              </button>
+
+              <p className="mt-4 text-center text-xs text-gray-400">
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => { setNeedsSocialCompletion(false); setSocialUser(null); setError(''); }}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Back to login
+                </button>
+              </p>
+            </form>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── RENDER: SUCCESS OVERLAY ──
+  if (showSuccess) {
+    return (
+      <>
+        <Meta
+          title="Success | Make Trend"
+          description="You have successfully logged in to Make Trend."
+        />
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-indigo-50">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            className="text-center"
+          >
+            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">{successMessage}</h2>
+            <p className="text-gray-500 mt-1">Redirecting...</p>
+          </motion.div>
+        </div>
+      </>
+    );
+  }
+
+  // ── RENDER: MAIN LOGIN/REGISTER ──
+  return (
+    <>
+      <Meta
+        title={emailExists === true ? "Login | Make Trend" : "Sign Up | Make Trend"}
+        description={emailExists === true 
+          ? "Sign in to your Make Trend account to create and manage campaigns."
+          : "Create your Make Trend account and start launching viral campaigns."
+        }
+      />
+      <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-purple-50 via-white to-indigo-50">
+        <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl border border-white/50 backdrop-blur-sm transition-all duration-300 hover:shadow-xl">
+          
+          {/* ── Hero Title ── */}
+          <div className="text-center mb-6">
+            <h1 className="hero-title">
+              <span className="make-word">MAKE</span>
+              <span className="trend-word">TREND</span>
+            </h1>
+          </div>
+
+          {/* ── Avatar (only in register mode) ── */}
+          {emailExists === false && email.length > 3 && (
+            <div className="flex flex-col items-center mb-4 animate-fadeIn">
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center shadow-sm">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                )}
+              </div>
+              <label className="mt-2 cursor-pointer text-sm font-medium text-primary hover:text-primary/80 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-primary/50">
+                Upload Profile Picture
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
+              </label>
+              <p className="text-sm text-gray-500 mt-2">Create your account in seconds</p>
+            </div>
+          )}
+
+          {/* ── Subtitle ── */}
+          <div className="text-center mb-4">
+            <p className="text-sm text-gray-400">
+              {emailExists === true ? 'Welcome back! Enter your password.' :
+               emailExists === false && email.length > 3 ? 'Enter your details to get started' :
+               'Enter your email to get started'}
+            </p>
+          </div>
+
+          {/* ── Error / Success ── */}
+          {error && (
+            <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 animate-fadeIn">
+              {error}
+            </div>
+          )}
+          {resetSent && (
+            <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-600 animate-fadeIn">
+              ✅ Password reset link sent!
+            </div>
+          )}
+
+          {/* ── Form ── */}
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition ${
+                    emailExists === true && email.length > 3
+                      ? 'border-green-500 focus:ring-green-200 bg-green-50'
+                      : emailExists === false && email.length > 3
+                      ? 'border-primary focus:ring-primary/20 bg-primary/5'
+                      : emailError
+                      ? 'border-red-500 focus:ring-red-200'
+                      : 'border-gray-300 focus:border-primary focus:ring-primary/20'
+                  }`}
+                  disabled={isSubmitting}
+                  required
+                />
+                {isCheckingEmail && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                    <span className="animate-pulse">⏳</span>
+                  </span>
+                )}
+                {!isCheckingEmail && email.length > 3 && emailExists === true && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Exists</span>
+                )}
+                {!isCheckingEmail && email.length > 3 && emailExists === false && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-primary font-medium">New ✨</span>
+                )}
+              </div>
+              {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
+              {emailExists === true && email.length > 3 && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Existing account — enter your password below.
+                  <button type="button" onClick={handleResetPassword} className="ml-1 text-primary hover:underline">Forgot password?</button>
+                </p>
+              )}
+            </div>
+
+            {/* Login Password */}
+            {emailExists === true && (
+              <div className="animate-fadeIn">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 pr-10 transition"
+                    placeholder="••••••••"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 pr-10 transition"
                     required
                     disabled={isSubmitting}
                     minLength={6}
@@ -988,137 +1021,215 @@ export default function AuthScreen({ onSuccess }) {
                     {showPassword ? '🙈' : '👁️'}
                   </button>
                 </div>
-                {password.length > 0 && (
-                  <div className="mt-1">
-                    <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                      <div className={`h-full transition-all duration-300 rounded-full ${
-                        passwordStrength <= 1 ? 'bg-red-500 w-1/4' :
-                        passwordStrength === 2 ? 'bg-yellow-500 w-2/4' :
-                        passwordStrength === 3 ? 'bg-blue-500 w-3/4' :
-                        'bg-green-500 w-full'
-                      }`} />
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Strength: {
-                        passwordStrength <= 1 ? 'Weak' :
-                        passwordStrength === 2 ? 'Fair' :
-                        passwordStrength === 3 ? 'Good' :
-                        'Strong'
-                      }
-                    </p>
+              </div>
+            )}
+
+            {/* Register Fields */}
+            {emailExists === false && email.length > 3 && (
+              <div className="space-y-3 animate-fadeIn">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    value={fullname}
+                    onChange={(e) => setFullname(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                      placeholder="john_doe"
+                      className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition ${
+                        usernameAvailable === true && username.length >= 3
+                          ? 'border-green-500 focus:ring-green-200'
+                          : usernameAvailable === false && username.length >= 3
+                          ? 'border-red-500 focus:ring-red-200'
+                          : 'border-gray-300 focus:border-primary focus:ring-primary/20'
+                      }`}
+                      required
+                      disabled={isSubmitting}
+                    />
+                    {isCheckingUsername && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                        <span className="animate-pulse">⏳</span>
+                      </span>
+                    )}
+                    {!isCheckingUsername && username.length >= 3 && usernameAvailable === true && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
+                    )}
+                    {!isCheckingUsername && username.length >= 3 && usernameAvailable === false && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
+                    )}
                   </div>
-                )}
-              </div>
+                  <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
-                  required
-                  disabled={isSubmitting}
-                />
-                {confirmPassword && password && confirmPassword !== password && (
-                  <p className="mt-1 text-xs text-red-500">Passwords do not match.</p>
-                )}
-                {confirmPassword && password && confirmPassword === password && (
-                  <p className="mt-1 text-xs text-green-600">✓ Passwords match.</p>
-                )}
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 pr-10 transition"
+                      required
+                      disabled={isSubmitting}
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                  {password.length > 0 && (
+                    <div className="mt-1">
+                      <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div className={`h-full transition-all duration-300 rounded-full ${
+                          passwordStrength <= 1 ? 'bg-red-500 w-1/4' :
+                          passwordStrength === 2 ? 'bg-yellow-500 w-2/4' :
+                          passwordStrength === 3 ? 'bg-blue-500 w-3/4' :
+                          'bg-green-500 w-full'
+                        }`} />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Strength: {
+                          passwordStrength <= 1 ? 'Weak' :
+                          passwordStrength === 2 ? 'Fair' :
+                          passwordStrength === 3 ? 'Good' :
+                          'Strong'
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Referral Code (optional)</label>
-                <input
-                  type="text"
-                  value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                  placeholder="ENTER CODE"
-                  className="w-full rounded-lg border border-border px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 uppercase transition"
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
-          )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                    required
+                    disabled={isSubmitting}
+                  />
+                  {confirmPassword && password && confirmPassword !== password && (
+                    <p className="mt-1 text-xs text-red-500">Passwords do not match.</p>
+                  )}
+                  {confirmPassword && password && confirmPassword === password && (
+                    <p className="mt-1 text-xs text-green-600">✓ Passwords match.</p>
+                  )}
+                </div>
 
-          {emailExists !== null && email.length > 3 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Referral Code (optional)</label>
+                  <input
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                    placeholder="ENTER CODE"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 uppercase transition"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            {emailExists !== null && email.length > 3 && (
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-1 hover:-translate-y-0.5"
+              >
+                {isSubmitting ? 'Processing...' : emailExists === true ? 'Log In' : 'Create Account'}
+              </button>
+            )}
+
+            {emailExists === null && email.length > 3 && (
+              <button
+                type="button"
+                disabled={isCheckingEmail}
+                className="w-full rounded-lg bg-gray-200 py-3 text-sm font-semibold text-gray-500 cursor-not-allowed"
+              >
+                {isCheckingEmail ? 'Verifying...' : 'Enter email to continue'}
+              </button>
+            )}
+          </form>
+
+          {/* ── Divider ── */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">Or continue with</span></div>
+          </div>
+
+          {/* ── Social Buttons ── */}
+          <div className="flex gap-3">
             <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+              onClick={() => handleSocialLogin('google')}
+              disabled={isSocialLoading || isSubmitting}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
             >
-              {isSubmitting ? 'Processing...' : emailExists === true ? 'Log In' : 'Create Account'}
+              <svg className="h-4 w-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Google
             </button>
-          )}
-
-          {emailExists === null && email.length > 3 && (
             <button
-              type="button"
-              disabled={isCheckingEmail}
-              className="w-full rounded-lg bg-gray-200 py-3 text-sm font-semibold text-gray-500 cursor-not-allowed"
+              onClick={() => handleSocialLogin('facebook')}
+              disabled={isSocialLoading || isSubmitting}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
             >
-              {isCheckingEmail ? 'Verifying...' : 'Enter email to continue'}
+              <svg className="h-4 w-4" fill="#1877F2" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              Facebook
             </button>
-          )}
-        </form>
+          </div>
 
-        <div className="relative my-5">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-          <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">Or continue with</span></div>
+          {/* ── Switch links ── */}
+          {emailExists === false && email.length > 3 && (
+            <p className="mt-4 text-center text-xs text-gray-400">
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={() => { setEmailExists(null); setPassword(''); setError(''); }}
+                className="text-primary hover:underline font-medium"
+              >
+                Use a different email
+              </button>
+            </p>
+          )}
+          {emailExists === true && (
+            <p className="mt-4 text-center text-xs text-gray-400">
+              New here?{' '}
+              <button
+                type="button"
+                onClick={() => { setEmailExists(null); setPassword(''); setFullname(''); setUsername(''); setError(''); }}
+                className="text-primary hover:underline font-medium"
+              >
+                Create an account
+              </button>
+            </p>
+          )}
         </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => handleSocialLogin('google')}
-            disabled={isSocialLoading || isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Google
-          </button>
-          <button
-            onClick={() => handleSocialLogin('facebook')}
-            disabled={isSocialLoading || isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
-          >
-            <svg className="h-4 w-4" fill="#1877F2" viewBox="0 0 24 24">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-            </svg>
-            Facebook
-          </button>
-        </div>
-
-        {emailExists === false && email.length > 3 && (
-          <p className="mt-4 text-center text-xs text-gray-400">
-            Already have an account?{' '}
-            <button
-              type="button"
-              onClick={() => { setEmailExists(null); setPassword(''); setError(''); }}
-              className="text-primary hover:underline font-medium"
-            >
-              Use a different email
-            </button>
-          </p>
-        )}
-        {emailExists === true && (
-          <p className="mt-4 text-center text-xs text-gray-400">
-            New here?{' '}
-            <button
-              type="button"
-              onClick={() => { setEmailExists(null); setPassword(''); setFullname(''); setUsername(''); setError(''); }}
-              className="text-primary hover:underline font-medium"
-            >
-              Create an account
-            </button>
-          </p>
-        )}
       </div>
 
       <style jsx>{`
@@ -1131,7 +1242,6 @@ export default function AuthScreen({ onSuccess }) {
           to { opacity: 1; transform: translateY(0); }
         }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .animate-slideDown { animation: slideDown 0.3s ease-out; }
         .hero-title {
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           font-size: clamp(32px, 6vw, 60px);
@@ -1168,6 +1278,6 @@ export default function AuthScreen({ onSuccess }) {
           }
         }
       `}</style>
-    </div>
+    </>
   );
 }
