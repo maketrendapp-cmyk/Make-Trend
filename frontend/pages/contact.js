@@ -19,13 +19,19 @@ import {
   FiPhone,
   FiGlobe,
   FiHeart,
+  FiSend as FiSendIcon,
 } from 'react-icons/fi';
 import { FaWhatsapp, FaTelegram, FaTwitter } from 'react-icons/fa';
 
 export default function Contact() {
-  const { user } = useAuth();
+  const { user, profile: contextProfile } = useAuth();
+
+  // ── Get username for welcome message ──
+  const username = contextProfile?.username || user?.username || user?.email?.split('@')[0] || 'User';
+  const displayName = contextProfile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
+
   const [formData, setFormData] = useState({
-    name: user?.fullName || '',  // ← changed from fullname to fullName
+    name: user?.fullName || user?.fullname || '',
     email: user?.email || '',
     subject: '',
     message: '',
@@ -102,7 +108,7 @@ export default function Contact() {
         `Name: ${formData.name}\nEmail: ${formData.email}\n\nMessage:\n${formData.message}`
       );
       
-      window.location.href = `mailto:maketrendcustomersupport@gmail.com?subject=${subject}&body=${body}`;
+      window.location.href = `mailto:maketrendsupport@gmail.com?subject=${subject}&body=${body}`;
       
       setToastMessage('📧 Opening your email app! Feel free to send us your message.');
       setToastType('success');
@@ -111,7 +117,7 @@ export default function Contact() {
       
       // Reset form after successful send
       setFormData({
-        name: user?.fullName || '',  // ← changed from fullname to fullName
+        name: user?.fullName || user?.fullname || '',
         email: user?.email || '',
         subject: '',
         message: '',
@@ -125,6 +131,11 @@ export default function Contact() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // ── Email handler for direct button ──
+  const handleEmailNow = () => {
+    window.location.href = 'mailto:maketrendsupport@gmail.com?subject=Make Trend Support Inquiry';
   };
 
   const containerVariants = {
@@ -182,8 +193,8 @@ export default function Contact() {
     {
       icon: <FiMail className="w-6 h-6" />,
       title: 'Email',
-      value: 'maketrendcustomersupport@gmail.com',
-      link: 'mailto:maketrendcustomersupport@gmail.com',
+      value: 'maketrendsupport@gmail.com',
+      link: 'mailto:maketrendsupport@gmail.com',
       color: 'bg-purple-100 text-purple-600 hover:bg-purple-200',
     },
     {
@@ -198,7 +209,7 @@ export default function Contact() {
   return (
     <>
       <Meta
-        title="Contact Us"
+        title="Contact Us | Make Trend"
         description="Get in touch with Make Trend support. We're here to help you with any questions or issues."
         image="https://maketrend.vercel.app/og-contact.jpg"
         url="https://maketrend.vercel.app/contact"
@@ -242,6 +253,27 @@ export default function Contact() {
             >
               We'd love to hear from you. Send us a message and we'll respond as soon as possible.
             </motion.p>
+
+            {/* ── Welcome Message ── */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mt-6 inline-flex items-center gap-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-2xl px-6 py-3 shadow-lg"
+            >
+              <FiUser className="w-5 h-5 text-purple-600" />
+              <span className="text-gray-700 font-medium">
+                Welcome,{' '}
+                <span className="font-bold text-purple-700">
+                  @{user ? username : 'User'}
+                </span>
+                {user && (
+                  <span className="text-gray-400 text-sm ml-1">
+                    ({displayName})
+                  </span>
+                )}
+              </span>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -464,6 +496,22 @@ export default function Contact() {
                   <div className="flex items-start gap-2 text-gray-600">
                     <FiGlobe className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
                     <span>Available worldwide</span>
+                  </div>
+                  {/* Email button in quick info */}
+                  <div className="pt-2 mt-2 border-t border-gray-200/50">
+                    <button
+                      onClick={handleEmailNow}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-xl hover:shadow-lg transition-all duration-200 shadow-md hover:-translate-y-0.5 text-sm"
+                    >
+                      <FiSendIcon className="w-4 h-4" />
+                      Email Now
+                    </button>
+                    <p className="text-xs text-gray-400 mt-1.5 text-center">
+                      or directly at{' '}
+                      <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-700 border border-gray-200 text-xs">
+                        maketrendsupport@gmail.com
+                      </code>
+                    </p>
                   </div>
                 </div>
               </motion.div>
