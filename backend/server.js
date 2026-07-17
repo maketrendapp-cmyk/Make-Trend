@@ -1,4 +1,12 @@
 // backend/server.js
+// ============================================================
+// COMPLETE PRODUCTION BACKEND
+// Security: Helmet, CORS, Rate Limiting, XSS Protection, JWT
+// Cache: Infinite Redis (cache until change)
+// Duplicate Prevention: IP + UserID tracking (silent – no frontend errors)
+// Stats: Auto-invalidates on campaign create/update/delete
+// ============================================================
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -8,9 +16,56 @@ const admin = require('firebase-admin');
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const streamifier = require('streamifier');
+const Redis = require('ioredis');
 
 // ============================================================
-// 1. INITIALIZE FIREBASE ADMIN SDK
+// 0. REDIS CLIENT (Infinite Cache)
+// ============================================================
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+redis.on('connect', () => console.log('✅ Redis connected (infinite cache mode)'));
+redis.on('error', (err) => console.error('❌ Redis error:', err));
+
+async function getOrSetCache(key, fetchFn) {
+  try {
+    const cached = await redis.get(key);
+    if (cached) {
+      console.log(`📦 Cache HIT: ${key}`);
+      return JSON.parse(cached);
+    }
+    console.log(`📡 Cache MISS: ${key}`);
+    const data = await fetchFn();
+    await redis.set(key, JSON.stringify(data));
+    return data;
+  } catch (error) {
+    console.error(`❌ Cache error for ${key}:`, error);
+    return await fetchFn();
+  }
+}
+
+async function invalidateKey(key) {
+  try {
+    await redis.del(key);
+    console.log(`🗑️ Cache invalidated: ${key}`);
+  } catch (error) {
+    console.error(`❌ Cache invalidation error for ${key}:`, error);
+  }
+}
+
+async function invalidatePattern(pattern) {
+  try {
+    const keys = await redis.keys(pattern);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+      console.log(`🗑️ Cache invalidated: ${pattern} (${keys.length} keys)`);
+    }
+  } catch (error) {
+    console.error(`❌ Cache invalidation error for ${pattern}:`, error);
+  }
+}
+
+// ============================================================
+// 1. FIREBASE ADMIN SDK
 // ============================================================
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -22,17 +77,17 @@ if (!admin.apps.length) {
   });
 }
 const db = admin.firestore();
-console.log('🔥 Firebase Admin SDK initialized');
+console.log('✅ Firebase Admin SDK initialized');
 
 // ============================================================
-// 2. INITIALIZE CLOUDINARY
+// 2. CLOUDINARY
 // ============================================================
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-console.log('☁️ Cloudinary initialized');
+console.log('✅ Cloudinary initialized');
 
 // ============================================================
 // 3. MULTER SETUP
@@ -55,34 +110,53 @@ const upload = multer({
 // 4. EXPRESS APP
 // ============================================================
 const app = express();
-app.set('trust proxy', 1); // ✅ Add this line
+app.set('trust proxy', 1);
 
 // ============================================================
 // 5. HELMET (Security Headers)
 // ============================================================
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'"],
+    },
+  },
+}));
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 
 // ============================================================
-// 6. CORS (Allow multiple domains)
+// 6. CORS
 // ============================================================
 const allowedOrigins = [
   process.env.CLIENT_URL || 'https://maketrend.vercel.app',
   'https://make-trend-system.vercel.app',
   'https://maketrend.vercel.app',
   'https://make-trend.vercel.app',
-  'http://localhost:3000',
-  // Add your admin domain here if different
-  // 'https://admin.maketrend.vercel.app',
 ];
+
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:3000');
+}
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn('Blocked by CORS:', origin);
+      console.warn('🚫 Blocked by CORS:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -102,11 +176,50 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many requests, please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/check-email', strictLimiter);
+app.use('/api/auth/check-username', strictLimiter);
+
 // ============================================================
-// 8. BODY PARSERS
+// 8. BODY PARSERS & SANITIZATION
 // ============================================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use((req, res, next) => {
+  if (req.query) {
+    Object.keys(req.query).forEach(key => {
+      if (typeof req.query[key] === 'string') {
+        req.query[key] = req.query[key].replace(/[<>]/g, '').trim();
+      }
+    });
+  }
+  if (req.body) {
+    Object.keys(req.body).forEach(key => {
+      if (typeof req.body[key] === 'string') {
+        req.body[key] = req.body[key].replace(/[<>]/g, '').trim();
+      }
+    });
+  }
+  next();
+});
 
 // ============================================================
 // 9. HEALTH CHECK
@@ -116,29 +229,1484 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// 10. ROUTES
+// 10. HELPER FUNCTIONS
 // ============================================================
-const apiRoutes = require('./routes/route');
-app.use('/api', apiRoutes);
 
-// ============================================================
-// 11. CLOUDINARY UPLOAD ROUTE
-// ============================================================
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
+    return res.status(401).json({ success: false, error: 'Unauthorized: No token provided' });
   }
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    req.user = decoded;
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken;
     next();
-  } catch {
-    return res.status(403).json({ success: false, error: 'Invalid token' });
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    return res.status(403).json({ success: false, error: 'Invalid or expired token' });
   }
 };
 
+async function isAdmin(uid) {
+  try {
+    const user = await admin.auth().getUser(uid);
+    return user.customClaims?.admin === true;
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeUsername(str) {
+  if (!str) return '';
+  return String(str).replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+}
+
+function sanitizeFullName(str) {
+  if (!str) return '';
+  return String(str).replace(/[^a-zA-Z0-9 ]/g, '').trim();
+}
+
+function sanitizeReferralCode(str) {
+  if (!str) return '';
+  return String(str).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
+function sanitizeCommentInput(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .trim();
+}
+
+function generateReferralCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+async function generateUniqueReferralCode() {
+  let code;
+  let exists = true;
+  let attempts = 0;
+  while (exists && attempts < 10) {
+    code = generateReferralCode();
+    const snapshot = await db.collection('users').where('referralCode', '==', code).limit(1).get();
+    exists = !snapshot.empty;
+    attempts++;
+  }
+  if (exists) {
+    code = generateReferralCode() + Date.now().toString(36).toUpperCase().slice(-2);
+  }
+  return code;
+}
+
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+         req.headers['x-real-ip'] ||
+         req.ip ||
+         req.connection?.remoteAddress ||
+         'unknown';
+}
+
+async function hasPerformedAction(campaignId, userId, ip, actionType) {
+  try {
+    const docId = userId ? `user_${userId}` : `ip_${ip}`;
+    const doc = await db.collection('campaigns').doc(campaignId)
+      .collection(actionType)
+      .doc(docId)
+      .get();
+    return doc.exists;
+  } catch (error) {
+    console.error(`❌ Check ${actionType} error:`, error);
+    return false;
+  }
+}
+
+async function recordAction(campaignId, userId, ip, actionType) {
+  try {
+    const docId = userId ? `user_${userId}` : `ip_${ip}`;
+    await db.collection('campaigns').doc(campaignId)
+      .collection(actionType)
+      .doc(docId)
+      .set({
+        userId: userId || null,
+        ip: ip || 'unknown',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    return true;
+  } catch (error) {
+    console.error(`❌ Record ${actionType} error:`, error);
+    return false;
+  }
+}
+
+// ============================================================
+// 11. AUTH ENDPOINTS
+// ============================================================
+
+// ── Check username availability ──
+app.get('/api/auth/check-username', async (req, res) => {
+  try {
+    const username = sanitizeUsername(req.query.username);
+    if (!username || username.length < 3) {
+      return res.status(400).json({ success: false, error: 'Username must be at least 3 characters' });
+    }
+    const snapshot = await db.collection('users').where('username', '==', username).limit(1).get();
+    const available = snapshot.empty;
+    res.json({ success: true, available });
+  } catch (error) {
+    console.error('Check username error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check username' });
+  }
+});
+
+// ── Check email availability ──
+app.get('/api/auth/check-email', async (req, res) => {
+  try {
+    const email = req.query.email?.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Invalid email' });
+    }
+    const snapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+    const exists = !snapshot.empty;
+    res.json({ success: true, exists });
+  } catch (error) {
+    console.error('Check email error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ── Register new user ──
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { uid, username, fullname, email, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
+    const cleanUsername = sanitizeUsername(username);
+    const cleanFullname = sanitizeFullName(fullname);
+    const cleanEmail = email?.trim().toLowerCase();
+
+    if (!uid || !cleanUsername || !cleanFullname || !cleanEmail) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+      return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
+    }
+    if (cleanFullname.length < 2 || cleanFullname.length > 100) {
+      return res.status(400).json({ success: false, error: 'Full name must be 2-100 characters' });
+    }
+
+    const existingUser = await db.collection('users').where('username', '==', cleanUsername).get();
+    if (!existingUser.empty) {
+      return res.status(409).json({ success: false, error: 'Username already taken' });
+    }
+    const existingEmail = await db.collection('users').where('email', '==', cleanEmail).get();
+    if (!existingEmail.empty) {
+      return res.status(409).json({ success: false, error: 'Email already registered' });
+    }
+
+    const newReferralCode = await generateUniqueReferralCode();
+    const cleanReferredBy = sanitizeReferralCode(referredByCode);
+
+    const userData = {
+      uid,
+      username: cleanUsername,
+      fullname: cleanFullname,
+      email: cleanEmail,
+      avatar: avatar || '',
+      referralCode: newReferralCode,
+      referredBy: cleanReferredBy || null,
+      deviceFingerprint: deviceFingerprint || '',
+      completed: true,
+      plan: 'free',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      isBanned: false,
+    };
+
+    await db.collection('users').doc(uid).set(userData);
+    delete userData.deviceFingerprint;
+    res.status(201).json({ success: true, user: userData });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ success: false, error: 'Registration failed' });
+  }
+});
+
+// ── Complete social profile ──
+app.post('/api/auth/complete-social', verifyToken, async (req, res) => {
+  try {
+    const { uid, email, fullname, username, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
+    const cleanUsername = sanitizeUsername(username);
+    const cleanFullname = sanitizeFullName(fullname);
+    const cleanEmail = email?.trim().toLowerCase();
+
+    if (!cleanUsername || !cleanFullname || !cleanEmail) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+      return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
+    }
+
+    const existing = await db.collection('users').where('username', '==', cleanUsername).get();
+    if (!existing.empty && existing.docs[0].id !== uid) {
+      return res.status(409).json({ success: false, error: 'Username already taken' });
+    }
+
+    const newReferralCode = await generateUniqueReferralCode();
+    const cleanReferredBy = sanitizeReferralCode(referredByCode);
+
+    const userData = {
+      uid,
+      username: cleanUsername,
+      fullname: cleanFullname,
+      email: cleanEmail,
+      avatar: avatar || '',
+      referralCode: newReferralCode,
+      referredBy: cleanReferredBy || null,
+      deviceFingerprint: deviceFingerprint || '',
+      completed: true,
+      plan: 'free',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      isBanned: false,
+    };
+
+    await db.collection('users').doc(uid).set(userData, { merge: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Complete social profile error:', error);
+    res.status(500).json({ success: false, error: 'Failed to complete profile' });
+  }
+});
+
+// ── Get current user profile ──
+app.get('/api/auth/me', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const doc = await db.collection('users').doc(uid).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = doc.data();
+    delete userData.deviceFingerprint;
+    res.json({ success: true, user: { uid, ...userData } });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch profile' });
+  }
+});
+
+// ── Check if user is banned ──
+app.get('/api/auth/check-ban', async (req, res) => {
+  try {
+    const uid = req.query.uid;
+    if (!uid) {
+      return res.status(400).json({ success: false, error: 'Missing uid' });
+    }
+    const doc = await db.collection('users').doc(uid).get();
+    if (!doc.exists) {
+      return res.json({ success: true, banned: false });
+    }
+    const data = doc.data();
+    res.json({ success: true, banned: data.isBanned || false });
+  } catch (error) {
+    console.error('Check ban error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check ban status' });
+  }
+});
+
+// ── Record login ──
+app.post('/api/auth/record-login', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    await db.collection('users').doc(uid).update({
+      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Record login error:', error);
+    res.json({ success: true });
+  }
+});
+
+// ── Get profile completion status ──
+app.get('/api/auth/profile', async (req, res) => {
+  try {
+    const uid = req.query.uid;
+    if (!uid) {
+      return res.status(400).json({ success: false, error: 'Missing uid' });
+    }
+    const doc = await db.collection('users').doc(uid).get();
+    if (!doc.exists) {
+      return res.json({ success: true, completed: false, username: null });
+    }
+    const data = doc.data();
+    res.json({
+      success: true,
+      completed: data.completed || false,
+      username: data.username || null,
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch profile' });
+  }
+});
+
+// ── Update user profile ──
+app.put('/api/auth/profile', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { username, fullname, email, avatar } = req.body;
+
+    const cleanUsername = sanitizeUsername(username);
+    const cleanFullname = sanitizeFullName(fullname);
+    const cleanEmail = email?.trim().toLowerCase();
+
+    if (!cleanUsername || !cleanFullname || !cleanEmail) {
+      return res.status(400).json({ success: false, error: 'All fields are required' });
+    }
+    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+      return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
+    }
+    if (cleanFullname.length < 2 || cleanFullname.length > 100) {
+      return res.status(400).json({ success: false, error: 'Full name must be 2-100 characters' });
+    }
+    if (!cleanEmail.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Invalid email' });
+    }
+
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const currentData = userDoc.data();
+
+    if (cleanUsername !== currentData.username) {
+      const existingUsername = await db.collection('users')
+        .where('username', '==', cleanUsername)
+        .limit(1)
+        .get();
+      if (!existingUsername.empty) {
+        return res.status(409).json({ success: false, error: 'Username already taken' });
+      }
+    }
+
+    if (cleanEmail !== currentData.email) {
+      const existingEmail = await db.collection('users')
+        .where('email', '==', cleanEmail)
+        .limit(1)
+        .get();
+      if (!existingEmail.empty) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
+
+      try {
+        await admin.auth().updateUser(uid, { email: cleanEmail });
+      } catch (authError) {
+        console.error('Firebase Auth email update error:', authError);
+        return res.status(400).json({
+          success: false,
+          error: 'Failed to update email. You may need to re‑authenticate.',
+        });
+      }
+    }
+
+    const updateData = {
+      username: cleanUsername,
+      fullname: cleanFullname,
+      email: cleanEmail,
+      avatar: avatar || currentData.avatar || '',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await db.collection('users').doc(uid).update(updateData);
+
+    const updatedDoc = await db.collection('users').doc(uid).get();
+    const updatedUser = updatedDoc.data();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: { uid, ...updatedUser },
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update profile' });
+  }
+});
+
+// ── Get referrals ──
+app.get('/api/auth/referrals', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = userDoc.data();
+    const referralCode = userData.referralCode;
+
+    if (!referralCode) {
+      return res.json({ success: true, referrals: [], referrer: null });
+    }
+
+    const snapshot = await db.collection('users')
+      .where('referredBy', '==', referralCode)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const referredUsers = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      referredUsers.push({
+        uid: doc.id,
+        username: data.username || '',
+        fullname: data.fullname || '',
+        email: data.email || '',
+        avatar: data.avatar || '',
+        createdAt: data.createdAt || null,
+      });
+    });
+
+    let referrer = null;
+    if (userData.referredBy) {
+      const referrerDoc = await db.collection('users')
+        .where('referralCode', '==', userData.referredBy)
+        .limit(1)
+        .get();
+      if (!referrerDoc.empty) {
+        const refData = referrerDoc.docs[0].data();
+        referrer = {
+          uid: referrerDoc.docs[0].id,
+          username: refData.username || '',
+          fullname: refData.fullname || '',
+          email: refData.email || '',
+          avatar: refData.avatar || '',
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      referralCode,
+      totalReferrals: referredUsers.length,
+      referredUsers,
+      referrer,
+    });
+  } catch (error) {
+    console.error('Get referrals error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch referrals' });
+  }
+});
+
+// ── SET ADMIN (protected with environment secret) ──
+app.post('/api/auth/set-admin', async (req, res) => {
+  try {
+    const { email, secret } = req.body;
+    if (secret !== process.env.ADMIN_SECRET_KEY) {
+      return res.status(403).json({ success: false, error: 'Invalid secret key' });
+    }
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required' });
+    }
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(email);
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        return res.status(404).json({ success: false, error: 'User not found. Please create an account first.' });
+      }
+      throw error;
+    }
+    await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
+    await db.collection('users').doc(userRecord.uid).set({
+      email: email,
+      role: 'admin',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    res.json({
+      success: true,
+      message: `Admin claim set for ${email}`,
+      uid: userRecord.uid,
+    });
+  } catch (error) {
+    console.error('Set admin error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// 12. TEMPLATE ENDPOINTS (with infinite cache)
+// ============================================================
+
+// ── Get all templates (ONLY ACTIVE) ──
+app.get('/api/templates', async (req, res) => {
+  try {
+    const { category, platform, highlight, plan, limit = 50 } = req.query;
+
+    const hasFilters = category || platform || highlight || plan;
+    const cacheKey = hasFilters
+      ? `templates:filters:${JSON.stringify({ category, platform, highlight, plan, limit })}`
+      : 'templates:all';
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      let query = db.collection('templates').where('isActive', '==', true);
+      if (category) query = query.where('category', '==', category);
+      if (platform) query = query.where('platform', '==', platform);
+      if (highlight === 'true') query = query.where('isHighlight', '==', true);
+      if (plan) query = query.where('plan', '==', plan);
+      try {
+        query = query.orderBy('createdAt', 'desc');
+      } catch (orderError) {
+        console.warn('⚠️ Cannot order by createdAt:', orderError.message);
+      }
+      query = query.limit(parseInt(limit) || 50);
+      const snapshot = await query.get();
+      const templates = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        templates.push({
+          id: doc.id,
+          ...data,
+          title: data.title || 'Untitled',
+          slug: data.slug || doc.id,
+          description: data.description || '',
+          image: data.image || '',
+          category: data.category || '',
+          platform: data.platform || 'all',
+          hashtags: data.hashtags || [],
+          isHighlight: data.isHighlight || false,
+          usageCount: data.usageCount || 0,
+          plan: data.plan || 'free',
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
+        });
+      });
+      return { success: true, templates };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Get templates error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Get template by slug (ONLY ACTIVE) ──
+app.get('/api/templates/slug/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const cacheKey = `templates:slug:${slug}`;
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const snapshot = await db.collection('templates')
+        .where('slug', '==', slug)
+        .where('isActive', '==', true)
+        .limit(1)
+        .get();
+      if (snapshot.empty) {
+        return { success: false, error: 'Template not found' };
+      }
+      const doc = snapshot.docs[0];
+      const data = doc.data();
+      return {
+        success: true,
+        template: { id: doc.id, ...data, plan: data.plan || 'free' },
+      };
+    });
+
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('Get template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch template' });
+  }
+});
+
+// ── Get template filters ──
+app.get('/api/templates/filters', async (req, res) => {
+  try {
+    const cacheKey = 'templates:filters:list';
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const snapshot = await db.collection('templates').where('isActive', '==', true).get();
+      const categories = new Set();
+      const platforms = new Set();
+      const plans = new Set();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.category) categories.add(data.category);
+        if (data.platform) platforms.add(data.platform);
+        if (data.plan) plans.add(data.plan);
+      });
+      return {
+        success: true,
+        categories: Array.from(categories),
+        platforms: Array.from(platforms),
+        plans: Array.from(plans),
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Get filters error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch filters' });
+  }
+});
+
+// ── Get template by ID (ONLY ACTIVE) ──
+app.get('/api/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cacheKey = `templates:id:${id}`;
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const doc = await db.collection('templates').doc(id).get();
+      if (!doc.exists) {
+        return { success: false, error: 'Template not found' };
+      }
+      const data = doc.data();
+      if (data.isActive === false) {
+        return { success: false, error: 'Template not available' };
+      }
+      return {
+        success: true,
+        template: { id: doc.id, ...data },
+      };
+    });
+
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('Get template by ID error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch template' });
+  }
+});
+
+// ── Create template (admin only) ──
+app.post('/api/templates', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    const { title, slug, description, image, thumbnail, category, platform, hashtags, isHighlight, plan = 'free', reward } = req.body;
+
+    if (!title || !slug) {
+      return res.status(400).json({ success: false, error: 'Title and slug are required' });
+    }
+    const validPlans = ['free', 'pro'];
+    if (plan && !validPlans.includes(plan)) {
+      return res.status(400).json({ success: false, error: 'Invalid plan. Must be: free, pro' });
+    }
+
+    const existing = await db.collection('templates').where('slug', '==', slug).get();
+    if (!existing.empty) {
+      return res.status(409).json({ success: false, error: 'Slug already exists' });
+    }
+
+    const templateData = {
+      title,
+      slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      description: description || '',
+      image: image || '',
+      thumbnail: thumbnail || image || '',
+      category: category || '',
+      platform: platform || '',
+      hashtags: hashtags || [],
+      isHighlight: isHighlight || false,
+      plan: plan || 'free',
+      reward: reward || 'Exclusive Reward',
+      isActive: true,
+      usageCount: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    const docRef = await db.collection('templates').add(templateData);
+
+    await invalidatePattern('templates:*');
+
+    res.status(201).json({ success: true, template: { id: docRef.id, ...templateData } });
+  } catch (error) {
+    console.error('Create template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create template' });
+  }
+});
+
+// ── Update template (admin only) ──
+app.put('/api/templates/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+    const updates = req.body;
+    delete updates.createdAt;
+    delete updates.usageCount;
+    delete updates.id;
+
+    if (updates.plan) {
+      const validPlans = ['free', 'pro'];
+      if (!validPlans.includes(updates.plan)) {
+        return res.status(400).json({ success: false, error: 'Invalid plan. Must be: free, pro' });
+      }
+    }
+    if (updates.slug) {
+      updates.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const existing = await db.collection('templates').where('slug', '==', updates.slug).get();
+      if (!existing.empty && existing.docs[0].id !== id) {
+        return res.status(409).json({ success: false, error: 'Slug already exists' });
+      }
+    }
+    updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    await db.collection('templates').doc(id).update(updates);
+
+    await invalidatePattern('templates:*');
+
+    res.json({ success: true, message: 'Template updated' });
+  } catch (error) {
+    console.error('Update template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update template' });
+  }
+});
+
+// ── Delete/archive template (admin only) ──
+app.delete('/api/templates/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    await db.collection('templates').doc(id).update({
+      isActive: false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await invalidatePattern('templates:*');
+
+    res.json({ success: true, message: 'Template archived' });
+  } catch (error) {
+    console.error('Delete template error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete template' });
+  }
+});
+
+// ── Increment template usage ──
+app.post('/api/templates/:id/usage', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('templates').doc(id).update({
+      usageCount: admin.firestore.FieldValue.increment(1),
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Increment usage error:', error);
+    res.status(500).json({ success: false, error: 'Failed to increment usage' });
+  }
+});
+
+// ============================================================
+// 13. CAMPAIGN ENDPOINTS (with infinite cache, duplicate prevention, stats invalidation)
+// ============================================================
+
+// ── Get user's campaigns (ONLY ACTIVE, PER USER) ──
+app.get('/api/campaigns', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    let limit = parseInt(req.query.limit) || 25;
+    if (isNaN(limit) || limit < 1) limit = 25;
+    if (limit > 25) limit = 25;
+
+    const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
+    const lastId = req.query.lastId || null;
+
+    const isFirstPage = !lastCreatedAt && !lastId;
+    const cacheKey = `campaigns:user:${uid}`;
+
+    if (isFirstPage) {
+      const result = await getOrSetCache(cacheKey, async () => {
+        let query = db.collection('campaigns')
+          .where('userId', '==', uid)
+          .where('status', 'in', ['active', 'paused'])
+          .orderBy('createdAt', 'desc')
+          .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
+          .limit(limit);
+
+        const snapshot = await query.get();
+        const campaigns = [];
+        let lastDoc = null;
+
+        snapshot.forEach(doc => {
+          campaigns.push({ id: doc.id, ...doc.data() });
+          lastDoc = doc;
+        });
+
+        const hasMore = snapshot.size === limit;
+
+        return {
+          success: true,
+          campaigns,
+          hasMore,
+          lastCreatedAt: lastDoc ? lastDoc.data().createdAt.toMillis() : null,
+          lastId: lastDoc ? lastDoc.id : null,
+        };
+      });
+
+      return res.json(result);
+    }
+
+    // ── Paginated requests bypass cache ──
+    let query = db.collection('campaigns')
+      .where('userId', '==', uid)
+      .where('status', 'in', ['active', 'paused'])
+      .orderBy('createdAt', 'desc')
+      .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
+      .limit(limit);
+
+    if (lastCreatedAt && lastId) {
+      const lastTimestamp = admin.firestore.Timestamp.fromDate(lastCreatedAt);
+      query = query.startAfter(lastTimestamp, lastId);
+    }
+
+    const snapshot = await query.get();
+    const campaigns = [];
+    let lastDoc = null;
+
+    snapshot.forEach(doc => {
+      campaigns.push({ id: doc.id, ...doc.data() });
+      lastDoc = doc;
+    });
+
+    const hasMore = snapshot.size === limit;
+
+    res.json({
+      success: true,
+      campaigns,
+      hasMore,
+      lastCreatedAt: lastDoc ? lastDoc.data().createdAt.toMillis() : null,
+      lastId: lastDoc ? lastDoc.id : null,
+    });
+  } catch (error) {
+    console.error('❌ Get campaigns error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Get campaign by ID (ONLY ACTIVE) with silent view tracking ──
+app.get('/api/campaigns/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cacheKey = `campaigns:id:${id}`;
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const doc = await db.collection('campaigns').doc(id).get();
+      if (!doc.exists) {
+        return { success: false, error: 'Campaign not found' };
+      }
+      const campaignData = doc.data();
+      if (campaignData.status === 'deleted') {
+        return { success: false, error: 'Campaign not available' };
+      }
+      return {
+        success: true,
+        campaign: { id: doc.id, ...campaignData },
+      };
+    });
+
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+
+    // ── Silent view tracking (no error if already viewed) ──
+    try {
+      const ip = getClientIp(req);
+      const userId = req.headers['x-user-id'] || null;
+      const alreadyViewed = await hasPerformedAction(id, userId, ip, 'views');
+      if (!alreadyViewed) {
+        await db.collection('campaigns').doc(id).update({
+          views: admin.firestore.FieldValue.increment(1),
+        });
+        await recordAction(id, userId, ip, 'views');
+      }
+    } catch (err) {
+      console.warn('View tracking failed:', err.message);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching campaign:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch campaign' });
+  }
+});
+
+// ── Create campaign ──
+app.post('/api/campaigns', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { templateId, shareCount, tasks, finalUrl, features, title, description, reward } = req.body;
+
+    if (!templateId) {
+      return res.status(400).json({ success: false, error: 'Template ID is required' });
+    }
+    const templateRef = db.collection('templates').doc(templateId);
+    const templateDoc = await templateRef.get();
+    if (!templateDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+    const templateData = templateDoc.data();
+
+    const { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled } = features || {};
+    if (typeof scEnabled !== 'boolean' || typeof tasksEnabled !== 'boolean' || typeof fuEnabled !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'Features must include shareCount, tasks, finalUrl as booleans',
+      });
+    }
+    if (!scEnabled && !tasksEnabled && !fuEnabled) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one feature must be enabled',
+      });
+    }
+
+    let finalShareCount = 0;
+    if (scEnabled) {
+      if (shareCount === undefined || shareCount === null) {
+        return res.status(400).json({ success: false, error: 'Share count is required when enabled' });
+      }
+      const num = Number(shareCount);
+      if (!Number.isInteger(num) || num < 1 || num > 9999) {
+        return res.status(400).json({ success: false, error: 'Share count must be a whole number between 1 and 9999' });
+      }
+      finalShareCount = num;
+    }
+
+    let finalTasks = [];
+    if (tasksEnabled) {
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        return res.status(400).json({ success: false, error: 'At least one task is required when tasks are enabled' });
+      }
+      if (tasks.length > 100) {
+        return res.status(400).json({ success: false, error: 'Maximum 100 tasks allowed' });
+      }
+      for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        if (!task.text || typeof task.text !== 'string' || task.text.length < 1 || task.text.length > 250) {
+          return res.status(400).json({ success: false, error: `Task ${i+1}: Text must be between 1 and 250 characters` });
+        }
+        if (!task.url || typeof task.url !== 'string') {
+          return res.status(400).json({ success: false, error: `Task ${i+1}: URL is required` });
+        }
+        try { new URL(task.url); } catch {
+          return res.status(400).json({ success: false, error: `Task ${i+1}: Invalid URL format` });
+        }
+      }
+      finalTasks = tasks.map(t => ({ text: t.text.trim(), url: t.url.trim() }));
+    }
+
+    let finalFinalUrl = '';
+    if (fuEnabled) {
+      if (!finalUrl || typeof finalUrl !== 'string') {
+        return res.status(400).json({ success: false, error: 'Final URL is required when enabled' });
+      }
+      try {
+        new URL(finalUrl);
+        finalFinalUrl = finalUrl.trim();
+      } catch {
+        return res.status(400).json({ success: false, error: 'Invalid final redirect URL format' });
+      }
+    }
+
+    const finalTitle = title?.trim() || templateData.title || 'Untitled Campaign';
+    const finalDescription = description?.trim() || templateData.description || '';
+    const finalReward = reward?.trim() || templateData.reward || 'Exclusive Reward';
+
+    const campaignData = {
+      templateId,
+      userId: uid,
+      shareCount: finalShareCount,
+      tasks: finalTasks,
+      finalUrl: finalFinalUrl,
+      features: { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled },
+      title: finalTitle,
+      description: finalDescription,
+      image: templateData.image || '',
+      reward: finalReward,
+      templateSlug: templateData.slug || 'campaign',
+      status: 'active',
+      views: 0,
+      completions: 0,
+      shares: 0,
+      unlockCount: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('campaigns').add(campaignData);
+
+    await templateRef.update({
+      usageCount: admin.firestore.FieldValue.increment(1),
+    });
+
+    // ── Invalidate campaign cache AND stats cache ──
+    await invalidateKey(`campaigns:user:${uid}`);
+    await invalidateKey(`stats:user:${uid}`);
+
+    res.status(201).json({
+      success: true,
+      campaignId: docRef.id,
+      message: 'Campaign created successfully',
+    });
+  } catch (error) {
+    console.error('Create campaign error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create campaign' });
+  }
+});
+
+// ── Update campaign ──
+app.put('/api/campaigns/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const updates = req.body;
+
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const data = doc.data();
+    if (data.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'Forbidden: You do not own this campaign' });
+    }
+    if (data.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    const allowedFields = ['title', 'description', 'reward', 'image', 'shareCount', 'tasks', 'finalUrl', 'status', 'features'];
+    const filteredUpdates = {};
+    allowedFields.forEach(field => {
+      if (updates[field] !== undefined) {
+        filteredUpdates[field] = updates[field];
+      }
+    });
+    filteredUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    await doc.ref.update(filteredUpdates);
+
+    // ── Invalidate campaign cache AND stats cache ──
+    await invalidateKey(`campaigns:user:${uid}`);
+    await invalidateKey(`campaigns:id:${id}`);
+    await invalidateKey(`stats:user:${uid}`);
+
+    res.json({ success: true, message: 'Campaign updated' });
+  } catch (error) {
+    console.error('Update campaign error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update campaign' });
+  }
+});
+
+// ── Delete campaign ──
+app.delete('/api/campaigns/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const data = doc.data();
+    if (data.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'Forbidden: You do not own this campaign' });
+    }
+
+    await doc.ref.update({
+      status: 'deleted',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // ── Invalidate campaign cache AND stats cache ──
+    await invalidateKey(`campaigns:user:${uid}`);
+    await invalidateKey(`campaigns:id:${id}`);
+    await invalidateKey(`stats:user:${uid}`);
+
+    res.json({ success: true, message: 'Campaign deleted' });
+  } catch (error) {
+    console.error('Delete campaign error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete campaign' });
+  }
+});
+
+// ── Record share (silent skip if already shared) ──
+app.post('/api/campaigns/:id/share', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ip = getClientIp(req);
+    const userId = req.body.userId || null;
+
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const data = doc.data();
+    if (data.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    const alreadyShared = await hasPerformedAction(id, userId, ip, 'shares');
+    if (alreadyShared) {
+      return res.json({
+        success: true,
+        shares: data.shares || 0,
+        shareCount: data.shareCount || 0,
+        message: 'Already shared',
+      });
+    }
+
+    const targetShareCount = data.shareCount || 0;
+
+    await doc.ref.update({
+      shares: targetShareCount,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await recordAction(id, userId, ip, 'shares');
+    await invalidateKey(`campaigns:sharecount:${id}`);
+
+    const updatedDoc = await doc.ref.get();
+    const updatedData = updatedDoc.data();
+
+    res.json({
+      success: true,
+      shares: updatedData.shares || 0,
+      shareCount: updatedData.shareCount || 0,
+    });
+  } catch (error) {
+    console.error('❌ Share error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Get share count ──
+app.get('/api/campaigns/:id/share-count', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cacheKey = `campaigns:sharecount:${id}`;
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const doc = await db.collection('campaigns').doc(id).get();
+      if (!doc.exists) {
+        return { success: false, error: 'Campaign not found' };
+      }
+      const data = doc.data();
+      if (data.status === 'deleted') {
+        return { success: false, error: 'Campaign not found' };
+      }
+      return {
+        success: true,
+        shares: data.shares || 0,
+        shareCount: data.shareCount || 0,
+        isComplete: (data.shares || 0) >= (data.shareCount || 0),
+      };
+    });
+
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting share count:', error);
+    res.status(500).json({ success: false, error: 'Failed to get share count' });
+  }
+});
+
+// ── Complete campaign (silent skip if already completed) ──
+app.post('/api/campaigns/:id/complete', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ip = getClientIp(req);
+    const userId = req.body.userId || null;
+
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const data = doc.data();
+    if (data.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    const alreadyCompleted = await hasPerformedAction(id, userId, ip, 'completions');
+    if (alreadyCompleted) {
+      return res.json({
+        success: true,
+        message: 'Already completed',
+      });
+    }
+
+    await doc.ref.update({
+      completions: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await recordAction(id, userId, ip, 'completions');
+
+    res.json({
+      success: true,
+      message: 'Campaign completed!',
+    });
+  } catch (error) {
+    console.error('❌ Complete error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Unlock campaign (silent skip if already unlocked) ──
+app.post('/api/campaigns/:id/unlock', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ip = getClientIp(req);
+    const userId = req.body.userId || null;
+
+    const doc = await db.collection('campaigns').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const data = doc.data();
+    if (data.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    const alreadyUnlocked = await hasPerformedAction(id, userId, ip, 'unlocks');
+    if (alreadyUnlocked) {
+      return res.json({
+        success: true,
+        message: 'Already unlocked',
+      });
+    }
+
+    await doc.ref.update({
+      unlockCount: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await recordAction(id, userId, ip, 'unlocks');
+
+    res.json({
+      success: true,
+      message: 'Campaign unlocked!',
+    });
+  } catch (error) {
+    console.error('❌ Unlock error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// 14. USER STATS (EXCLUDES DELETED CAMPAIGNS, PER-USER CACHE)
+// ============================================================
+app.get('/api/stats', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const cacheKey = `stats:user:${uid}`;
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const snapshot = await db.collection('campaigns')
+        .where('userId', '==', uid)
+        .get();
+
+      let totalCampaigns = 0;
+      let totalViews = 0;
+      let totalUnlocks = 0;
+      let totalShares = 0;
+      let totalCompletions = 0;
+      let successfulCampaigns = 0;
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.status === 'deleted') return;
+
+        totalCampaigns++;
+        totalViews += data.views || 0;
+        totalUnlocks += data.unlockCount || 0;
+        totalShares += data.shares || 0;
+        totalCompletions += data.completions || 0;
+        if (data.shareCount > 0 && (data.shares || 0) >= data.shareCount) {
+          successfulCampaigns++;
+        }
+      });
+
+      return {
+        success: true,
+        stats: {
+          totalCampaigns,
+          totalViews,
+          totalUnlocks,
+          totalShares,
+          totalCompletions,
+          successfulCampaigns,
+        },
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Stats error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// 15. SUPPORT TICKETS
+// ============================================================
+app.get('/api/support', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const cacheKey = `support:user:${uid}`;
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const snapshot = await db.collection('supportTickets')
+        .where('userId', '==', uid)
+        .orderBy('createdAt', 'desc')
+        .get();
+
+      const tickets = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          title: data.title || '',
+          description: data.description || '',
+          image: data.image || '',
+          status: data.status || 'open',
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
+        });
+      });
+
+      return { success: true, tickets };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Get support tickets error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tickets' });
+  }
+});
+
+app.post('/api/support', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { title, description, image } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Title is required' });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({ success: false, error: 'Description is required' });
+    }
+
+    const ticketData = {
+      userId: uid,
+      title: title.trim(),
+      description: description.trim(),
+      image: image || '',
+      status: 'open',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('supportTickets').add(ticketData);
+    const newTicket = { id: docRef.id, ...ticketData };
+
+    await invalidateKey(`support:user:${uid}`);
+
+    res.status(201).json({ success: true, ticket: newTicket });
+  } catch (error) {
+    console.error('Create support ticket error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create ticket' });
+  }
+});
+
+// ============================================================
+// 16. COMMENTS
+// ============================================================
+app.get('/api/comments', async (req, res) => {
+  try {
+    const cacheKey = 'comments:all';
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      const snapshot = await db.collection('comments')
+        .orderBy('createdAt', 'desc')
+        .limit(5)
+        .get();
+
+      const comments = [];
+      snapshot.forEach(doc => {
+        comments.push({ id: doc.id, ...doc.data() });
+      });
+
+      return { success: true, comments };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Get comments error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/comments', async (req, res) => {
+  try {
+    const { name, comment, rating } = req.body;
+
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ success: false, error: 'Name must be at least 2 characters' });
+    }
+    if (!comment || comment.trim().length < 3) {
+      return res.status(400).json({ success: false, error: 'Comment must be at least 3 characters' });
+    }
+    const ratingNum = Number(rating);
+    if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      return res.status(400).json({ success: false, error: 'Rating must be a whole number between 1 and 5' });
+    }
+
+    const sanitisedName = sanitizeCommentInput(name.trim());
+    const sanitisedComment = sanitizeCommentInput(comment.trim());
+
+    const commentData = {
+      name: sanitisedName,
+      comment: sanitisedComment,
+      rating: ratingNum,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('comments').add(commentData);
+    const newComment = { id: docRef.id, ...commentData };
+
+    await invalidateKey('comments:all');
+
+    res.status(201).json({ success: true, comment: newComment });
+  } catch (error) {
+    console.error('❌ Post comment error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// 17. CLOUDINARY UPLOAD
+// ============================================================
 app.post('/api/upload', verifyToken, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -171,7 +1739,7 @@ app.post('/api/upload', verifyToken, upload.single('image'), async (req, res) =>
 });
 
 // ============================================================
-// 12. GLOBAL ERROR HANDLER
+// 18. GLOBAL ERROR HANDLER
 // ============================================================
 app.use((err, req, res, next) => {
   console.error('🔥 Global error:', err);
@@ -188,11 +1756,14 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================================
-// 13. START SERVER
+// 19. START SERVER
 // ============================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on port ${PORT}`);
   console.log(`🔒 Allowed origins:`, allowedOrigins);
   console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+  console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
+  console.log(`📦 Redis: INFINITE CACHE (cache until change)`);
+  console.log(`🛡️ Duplicate Prevention: IP + UserID tracking (silent – no frontend errors)`);
 });
