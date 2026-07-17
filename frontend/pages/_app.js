@@ -28,6 +28,7 @@ const TOP_NAV_ONLY_PAGES = [
 '/follow',
 '/download',
 '/contact',
+'/login',
 ];
 
 function MyApp({ Component, pageProps }) {
