@@ -48,7 +48,7 @@ async function apiRequest(endpoint, options = {}, token = null) {
 }
 
 // ============================================================
-// AUTH CONTEXT
+// AUTH CONTEXT (FULL – PRESERVED)
 // ============================================================
 const AuthContext = createContext();
 
@@ -403,7 +403,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI – COMPACT SPLIT SCREEN (UPDATED)
+// AUTH SCREEN UI – ULTRA‑COMPACT, NO EXTRA SPACE, SMOOTH ANIMATION
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
@@ -418,7 +418,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     user,
   } = useAuth();
 
-  // ── State ──
+  // ── State (same as before) ──
   const [email, setEmail] = useState('');
   const [emailExists, setEmailExists] = useState(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -468,7 +468,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     setTimeout(() => performRedirect(), 1500);
   };
 
-  // ── Check for social completion ──
+  // ── Effects (unchanged) ──
   useEffect(() => {
     if (user && user.completed === false && !needsSocialCompletion) {
       setSocialUser(user);
@@ -478,7 +478,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     }
   }, [user, needsSocialCompletion]);
 
-  // ── Email check ──
   useEffect(() => {
     if (email.length > 3 && email.includes('@') && !needsSocialCompletion) {
       clearTimeout(emailTimerRef.current);
@@ -507,7 +506,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     return () => clearTimeout(emailTimerRef.current);
   }, [email, needsSocialCompletion]);
 
-  // ── Username check ──
   const usernameToCheck = needsSocialCompletion ? socialUsername : username;
   const isRegisterMode = (emailExists === false && email.length > 3) || needsSocialCompletion;
 
@@ -536,7 +534,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     return () => clearTimeout(usernameTimerRef.current);
   }, [isRegisterMode, usernameToCheck]);
 
-  // ── Password strength ──
   useEffect(() => {
     if (!password) { setPasswordStrength(0); return; }
     let score = 0;
@@ -868,7 +865,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     );
   }
 
-  // ─── MAIN SPLIT‑SCREEN LAYOUT ───
+  // ─── MAIN SPLIT‑SCREEN LAYOUT (ULTRA‑COMPACT) ───
   return (
     <>
       <Meta
@@ -880,21 +877,21 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       />
       <div className="min-h-screen flex flex-col lg:flex-row bg-white overflow-hidden">
 
-        {/* ─── LEFT HERO ─── (compact) */}
+        {/* ─── LEFT HERO ─── (minimal padding, compact) */}
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
+          initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
-          className="flex-1 bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-800 text-white p-6 lg:p-8 flex flex-col justify-center min-h-[30vh] lg:min-h-screen relative overflow-hidden"
+          transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+          className="flex-1 bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-800 text-white p-4 lg:p-6 flex flex-col justify-center min-h-[20vh] lg:min-h-[50vh] relative overflow-hidden"
         >
           <div className="absolute -top-20 -right-20 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
           <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl" />
 
           <div className="relative z-10 max-w-md mx-auto lg:mx-0 text-center lg:text-left">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight mb-3">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight mb-2">
               {emailExists === true ? 'Welcome Back!' : 'Join the Movement'}
             </h1>
-            <p className="text-purple-200 text-base sm:text-lg max-w-md">
+            <p className="text-purple-200 text-sm sm:text-base max-w-md">
               {emailExists === true
                 ? 'Sign in to continue building viral campaigns.'
                 : 'Create your account and launch your first campaign in minutes.'
@@ -903,21 +900,21 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
           </div>
         </motion.div>
 
-        {/* ─── RIGHT FORM ─── */}
+        {/* ─── RIGHT FORM ─── (reduced padding, form moved up) */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
-          className="flex-1 flex items-center justify-center p-6 lg:p-8 bg-white"
+          initial={{ opacity: 0, y: 30, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.05, ease: [0.25, 0.1, 0.25, 1] }}
+          className="flex-1 flex items-center justify-center p-4 lg:p-6 bg-white"
         >
           <div className="w-full max-w-md">
 
             {/* ── Mobile heading ── */}
-            <div className="lg:hidden text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
+            <div className="lg:hidden text-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
                 {emailExists === true ? 'Welcome Back' : 'Create Account'}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs text-gray-500">
                 {emailExists === true ? 'Sign in to your account' : 'Start your journey with Make Trend'}
               </p>
             </div>
@@ -928,16 +925,16 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1 }}
-                className="flex flex-col items-center mb-4"
+                className="flex flex-col items-center mb-3"
               >
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-purple-200 bg-gray-100 flex items-center justify-center shadow-sm">
+                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-purple-200 bg-gray-100 flex items-center justify-center shadow-sm">
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
-                    <FiUser className="w-12 h-12 text-gray-400" />
+                    <FiUser className="w-10 h-10 text-gray-400" />
                   )}
                 </div>
-                <label className="mt-2 cursor-pointer text-sm font-medium text-purple-600 hover:text-purple-800 transition border border-dashed border-gray-300 rounded-lg px-4 py-1.5 hover:border-purple-400">
+                <label className="mt-1 cursor-pointer text-xs font-medium text-purple-600 hover:text-purple-800 transition border border-dashed border-gray-300 rounded-lg px-3 py-1 hover:border-purple-400">
                   Upload Profile Picture
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarChange(e, 'register')} disabled={isSubmitting} />
                 </label>
@@ -949,7 +946,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600 flex items-start gap-2"
+                className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600 flex items-start gap-2"
               >
                 <FiAlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
@@ -959,7 +956,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-600 flex items-start gap-2"
+                className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-600 flex items-start gap-2"
               >
                 <FiCheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>✅ Password reset link sent!</span>
@@ -967,20 +964,20 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             )}
 
             {/* ── Form ── */}
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <FiMail className="w-5 h-5" />
+                    <FiMail className="w-4 h-4" />
                   </div>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className={`w-full pl-10 pr-10 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 transition ${
+                    className={`w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 transition ${
                       emailExists === true && email.length > 3
                         ? 'border-green-500 focus:ring-green-200 bg-green-50'
                         : emailExists === false && email.length > 3
@@ -993,13 +990,13 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                     required
                   />
                   {isCheckingEmail && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 animate-pulse">⏳</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">⏳</span>
                   )}
                   {!isCheckingEmail && email.length > 3 && emailExists === true && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Exists</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-medium">✓ Exists</span>
                   )}
                   {!isCheckingEmail && email.length > 3 && emailExists === false && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-purple-600 font-medium">New ✨</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-purple-600 font-medium">New ✨</span>
                   )}
                 </div>
                 {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
@@ -1019,17 +1016,17 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden"
                 >
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                      <FiLock className="w-5 h-5" />
+                      <FiLock className="w-4 h-4" />
                     </div>
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                      className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                       required
                       disabled={isSubmitting}
                       minLength={6}
@@ -1051,20 +1048,20 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   transition={{ duration: 0.4 }}
-                  className="space-y-4 overflow-hidden"
+                  className="space-y-3 overflow-hidden"
                 >
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Full Name *</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                        <FiUser className="w-5 h-5" />
+                        <FiUser className="w-4 h-4" />
                       </div>
                       <input
                         type="text"
                         value={fullname}
                         onChange={(e) => setFullname(e.target.value)}
                         placeholder="John Doe"
-                        className="w-full pl-10 py-2.5 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        className="w-full pl-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                         required
                         disabled={isSubmitting}
                       />
@@ -1072,17 +1069,17 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Username *</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                        <FiUserPlus className="w-5 h-5" />
+                        <FiUserPlus className="w-4 h-4" />
                       </div>
                       <input
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                         placeholder="john_doe"
-                        className={`w-full pl-10 pr-10 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 transition ${
+                        className={`w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 transition ${
                           usernameAvailable === true && username.length >= 3
                             ? 'border-green-500 focus:ring-green-200'
                             : usernameAvailable === false && username.length >= 3
@@ -1093,30 +1090,30 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                         disabled={isSubmitting}
                       />
                       {isCheckingUsername && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 animate-pulse">⏳</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">⏳</span>
                       )}
                       {!isCheckingUsername && username.length >= 3 && usernameAvailable === true && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-medium">✓ Available</span>
                       )}
                       {!isCheckingUsername && username.length >= 3 && usernameAvailable === false && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-600 font-medium">✗ Taken</span>
                       )}
                     </div>
                     <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Password *</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                        <FiLock className="w-5 h-5" />
+                        <FiLock className="w-4 h-4" />
                       </div>
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Minimum 6 characters"
-                        className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                         required
                         disabled={isSubmitting}
                         minLength={6}
@@ -1147,17 +1144,17 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Confirm Password *</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                        <FiLock className="w-5 h-5" />
+                        <FiLock className="w-4 h-4" />
                       </div>
                       <input
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-10 py-2.5 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        className="w-full pl-9 py-2 rounded-lg border border-gray-300 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                         required
                         disabled={isSubmitting}
                       />
@@ -1171,13 +1168,13 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Referral Code (optional)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Referral Code (optional)</label>
                     <input
                       type="text"
                       value={referralCode}
                       onChange={(e) => setReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                       placeholder="ENTER CODE"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 uppercase transition"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 uppercase transition"
                       disabled={isSubmitting}
                     />
                   </div>
@@ -1191,7 +1188,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   disabled={isSubmitting}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {isSubmitting ? 'Processing...' : emailExists === true ? 'Log In' : 'Create Account'}
                 </motion.button>
@@ -1200,7 +1197,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                 <button
                   type="button"
                   disabled={isCheckingEmail}
-                  className="w-full py-3 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed"
+                  className="w-full py-2.5 bg-gray-200 text-gray-500 font-semibold rounded-lg cursor-not-allowed text-sm"
                 >
                   {isCheckingEmail ? 'Verifying...' : 'Enter email to continue'}
                 </button>
@@ -1208,7 +1205,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             </form>
 
             {/* ── Divider ── */}
-            <div className="relative my-5">
+            <div className="relative my-4">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
               <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-gray-400">Or continue with</span></div>
             </div>
@@ -1218,7 +1215,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
               <button
                 onClick={() => handleSocialLogin('google')}
                 disabled={isSocialLoading || isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
               >
                 <FaGoogle className="w-4 h-4" />
                 Google
@@ -1226,7 +1223,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
               <button
                 onClick={() => handleSocialLogin('facebook')}
                 disabled={isSocialLoading || isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
               >
                 <FaFacebook className="w-4 h-4" />
                 Facebook
@@ -1234,7 +1231,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             </div>
 
             {/* ── Switch links ── */}
-            <div className="mt-4 text-center text-xs text-gray-400">
+            <div className="mt-3 text-center text-xs text-gray-400">
               {emailExists === false && email.length > 3 ? (
                 <>
                   Already have an account?{' '}
