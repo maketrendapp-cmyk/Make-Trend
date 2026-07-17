@@ -3,7 +3,7 @@
 // ALL DATA FETCHING LOGIC – Separated from AuthScreen for better maintainability
 // ============================================================
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { auth } from '../services/firebase';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
@@ -42,12 +42,12 @@ export function useAppData() {
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // ============================================================
-  // FETCH FUNCTIONS (FIXED: removed /api prefix from endpoints)
+  // FETCH FUNCTIONS
   // ============================================================
 
   const fetchTemplates = async () => {
     try {
-      const data = await apiRequest('/templates');  // ← FIXED
+      const data = await apiRequest('/templates');
       const all = data.templates || [];
       setTemplates(all);
       setFeaturedTemplates(all.filter(t => t.isHighlight === true));
@@ -91,7 +91,7 @@ export function useAppData() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/campaigns?limit=25', {}, token);  // ← FIXED
+      const data = await apiRequest('/campaigns?limit=25', {}, token);
       setCampaigns(data.campaigns || []);
     } catch (err) {
       console.error('Campaigns fetch error:', err);
@@ -103,7 +103,7 @@ export function useAppData() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/stats', {}, token);  // ← FIXED
+      const data = await apiRequest('/stats', {}, token);
       if (data.success) {
         setStats(data.stats);
       }
@@ -117,7 +117,7 @@ export function useAppData() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/support', {}, token);  // ← FIXED
+      const data = await apiRequest('/support', {}, token);
       setSupportTickets(data.tickets || []);
     } catch (err) {
       console.error('Support tickets fetch error:', err);
@@ -126,7 +126,7 @@ export function useAppData() {
 
   const fetchComments = async () => {
     try {
-      const data = await apiRequest('/comments');  // ← FIXED
+      const data = await apiRequest('/comments');
       setComments(data.comments || []);
     } catch (err) {
       console.error('Comments fetch error:', err);
@@ -134,20 +134,30 @@ export function useAppData() {
   };
 
   // ============================================================
-  // MASTER LOADER (called once)
+  // MASTER LOADER (called on app start AND on login)
   // ============================================================
   const loadAllData = useCallback(async () => {
-    if (dataLoaded) return;
+    // Always fetch public data
     await fetchTemplates();
     await fetchComments();
+
+    // Fetch user-specific data only if logged in
     if (auth.currentUser) {
       await fetchProfile();
       await fetchCampaigns();
       await fetchStats();
       await fetchSupportTickets();
     }
+
     setDataLoaded(true);
-  }, [dataLoaded]);
+  }, []);
+
+  // ============================================================
+  // 🆕 LOAD PUBLIC DATA ON APP START (even without login)
+  // ============================================================
+  useEffect(() => {
+    loadAllData();
+  }, []); // ← Runs once when the app starts
 
   // ============================================================
   // REFETCH HELPERS (for after edits)
@@ -174,6 +184,7 @@ export function useAppData() {
       totalCompletions: 0,
       successfulCampaigns: 0,
     });
+    // Keep templates and comments (public)
   }, []);
 
   return {
