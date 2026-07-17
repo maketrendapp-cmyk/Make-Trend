@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
+import Meta from '../components/Meta';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
@@ -42,7 +43,6 @@ export default function EditProfile() {
       setAvatarPreview(contextProfile.avatar || contextProfile.profilePic || '');
       setLoading(false);
     } else if (dataLoaded) {
-      // If data is loaded but no profile, user might not be logged in
       setLoading(false);
     }
   }, [contextProfile, dataLoaded]);
@@ -67,7 +67,6 @@ export default function EditProfile() {
         const res = await fetch(`${API_BASE}/api/auth/check-username?username=${encodeURIComponent(username)}`);
         const data = await res.json();
         if (data.success) {
-          // If the username is the current one, it's available (we're not changing)
           const currentUsername = contextProfile?.username || '';
           setUsernameAvailable(data.available || (username === currentUsername));
         } else {
@@ -137,7 +136,7 @@ export default function EditProfile() {
     setSuccess('');
     setSaving(true);
 
-    // Validate
+    // ── Validation ──
     if (fullName.length < 2) {
       setError('Full name must be at least 2 characters.');
       setSaving(false);
@@ -160,12 +159,13 @@ export default function EditProfile() {
     }
 
     try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) throw new Error('Not authenticated');
+      const token = await firebaseUser.getIdToken();
+
       // 1) Upload avatar if changed
       let avatarUrl = currentAvatar;
       if (avatarFile) {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) throw new Error('Not authenticated');
-        const token = await firebaseUser.getIdToken();
         const formData = new FormData();
         formData.append('image', avatarFile);
         const uploadRes = await fetch(`${API_BASE}/upload`, {
@@ -182,9 +182,6 @@ export default function EditProfile() {
       }
 
       // 2) Update profile
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) throw new Error('Not authenticated');
-      const token = await firebaseUser.getIdToken();
       const payload = { username, fullname: fullName, email, avatar: avatarUrl };
       const updateRes = await fetch(`${API_BASE}/api/auth/profile`, {
         method: 'PUT',
@@ -197,183 +194,212 @@ export default function EditProfile() {
       const updateData = await updateRes.json();
       if (updateData.success) {
         setSuccess('Profile updated successfully!');
-        // Refresh the auth context user
         await refreshUser();
-        // Redirect after short delay
         setTimeout(() => router.push('/profile'), 1500);
       } else {
         setError(updateData.error || 'Update failed');
       }
     } catch (err) {
       console.error('Submit error:', err);
-      setError(err.message || 'Something went wrong');
+      // More user-friendly error messages
+      if (err.message === 'Not authenticated') {
+        setError('You are not logged in. Please log in again.');
+      } else if (err.message.includes('avatar')) {
+        setError('Avatar upload failed. Please try a different image.');
+      } else {
+        setError(err.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setSaving(false);
     }
   };
 
+  // ── Loading state ──
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <>
+        <Meta title="Loading Profile | Make Trend" />
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Profile</h1>
+    <>
+      <Meta
+        title="Edit Profile | Make Trend"
+        description="Update your name, username, email, and profile picture on Make Trend."
+      />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 py-8">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-8 backdrop-blur-sm transition-all hover:shadow-2xl">
+            <h1 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center gap-3">
+              <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Edit</span> Profile
+            </h1>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
-              {success}
-            </div>
-          )}
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-2">
+                <span className="text-red-500 text-lg">⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+            {success && (
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-start gap-2">
+                <span className="text-green-500 text-lg">✅</span>
+                <span>{success}</span>
+              </div>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Avatar */}
-            <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-4xl text-gray-400">👤</span>
-                  )}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Avatar */}
+              <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
+                <div className="relative">
+                  <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-5xl text-gray-400">👤</span>
+                    )}
+                  </div>
+                  <label
+                    htmlFor="avatar-upload"
+                    className="absolute -bottom-1 -right-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full p-2 cursor-pointer hover:shadow-lg transition-all duration-200 shadow-md hover:scale-110"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <input
+                      id="avatar-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                      disabled={saving}
+                    />
+                  </label>
                 </div>
-                <label
-                  htmlFor="avatar-upload"
-                  className="absolute -bottom-1 -right-1 bg-purple-600 text-white rounded-full p-1.5 cursor-pointer hover:bg-purple-700 transition shadow-sm"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <input
-                    id="avatar-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                    disabled={saving}
-                  />
-                </label>
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-sm text-gray-600 font-medium">Click the camera icon to change your profile picture.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">JPEG, PNG, WEBP, GIF up to 5MB</p>
+                </div>
               </div>
-              <div className="flex-1 text-center sm:text-left">
-                <p className="text-sm text-gray-500">Click the camera icon to change your profile picture.</p>
-                <p className="text-xs text-gray-400">JPEG, PNG, WEBP, GIF up to 5MB</p>
-              </div>
-            </div>
 
-            {/* Full Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
-                required
-                disabled={saving}
-                placeholder="John Doe"
-              />
-            </div>
-
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-              <div className="relative">
+              {/* Full Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                 <input
                   type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                  className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:ring-2 transition ${
-                    usernameAvailable === true && username.length >= 3
-                      ? 'border-green-500 focus:ring-green-200'
-                      : usernameAvailable === false && username.length >= 3
-                      ? 'border-red-500 focus:ring-red-200'
-                      : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
-                  }`}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                   required
                   disabled={saving}
-                  placeholder="john_doe"
+                  placeholder="John Doe"
                 />
-                {isCheckingUsername && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
-                )}
-                {!isCheckingUsername && username.length >= 3 && usernameAvailable === true && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
-                )}
-                {!isCheckingUsername && username.length >= 3 && usernameAvailable === false && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
-                )}
               </div>
-              <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
-            </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value.trim())}
-                  className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:ring-2 transition ${
-                    emailAvailable === true && email.includes('@')
-                      ? 'border-green-500 focus:ring-green-200'
-                      : emailAvailable === false && email.includes('@')
-                      ? 'border-red-500 focus:ring-red-200'
-                      : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
-                  }`}
-                  required
+              {/* Username */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:ring-2 transition ${
+                      usernameAvailable === true && username.length >= 3
+                        ? 'border-green-500 focus:ring-green-200'
+                        : usernameAvailable === false && username.length >= 3
+                        ? 'border-red-500 focus:ring-red-200'
+                        : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                    }`}
+                    required
+                    disabled={saving}
+                    placeholder="john_doe"
+                  />
+                  {isCheckingUsername && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
+                  )}
+                  {!isCheckingUsername && username.length >= 3 && usernameAvailable === true && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
+                  )}
+                  {!isCheckingUsername && username.length >= 3 && usernameAvailable === false && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value.trim())}
+                    className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:ring-2 transition ${
+                      emailAvailable === true && email.includes('@')
+                        ? 'border-green-500 focus:ring-green-200'
+                        : emailAvailable === false && email.includes('@')
+                        ? 'border-red-500 focus:ring-red-200'
+                        : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                    }`}
+                    required
+                    disabled={saving}
+                    placeholder="you@example.com"
+                  />
+                  {isCheckingEmail && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
+                  )}
+                  {!isCheckingEmail && email.includes('@') && emailAvailable === true && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
+                  )}
+                  {!isCheckingEmail && email.includes('@') && emailAvailable === false && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">Changing your email will update your login credentials.</p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="submit"
                   disabled={saving}
-                  placeholder="you@example.com"
-                />
-                {isCheckingEmail && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
-                )}
-                {!isCheckingEmail && email.includes('@') && emailAvailable === true && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
-                )}
-                {!isCheckingEmail && email.includes('@') && emailAvailable === false && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
-                )}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </span>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push('/profile')}
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
               </div>
-              <p className="mt-1 text-xs text-gray-400">Changing your email will update your login credentials.</p>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 bg-purple-600 text-white py-3 rounded-lg font-medium hover:bg-purple-700 transition disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push('/profile')}
-                className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 transition"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
