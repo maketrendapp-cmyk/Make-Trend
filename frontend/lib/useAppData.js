@@ -42,12 +42,12 @@ export function useAppData() {
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // ============================================================
-  // FETCH FUNCTIONS
+  // FETCH FUNCTIONS (FIXED: removed /api prefix from endpoints)
   // ============================================================
 
   const fetchTemplates = async () => {
     try {
-      const data = await apiRequest('/api/templates');
+      const data = await apiRequest('/templates');  // ← FIXED
       const all = data.templates || [];
       setTemplates(all);
       setFeaturedTemplates(all.filter(t => t.isHighlight === true));
@@ -91,7 +91,7 @@ export function useAppData() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/api/campaigns?limit=25', {}, token);
+      const data = await apiRequest('/campaigns?limit=25', {}, token);  // ← FIXED
       setCampaigns(data.campaigns || []);
     } catch (err) {
       console.error('Campaigns fetch error:', err);
@@ -103,7 +103,7 @@ export function useAppData() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/api/stats', {}, token);
+      const data = await apiRequest('/stats', {}, token);  // ← FIXED
       if (data.success) {
         setStats(data.stats);
       }
@@ -117,7 +117,7 @@ export function useAppData() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/api/support', {}, token);
+      const data = await apiRequest('/support', {}, token);  // ← FIXED
       setSupportTickets(data.tickets || []);
     } catch (err) {
       console.error('Support tickets fetch error:', err);
@@ -126,7 +126,7 @@ export function useAppData() {
 
   const fetchComments = async () => {
     try {
-      const data = await apiRequest('/api/comments');
+      const data = await apiRequest('/comments');  // ← FIXED
       setComments(data.comments || []);
     } catch (err) {
       console.error('Comments fetch error:', err);
@@ -174,11 +174,9 @@ export function useAppData() {
       totalCompletions: 0,
       successfulCampaigns: 0,
     });
-    // Keep templates and comments (public)
   }, []);
 
   return {
-    // Data
     templates,
     featuredTemplates,
     profile,
@@ -187,7 +185,6 @@ export function useAppData() {
     comments,
     stats,
     dataLoaded,
-    // Actions
     loadAllData,
     refetchProfile,
     refetchCampaigns,
