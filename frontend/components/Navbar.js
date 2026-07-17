@@ -5,16 +5,10 @@ import { useAuth } from '../components/AuthScreen';
 import { useState, useEffect } from 'react';
 import {
   FiHome,
-  FiPlus,
   FiUser,
   FiLogOut,
   FiMenu,
   FiX,
-  FiMail,
-  FiDownload,
-  FiInfo,
-  FiShield,
-  FiBook,
 } from 'react-icons/fi';
 
 export default function Navbar() {
@@ -49,13 +43,15 @@ export default function Navbar() {
     { href: '/privacy', label: 'Privacy', icon: <FiShield className="w-4 h-4" /> },
   ];
 
-  const desktopNavLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/create', label: 'Create' },
-    { href: '/about', label: 'About' },
-    { href: '/contact', label: 'Contact' },
-    { href: '/download', label: 'Download' },
-  ];
+  // ── Re-import icons for mobile nav ──
+  const {
+    FiPlus,
+    FiInfo,
+    FiMail,
+    FiDownload,
+    FiShield,
+    FiBook,
+  } = require('react-icons/fi');
 
   const isActive = (path) => router.pathname === path;
 
@@ -73,7 +69,7 @@ export default function Navbar() {
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="flex h-14 sm:h-16 items-center justify-between">
             
-            {/* ── Logo ── */}
+            {/* ── Logo / Home ── */}
             <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
               <img 
                 src="/favicon.ico" 
@@ -85,25 +81,6 @@ export default function Navbar() {
                 <span className="text-gray-900 group-hover:text-purple-600/80 transition">Trend</span>
               </span>
             </Link>
-
-            {/* ── Desktop Navigation Links ── */}
-            <div className="hidden md:flex items-center gap-1">
-              {desktopNavLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`
-                    px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200
-                    ${isActive(link.href)
-                      ? 'bg-purple-100 text-purple-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }
-                  `}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
 
             {/* ── Right side: Auth / User ── */}
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -129,11 +106,11 @@ export default function Navbar() {
                     </span>
                   </Link>
 
-                  {/* Logout Button */}
+                  {/* Logout Button (hidden on mobile) */}
                   <button
                     onClick={handleLogout}
                     className="
-                      flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 sm:py-2 
+                      hidden sm:flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 sm:py-2 
                       text-xs sm:text-sm font-medium text-gray-600 
                       hover:text-red-600 hover:bg-red-50 
                       rounded-lg sm:rounded-xl transition-all duration-200
@@ -141,39 +118,25 @@ export default function Navbar() {
                     "
                   >
                     <FiLogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span className="hidden xs:inline">Logout</span>
+                    <span>Logout</span>
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <Link
-                    href="/auth/login"
-                    className="
-                      px-3 sm:px-4 py-1.5 sm:py-2 
-                      text-xs sm:text-sm font-medium text-gray-600 
-                      hover:text-gray-900 hover:bg-gray-100 
-                      rounded-lg sm:rounded-xl transition-all duration-200
-                      whitespace-nowrap
-                    "
-                  >
-                    Log in
-                  </Link>
-                  <Link
-                    href="/auth/register"
-                    className="
-                      flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2.5 
-                      bg-gradient-to-r from-purple-600 to-indigo-600 
-                      text-white font-semibold rounded-lg sm:rounded-xl 
-                      hover:from-purple-700 hover:to-indigo-700 
-                      transition-all duration-200 shadow-md hover:shadow-lg 
-                      hover:-translate-y-0.5 active:scale-95
-                      text-xs sm:text-sm whitespace-nowrap
-                    "
-                  >
-                    <FiUser className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>Get Started</span>
-                  </Link>
-                </div>
+                <Link
+                  href="/auth/login"
+                  className="
+                    flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2.5 
+                    bg-gradient-to-r from-purple-600 to-indigo-600 
+                    text-white font-semibold rounded-lg sm:rounded-xl 
+                    hover:from-purple-700 hover:to-indigo-700 
+                    transition-all duration-200 shadow-md hover:shadow-lg 
+                    hover:-translate-y-0.5 active:scale-95
+                    text-xs sm:text-sm whitespace-nowrap
+                  "
+                >
+                  <FiUser className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>Get Started</span>
+                </Link>
               )}
 
               {/* ── Mobile Menu Button ── */}
@@ -238,22 +201,13 @@ export default function Navbar() {
                 Logout
               </button>
             ) : (
-              <div className="space-y-2">
-                <Link
-                  href="/auth/login"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-center px-4 py-3 rounded-lg sm:rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all duration-200 w-full"
-                >
-                  Log in
-                </Link>
-                <Link
-                  href="/auth/register"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg sm:rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 w-full"
-                >
-                  Get Started
-                </Link>
-              </div>
+              <Link
+                href="/auth/login"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg sm:rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 w-full"
+              >
+                Get Started
+              </Link>
             )}
           </div>
         </div>
