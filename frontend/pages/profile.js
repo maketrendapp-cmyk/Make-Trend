@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { auth } from '../services/firebase';
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
@@ -13,21 +12,13 @@ import { FaCrown } from 'react-icons/fa';
 
 export default function Profile() {
   const router = useRouter();
-  const { user, logout } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState({
-    totalCampaigns: 0,
-    totalViews: 0,
-    totalUnlocks: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { user, logout, profile: contextProfile, stats, dataLoaded } = useAuth();
+  const [loading, setLoading] = useState(!dataLoaded);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-
   const copyReferralCode = () => {
-    const code = profile?.referralCode || '';
+    const code = contextProfile?.referralCode || '';
     if (!code) return;
     navigator.clipboard.writeText(code).then(() => {
       setCopySuccess('✅ Copied!');
@@ -44,93 +35,12 @@ export default function Profile() {
     });
   };
 
-  // ── Fetch profile ──
-  const fetchProfile = async () => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const url = `${API_BASE}/api/auth/me`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        setProfile({
-          uid: data.user.uid || firebaseUser.uid,
-          username: data.user.username || data.user.email?.split('@')[0] || 'user',
-          fullName: data.user.fullname || data.user.displayName || data.user.email || 'User',
-          email: data.user.email || firebaseUser.email,
-          profilePic: data.user.avatar || data.user.photoURL || firebaseUser.photoURL || null,
-          isPro: data.user.plan === 'pro' || false,
-          referrals: data.user.referrals || 0,
-          referralCode: data.user.referralCode || '',
-        });
-      } else {
-        // fallback to Firebase Auth
-        setProfile({
-          uid: firebaseUser.uid,
-          username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'user',
-          fullName: firebaseUser.displayName || firebaseUser.email || 'User',
-          email: firebaseUser.email,
-          profilePic: firebaseUser.photoURL || null,
-          isPro: false,
-          referrals: 0,
-          referralCode: '',
-        });
-      }
-    } catch (error) {
-      const firebaseUser = auth.currentUser;
-      if (firebaseUser) {
-        setProfile({
-          uid: firebaseUser.uid,
-          username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'user',
-          fullName: firebaseUser.displayName || firebaseUser.email || 'User',
-          email: firebaseUser.email,
-          profilePic: firebaseUser.photoURL || null,
-          isPro: false,
-          referrals: 0,
-          referralCode: '',
-        });
-      }
-    }
-  };
-
-  // ── Fetch stats from new /api/stats endpoint ──
-  const fetchStats = async () => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const url = `${API_BASE}/api/stats`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setStats({
-          totalCampaigns: data.stats.totalCampaigns || 0,
-          totalViews: data.stats.totalViews || 0,
-          totalUnlocks: data.stats.totalUnlocks || 0,
-        });
-      }
-    } catch (error) {
-      // silent fail
-    }
-  };
-
+  // ── profile and stats are already loaded from AuthContext ──
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(firebaseUser => {
-      if (firebaseUser) {
-        setLoading(true);
-        Promise.all([fetchProfile(), fetchStats()])
-          .finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+    if (dataLoaded) {
+      setLoading(false);
+    }
+  }, [dataLoaded]);
 
   const handleLogout = async () => {
     try {
@@ -142,24 +52,24 @@ export default function Profile() {
     }
   };
 
-  const displayUser = profile || {
+  const displayUser = contextProfile || {
     username: 'guest',
     fullName: 'Guest User',
-    email: auth.currentUser?.email || 'guest@example.com',
-    profilePic: auth.currentUser?.photoURL || null,
+    email: 'guest@example.com',
+    profilePic: null,
     isPro: false,
     referrals: 0,
     referralCode: '',
   };
 
   const statsItems = [
-    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats.totalCampaigns },
-    { icon: FiEye, label: 'Total Views', value: stats.totalViews },
-    { icon: FiUnlock, label: 'Total Unlocks', value: stats.totalUnlocks },
+    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats.totalCampaigns || 0 },
+    { icon: FiEye, label: 'Total Views', value: stats.totalViews || 0 },
+    { icon: FiUnlock, label: 'Total Unlocks', value: stats.totalUnlocks || 0 },
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
-  // ✅ Quick Actions – removed Billing & Subscription, Logout is only in header
+  // ✅ Quick Actions
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -167,7 +77,7 @@ export default function Profile() {
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
   ];
 
-  // ✅ Explore – replaced "Platform" with "Follow Us"
+  // ✅ Explore
   const exploreOptions = [
     { icon: FiGrid, label: 'Follow Us', href: '/follow' },
     { icon: FiInfo, label: 'About Make Trend', href: '/about' },
@@ -180,8 +90,8 @@ export default function Profile() {
     { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
   ];
 
-  // ── Skeleton Loader ──
-  if (loading) {
+  // ── Skeleton Loader (show only if data not loaded yet) ──
+  if (loading || !dataLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -276,7 +186,7 @@ export default function Profile() {
               <p className="text-gray-400 text-sm">{displayUser.email}</p>
 
               {/* ── Referral Code ── */}
-              {auth.currentUser && (
+              {user && (
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-medium text-gray-500">Referral Code:</span>
                   {displayUser.referralCode ? (
@@ -298,10 +208,10 @@ export default function Profile() {
                 </div>
               )}
 
-              {!auth.currentUser && <p className="text-sm text-gray-400 mt-2">Sign in to access your dashboard</p>}
+              {!user && <p className="text-sm text-gray-400 mt-2">Sign in to access your dashboard</p>}
             </div>
 
-            {!auth.currentUser ? (
+            {!user ? (
               <Link href="/login">
                 <button className="px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
                   Login
@@ -320,7 +230,7 @@ export default function Profile() {
         </div>
 
         {/* ── Stats Grid ── */}
-        {auth.currentUser && (
+        {user && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             {statsItems.map((stat, index) => (
               <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
@@ -350,7 +260,7 @@ export default function Profile() {
         </div>
 
         {/* ── Refer & Affiliates ── */}
-        {auth.currentUser && (
+        {user && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Refer & Affiliates</h2>
             <div className="flex items-center justify-between flex-wrap gap-3">

@@ -25,7 +25,7 @@ import { FaWhatsapp, FaTelegram, FaTwitter } from 'react-icons/fa';
 export default function Contact() {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
-    name: user?.fullname || '',
+    name: user?.fullName || '',  // ← changed from fullname to fullName
     email: user?.email || '',
     subject: '',
     message: '',
@@ -111,7 +111,7 @@ export default function Contact() {
       
       // Reset form after successful send
       setFormData({
-        name: user?.fullname || '',
+        name: user?.fullName || '',  // ← changed from fullname to fullName
         email: user?.email || '',
         subject: '',
         message: '',

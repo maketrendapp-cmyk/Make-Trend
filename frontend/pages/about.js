@@ -32,8 +32,7 @@ import {
 import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin } from 'react-icons/fa';
 import { useAuth } from '../components/AuthScreen';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-const API_BASE = BACKEND_URL + '/api';
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
 // ── Custom hooks ──
 function useFadeUp(threshold = 0.1) {
@@ -155,16 +154,16 @@ function Milestone({ year, title, description, icon }) {
 
 export default function About() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [comments, setComments] = useState([]);
+  const { user, comments, dataLoaded, refetchComments } = useAuth();
   const [commentName, setCommentName] = useState('');
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingComments, setLoadingComments] = useState(true);
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
+  const [loadingComments, setLoadingComments] = useState(!dataLoaded);
+
   const toggleFaq = (index) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
   };
@@ -191,17 +190,12 @@ export default function About() {
   ];
   const counters = stats.map(s => useCounter(s.target));
 
-  // ── Fetch comments ──
-  const fetchComments = useCallback(async () => {
-    try {
-      setLoadingComments(true);
-      const res = await fetch(`${API_BASE}/comments`);
-      if (!res.ok) throw new Error('Failed to fetch comments');
-      const data = await res.json();
-      if (data.success) setComments(data.comments || []);
-    } catch (err) { console.error('Comments fetch error:', err); } finally { setLoadingComments(false); }
-  }, []);
-  useEffect(() => { fetchComments(); }, [fetchComments]);
+  // ── comments are already loaded from AuthContext ──
+  useEffect(() => {
+    if (dataLoaded) {
+      setLoadingComments(false);
+    }
+  }, [dataLoaded]);
 
   // ── Submit comment ──
   const handleSubmitComment = async (e) => {
@@ -231,7 +225,7 @@ export default function About() {
       if (data.success) {
         setSubmitMessage('✅ Thank you for your feedback!');
         setCommentName(''); setCommentText(''); setCommentRating(5);
-        await fetchComments();
+        await refetchComments();
         setTimeout(() => setSubmitMessage(''), 5000);
       } else {
         setSubmitMessage(data.error || 'Failed to submit comment.');
@@ -618,9 +612,9 @@ export default function About() {
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <FiMessageCircle className="w-5 h-5 text-purple-600" />
-              Latest Reviews ({comments.length})
+              Latest Reviews ({comments?.length || 0})
             </h3>
-            {loadingComments ? (
+            {loadingComments || !dataLoaded ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 animate-pulse">
@@ -630,31 +624,31 @@ export default function About() {
                   </div>
                 ))}
               </div>
-            ) : comments.length === 0 ? (
+            ) : comments && comments.length === 0 ? (
               <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-gray-200">
                 <p className="text-gray-500">No reviews yet. Be the first!</p>
               </div>
-            ) : (
+            ) : comments && comments.length > 0 ? (
               <div className="space-y-3">
                 {comments.map((c) => (
                   <div key={c.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">
-                          {c.name.charAt(0).toUpperCase()}
+                          {c.name?.charAt(0).toUpperCase() || '?'}
                         </div>
-                        <span className="font-medium text-gray-800 text-sm">{c.name}</span>
+                        <span className="font-medium text-gray-800 text-sm">{c.name || 'Anonymous'}</span>
                       </div>
-                      <StarRating rating={c.rating} readonly />
+                      <StarRating rating={c.rating || 5} readonly />
                     </div>
-                    <p className="text-gray-600 text-sm mt-1">{c.comment}</p>
+                    <p className="text-gray-600 text-sm mt-1">{c.comment || ''}</p>
                     <p className="text-xs text-gray-400 mt-1">
                       {c.createdAt?.toDate?.()?.toLocaleDateString() || 'Just now'}
                     </p>
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </section>

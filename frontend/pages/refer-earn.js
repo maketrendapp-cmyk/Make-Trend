@@ -4,14 +4,14 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import Link from 'next/link';
-import { FiCopy, FiUsers, FiUserPlus, FiShare2, FiChevronRight } from 'react-icons/fi';
+import { FiCopy, FiUsers, FiUserPlus, FiShare2, FiChevronRight, FiLogIn } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
 export default function ReferEarn() {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
+  const { user, dataLoaded } = useAuth();
   const [loading, setLoading] = useState(true);
   const [referralData, setReferralData] = useState({
     referralCode: '',
@@ -21,12 +21,13 @@ export default function ReferEarn() {
   });
   const [copySuccess, setCopySuccess] = useState('');
 
+  // ── Fetch referral data locally ──
   useEffect(() => {
     const fetchReferrals = async () => {
       try {
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) {
-          router.push('/login');
+          setLoading(false);
           return;
         }
         const token = await firebaseUser.getIdToken();
@@ -51,7 +52,7 @@ export default function ReferEarn() {
       }
     };
     fetchReferrals();
-  }, [router]);
+  }, []);
 
   const copyReferralCode = () => {
     const code = referralData.referralCode;
@@ -85,12 +86,58 @@ export default function ReferEarn() {
     }
   };
 
-  if (loading) {
+  // ── Show loading while auth is loading ──
+  if (!dataLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Unauthenticated – Show Login Prompt ──
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FiUsers className="w-10 h-10 text-purple-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Refer & Earn</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Sign in to get your referral code and start earning rewards by inviting friends.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md w-full"
+          >
+            <FiLogIn className="w-5 h-5" />
+            Sign In
+          </button>
+          <p className="mt-4 text-xs text-gray-400">
+            Don't have an account?{' '}
+            <button
+              onClick={() => router.push('/login')}
+              className="text-purple-600 hover:underline font-medium"
+            >
+              Create one
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Show loading while fetching referrals ──
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading referrals...</p>
         </div>
       </div>
     );

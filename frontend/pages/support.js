@@ -1,5 +1,5 @@
 // pages/support.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
@@ -10,11 +10,10 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 
 export default function Support() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const { user, profile: contextProfile, supportTickets, dataLoaded, refetchSupportTickets } = useAuth();
+  const [loading, setLoading] = useState(!dataLoaded);
   const [submitting, setSubmitting] = useState(false);
-  const [tickets, setTickets] = useState([]);
-  const [profile, setProfile] = useState(null);
+  const [tickets, setTickets] = useState(supportTickets || []);
 
   // Form fields
   const [title, setTitle] = useState('');
@@ -26,50 +25,26 @@ export default function Support() {
 
   const fileInputRef = useRef(null);
 
-  // Fetch user profile and tickets
+  // ── Update tickets when context updates ──
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-          router.push('/login');
-          return;
-        }
+    if (supportTickets) {
+      setTickets(supportTickets);
+    }
+  }, [supportTickets]);
 
-        const token = await firebaseUser.getIdToken();
+  // ── Set loading false when data is loaded ──
+  useEffect(() => {
+    if (dataLoaded) {
+      setLoading(false);
+    }
+  }, [dataLoaded]);
 
-        // Fetch profile
-        const profileRes = await fetch(`${API_BASE}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const profileData = await profileRes.json();
-        if (profileData.success && profileData.user) {
-          setProfile(profileData.user);
-        } else {
-          setProfile({
-            username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'user',
-            fullname: firebaseUser.displayName || firebaseUser.email || 'User',
-            email: firebaseUser.email,
-            avatar: firebaseUser.photoURL || '',
-          });
-        }
-
-        // Fetch tickets
-        const ticketsRes = await fetch(`${API_BASE}/api/support`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const ticketsData = await ticketsRes.json();
-        if (ticketsData.success) {
-          setTickets(ticketsData.tickets || []);
-        }
-      } catch (err) {
-        console.error('Fetch support data error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [router]);
+  // ── Redirect if not authenticated ──
+  useEffect(() => {
+    if (dataLoaded && !user) {
+      router.push('/login');
+    }
+  }, [dataLoaded, user, router]);
 
   // ── Image upload handler ──
   const handleImageChange = (e) => {
@@ -118,6 +93,11 @@ export default function Support() {
 
     try {
       const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        setError('You must be logged in.');
+        setSubmitting(false);
+        return;
+      }
       const token = await firebaseUser.getIdToken();
 
       // 1) Upload image if any
@@ -151,7 +131,8 @@ export default function Support() {
       const createData = await createRes.json();
       if (createData.success) {
         setSuccess('Report submitted successfully!');
-        setTickets(prev => [createData.ticket, ...prev]);
+        // Refresh tickets from context
+        await refetchSupportTickets();
         setTitle('');
         setDescription('');
         removeImage();
@@ -201,7 +182,7 @@ export default function Support() {
     }
   };
 
-  if (loading) {
+  if (loading || !dataLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -212,11 +193,11 @@ export default function Support() {
     );
   }
 
-  const displayUser = profile || {
+  const displayUser = contextProfile || {
     username: 'User',
     fullname: 'User',
-    email: auth.currentUser?.email || 'user@example.com',
-    avatar: auth.currentUser?.photoURL || '',
+    email: user?.email || 'user@example.com',
+    avatar: user?.photoURL || '',
   };
 
   return (

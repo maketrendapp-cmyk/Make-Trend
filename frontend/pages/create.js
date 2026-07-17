@@ -2,9 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-const API_BASE = BACKEND_URL + '/api';
+import { useAuth } from '../components/AuthScreen';
 
 // ── Emoji mapping for categories ──
 const categoryEmojis = {
@@ -27,16 +25,14 @@ export default function Create() {
   const { slug: highlightSlug, search: initialSearch } = router.query;
 
   // ── State ──
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { templates, dataLoaded } = useAuth();
   const [searchQuery, setSearchQuery] = useState(initialSearch || '');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
+  // retryCount removed – data is globally available
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
@@ -48,40 +44,20 @@ export default function Create() {
     }
   }, [initialSearch]);
 
-  // ── Fetch templates ──
+  // ── templates are already loaded from AuthContext ──
   useEffect(() => {
-    const fetchTemplates = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`${API_BASE}/templates`);
-        if (!res.ok) throw new Error(`HTTP ${res.status} - ${res.statusText}`);
-        const data = await res.json();
-        if (data.success) {
-          setTemplates(data.templates || []);
-          if (highlightSlug) {
-            const found = data.templates.find(t => t.slug === highlightSlug);
-            if (found) {
-              setHighlightedId(found.id);
-              highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
-            }
-          }
-        } else {
-          throw new Error(data.error || 'Failed to fetch templates');
-        }
-      } catch (err) {
-        setError(err.message);
-        console.error('Fetch error:', err);
-      } finally {
-        setLoading(false);
+    if (highlightSlug && templates.length > 0) {
+      const found = templates.find(t => t.slug === highlightSlug);
+      if (found) {
+        setHighlightedId(found.id);
+        highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
       }
-    };
-    fetchTemplates();
+    }
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [highlightSlug, retryCount]);
+  }, [highlightSlug, templates]);
 
   useEffect(() => {
     if (highlightedId) {
@@ -189,30 +165,8 @@ export default function Create() {
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
-  // ── Error state ──
-  if (error) {
-    return (
-      <>
-        <Meta title="Error" />
-        <main className="max-w-md mx-auto px-6 py-20 text-center">
-          <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">⚠️</span>
-          </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-1">Failed to load templates</h2>
-          <p className="text-slate-500 text-xs mb-5">{error}</p>
-          <button
-            type="button"
-            onClick={() => setRetryCount(prev => prev + 1)}
-            className="w-full py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/95 transition active:scale-95"
-          >
-            Try Again
-          </button>
-        </main>
-      </>
-    );
-  }
-
-  if (!loading && templates.length === 0) {
+  // ── No templates state (after data is loaded) ──
+  if (dataLoaded && templates.length === 0) {
     return (
       <>
         <Meta title="No Templates" />
@@ -425,7 +379,7 @@ export default function Create() {
         </div>
 
         {/* ── Regular Templates Grid ── */}
-        {loading ? (
+        {!dataLoaded ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">

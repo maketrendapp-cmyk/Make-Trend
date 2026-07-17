@@ -1,7 +1,8 @@
 // pages/index.js
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
+import { useAuth } from '../components/AuthScreen';
 import {
   FiZap,
   FiTrendingUp,
@@ -14,9 +15,6 @@ import {
   FiShare2,
 } from 'react-icons/fi';
 import { FaRocket, FaChartLine, FaUserFriends } from 'react-icons/fa';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-const API_BASE = BACKEND_URL + '/api';
 
 // ── Custom hooks ──
 function useFadeUp(threshold = 0.1) {
@@ -107,9 +105,7 @@ const platformBadgeStyles = {
 
 export default function Home() {
   const router = useRouter();
-  const [featuredTemplates, setFeaturedTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { featuredTemplates } = useAuth();
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,29 +132,7 @@ export default function Home() {
   const counter4 = useCounter(1200);
   const counters = [counter1, counter2, counter3, counter4];
 
-  // ── Fetch featured templates ──
-  useEffect(() => {
-    const fetchFeatured = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`${API_BASE}/templates?highlight=true`);
-        if (!res.ok) throw new Error('Failed to fetch featured templates');
-        const data = await res.json();
-        if (data.success) {
-          setFeaturedTemplates(data.templates || []);
-        } else {
-          throw new Error(data.error || 'Invalid response');
-        }
-      } catch (err) {
-        setError(err.message);
-        console.error('Featured fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFeatured();
-  }, []);
+  // ── featuredTemplates are already loaded from AuthContext ──
 
   // ── Carousel auto‑slide (2 seconds) ──
   useEffect(() => {
@@ -216,40 +190,12 @@ export default function Home() {
 
   // ── Render carousel ──
   const renderCarousel = () => {
-    if (loading) {
-      return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
-          <div className="w-full aspect-video bg-slate-200" />
-          <div className="p-4 space-y-2">
-            <div className="h-4 bg-slate-200 rounded w-2/3" />
-            <div className="h-3 bg-slate-200 rounded w-1/2" />
-            <div className="flex gap-2 mt-2">
-              <div className="h-8 w-16 bg-slate-200 rounded" />
-              <div className="h-8 w-16 bg-slate-200 rounded" />
-            </div>
-          </div>
-        </div>
-      );
-    }
+    // No loading or error states needed – data is already loaded globally
 
-    if (error) {
-      return (
-        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-red-200">
-          <p className="text-red-500">Failed to load featured templates: {error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
-          >
-            Retry
-          </button>
-        </div>
-      );
-    }
-
-    if (featuredTemplates.length === 0) {
+    if (!featuredTemplates || featuredTemplates.length === 0) {
       return (
         <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
-          <p className="text-slate-500">No featured templates available yet.</p>
+          <p className="text-slate-500">No featured templates available.</p>
         </div>
       );
     }

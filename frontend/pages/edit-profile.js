@@ -3,14 +3,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
-import axios from 'axios';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
 export default function EditProfile() {
   const router = useRouter();
-  const { user, refreshUser } = useAuth(); // we'll refresh after update
-  const [loading, setLoading] = useState(true);
+  const { user, profile: contextProfile, refreshUser, dataLoaded } = useAuth();
+  const [loading, setLoading] = useState(!dataLoaded);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -33,52 +32,27 @@ export default function EditProfile() {
   const usernameTimer = useRef(null);
   const emailTimer = useRef(null);
 
-  // Load current user data from context or direct fetch
+  // ── Populate form from contextProfile ──
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-          router.push('/login');
-          return;
-        }
-        // Fetch fresh profile from /auth/me
-        const token = await firebaseUser.getIdToken();
-        const res = await axios.get(`${API_BASE}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.data.success && res.data.user) {
-          const data = res.data.user;
-          setFullName(data.fullname || '');
-          setUsername(data.username || '');
-          setEmail(data.email || '');
-          setCurrentAvatar(data.avatar || '');
-          setAvatarPreview(data.avatar || '');
-        } else {
-          // fallback to context user
-          if (user) {
-            setFullName(user.fullName || user.fullname || '');
-            setUsername(user.username || '');
-            setEmail(user.email || '');
-            setCurrentAvatar(user.avatar || user.photoURL || '');
-            setAvatarPreview(user.avatar || user.photoURL || '');
-          }
-        }
-      } catch (err) {
-        console.error('Load user error:', err);
-        if (user) {
-          setFullName(user.fullName || user.fullname || '');
-          setUsername(user.username || '');
-          setEmail(user.email || '');
-          setCurrentAvatar(user.avatar || user.photoURL || '');
-          setAvatarPreview(user.avatar || user.photoURL || '');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadUser();
-  }, [user, router]);
+    if (contextProfile) {
+      setFullName(contextProfile.fullname || contextProfile.name || '');
+      setUsername(contextProfile.username || '');
+      setEmail(contextProfile.email || '');
+      setCurrentAvatar(contextProfile.avatar || contextProfile.profilePic || '');
+      setAvatarPreview(contextProfile.avatar || contextProfile.profilePic || '');
+      setLoading(false);
+    } else if (dataLoaded) {
+      // If data is loaded but no profile, user might not be logged in
+      setLoading(false);
+    }
+  }, [contextProfile, dataLoaded]);
+
+  // ── Redirect if not authenticated ──
+  useEffect(() => {
+    if (dataLoaded && !user) {
+      router.push('/login');
+    }
+  }, [dataLoaded, user, router]);
 
   // ── Check username availability ──
   useEffect(() => {
@@ -94,7 +68,7 @@ export default function EditProfile() {
         const data = await res.json();
         if (data.success) {
           // If the username is the current one, it's available (we're not changing)
-          const currentUsername = user?.username || '';
+          const currentUsername = contextProfile?.username || '';
           setUsernameAvailable(data.available || (username === currentUsername));
         } else {
           setUsernameAvailable(false);
@@ -106,7 +80,7 @@ export default function EditProfile() {
       }
     }, 500);
     return () => clearTimeout(usernameTimer.current);
-  }, [username, user?.username]);
+  }, [username, contextProfile?.username]);
 
   // ── Check email availability ──
   useEffect(() => {
@@ -121,7 +95,7 @@ export default function EditProfile() {
         const res = await fetch(`${API_BASE}/api/auth/check-email?email=${encodeURIComponent(email)}`);
         const data = await res.json();
         if (data.success) {
-          const currentEmail = user?.email || '';
+          const currentEmail = contextProfile?.email || '';
           setEmailAvailable(data.exists ? (email === currentEmail) : true);
         } else {
           setEmailAvailable(false);
@@ -133,7 +107,7 @@ export default function EditProfile() {
       }
     }, 500);
     return () => clearTimeout(emailTimer.current);
-  }, [email, user?.email]);
+  }, [email, contextProfile?.email]);
 
   // ── Avatar upload handler ──
   const handleAvatarChange = (e) => {
@@ -190,6 +164,7 @@ export default function EditProfile() {
       let avatarUrl = currentAvatar;
       if (avatarFile) {
         const firebaseUser = auth.currentUser;
+        if (!firebaseUser) throw new Error('Not authenticated');
         const token = await firebaseUser.getIdToken();
         const formData = new FormData();
         formData.append('image', avatarFile);
@@ -208,6 +183,7 @@ export default function EditProfile() {
 
       // 2) Update profile
       const firebaseUser = auth.currentUser;
+      if (!firebaseUser) throw new Error('Not authenticated');
       const token = await firebaseUser.getIdToken();
       const payload = { username, fullname: fullName, email, avatar: avatarUrl };
       const updateRes = await fetch(`${API_BASE}/api/auth/profile`, {

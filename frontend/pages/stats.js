@@ -17,16 +17,25 @@ import {
   FiTrash2,
   FiClock,
   FiLink,
+  FiLogIn,
+  FiArrowRight,
 } from 'react-icons/fi';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-const API_BASE = BACKEND_URL + '/api';
 
 export default function Stats() {
   const router = useRouter();
-  const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
-  const [campaigns, setCampaigns] = useState([]);
-  const [stats, setStats] = useState({
+  const { 
+    user, 
+    isAuthenticated, 
+    needsCompletion, 
+    loading, 
+    refreshUser, 
+    campaigns: contextCampaigns, 
+    stats: contextStats,
+    dataLoaded 
+  } = useAuth();
+  
+  const [campaigns, setCampaigns] = useState(contextCampaigns || []);
+  const [stats, setStats] = useState(contextStats || {
     totalCampaigns: 0,
     totalViews: 0,
     totalUnlocks: 0,
@@ -34,7 +43,7 @@ export default function Stats() {
     totalCompletions: 0,
     successfulCampaigns: 0,
   });
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(!dataLoaded);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [lastCreatedAt, setLastCreatedAt] = useState(null);
@@ -96,7 +105,7 @@ export default function Stats() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) { setLoadingMore(false); return; }
       const token = await firebaseUser.getIdToken();
-      let url = `${API_BASE}/campaigns?limit=25`;
+      let url = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns?limit=25`;
       if (!isInitial && lastCreatedAt && lastId) {
         url += `&lastCreatedAt=${lastCreatedAt}&lastId=${lastId}`;
       }
@@ -126,40 +135,35 @@ export default function Stats() {
     }
   }, [hasMore, lastCreatedAt, lastId, loadingMore]);
 
-  // ===== FETCH STATS =====
-  const fetchStats = useCallback(async () => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const res = await fetch(`${API_BASE}/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Server error (${res.status})`);
-      const data = await res.json();
-      if (data.success) {
-        setStats(data.stats);
-      }
-    } catch (error) {
-      console.error('❌ fetchStats error:', error.message);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  // ===== LOAD INITIAL DATA =====
+  // ===== LOAD INITIAL DATA – use context if available, otherwise fetch =====
   useEffect(() => {
-    if (isAuthenticated && !needsCompletion) {
-      setStatsLoading(true);
+    if (!isAuthenticated || needsCompletion) {
+      setStatsLoading(false);
+      return;
+    }
+
+    // If data is already loaded from context, use it
+    if (dataLoaded && contextCampaigns && contextCampaigns.length > 0) {
+      setCampaigns(contextCampaigns);
+      // Update stats from context
+      if (contextStats) {
+        setStats(contextStats);
+      }
+      setStatsLoading(false);
+      // Reset pagination for infinite scroll
       setHasMore(true);
       setLastCreatedAt(null);
       setLastId(null);
-      Promise.all([fetchCampaigns(true), fetchStats()])
-        .finally(() => setStatsLoading(false));
-    } else {
-      setStatsLoading(false);
+      return;
     }
-  }, [isAuthenticated, needsCompletion]);
+
+    // Otherwise, fetch initial page from API
+    setStatsLoading(true);
+    setHasMore(true);
+    setLastCreatedAt(null);
+    setLastId(null);
+    fetchCampaigns(true).finally(() => setStatsLoading(false));
+  }, [isAuthenticated, needsCompletion, dataLoaded, contextCampaigns, contextStats]);
 
   // ===== INFINITE SCROLL OBSERVER =====
   useEffect(() => {
@@ -201,7 +205,7 @@ export default function Stats() {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) { alert('You must be logged in'); return; }
       const token = await firebaseUser.getIdToken();
-      const res = await fetch(`${API_BASE}/campaigns/${campaignId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${campaignId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -210,12 +214,11 @@ export default function Stats() {
         setCampaigns(campaigns.filter((c) => c.id !== campaignId));
         setMessage('✅ Campaign deleted successfully!');
         setTimeout(() => setMessage(''), 3000);
-        // Re‑fetch stats and reset pagination
+        // Re‑fetch campaigns and reset pagination
         setHasMore(true);
         setLastCreatedAt(null);
         setLastId(null);
         await fetchCampaigns(true);
-        await fetchStats();
       } else {
         alert(data.error || 'Failed to delete campaign');
       }
@@ -246,7 +249,7 @@ export default function Stats() {
         features: editForm.features,
       };
 
-      const res = await fetch(`${API_BASE}/campaigns/${editingCampaign.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${editingCampaign.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -258,12 +261,11 @@ export default function Stats() {
       const data = await res.json();
       if (data.success) {
         setMessage('✅ Campaign updated successfully!');
-        // Refresh campaign list and stats
+        // Refresh campaign list
         setHasMore(true);
         setLastCreatedAt(null);
         setLastId(null);
         await fetchCampaigns(true);
-        await fetchStats();
         setTimeout(() => {
           setShowEditModal(false);
           document.body.style.overflow = 'unset';
@@ -313,8 +315,69 @@ export default function Stats() {
     setEditForm((prev) => ({ ...prev, tasks: updated }));
   };
 
-  // ===== SKELETON LOADING =====
-  if (loading) {
+  // ============================================================
+  // UNAUTHENTICATED – Show Login Prompt
+  // ============================================================
+  if (!isAuthenticated && !loading) {
+    return (
+      <>
+        <Meta title="Dashboard" description="Track your campaign performance." />
+        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiBarChart2 className="w-10 h-10 text-purple-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Track Your Stats</h2>
+            <p className="text-gray-500 text-sm mb-6">
+              Sign in to view your campaign analytics, track performance, and manage your campaigns.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => router.push('/login')}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <FiLogIn className="w-5 h-5" />
+                Sign In
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all duration-200"
+              >
+                <FiArrowRight className="w-5 h-5" />
+                Browse Templates
+              </button>
+            </div>
+            <p className="mt-4 text-xs text-gray-400">
+              Don't have an account?{' '}
+              <button
+                onClick={() => router.push('/login')}
+                className="text-purple-600 hover:underline font-medium"
+              >
+                Create one
+              </button>
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ============================================================
+  // NEEDS PROFILE COMPLETION
+  // ============================================================
+  if (needsCompletion) {
+    return (
+      <>
+        <Meta title="Complete Profile" description="Complete your profile." />
+        <AuthScreen onSuccess={refreshUser} />
+      </>
+    );
+  }
+
+  // ============================================================
+  // SKELETON LOADING (only if auth loading or data not loaded)
+  // ============================================================
+  if (loading || !dataLoaded) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 animate-pulse">
@@ -353,24 +416,9 @@ export default function Stats() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Meta title="Stats" description="Track your campaign performance." />
-        <AuthScreen onSuccess={refreshUser} />
-      </>
-    );
-  }
-
-  if (needsCompletion) {
-    return (
-      <>
-        <Meta title="Complete Profile" description="Complete your profile." />
-        <AuthScreen onSuccess={refreshUser} />
-      </>
-    );
-  }
-
+  // ============================================================
+  // MAIN RENDER
+  // ============================================================
   return (
     <>
       <Meta title="Dashboard" description="Manage your campaigns and track performance." />

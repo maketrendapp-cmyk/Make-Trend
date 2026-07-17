@@ -11,8 +11,8 @@ import {
 
 export default function ChangePassword() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const { user, dataLoaded } = useAuth();
+  const [loading, setLoading] = useState(!dataLoaded);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -25,21 +25,23 @@ export default function ChangePassword() {
   const [showNew, setShowNew] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
 
+  // ── Check if user has email/password provider ──
   useEffect(() => {
-    const checkUser = async () => {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        router.push('/login');
-        return;
-      }
-      // Check if user has email/password provider
+    if (!dataLoaded) return;
+
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    const firebaseUser = auth.currentUser;
+    if (firebaseUser) {
       const providerData = firebaseUser.providerData || [];
       const hasEmailProvider = providerData.some(p => p.providerId === 'password');
       setHasPassword(hasEmailProvider);
-      setLoading(false);
-    };
-    checkUser();
-  }, [router]);
+    }
+    setLoading(false);
+  }, [dataLoaded, user, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
