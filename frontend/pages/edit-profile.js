@@ -5,7 +5,7 @@ import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com') + '/api';
 
 export default function EditProfile() {
   const router = useRouter();
@@ -64,7 +64,7 @@ export default function EditProfile() {
     setIsCheckingUsername(true);
     usernameTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/auth/check-username?username=${encodeURIComponent(username)}`);
+        const res = await fetch(`${API_BASE}/auth/check-username?username=${encodeURIComponent(username)}`);
         const data = await res.json();
         if (data.success) {
           const currentUsername = contextProfile?.username || '';
@@ -91,7 +91,7 @@ export default function EditProfile() {
     setIsCheckingEmail(true);
     emailTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/auth/check-email?email=${encodeURIComponent(email)}`);
+        const res = await fetch(`${API_BASE}/auth/check-email?email=${encodeURIComponent(email)}`);
         const data = await res.json();
         if (data.success) {
           const currentEmail = contextProfile?.email || '';
@@ -183,7 +183,7 @@ export default function EditProfile() {
 
       // 2) Update profile
       const payload = { username, fullname: fullName, email, avatar: avatarUrl };
-      const updateRes = await fetch(`${API_BASE}/api/auth/profile`, {
+      const updateRes = await fetch(`${API_BASE}/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -201,7 +201,6 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Submit error:', err);
-      // More user-friendly error messages
       if (err.message === 'Not authenticated') {
         setError('You are not logged in. Please log in again.');
       } else if (err.message.includes('avatar')) {
@@ -219,10 +218,10 @@ export default function EditProfile() {
     return (
       <>
         <Meta title="Loading Profile | Make Trend" />
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-purple-50/30">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
+            <div className="animate-spin rounded-full h-14 w-14 border-4 border-purple-600 border-t-transparent mx-auto"></div>
+            <p className="mt-4 text-gray-600 font-medium">Loading profile...</p>
           </div>
         </div>
       </>
@@ -235,8 +234,19 @@ export default function EditProfile() {
         title="Edit Profile | Make Trend"
         description="Update your name, username, email, and profile picture on Make Trend."
       />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 py-8">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4">
+        <div className="max-w-2xl mx-auto">
+          {/* ── Back Button ── */}
+          <button
+            onClick={() => router.back()}
+            className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-4 px-3 py-1.5 rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            Back
+          </button>
+
           <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-8 backdrop-blur-sm transition-all hover:shadow-2xl">
             <h1 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center gap-3">
               <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Edit</span> Profile
@@ -249,17 +259,17 @@ export default function EditProfile() {
               </div>
             )}
             {success && (
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-start gap-2">
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-start gap-2 animate-fadeIn">
                 <span className="text-green-500 text-lg">✅</span>
                 <span>{success}</span>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Avatar */}
+              {/* ── Avatar ── */}
               <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
                 <div className="relative">
-                  <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white">
+                  <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white shadow-md">
                     {avatarPreview ? (
                       <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
@@ -290,7 +300,7 @@ export default function EditProfile() {
                 </div>
               </div>
 
-              {/* Full Name */}
+              {/* ── Full Name ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                 <input
@@ -304,7 +314,7 @@ export default function EditProfile() {
                 />
               </div>
 
-              {/* Username */}
+              {/* ── Username ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
                 <div className="relative">
@@ -336,7 +346,7 @@ export default function EditProfile() {
                 <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
               </div>
 
-              {/* Email */}
+              {/* ── Email ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <div className="relative">
@@ -368,7 +378,7 @@ export default function EditProfile() {
                 <p className="mt-1 text-xs text-gray-400">Changing your email will update your login credentials.</p>
               </div>
 
-              {/* Buttons */}
+              {/* ── Buttons ── */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="submit"
@@ -400,6 +410,16 @@ export default function EditProfile() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
     </>
   );
 }
