@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import {
   auth,
   onAuthStateChanged,
+  onIdTokenChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -69,13 +70,15 @@ async function apiRequest(endpoint, options = {}, token = null) {
 // ============================================================
 const AuthContext = createContext();
 
-export function AuthProvider({ children }) {
+export function AuthProvider({ children, initialUser }) {
   // --- AUTH STATE ---
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
+  const loadedFromCookieRef = useRef(false);
+  const cookieUidRef = useRef(null);
 
   // --- ALL DATA FROM useAppData ---
   const {
@@ -137,10 +140,45 @@ export function AuthProvider({ children }) {
   }, []);
 
   // --- AUTH STATE LISTENER ---
+  // 1️⃣ Fast: load user from server-side cookie token
+  useEffect(() => {
+    let isMounted = true;
+    const loadFromCookie = async () => {
+      if (initialUser && initialUser.token && !user) {
+        try {
+          const data = await apiRequest('/auth/me', {}, initialUser.token);
+          if (data.success && data.user && isMounted) {
+            setUser(data.user);
+            setIsAuthenticated(true);
+            setNeedsCompletion(false);
+            loadedFromCookieRef.current = true;
+            cookieUidRef.current = data.user.uid;
+            // ✅ User is known – render immediately
+            setLoading(false);
+            // 🔄 Load data in background (do not await)
+            loadAllData().catch(err => console.warn('Background data load error:', err));
+          }
+        } catch (err) {
+          console.log('Cookie token invalid, waiting for Firebase');
+        }
+      }
+    };
+    loadFromCookie();
+    return () => { isMounted = false; };
+  }, []);
+
+  // 2️⃣ Firebase listener (sign‑in / sign‑out / token refresh)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
+        // If we already have the same user from cookie, skip heavy fetch
+        if (cookieUidRef.current === firebaseUser.uid) {
+          setLoading(false);
+          return;
+        }
+
+        // Normal flow (new login, token refresh with different UID, etc.)
         try {
           const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
           if (data.banned) {
@@ -180,15 +218,32 @@ export function AuthProvider({ children }) {
           }
         }
       } else {
+        // User signed out – clear all
         setUser(null);
         setIsAuthenticated(false);
         setNeedsCompletion(false);
         clearUserData();
+        cookieUidRef.current = null; // reset ref
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, [fetchUserProfile, checkProfileStatus, loadAllData, clearUserData]);
+
+  // ── Refresh session cookie whenever Firebase issues a new token (≈ every hour) ──
+  useEffect(() => {
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
+          await setSessionCookie(token);
+        } catch {
+          // Silent fail – the fast path will fall back to Firebase on next load
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // --- LOGIN ---
   const login = async (email, password) => {
@@ -368,6 +423,15 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      // ── Clear the session cookie ──
+      try {
+        await fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch {
+        // If the logout endpoint fails, the cookie will eventually expire
+      }
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);
