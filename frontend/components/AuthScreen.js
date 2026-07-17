@@ -145,7 +145,19 @@ export function AuthProvider({ children, initialUser }) {
   useEffect(() => {
     let isMounted = true;
     const loadFromCookie = async () => {
-      if (initialUser && initialUser.token && !user) {
+      // Case 1: No cookie at all – we know the user is NOT logged in
+      if (!initialUser) {
+        if (isMounted) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setLoading(false); // ✅ Immediate render as logged out
+        }
+        fastPathAttemptedRef.current = true;
+        return;
+      }
+
+      // Case 2: Cookie exists – try to load the user fast
+      if (initialUser.token && !user) {
         try {
           const data = await apiRequest('/auth/me', {}, initialUser.token);
           if (data.success && data.user && isMounted) {
@@ -154,12 +166,11 @@ export function AuthProvider({ children, initialUser }) {
             setNeedsCompletion(false);
             loadedFromCookieRef.current = true;
             cookieUidRef.current = data.user.uid;
-            // ✅ User is known – render immediately
             setLoading(false);
-            // 🔄 Load data in background (do not await)
             loadAllData().catch(err => console.warn('Background data load error:', err));
           }
         } catch (err) {
+          // Token invalid – fall back to Firebase
           console.log('Cookie token invalid, waiting for Firebase');
         }
       }
