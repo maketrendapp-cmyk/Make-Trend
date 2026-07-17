@@ -79,6 +79,7 @@ export function AuthProvider({ children, initialUser }) {
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const loadedFromCookieRef = useRef(false);
   const cookieUidRef = useRef(null);
+  const fastPathAttemptedRef = useRef(false); // ← add this
 
   // --- ALL DATA FROM useAppData ---
   const {
@@ -162,6 +163,8 @@ export function AuthProvider({ children, initialUser }) {
           console.log('Cookie token invalid, waiting for Firebase');
         }
       }
+      // Mark that we've attempted the fast path
+      fastPathAttemptedRef.current = true;
     };
     loadFromCookie();
     return () => { isMounted = false; };
@@ -170,6 +173,12 @@ export function AuthProvider({ children, initialUser }) {
   // 2️⃣ Firebase listener (sign‑in / sign‑out / token refresh)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // ⏳ If fast path hasn't tried yet, let it go first
+      if (!fastPathAttemptedRef.current) {
+        setLoading(false); // don't block render
+        return;
+      }
+
       setLoading(true);
       if (firebaseUser) {
         // If we already have the same user from cookie, skip heavy fetch
@@ -181,7 +190,7 @@ export function AuthProvider({ children, initialUser }) {
         // Normal flow (new login, token refresh with different UID, etc.)
         try {
           const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
-          if (data.banned) {
+          // ... rest of the existing logic  if (data.banned) {
             await signOut(auth);
             setUser(null);
             setIsAuthenticated(false);
