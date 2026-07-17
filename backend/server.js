@@ -1726,7 +1726,7 @@ app.post('/api/auth/set-session', async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 1000, // 1 hour
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: '/',
     });
 
@@ -1748,6 +1748,17 @@ app.post('/api/auth/set-session', async (req, res) => {
     console.error('Set session error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// ── Clear session cookie ──
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  });
+  res.json({ success: true });
 });
 
 // ============================================================
