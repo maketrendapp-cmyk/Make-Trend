@@ -39,14 +39,14 @@ export default function Navbar() {
   };
 
   const navLinks = [
-    { href: '/', label: 'Home', icon: <FiHome className="w-5 h-5" /> },
-    { href: '/create', label: 'Create', icon: <FiPlus className="w-5 h-5" /> },
-    { href: '/about', label: 'About', icon: <FiInfo className="w-5 h-5" /> },
-    { href: '/contact', label: 'Contact', icon: <FiMail className="w-5 h-5" /> },
-    { href: '/download', label: 'Download', icon: <FiDownload className="w-5 h-5" /> },
-    { href: '/rules', label: 'Rules', icon: <FiShield className="w-5 h-5" /> },
-    { href: '/terms', label: 'Terms', icon: <FiBook className="w-5 h-5" /> },
-    { href: '/privacy', label: 'Privacy', icon: <FiShield className="w-5 h-5" /> },
+    { href: '/', label: 'Home', icon: <FiHome className="w-4 h-4" /> },
+    { href: '/create', label: 'Create', icon: <FiPlus className="w-4 h-4" /> },
+    { href: '/about', label: 'About', icon: <FiInfo className="w-4 h-4" /> },
+    { href: '/contact', label: 'Contact', icon: <FiMail className="w-4 h-4" /> },
+    { href: '/download', label: 'Download', icon: <FiDownload className="w-4 h-4" /> },
+    { href: '/rules', label: 'Rules', icon: <FiShield className="w-4 h-4" /> },
+    { href: '/terms', label: 'Terms', icon: <FiBook className="w-4 h-4" /> },
+    { href: '/privacy', label: 'Privacy', icon: <FiShield className="w-4 h-4" /> },
   ];
 
   const isActive = (path) => router.pathname === path;
@@ -63,41 +63,59 @@ export default function Navbar() {
         `}
       >
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
+          <div className="flex h-14 sm:h-16 items-center justify-between gap-1">
             
             {/* ── Logo ── */}
-            <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
+            <Link href="/" className="flex items-center gap-1.5 sm:gap-2 group flex-shrink-0">
               <img 
                 src="/favicon.ico" 
                 alt="Make Trend" 
-                className="w-8 h-8 rounded-xl shadow-md group-hover:shadow-lg transition-all group-hover:scale-105"
+                className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg shadow-md group-hover:shadow-lg transition-all group-hover:scale-105"
               />
-              <span className="text-xl font-extrabold tracking-tight whitespace-nowrap">
+              <span className="text-sm sm:text-xl font-extrabold tracking-tight whitespace-nowrap">
                 <span className="text-primary">Make</span>
                 <span className="text-gray-900 group-hover:text-primary/80 transition">Trend</span>
               </span>
             </Link>
 
+            {/* ── Home Button (Always Visible) ── */}
+            <Link
+              href="/"
+              className={`
+                flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2
+                rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-200
+                ${isActive('/')
+                  ? 'bg-purple-100 text-purple-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }
+                flex-shrink-0
+              `}
+            >
+              <FiHome className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Home</span>
+            </Link>
+
             {/* ── Right side: Auth / User ── */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {isAuthenticated ? (
-                <div className="flex items-center gap-2">
+                <>
                   {/* User Profile Button */}
                   <Link
                     href="/profile"
                     className="
-                      flex items-center gap-2 px-3.5 py-2
+                      flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2
                       bg-gradient-to-r from-purple-50 to-indigo-50 
-                      border border-purple-200/50 rounded-xl 
+                      border border-purple-200/50 rounded-lg sm:rounded-xl 
                       hover:from-purple-100 hover:to-indigo-100 
                       transition-all duration-200 group
                       shadow-sm hover:shadow-md
+                      flex-shrink-0
                     "
                   >
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0">
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[9px] sm:text-xs font-bold shadow-sm flex-shrink-0">
                       {user?.fullname?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
-                    <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[100px]">
+                    <span className="text-xs sm:text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[60px] sm:max-w-[120px]">
                       @{user?.username || user?.fullname?.split(' ')[0]?.toLowerCase() || 'user'}
                     </span>
                   </Link>
@@ -106,31 +124,33 @@ export default function Navbar() {
                   <button
                     onClick={handleLogout}
                     className="
-                      hidden sm:flex items-center gap-1.5 px-3.5 py-2 
-                      text-sm font-medium text-gray-600 
+                      hidden sm:flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 sm:py-2 
+                      text-xs sm:text-sm font-medium text-gray-600 
                       hover:text-red-600 hover:bg-red-50 
-                      rounded-xl transition-all duration-200
+                      rounded-lg sm:rounded-xl transition-all duration-200
                       border border-transparent hover:border-red-200
+                      flex-shrink-0
                     "
                   >
-                    <FiLogOut className="w-4 h-4" />
+                    <FiLogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     <span>Logout</span>
                   </button>
-                </div>
+                </>
               ) : (
                 <Link
                   href="/auth/login"
                   className="
-                    flex items-center gap-2 px-5 py-2.5 
+                    flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2.5 
                     bg-gradient-to-r from-purple-600 to-indigo-600 
-                    text-white font-semibold rounded-xl 
+                    text-white font-semibold rounded-lg sm:rounded-xl 
                     hover:from-purple-700 hover:to-indigo-700 
                     transition-all duration-200 shadow-md hover:shadow-lg 
                     hover:-translate-y-0.5 active:scale-95
-                    text-sm
+                    text-xs sm:text-sm whitespace-nowrap
+                    flex-shrink-0
                   "
                 >
-                  <FiUser className="w-4 h-4" />
+                  <FiUser className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Get Started</span>
                 </Link>
               )}
@@ -138,13 +158,13 @@ export default function Navbar() {
               {/* ── Mobile Menu Button ── */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0"
+                className="md:hidden p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0"
                 aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
-                  <FiX className="w-6 h-6" />
+                  <FiX className="w-5 h-5 sm:w-6 sm:h-6" />
                 ) : (
-                  <FiMenu className="w-6 h-6" />
+                  <FiMenu className="w-5 h-5 sm:w-6 sm:h-6" />
                 )}
               </button>
             </div>
@@ -156,23 +176,23 @@ export default function Navbar() {
       {/* ── Mobile Menu ── */}
       <div
         className={`
-          md:hidden fixed inset-x-0 top-16 z-40 
+          md:hidden fixed inset-x-0 top-14 sm:top-16 z-40 
           bg-white/95 backdrop-blur-lg border-b border-gray-200
           shadow-xl transition-all duration-300 ease-in-out
           ${isMobileMenuOpen 
-            ? 'max-h-[calc(100vh-4rem)] opacity-100 translate-y-0' 
+            ? 'max-h-[calc(100vh-3.5rem)] opacity-100 translate-y-0' 
             : 'max-h-0 opacity-0 -translate-y-4 overflow-hidden'
           }
         `}
       >
-        <div className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-4rem)]">
+        <div className="p-3 sm:p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setIsMobileMenuOpen(false)}
               className={`
-                flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
+                flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium transition-all duration-200
                 ${isActive(link.href)
                   ? 'bg-purple-100 text-purple-700 shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -191,7 +211,7 @@ export default function Navbar() {
             {isAuthenticated ? (
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 w-full"
+                className="flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 w-full"
               >
                 <FiLogOut className="w-4 h-4" />
                 Logout
@@ -200,7 +220,7 @@ export default function Navbar() {
               <Link
                 href="/auth/login"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 w-full"
+                className="flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg sm:rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 w-full"
               >
                 Get Started
               </Link>
