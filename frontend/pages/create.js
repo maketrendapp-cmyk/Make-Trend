@@ -1,6 +1,7 @@
 // pages/create.js
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import Meta from '../components/Meta';
 import { useAuth } from '../components/AuthScreen';
 
@@ -20,6 +21,16 @@ const categoryEmojis = {
   default: '✨',
 };
 
+// ── Cloudinary image optimization URL helper ──
+const getOptimizedImage = (url, width = 400, height = 300) => {
+  if (!url) return null;
+  // If it's a Cloudinary URL, add transformations
+  if (url.includes('cloudinary.com')) {
+    return url.replace('/upload/', `/upload/c_fill,w_${width},h_${height},f_auto,q_auto/`);
+  }
+  return url;
+};
+
 export default function Create() {
   const router = useRouter();
   const { slug: highlightSlug, search: initialSearch } = router.query;
@@ -32,12 +43,11 @@ export default function Create() {
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  // retryCount removed – data is globally available
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
 
-  // ── Sync search from URL (when changed via browser back/forward or SPA) ──
+  // ── Sync search from URL ──
   useEffect(() => {
     if (initialSearch !== undefined) {
       setSearchQuery(initialSearch);
@@ -66,7 +76,7 @@ export default function Create() {
     }
   }, [highlightedId]);
 
-  // ── Apply search & filters to ALL templates ──
+  // ── Apply search & filters ──
   const filteredAll = useMemo(() => {
     let filtered = [...templates];
     if (searchQuery.trim()) {
@@ -165,7 +175,7 @@ export default function Create() {
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
-  // ── No templates state (after data is loaded) ──
+  // ── No templates state ──
   if (dataLoaded && templates.length === 0) {
     return (
       <>
@@ -284,69 +294,78 @@ export default function Create() {
                 className="flex transition-transform duration-700 ease-in-out"
                 style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
               >
-                {featuredTemplates.map((template) => (
-                  <div key={template.id} className="w-full flex-shrink-0">
-                    <div className="flex flex-col">
-                      <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
-                        {template.image ? (
-                          <img
-                            src={template.image}
-                            alt={template.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                            <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
-                          </div>
-                        )}
-                        <div className="absolute top-2.5 left-2.5 flex gap-1 z-10">
-                          <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                            ⭐ Featured
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-white">
-                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                          {template.platform && (
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
-                              {template.platform}
-                            </span>
+                {featuredTemplates.map((template, idx) => {
+                  const optimizedImage = getOptimizedImage(template.image, 600, 400);
+                  return (
+                    <div key={template.id} className="w-full flex-shrink-0">
+                      <div className="flex flex-col">
+                        <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
+                          {optimizedImage ? (
+                            <Image
+                              src={optimizedImage}
+                              alt={template.title}
+                              width={600}
+                              height={400}
+                              className="w-full h-full object-cover"
+                              priority={idx === 0}
+                              fetchPriority={idx === 0 ? 'high' : 'auto'}
+                              sizes="(max-width: 640px) 100vw, 600px"
+                              quality={80}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                              <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
+                            </div>
                           )}
-                          <span className="bg-slate-50 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center">
-                            👥 {template.usageCount || 0} Uses
-                          </span>
+                          <div className="absolute top-2.5 left-2.5 flex gap-1 z-10">
+                            <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                              ⭐ Featured
+                            </span>
+                          </div>
                         </div>
 
-                        <h3 className="text-sm font-black leading-tight text-slate-950 mb-0.5">
-                          {template.title}
-                        </h3>
-                        <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
-                          {template.description || 'Launch your campaign with this template.'}
-                        </p>
+                        <div className="p-3 bg-white">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                            {template.platform && (
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                                {template.platform}
+                              </span>
+                            )}
+                            <span className="bg-slate-50 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center">
+                              👥 {template.usageCount || 0} Uses
+                            </span>
+                          </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handlePreview(template.slug)}
-                            className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            Preview
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUseTemplate(template.slug)}
-                            className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                            Use Template
-                          </button>
+                          <h3 className="text-sm font-black leading-tight text-slate-950 mb-0.5">
+                            {template.title}
+                          </h3>
+                          <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
+                            {template.description || 'Launch your campaign with this template.'}
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handlePreview(template.slug)}
+                              className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                              Preview
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUseTemplate(template.slug)}
+                              className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                              Use Template
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {featuredTemplates.length > 1 && (
@@ -412,6 +431,7 @@ export default function Create() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {regularTemplates.map((template) => {
               const isHighlighted = highlightedId === template.id;
+              const optimizedImage = getOptimizedImage(template.image, 400, 300);
               return (
                 <div
                   key={template.id}
@@ -421,12 +441,18 @@ export default function Create() {
                   }`}
                 >
                   <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
-                    {template.image ? (
-                      <img
-                        src={template.image}
+                    {optimizedImage ? (
+                      <Image
+                        src={optimizedImage}
                         alt={template.title}
+                        width={400}
+                        height={300}
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        quality={75}
+                        placeholder="blur"
+                        blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23f1f5f9' width='400' height='300'/%3E%3C/svg%3E"
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
