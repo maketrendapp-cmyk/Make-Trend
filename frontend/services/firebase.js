@@ -28,10 +28,9 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 
 export {
-  app as firebaseApp,          // <-- needed for AuthScreen to read API key
   auth,
   onAuthStateChanged,
-  onIdTokenChanged,            // <-- needed for token refresh
+  onIdTokenChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
