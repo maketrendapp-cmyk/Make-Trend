@@ -1,30 +1,80 @@
 // lib/useAppData.js
 // ============================================================
-// ALL DATA FETCHING LOGIC – Separated from AuthScreen for better maintainability
+// ENHANCED – Caching, Parallel Batches, Loading States, Abort, Retry, Toasts
 // ============================================================
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { auth } from '../services/firebase';
+import toast from 'react-hot-toast';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
-async function apiRequest(endpoint, options = {}, token = null) {
+// ── Simple in‑memory cache (5 minutes TTL) ──
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000;
+
+function getCached(key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+function setCache(key, data) {
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+// ── Deduplicate in‑flight requests ──
+const pending = new Map();
+async function fetchWithDedupe(key, fetchFn) {
+  if (pending.has(key)) return pending.get(key);
+  const promise = fetchFn().then(data => {
+    setCache(key, data);
+    pending.delete(key);
+    return data;
+  });
+  pending.set(key, promise);
+  return promise;
+}
+
+// ── API helper with abort, retry, logging ──
+async function apiRequest(endpoint, options = {}, token = null, signal = null) {
   const url = `${API_BASE}${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (options.body && !(options.body instanceof FormData)) {
     options.body = JSON.stringify(options.body);
   }
-  const response = await fetch(url, { ...options, headers });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `API error: ${response.status}`);
-  return data;
+
+  const start = performance.now();
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(url, { ...options, headers, signal });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      console.log(`⚡ ${endpoint} – ${(performance.now() - start).toFixed(0)}ms`);
+      return data;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log(`⏹️ ${endpoint} aborted`);
+        throw err;
+      }
+      lastError = err;
+      await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt)));
+    }
+  }
+  toast.error(`Failed to load ${endpoint}: ${lastError.message}`);
+  throw lastError;
 }
 
 export function useAppData() {
-  // ============================================================
-  // GLOBAL DATA STATE – PREFETCHED ONCE
-  // ============================================================
+  // ---- Data states ----
   const [templates, setTemplates] = useState([]);
   const [featuredTemplates, setFeaturedTemplates] = useState([]);
   const [profile, setProfile] = useState(null);
@@ -41,151 +91,282 @@ export function useAppData() {
   });
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // ============================================================
-  // FETCH FUNCTIONS
-  // ============================================================
+  // ---- Loading states (for your existing skeletons) ----
+  const [loadingState, setLoadingState] = useState({
+    profile: false,
+    stats: false,
+    highlights: false,
+    allTemplates: false,
+    campaigns: false,
+    support: false,
+    comments: false,
+  });
 
-  const fetchTemplates = async () => {
-    try {
-      const data = await apiRequest('/templates');
-      const all = data.templates || [];
-      setTemplates(all);
-      setFeaturedTemplates(all.filter(t => t.isHighlight === true));
-    } catch (err) {
-      console.error('Templates fetch error:', err);
-    }
-  };
+  const abortControllerRef = useRef(null);
 
-  const fetchProfile = async () => {
+  // ---- Individual fetch functions (with cache) ----
+
+  const fetchProfile = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    setLoadingState(s => ({ ...s, profile: true }));
     try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/auth/me', {}, token);
-      if (data.success) {
-        setProfile(data.user);
-      } else {
-        setProfile({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || '',
-          avatar: firebaseUser.photoURL || '',
-        });
+      const token = await user.getIdToken();
+      const key = `profile:${user.uid}`;
+      const cached = getCached(key);
+      if (cached) {
+        setProfile(cached);
+        return;
       }
-    } catch (err) {
-      console.error('Profile fetch error:', err);
-      const firebaseUser = auth.currentUser;
-      if (firebaseUser) {
-        setProfile({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || '',
-          avatar: firebaseUser.photoURL || '',
-        });
-      }
+      const data = await fetchWithDedupe(key, async () => {
+        const result = await apiRequest('/auth/me', {}, token);
+        return result.success ? result.user : null;
+      });
+      if (data) setProfile(data);
+    } finally {
+      setLoadingState(s => ({ ...s, profile: false }));
     }
-  };
-
-  const fetchCampaigns = async () => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/campaigns?limit=25', {}, token);
-      setCampaigns(data.campaigns || []);
-    } catch (err) {
-      console.error('Campaigns fetch error:', err);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/stats', {}, token);
-      if (data.success) {
-        setStats(data.stats);
-      }
-    } catch (err) {
-      console.error('Stats fetch error:', err);
-    }
-  };
-
-  const fetchSupportTickets = async () => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/support', {}, token);
-      setSupportTickets(data.tickets || []);
-    } catch (err) {
-      console.error('Support tickets fetch error:', err);
-    }
-  };
-
-  const fetchComments = async () => {
-    try {
-      const data = await apiRequest('/comments');
-      setComments(data.comments || []);
-    } catch (err) {
-      console.error('Comments fetch error:', err);
-    }
-  };
-
-  // ============================================================
-  // MASTER LOADER (called on app start AND on login)
-  // ============================================================
-  const loadAllData = useCallback(async () => {
-    // Always fetch public data
-    await fetchTemplates();
-    await fetchComments();
-
-    // Fetch user-specific data only if logged in
-    if (auth.currentUser) {
-      await fetchProfile();
-      await fetchCampaigns();
-      await fetchStats();
-      await fetchSupportTickets();
-    }
-
-    setDataLoaded(true);
   }, []);
 
-  // ============================================================
-  // 🆕 LOAD PUBLIC DATA ON APP START (even without login)
-  // ============================================================
-  // 🔄 Removed automatic load – AuthProvider handles data loading now
-  // useEffect(() => {
-  //   loadAllData();
-  // }, []);
+  const fetchStats = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    setLoadingState(s => ({ ...s, stats: true }));
+    try {
+      const token = await user.getIdToken();
+      const key = `stats:${user.uid}`;
+      const cached = getCached(key);
+      if (cached) {
+        setStats(cached);
+        return;
+      }
+      const data = await fetchWithDedupe(key, async () => {
+        const result = await apiRequest('/stats', {}, token);
+        return result.success ? result.stats : null;
+      });
+      if (data) setStats(data);
+    } finally {
+      setLoadingState(s => ({ ...s, stats: false }));
+    }
+  }, []);
 
-  // ============================================================
-  // REFETCH HELPERS (for after edits)
-  // ============================================================
-  const refetchProfile = fetchProfile;
-  const refetchCampaigns = fetchCampaigns;
-  const refetchStats = fetchStats;
-  const refetchSupportTickets = fetchSupportTickets;
-  const refetchComments = fetchComments;
-  const refetchTemplates = fetchTemplates;
+  const fetchHighlightedTemplates = useCallback(async () => {
+    setLoadingState(s => ({ ...s, highlights: true }));
+    try {
+      const key = 'templates:highlight:true';
+      const cached = getCached(key);
+      if (cached) {
+        setFeaturedTemplates(cached);
+        return;
+      }
+      const data = await fetchWithDedupe(key, async () => {
+        const result = await apiRequest('/templates?highlight=true');
+        return result.templates || [];
+      });
+      setFeaturedTemplates(data);
+    } finally {
+      setLoadingState(s => ({ ...s, highlights: false }));
+    }
+  }, []);
 
-  // ============================================================
-  // CLEAR USER DATA (on logout)
-  // ============================================================
+  const fetchAllTemplates = useCallback(async () => {
+    setLoadingState(s => ({ ...s, allTemplates: true }));
+    try {
+      const key = 'templates:all';
+      const cached = getCached(key);
+      if (cached) {
+        setTemplates(cached);
+        return;
+      }
+      const data = await fetchWithDedupe(key, async () => {
+        const result = await apiRequest('/templates');
+        return result.templates || [];
+      });
+      setTemplates(data);
+    } finally {
+      setLoadingState(s => ({ ...s, allTemplates: false }));
+    }
+  }, []);
+
+  const fetchCampaigns = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    setLoadingState(s => ({ ...s, campaigns: true }));
+    try {
+      const token = await user.getIdToken();
+      const key = `campaigns:${user.uid}`;
+      const cached = getCached(key);
+      if (cached) {
+        setCampaigns(cached);
+        return;
+      }
+      const data = await fetchWithDedupe(key, async () => {
+        const result = await apiRequest('/campaigns?limit=25', {}, token);
+        return result.campaigns || [];
+      });
+      setCampaigns(data);
+    } finally {
+      setLoadingState(s => ({ ...s, campaigns: false }));
+    }
+  }, []);
+
+  const fetchSupportTickets = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    setLoadingState(s => ({ ...s, support: true }));
+    try {
+      const token = await user.getIdToken();
+      const key = `support:${user.uid}`;
+      const cached = getCached(key);
+      if (cached) {
+        setSupportTickets(cached);
+        return;
+      }
+      const data = await fetchWithDedupe(key, async () => {
+        const result = await apiRequest('/support', {}, token);
+        return result.tickets || [];
+      });
+      setSupportTickets(data);
+    } finally {
+      setLoadingState(s => ({ ...s, support: false }));
+    }
+  }, []);
+
+  const fetchComments = useCallback(async () => {
+    setLoadingState(s => ({ ...s, comments: true }));
+    try {
+      const key = 'comments:all';
+      const cached = getCached(key);
+      if (cached) {
+        setComments(cached);
+        return;
+      }
+      const data = await fetchWithDedupe(key, async () => {
+        const result = await apiRequest('/comments');
+        return result.comments || [];
+      });
+      setComments(data);
+    } finally {
+      setLoadingState(s => ({ ...s, comments: false }));
+    }
+  }, []);
+
+  // ---- Master loader – two parallel batches ----
+  const loadAllData = useCallback(async () => {
+    // Cancel any ongoing fetch
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    try {
+      // ── Batch 1: Profile, Stats, Highlights, All Templates ──
+      const batch1 = [];
+      if (auth.currentUser) {
+        batch1.push(fetchProfile());
+        batch1.push(fetchStats());
+      }
+      batch1.push(fetchHighlightedTemplates());
+      batch1.push(fetchAllTemplates());
+      await Promise.all(batch1);
+
+      // ── Batch 2: Campaigns, Support, Comments ──
+      const batch2 = [];
+      if (auth.currentUser) {
+        batch2.push(fetchCampaigns());
+        batch2.push(fetchSupportTickets());
+      }
+      batch2.push(fetchComments());
+      await Promise.all(batch2);
+
+      setDataLoaded(true);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        toast.error('Some data failed to load. Please refresh.');
+      }
+    } finally {
+      abortControllerRef.current = null;
+    }
+  }, [
+    fetchProfile,
+    fetchStats,
+    fetchHighlightedTemplates,
+    fetchAllTemplates,
+    fetchCampaigns,
+    fetchSupportTickets,
+    fetchComments,
+  ]);
+
+  // ---- Refetch helpers (clear cache AND pending) ----
+  const refetchProfile = useCallback(async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const key = `profile:${user.uid}`;
+      cache.delete(key);
+      pending.delete(key);
+      await fetchProfile();
+    }
+  }, [fetchProfile]);
+
+  const refetchCampaigns = useCallback(async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const key = `campaigns:${user.uid}`;
+      cache.delete(key);
+      pending.delete(key);
+      await fetchCampaigns();
+    }
+  }, [fetchCampaigns]);
+
+  const refetchStats = useCallback(async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const key = `stats:${user.uid}`;
+      cache.delete(key);
+      pending.delete(key);
+      await fetchStats();
+    }
+  }, [fetchStats]);
+
+  const refetchSupportTickets = useCallback(async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const key = `support:${user.uid}`;
+      cache.delete(key);
+      pending.delete(key);
+      await fetchSupportTickets();
+    }
+  }, [fetchSupportTickets]);
+
+  const refetchComments = useCallback(async () => {
+    const key = 'comments:all';
+    cache.delete(key);
+    pending.delete(key);
+    await fetchComments();
+  }, [fetchComments]);
+
+  const refetchTemplates = useCallback(async () => {
+    const keys = ['templates:all', 'templates:highlight:true'];
+    keys.forEach(key => {
+      cache.delete(key);
+      pending.delete(key);
+    });
+    await Promise.all([fetchAllTemplates(), fetchHighlightedTemplates()]);
+  }, [fetchAllTemplates, fetchHighlightedTemplates]);
+
+  // ---- Clear user data on logout ----
   const clearUserData = useCallback(() => {
     setProfile(null);
     setCampaigns([]);
     setSupportTickets([]);
-    setStats({
-      totalCampaigns: 0,
-      totalViews: 0,
-      totalUnlocks: 0,
-      totalShares: 0,
-      totalCompletions: 0,
-      successfulCampaigns: 0,
-    });
-    // Keep templates and comments (public)
+    setStats({ totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 });
+    const user = auth.currentUser;
+    if (user) {
+      cache.delete(`profile:${user.uid}`);
+      cache.delete(`stats:${user.uid}`);
+      cache.delete(`campaigns:${user.uid}`);
+      cache.delete(`support:${user.uid}`);
+    }
   }, []);
 
   return {
@@ -196,6 +377,7 @@ export function useAppData() {
     supportTickets,
     comments,
     stats,
+    loadingState,
     dataLoaded,
     loadAllData,
     refetchProfile,
