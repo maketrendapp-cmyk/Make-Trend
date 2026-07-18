@@ -89,9 +89,11 @@ export function useAppData() {
     totalCompletions: 0,
     successfulCampaigns: 0,
   });
-  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // ---- Loading states (for your existing skeletons) ----
+  // ---- 🚀 dataLoaded is true from the start – UI never waits ──
+  const [dataLoaded, setDataLoaded] = useState(true);
+
+  // ---- Loading states (for skeletons) ----
   const [loadingState, setLoadingState] = useState({
     profile: false,
     stats: false,
@@ -378,7 +380,7 @@ export function useAppData() {
     comments,
     stats,
     loadingState,
-    dataLoaded,
+    dataLoaded,        // ✅ now true from the start – UI never waits
     loadAllData,
     refetchProfile,
     refetchCampaigns,
