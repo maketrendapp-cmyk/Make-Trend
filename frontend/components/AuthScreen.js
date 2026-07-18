@@ -16,7 +16,7 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider,
 } from '../services/firebase';
-import { useAppData } from '../lib/useAppData';
+import { useInvalidateQueries } from '../lib/queries';
 import Meta from '../components/Meta';
 import { motion } from 'framer-motion';
 import {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const uidRef = useRef(storedAuth?.uid || null);
-  const { loadAllData } = useAppData(); // only loadAllData, no clearUserData
+  const { invalidateAll } = useInvalidateQueries();
 
   // ── Helper to cache auth info ──
   const cacheAuth = (authData) => {
@@ -150,7 +150,7 @@ export function AuthProvider({ children }) {
         cacheAuth(basicUser);
 
         // Fetch fresh data
-        loadAllData().catch(() => {});
+        invalidateAll();
 
         try {
           const profileData = await fetchUserProfile(firebaseUser);
@@ -206,7 +206,7 @@ export function AuthProvider({ children }) {
       cacheAuth(basicUser);
 
       // Load fresh data
-      loadAllData().catch(() => {});
+      invalidateAll();
 
       try {
         const profileData = await fetchUserProfile(firebaseUser);
@@ -268,7 +268,7 @@ export function AuthProvider({ children }) {
         setNeedsCompletion(false);
         cacheAuth(fullUser);
         // Load fresh data
-        loadAllData().catch(() => {});
+        invalidateAll();
       } else {
         await firebaseUser.delete();
         return { success: false, error: data.error || 'Registration failed' };
@@ -314,7 +314,7 @@ export function AuthProvider({ children }) {
       cacheAuth(basicUser);
 
       // Load fresh data
-      loadAllData().catch(() => {});
+      invalidateAll();
 
       try {
         const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
@@ -371,7 +371,7 @@ export function AuthProvider({ children }) {
           setNeedsCompletion(false);
           cacheAuth(profileData);
           // Load fresh data
-          loadAllData().catch(() => {});
+          invalidateAll();
         } else {
           const updated = { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true };
           setUser(updated);
@@ -379,7 +379,7 @@ export function AuthProvider({ children }) {
           setNeedsCompletion(false);
           cacheAuth(updated);
           // Load fresh data
-          loadAllData().catch(() => {});
+          invalidateAll();
         }
         uidRef.current = firebaseUser.uid;
         return { success: true };

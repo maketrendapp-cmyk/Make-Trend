@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile } from '../lib/queries';
 import { useState, useEffect } from 'react';
 import {
   FiHome,
@@ -21,7 +21,7 @@ import {
 export default function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-  const { profile, loadingState } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -77,7 +77,7 @@ export default function Navbar() {
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
 
   // ── Determine if profile is loading ──
-  const isProfileLoading = loadingState?.profile && !profile;
+  const isProfileLoading = profileLoading && !profile;
 
   return (
     <>
@@ -144,8 +144,8 @@ export default function Navbar() {
                   >
                     {isProfileLoading ? (
                       <>
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0"></div>
-                        <div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div>
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
+                        <div className="h-4 w-20 bg-gray-200 animate-pulse rounded" />
                       </>
                     ) : (
                       <>
