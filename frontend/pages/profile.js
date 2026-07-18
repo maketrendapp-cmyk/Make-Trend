@@ -1,8 +1,9 @@
 // pages/profile.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
@@ -13,35 +14,28 @@ import Meta from '../components/Meta';
 
 export default function Profile() {
   const router = useRouter();
-  const { user, logout, profile: contextProfile, stats, dataLoaded } = useAuth();
-  const [loading, setLoading] = useState(!dataLoaded);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [copySuccess, setCopySuccess] = useState('');
+  const { user, logout } = useAuth();
+const { profile: contextProfile, stats, loadingState } = useAppData();
+const [showLogoutModal, setShowLogoutModal] = useState(false);
+const [copySuccess, setCopySuccess] = useState('');
 
-  const copyReferralCode = () => {
-    const code = contextProfile?.referralCode || '';
-    if (!code) return;
-    navigator.clipboard.writeText(code).then(() => {
-      setCopySuccess('✅ Copied!');
-      setTimeout(() => setCopySuccess(''), 2000);
-    }).catch(() => {
-      const textArea = document.createElement('textarea');
-      textArea.value = code;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopySuccess('✅ Copied!');
-      setTimeout(() => setCopySuccess(''), 2000);
-    });
-  };
-
-  // ── profile and stats are already loaded from AuthContext ──
-  useEffect(() => {
-    if (dataLoaded) {
-      setLoading(false);
-    }
-  }, [dataLoaded]);
+const copyReferralCode = () => {
+  const code = contextProfile?.referralCode || '';
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    setCopySuccess('✅ Copied!');
+    setTimeout(() => setCopySuccess(''), 2000);
+  }).catch(() => {
+    const textArea = document.createElement('textarea');
+    textArea.value = code;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    setCopySuccess('✅ Copied!');
+    setTimeout(() => setCopySuccess(''), 2000);
+  });
+};
 
   const handleLogout = async () => {
     try {
@@ -91,8 +85,8 @@ export default function Profile() {
     { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
   ];
 
-  // ── Skeleton Loader (show only if data not loaded yet) ──
-  if (loading || !dataLoaded) {
+// ── Skeleton Loader (show only while profile is loading) ──
+if (loadingState.profile) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
