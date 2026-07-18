@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const uidRef = useRef(storedAuth?.uid || null);
-  const { clearUserData } = useAppData();
+  const { loadAllData, clearUserData } = useAppData();
 
   // ── Helper to cache auth info ──
   const cacheAuth = (authData) => {
@@ -149,6 +149,10 @@ export function AuthProvider({ children }) {
         uidRef.current = firebaseUser.uid;
         cacheAuth(basicUser);
 
+        // ── Clear old cached data and fetch fresh ──
+        clearUserData();
+        loadAllData().catch(() => {});
+
         try {
           const profileData = await fetchUserProfile(firebaseUser);
           if (profileData) {
@@ -202,6 +206,10 @@ export function AuthProvider({ children }) {
       setNeedsCompletion(false);
       uidRef.current = firebaseUser.uid;
       cacheAuth(basicUser);
+
+      // ── Clear old cached data and fetch fresh ──
+      clearUserData();
+      loadAllData().catch(() => {});
 
       try {
         const profileData = await fetchUserProfile(firebaseUser);
@@ -262,6 +270,10 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(true);
         setNeedsCompletion(false);
         cacheAuth(fullUser);
+
+        // ── Clear old cached data and fetch fresh ──
+        clearUserData();
+        loadAllData().catch(() => {});
       } else {
         await firebaseUser.delete();
         return { success: false, error: data.error || 'Registration failed' };
@@ -305,6 +317,10 @@ export function AuthProvider({ children }) {
       setNeedsCompletion(false);
       uidRef.current = firebaseUser.uid;
       cacheAuth(basicUser);
+
+      // ── Clear old cached data and fetch fresh ──
+      clearUserData();
+      loadAllData().catch(() => {});
 
       try {
         const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
@@ -360,12 +376,20 @@ export function AuthProvider({ children }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           cacheAuth(profileData);
+
+          // ── Clear old cached data and fetch fresh ──
+          clearUserData();
+          loadAllData().catch(() => {});
         } else {
           const updated = { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true };
           setUser(updated);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           cacheAuth(updated);
+
+          // ── Clear old cached data and fetch fresh ──
+          clearUserData();
+          loadAllData().catch(() => {});
         }
         uidRef.current = firebaseUser.uid;
         return { success: true };
@@ -517,8 +541,9 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
           const data = await res.json();
           setEmailExists(data.exists);
         } catch {
-          setEmailExists(null);
-          setEmailError('Could not verify email. Please try again.');
+          // On error, assume email exists so user can attempt login
+          setEmailExists(true);
+          setEmailError('Unable to verify email. Please try logging in.');
         } finally {
           setIsCheckingEmail(false);
         }
