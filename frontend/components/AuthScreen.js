@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
+import jwtDecode from 'jwt-decode'; // <-- ADD THIS
 import {
   auth,
   onAuthStateChanged,
@@ -140,13 +141,14 @@ export function AuthProvider({ children, initialUser }) {
   }, []);
 
   // ============================================================
-  // 1️⃣ FAST PATH – Load user from server‑side cookie token
+  // 1️⃣ FASTEST PATH – Decode token directly from cookie (no network)
   // ============================================================
   useEffect(() => {
     let isMounted = true;
-    const loadFromCookie = async () => {
-      // Case 1: No cookie at all – we know the user is NOT logged in
-      if (!initialUser) {
+
+    const decodeTokenInstantly = () => {
+      // Case 1: No cookie – user is not logged in
+      if (!initialUser || !initialUser.token) {
         if (isMounted) {
           setUser(null);
           setIsAuthenticated(false);
@@ -156,28 +158,58 @@ export function AuthProvider({ children, initialUser }) {
         return;
       }
 
-      // Case 2: Cookie exists – try to load the user fast
-      if (initialUser.token && !user) {
-        try {
-          const data = await apiRequest('/auth/me', {}, initialUser.token);
-          if (data.success && data.user && isMounted) {
-            setUser(data.user);
-            setIsAuthenticated(true);
-            setNeedsCompletion(false);
-            loadedFromCookieRef.current = true;
-            cookieUidRef.current = data.user.uid;
-            setLoading(false);
-            // Load data in the background (non‑blocking)
-            loadAllData().catch(err => console.warn('Background data load error:', err));
-          }
-        } catch (err) {
-          console.log('Cookie token invalid, waiting for Firebase');
+      // Case 2: Cookie exists – decode token immediately
+      try {
+        const decoded = jwtDecode(initialUser.token);
+        const { uid, email, name, picture } = decoded;
+
+        // Build a basic user object from the token claims
+        const basicUser = {
+          uid,
+          email: email || '',
+          displayName: name || '',
+          photoURL: picture || '',
+          completed: true, // optimistic; will be corrected later if needed
+        };
+
+        if (isMounted) {
+          setUser(basicUser);
+          setIsAuthenticated(true);
+          setNeedsCompletion(false);
+          setLoading(false); // ✅ RENDER INSTANTLY
+          loadedFromCookieRef.current = true;
+          cookieUidRef.current = uid;
+        }
+
+        // ── Fetch full profile in background (non‑blocking) ──
+        apiRequest('/auth/me', {}, initialUser.token)
+          .then((data) => {
+            if (data.success && data.user && isMounted) {
+              // Merge the full profile (overwrites basic fields)
+              setUser((prev) => ({ ...prev, ...data.user, completed: true }));
+              // Also update cookieUidRef in case it changed
+              if (data.user.uid) cookieUidRef.current = data.user.uid;
+            }
+          })
+          .catch(() => {
+            // If /auth/me fails, we still have the basic user – we're fine.
+          });
+
+        // ── Load all other data in background ──
+        loadAllData().catch(() => {});
+
+      } catch (err) {
+        // Token decode failed – fallback to Firebase listener
+        console.log('Invalid token, waiting for Firebase');
+        if (isMounted) {
+          setLoading(false);
         }
       }
-      // Mark that we've attempted the fast path
+
       fastPathAttemptedRef.current = true;
     };
-    loadFromCookie();
+
+    decodeTokenInstantly();
     return () => { isMounted = false; };
   }, []);
 
