@@ -2,9 +2,7 @@
 // ============================================================
 // COMPLETE PRODUCTION BACKEND
 // Security: Helmet, CORS, Rate Limiting, XSS Protection, JWT
-// Cache: Infinite Redis (cache until change)
-// Duplicate Prevention: IP + UserID tracking (silent – no frontend errors)
-// Stats: Auto-invalidates on campaign create/update/delete
+// Cache: Redis with indefinite TTL – invalidated on data changes
 // ============================================================
 
 require('dotenv').config();
@@ -19,30 +17,39 @@ const streamifier = require('streamifier');
 const Redis = require('ioredis');
 
 // ============================================================
-// 0. REDIS CLIENT (Infinite Cache)
+// 0. REDIS CLIENT (with timeout guard)
 // ============================================================
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-
-redis.on('connect', () => console.log('✅ Redis connected (infinite cache mode)'));
+redis.on('connect', () => console.log('✅ Redis connected'));
 redis.on('error', (err) => console.error('❌ Redis error:', err));
 
+// ── Redis get with 500ms timeout ──
+async function redisGet(key) {
+  return Promise.race([
+    redis.get(key),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 500))
+  ]);
+}
+
+// ── Get from cache or fetch ──
 async function getOrSetCache(key, fetchFn) {
   try {
-    const cached = await redis.get(key);
+    const cached = await redisGet(key);
     if (cached) {
       console.log(`📦 Cache HIT: ${key}`);
       return JSON.parse(cached);
     }
     console.log(`📡 Cache MISS: ${key}`);
     const data = await fetchFn();
-    await redis.set(key, JSON.stringify(data));
+    await redis.set(key, JSON.stringify(data)); // no TTL = indefinite
     return data;
   } catch (error) {
-    console.error(`❌ Cache error for ${key}:`, error);
+    console.warn(`⚠️ Cache fallback for ${key}:`, error.message);
     return await fetchFn();
   }
 }
 
+// ── Invalidate single key ──
 async function invalidateKey(key) {
   try {
     await redis.del(key);
@@ -52,6 +59,7 @@ async function invalidateKey(key) {
   }
 }
 
+// ── Invalidate all keys matching a pattern ──
 async function invalidatePattern(pattern) {
   try {
     const keys = await redis.keys(pattern);
@@ -112,9 +120,7 @@ const upload = multer({
 const app = express();
 app.set('trust proxy', 1);
 
-// ============================================================
-// 5. HELMET (Security Headers)
-// ============================================================
+// ── Helmet (Security Headers) ──
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -136,16 +142,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// ============================================================
-// 6. CORS
-// ============================================================
+// ── CORS ──
 const allowedOrigins = [
   process.env.CLIENT_URL || 'https://maketrend.vercel.app',
   'https://make-trend-system.vercel.app',
   'https://maketrend.vercel.app',
   'https://make-trend.vercel.app',
 ];
-
 if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.push('http://localhost:3000');
 }
@@ -164,9 +167,7 @@ app.use(cors({
   optionsSuccessStatus: 200,
 }));
 
-// ============================================================
-// 7. RATE LIMITING
-// ============================================================
+// ── Rate Limiting ──
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -197,9 +198,7 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/check-email', strictLimiter);
 app.use('/api/auth/check-username', strictLimiter);
 
-// ============================================================
-// 8. BODY PARSERS & SANITIZATION
-// ============================================================
+// ── Body Parsers & Sanitization ──
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -221,17 +220,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// ============================================================
-// 9. HEALTH CHECK
-// ============================================================
+// ── Health Check ──
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // ============================================================
-// 10. HELPER FUNCTIONS
+// 10. HELPER FUNCTIONS (verifyToken, isAdmin, sanitize, etc.)
 // ============================================================
-
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -486,17 +482,41 @@ app.post('/api/auth/complete-social', verifyToken, async (req, res) => {
   }
 });
 
-// ── Get current user profile ──
+// ── Get current user profile (cached 60 seconds) ──
 app.get('/api/auth/me', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
+    const cacheKey = `user:profile:${uid}`;
+    // Use a short TTL (60s) – we can still use getOrSetCache but with TTL set
+    // We'll implement a custom cached fetch with TTL
+    let result;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) {
+        console.log(`📦 User profile cache HIT: ${uid}`);
+        return res.json(JSON.parse(cached));
+      }
+    } catch (error) {
+      console.warn(`⚠️ User cache miss/error for ${uid}:`, error.message);
+    }
+
+    // Fetch from Firestore
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
     const userData = doc.data();
     delete userData.deviceFingerprint;
-    res.json({ success: true, user: { uid, ...userData } });
+    result = { success: true, user: { uid, ...userData } };
+
+    // Store in Redis with 60s TTL
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+      console.log(`💾 User profile cached: ${uid}`);
+    } catch (err) {
+      // Ignore
+    }
+    res.json(result);
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -522,7 +542,7 @@ app.get('/api/auth/check-ban', async (req, res) => {
   }
 });
 
-// ── Record login ──
+// ── Record login (no cache needed) ──
 app.post('/api/auth/record-login', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -559,7 +579,7 @@ app.get('/api/auth/profile', async (req, res) => {
   }
 });
 
-// ── Update user profile ──
+// ── Update user profile (invalidate user profile cache) ──
 app.put('/api/auth/profile', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -626,6 +646,9 @@ app.put('/api/auth/profile', verifyToken, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     await db.collection('users').doc(uid).update(updateData);
+
+    // ── Invalidate user profile cache ──
+    await invalidateKey(`user:profile:${uid}`);
 
     const updatedDoc = await db.collection('users').doc(uid).get();
     const updatedUser = updatedDoc.data();
@@ -705,7 +728,7 @@ app.get('/api/auth/referrals', verifyToken, async (req, res) => {
   }
 });
 
-// ── SET ADMIN (protected with environment secret) ──
+// ── SET ADMIN ──
 app.post('/api/auth/set-admin', async (req, res) => {
   try {
     const { email, secret } = req.body;
@@ -741,32 +764,76 @@ app.post('/api/auth/set-admin', async (req, res) => {
   }
 });
 
+// ── Set session cookie (optimized) ──
+app.post('/api/auth/set-session', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Token required' });
+    }
+
+    const decoded = await admin.auth().verifyIdToken(token);
+    if (!decoded) {
+      return res.status(401).json({ success: false, error: 'Invalid token' });
+    }
+
+    // Set cookie immediately (no Firestore fetch)
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
+    });
+
+    // Return success – frontend will call /auth/me
+    res.json({ success: true });
+
+    // Update lastLogin in the background (don't await)
+    try {
+      await db.collection('users').doc(decoded.uid).update({
+        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Background lastLogin update failed:', err);
+    }
+  } catch (error) {
+    console.error('Set session error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Clear session cookie ──
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  });
+  res.json({ success: true });
+});
+
 // ============================================================
-// 12. TEMPLATE ENDPOINTS (with infinite cache)
+// 12. TEMPLATE ENDPOINTS (cached indefinitely, invalidated on change)
 // ============================================================
 
-// ── Get all templates (ONLY ACTIVE) ──
+// ── Get all templates (cached indefinitely) ──
 app.get('/api/templates', async (req, res) => {
   try {
-    const { category, platform, highlight, plan, limit = 50 } = req.query;
-
-    const hasFilters = category || platform || highlight || plan;
-    const cacheKey = hasFilters
-      ? `templates:filters:${JSON.stringify({ category, platform, highlight, plan, limit })}`
-      : 'templates:all';
-
+    const cacheKey = 'templates:all';
     const result = await getOrSetCache(cacheKey, async () => {
+      console.log('📡 Fetching templates from Firestore...');
+      // Simplified query without orderBy to avoid index requirement
       let query = db.collection('templates').where('isActive', '==', true);
+      // Optional filters – if you need them, they are still fast with indexes
+      const { category, platform, highlight, plan, limit = 50 } = req.query;
       if (category) query = query.where('category', '==', category);
       if (platform) query = query.where('platform', '==', platform);
       if (highlight === 'true') query = query.where('isHighlight', '==', true);
       if (plan) query = query.where('plan', '==', plan);
-      try {
-        query = query.orderBy('createdAt', 'desc');
-      } catch (orderError) {
-        console.warn('⚠️ Cannot order by createdAt:', orderError.message);
-      }
       query = query.limit(parseInt(limit) || 50);
+
       const snapshot = await query.get();
       const templates = [];
       snapshot.forEach(doc => {
@@ -790,7 +857,6 @@ app.get('/api/templates', async (req, res) => {
       });
       return { success: true, templates };
     });
-
     res.json(result);
   } catch (error) {
     console.error('❌ Get templates error:', error);
@@ -798,102 +864,7 @@ app.get('/api/templates', async (req, res) => {
   }
 });
 
-// ── Get template by slug (ONLY ACTIVE) ──
-app.get('/api/templates/slug/:slug', async (req, res) => {
-  try {
-    const { slug } = req.params;
-    const cacheKey = `templates:slug:${slug}`;
-
-    const result = await getOrSetCache(cacheKey, async () => {
-      const snapshot = await db.collection('templates')
-        .where('slug', '==', slug)
-        .where('isActive', '==', true)
-        .limit(1)
-        .get();
-      if (snapshot.empty) {
-        return { success: false, error: 'Template not found' };
-      }
-      const doc = snapshot.docs[0];
-      const data = doc.data();
-      return {
-        success: true,
-        template: { id: doc.id, ...data, plan: data.plan || 'free' },
-      };
-    });
-
-    if (!result.success) {
-      return res.status(404).json(result);
-    }
-    res.json(result);
-  } catch (error) {
-    console.error('Get template error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch template' });
-  }
-});
-
-// ── Get template filters ──
-app.get('/api/templates/filters', async (req, res) => {
-  try {
-    const cacheKey = 'templates:filters:list';
-
-    const result = await getOrSetCache(cacheKey, async () => {
-      const snapshot = await db.collection('templates').where('isActive', '==', true).get();
-      const categories = new Set();
-      const platforms = new Set();
-      const plans = new Set();
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.category) categories.add(data.category);
-        if (data.platform) platforms.add(data.platform);
-        if (data.plan) plans.add(data.plan);
-      });
-      return {
-        success: true,
-        categories: Array.from(categories),
-        platforms: Array.from(platforms),
-        plans: Array.from(plans),
-      };
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error('Get filters error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch filters' });
-  }
-});
-
-// ── Get template by ID (ONLY ACTIVE) ──
-app.get('/api/templates/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const cacheKey = `templates:id:${id}`;
-
-    const result = await getOrSetCache(cacheKey, async () => {
-      const doc = await db.collection('templates').doc(id).get();
-      if (!doc.exists) {
-        return { success: false, error: 'Template not found' };
-      }
-      const data = doc.data();
-      if (data.isActive === false) {
-        return { success: false, error: 'Template not available' };
-      }
-      return {
-        success: true,
-        template: { id: doc.id, ...data },
-      };
-    });
-
-    if (!result.success) {
-      return res.status(404).json(result);
-    }
-    res.json(result);
-  } catch (error) {
-    console.error('Get template by ID error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch template' });
-  }
-});
-
-// ── Create template (admin only) ──
+// ── Create template (admin) – invalidate all templates cache ──
 app.post('/api/templates', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -934,6 +905,7 @@ app.post('/api/templates', verifyToken, async (req, res) => {
     };
     const docRef = await db.collection('templates').add(templateData);
 
+    // ── Invalidate all templates cache ──
     await invalidatePattern('templates:*');
 
     res.status(201).json({ success: true, template: { id: docRef.id, ...templateData } });
@@ -943,7 +915,7 @@ app.post('/api/templates', verifyToken, async (req, res) => {
   }
 });
 
-// ── Update template (admin only) ──
+// ── Update template (admin) ──
 app.put('/api/templates/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -972,6 +944,7 @@ app.put('/api/templates/:id', verifyToken, async (req, res) => {
     updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await db.collection('templates').doc(id).update(updates);
 
+    // ── Invalidate all templates cache ──
     await invalidatePattern('templates:*');
 
     res.json({ success: true, message: 'Template updated' });
@@ -981,7 +954,7 @@ app.put('/api/templates/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ── Delete/archive template (admin only) ──
+// ── Delete/archive template (admin) ──
 app.delete('/api/templates/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -995,6 +968,7 @@ app.delete('/api/templates/:id', verifyToken, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // ── Invalidate all templates cache ──
     await invalidatePattern('templates:*');
 
     res.json({ success: true, message: 'Template archived' });
@@ -1004,7 +978,7 @@ app.delete('/api/templates/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ── Increment template usage ──
+// ── Increment template usage (no cache needed) ──
 app.post('/api/templates/:id/usage', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1019,93 +993,40 @@ app.post('/api/templates/:id/usage', async (req, res) => {
 });
 
 // ============================================================
-// 13. CAMPAIGN ENDPOINTS (with infinite cache, duplicate prevention, stats invalidation)
+// 13. CAMPAIGN ENDPOINTS (cached per user, invalidated on change)
 // ============================================================
 
-// ── Get user's campaigns (ONLY ACTIVE, PER USER) ──
+// ── Get user's campaigns (cached per user) ──
 app.get('/api/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
-    let limit = parseInt(req.query.limit) || 25;
-    if (isNaN(limit) || limit < 1) limit = 25;
-    if (limit > 25) limit = 25;
-
-    const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
-    const lastId = req.query.lastId || null;
-
-    const isFirstPage = !lastCreatedAt && !lastId;
     const cacheKey = `campaigns:user:${uid}`;
 
-    if (isFirstPage) {
-      const result = await getOrSetCache(cacheKey, async () => {
-        let query = db.collection('campaigns')
-          .where('userId', '==', uid)
-          .where('status', 'in', ['active', 'paused'])
-          .orderBy('createdAt', 'desc')
-          .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
-          .limit(limit);
+    const result = await getOrSetCache(cacheKey, async () => {
+      console.log(`📡 Fetching campaigns for user ${uid} from Firestore...`);
+      let query = db.collection('campaigns')
+        .where('userId', '==', uid)
+        .where('status', 'in', ['active', 'paused'])
+        .orderBy('createdAt', 'desc')
+        .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
+        .limit(25);
 
-        const snapshot = await query.get();
-        const campaigns = [];
-        let lastDoc = null;
-
-        snapshot.forEach(doc => {
-          campaigns.push({ id: doc.id, ...doc.data() });
-          lastDoc = doc;
-        });
-
-        const hasMore = snapshot.size === limit;
-
-        return {
-          success: true,
-          campaigns,
-          hasMore,
-          lastCreatedAt: lastDoc ? lastDoc.data().createdAt.toMillis() : null,
-          lastId: lastDoc ? lastDoc.id : null,
-        };
+      const snapshot = await query.get();
+      const campaigns = [];
+      snapshot.forEach(doc => {
+        campaigns.push({ id: doc.id, ...doc.data() });
       });
-
-      return res.json(result);
-    }
-
-    // ── Paginated requests bypass cache ──
-    let query = db.collection('campaigns')
-      .where('userId', '==', uid)
-      .where('status', 'in', ['active', 'paused'])
-      .orderBy('createdAt', 'desc')
-      .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
-      .limit(limit);
-
-    if (lastCreatedAt && lastId) {
-      const lastTimestamp = admin.firestore.Timestamp.fromDate(lastCreatedAt);
-      query = query.startAfter(lastTimestamp, lastId);
-    }
-
-    const snapshot = await query.get();
-    const campaigns = [];
-    let lastDoc = null;
-
-    snapshot.forEach(doc => {
-      campaigns.push({ id: doc.id, ...doc.data() });
-      lastDoc = doc;
+      return { success: true, campaigns, hasMore: snapshot.size === 25 };
     });
 
-    const hasMore = snapshot.size === limit;
-
-    res.json({
-      success: true,
-      campaigns,
-      hasMore,
-      lastCreatedAt: lastDoc ? lastDoc.data().createdAt.toMillis() : null,
-      lastId: lastDoc ? lastDoc.id : null,
-    });
+    res.json(result);
   } catch (error) {
     console.error('❌ Get campaigns error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// ── Get campaign by ID (ONLY ACTIVE) with silent view tracking ──
+// ── Get campaign by ID (cached indefinitely) ──
 app.get('/api/campaigns/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1120,17 +1041,14 @@ app.get('/api/campaigns/:id', async (req, res) => {
       if (campaignData.status === 'deleted') {
         return { success: false, error: 'Campaign not available' };
       }
-      return {
-        success: true,
-        campaign: { id: doc.id, ...campaignData },
-      };
+      return { success: true, campaign: { id: doc.id, ...campaignData } };
     });
 
     if (!result.success) {
       return res.status(404).json(result);
     }
 
-    // ── Silent view tracking (no error if already viewed) ──
+    // ── Silent view tracking ──
     try {
       const ip = getClientIp(req);
       const userId = req.headers['x-user-id'] || null;
@@ -1140,6 +1058,16 @@ app.get('/api/campaigns/:id', async (req, res) => {
           views: admin.firestore.FieldValue.increment(1),
         });
         await recordAction(id, userId, ip, 'views');
+        // Invalidate campaign cache and stats (views changed)
+        await invalidateKey(`campaigns:id:${id}`);
+        // Also invalidate user stats if userId provided
+        if (userId) {
+          const campaignDoc = await db.collection('campaigns').doc(id).get();
+          const data = campaignDoc.data();
+          if (data && data.userId) {
+            await invalidateKey(`stats:user:${data.userId}`);
+          }
+        }
       }
     } catch (err) {
       console.warn('View tracking failed:', err.message);
@@ -1152,7 +1080,7 @@ app.get('/api/campaigns/:id', async (req, res) => {
   }
 });
 
-// ── Create campaign ──
+// ── Create campaign (invalidate user campaigns & stats) ──
 app.post('/api/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -1170,16 +1098,10 @@ app.post('/api/campaigns', verifyToken, async (req, res) => {
 
     const { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled } = features || {};
     if (typeof scEnabled !== 'boolean' || typeof tasksEnabled !== 'boolean' || typeof fuEnabled !== 'boolean') {
-      return res.status(400).json({
-        success: false,
-        error: 'Features must include shareCount, tasks, finalUrl as booleans',
-      });
+      return res.status(400).json({ success: false, error: 'Features must include shareCount, tasks, finalUrl as booleans' });
     }
     if (!scEnabled && !tasksEnabled && !fuEnabled) {
-      return res.status(400).json({
-        success: false,
-        error: 'At least one feature must be enabled',
-      });
+      return res.status(400).json({ success: false, error: 'At least one feature must be enabled' });
     }
 
     let finalShareCount = 0;
@@ -1261,7 +1183,7 @@ app.post('/api/campaigns', verifyToken, async (req, res) => {
       usageCount: admin.firestore.FieldValue.increment(1),
     });
 
-    // ── Invalidate campaign cache AND stats cache ──
+    // ── Invalidate user campaigns and stats ──
     await invalidateKey(`campaigns:user:${uid}`);
     await invalidateKey(`stats:user:${uid}`);
 
@@ -1276,7 +1198,7 @@ app.post('/api/campaigns', verifyToken, async (req, res) => {
   }
 });
 
-// ── Update campaign ──
+// ── Update campaign (invalidate user campaigns, stats, campaign by ID) ──
 app.put('/api/campaigns/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1305,7 +1227,7 @@ app.put('/api/campaigns/:id', verifyToken, async (req, res) => {
     filteredUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await doc.ref.update(filteredUpdates);
 
-    // ── Invalidate campaign cache AND stats cache ──
+    // ── Invalidate caches ──
     await invalidateKey(`campaigns:user:${uid}`);
     await invalidateKey(`campaigns:id:${id}`);
     await invalidateKey(`stats:user:${uid}`);
@@ -1317,7 +1239,7 @@ app.put('/api/campaigns/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ── Delete campaign ──
+// ── Delete campaign (invalidate user campaigns, stats, campaign by ID) ──
 app.delete('/api/campaigns/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1336,7 +1258,7 @@ app.delete('/api/campaigns/:id', verifyToken, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // ── Invalidate campaign cache AND stats cache ──
+    // ── Invalidate caches ──
     await invalidateKey(`campaigns:user:${uid}`);
     await invalidateKey(`campaigns:id:${id}`);
     await invalidateKey(`stats:user:${uid}`);
@@ -1348,7 +1270,7 @@ app.delete('/api/campaigns/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ── Record share (silent skip if already shared) ──
+// ── Record share ──
 app.post('/api/campaigns/:id/share', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1383,6 +1305,10 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
 
     await recordAction(id, userId, ip, 'shares');
     await invalidateKey(`campaigns:sharecount:${id}`);
+    // Also invalidate stats for the user
+    if (data.userId) {
+      await invalidateKey(`stats:user:${data.userId}`);
+    }
 
     const updatedDoc = await doc.ref.get();
     const updatedData = updatedDoc.data();
@@ -1398,7 +1324,7 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
   }
 });
 
-// ── Get share count ──
+// ── Get share count (cached) ──
 app.get('/api/campaigns/:id/share-count', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1431,7 +1357,7 @@ app.get('/api/campaigns/:id/share-count', async (req, res) => {
   }
 });
 
-// ── Complete campaign (silent skip if already completed) ──
+// ── Complete campaign ──
 app.post('/api/campaigns/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1449,10 +1375,7 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
 
     const alreadyCompleted = await hasPerformedAction(id, userId, ip, 'completions');
     if (alreadyCompleted) {
-      return res.json({
-        success: true,
-        message: 'Already completed',
-      });
+      return res.json({ success: true, message: 'Already completed' });
     }
 
     await doc.ref.update({
@@ -1462,17 +1385,14 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
 
     await recordAction(id, userId, ip, 'completions');
 
-    res.json({
-      success: true,
-      message: 'Campaign completed!',
-    });
+    res.json({ success: true, message: 'Campaign completed!' });
   } catch (error) {
     console.error('❌ Complete error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// ── Unlock campaign (silent skip if already unlocked) ──
+// ── Unlock campaign ──
 app.post('/api/campaigns/:id/unlock', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1490,10 +1410,7 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
 
     const alreadyUnlocked = await hasPerformedAction(id, userId, ip, 'unlocks');
     if (alreadyUnlocked) {
-      return res.json({
-        success: true,
-        message: 'Already unlocked',
-      });
+      return res.json({ success: true, message: 'Already unlocked' });
     }
 
     await doc.ref.update({
@@ -1503,10 +1420,7 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
 
     await recordAction(id, userId, ip, 'unlocks');
 
-    res.json({
-      success: true,
-      message: 'Campaign unlocked!',
-    });
+    res.json({ success: true, message: 'Campaign unlocked!' });
   } catch (error) {
     console.error('❌ Unlock error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -1514,7 +1428,7 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
 });
 
 // ============================================================
-// 14. USER STATS (EXCLUDES DELETED CAMPAIGNS, PER-USER CACHE)
+// 14. USER STATS (cached per user, invalidated on campaign changes)
 // ============================================================
 app.get('/api/stats', verifyToken, async (req, res) => {
   try {
@@ -1522,6 +1436,7 @@ app.get('/api/stats', verifyToken, async (req, res) => {
     const cacheKey = `stats:user:${uid}`;
 
     const result = await getOrSetCache(cacheKey, async () => {
+      console.log(`📡 Fetching stats for user ${uid} from Firestore...`);
       const snapshot = await db.collection('campaigns')
         .where('userId', '==', uid)
         .get();
@@ -1568,7 +1483,7 @@ app.get('/api/stats', verifyToken, async (req, res) => {
 });
 
 // ============================================================
-// 15. SUPPORT TICKETS
+// 15. SUPPORT TICKETS (cached per user, invalidated on new ticket)
 // ============================================================
 app.get('/api/support', verifyToken, async (req, res) => {
   try {
@@ -1576,6 +1491,7 @@ app.get('/api/support', verifyToken, async (req, res) => {
     const cacheKey = `support:user:${uid}`;
 
     const result = await getOrSetCache(cacheKey, async () => {
+      console.log(`📡 Fetching support tickets for user ${uid} from Firestore...`);
       const snapshot = await db.collection('supportTickets')
         .where('userId', '==', uid)
         .orderBy('createdAt', 'desc')
@@ -1630,6 +1546,7 @@ app.post('/api/support', verifyToken, async (req, res) => {
     const docRef = await db.collection('supportTickets').add(ticketData);
     const newTicket = { id: docRef.id, ...ticketData };
 
+    // ── Invalidate support cache for this user ──
     await invalidateKey(`support:user:${uid}`);
 
     res.status(201).json({ success: true, ticket: newTicket });
@@ -1640,13 +1557,14 @@ app.post('/api/support', verifyToken, async (req, res) => {
 });
 
 // ============================================================
-// 16. COMMENTS
+// 16. COMMENTS (cached indefinitely, invalidated on new comment)
 // ============================================================
 app.get('/api/comments', async (req, res) => {
   try {
     const cacheKey = 'comments:all';
 
     const result = await getOrSetCache(cacheKey, async () => {
+      console.log('📡 Fetching comments from Firestore...');
       const snapshot = await db.collection('comments')
         .orderBy('createdAt', 'desc')
         .limit(5)
@@ -1695,6 +1613,7 @@ app.post('/api/comments', async (req, res) => {
     const docRef = await db.collection('comments').add(commentData);
     const newComment = { id: docRef.id, ...commentData };
 
+    // ── Invalidate comments cache ──
     await invalidateKey('comments:all');
 
     res.status(201).json({ success: true, comment: newComment });
@@ -1702,63 +1621,6 @@ app.post('/api/comments', async (req, res) => {
     console.error('❌ Post comment error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
-});
-
-
-// backend/server.js – add this endpoint
-
-// ── Set HttpOnly cookie with Firebase token ──
-app.post('/api/auth/set-session', async (req, res) => {
-  try {
-    const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ success: false, error: 'Token required' });
-    }
-
-    // ── Verify the token ──
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (!decoded) {
-      return res.status(401).json({ success: false, error: 'Invalid token' });
-    }
-
-    // ── Set HttpOnly cookie ──
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      path: '/',
-    });
-
-    // ── Also get user profile from Firestore ──
-    const userDoc = await db.collection('users').doc(decoded.uid).get();
-    const userData = userDoc.exists ? userDoc.data() : null;
-
-    res.json({
-      success: true,
-      user: {
-        uid: decoded.uid,
-        email: decoded.email,
-        displayName: decoded.name || '',
-        photoURL: decoded.picture || '',
-        ...userData,
-      },
-    });
-  } catch (error) {
-    console.error('Set session error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ── Clear session cookie ──
-app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-  });
-  res.json({ success: true });
 });
 
 // ============================================================
@@ -1821,6 +1683,5 @@ app.listen(PORT, () => {
   console.log(`🔒 Allowed origins:`, allowedOrigins);
   console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
   console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
-  console.log(`📦 Redis: INFINITE CACHE (cache until change)`);
-  console.log(`🛡️ Duplicate Prevention: IP + UserID tracking (silent – no frontend errors)`);
+  console.log(`📦 Redis: INDEFINITE CACHE with smart invalidation`);
 });
