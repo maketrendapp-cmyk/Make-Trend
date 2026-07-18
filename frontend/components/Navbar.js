@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import { useState, useEffect } from 'react';
 import {
   FiHome,
@@ -19,7 +20,8 @@ import {
 
 export default function Navbar() {
   const router = useRouter();
-  const { user, isAuthenticated, logout, profile: contextProfile } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
+  const { profile, loadingState } = useAppData();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -50,29 +52,32 @@ export default function Navbar() {
 
   const isActive = (path) => router.pathname === path;
 
-  // ── Get display name from contextProfile OR user ──
-  const displayName = contextProfile?.fullname || 
-                      contextProfile?.name || 
+  // ── Get display name from profile OR user ──
+  const displayName = profile?.fullname || 
+                      profile?.name || 
                       user?.fullName || 
                       user?.fullname || 
                       user?.displayName || 
                       'User';
 
-  // ── Get username from contextProfile OR user ──
-  const displayUsername = contextProfile?.username || 
+  // ── Get username from profile OR user ──
+  const displayUsername = profile?.username || 
                           user?.username || 
                           user?.email?.split('@')[0] || 
                           'user';
 
-  // ── Get avatar from contextProfile OR user ──
-  const avatarUrl = contextProfile?.avatar || 
-                    contextProfile?.profilePic || 
+  // ── Get avatar from profile OR user ──
+  const avatarUrl = profile?.avatar || 
+                    profile?.profilePic || 
                     user?.photoURL || 
                     user?.avatar || 
                     null;
 
   // ── First letter for fallback ──
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
+
+  // ── Determine if profile is loading ──
+  const isProfileLoading = loadingState?.profile && !profile;
 
   return (
     <>
@@ -137,28 +142,37 @@ export default function Navbar() {
                       mx-0.5 sm:mx-1
                     "
                   >
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex-shrink-0 shadow-sm border-2 border-white">
-                      {avatarUrl ? (
-                        <img 
-                          src={avatarUrl} 
-                          alt={displayName}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            // ── If image fails to load, show fallback ──
-                            e.target.style.display = 'none';
-                            e.target.parentElement.className = 'w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold';
-                            e.target.parentElement.textContent = firstLetter;
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold">
-                          {firstLetter}
+                    {/* ── Avatar / Skeleton ── */}
+                    {isProfileLoading ? (
+                      <>
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0"></div>
+                        <div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex-shrink-0 shadow-sm border-2 border-white">
+                          {avatarUrl ? (
+                            <img 
+                              src={avatarUrl} 
+                              alt={displayName}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.className = 'w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold';
+                                e.target.parentElement.textContent = firstLetter;
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold">
+                              {firstLetter}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <span className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[80px] sm:max-w-[130px]">
-                      @{displayUsername}
-                    </span>
+                        <span className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition truncate max-w-[80px] sm:max-w-[130px]">
+                          @{displayUsername}
+                        </span>
+                      </>
+                    )}
                   </Link>
 
                   <button
