@@ -35,7 +35,7 @@ const TOP_NAV_ONLY_PAGES = [
 // ── SSR: read token from cookie ──
 MyApp.getInitialProps = async (ctx) => {
   let initialUser = null;
-  const { req } = ctx;
+  const { req } = ctx.ctx; // ✅ FIX – correct nesting for _app.js
 
   if (req) {
     try {
@@ -43,10 +43,7 @@ MyApp.getInitialProps = async (ctx) => {
       const token = cookies.get('token') || null;
 
       if (token) {
-        // ── Optionally verify the token here ──
-        // For best security, verify with Firebase Admin SDK.
-        // But even without verification, the client will verify on mount.
-        // We'll just trust the cookie and pass the token – the client will validate.
+        // Pass the token to the client for instant JWT decoding
         initialUser = { token };
       }
     } catch (err) {
