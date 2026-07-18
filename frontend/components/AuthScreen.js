@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const uidRef = useRef(storedAuth?.uid || null);
-  const { loadAllData, clearUserData } = useAppData();
+  const { loadAllData } = useAppData(); // only loadAllData, no clearUserData
 
   // ── Helper to cache auth info ──
   const cacheAuth = (authData) => {
@@ -149,8 +149,7 @@ export function AuthProvider({ children }) {
         uidRef.current = firebaseUser.uid;
         cacheAuth(basicUser);
 
-        // ── Clear old cached data and fetch fresh ──
-        clearUserData();
+        // Fetch fresh data
         loadAllData().catch(() => {});
 
         try {
@@ -177,7 +176,6 @@ export function AuthProvider({ children }) {
         } catch {}
       } else {
         localStorage.removeItem(AUTH_CACHE_KEY);
-        clearUserData();
         setUser(null);
         setIsAuthenticated(false);
         setNeedsCompletion(false);
@@ -185,7 +183,7 @@ export function AuthProvider({ children }) {
       }
     });
     return () => unsubscribe();
-  }, [fetchUserProfile, checkProfileStatus]);
+  }, [fetchUserProfile, checkProfileStatus, loadAllData]);
 
   // ============================================================
   // AUTH METHODS
@@ -207,8 +205,7 @@ export function AuthProvider({ children }) {
       uidRef.current = firebaseUser.uid;
       cacheAuth(basicUser);
 
-      // ── Clear old cached data and fetch fresh ──
-      clearUserData();
+      // Load fresh data
       loadAllData().catch(() => {});
 
       try {
@@ -270,9 +267,7 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(true);
         setNeedsCompletion(false);
         cacheAuth(fullUser);
-
-        // ── Clear old cached data and fetch fresh ──
-        clearUserData();
+        // Load fresh data
         loadAllData().catch(() => {});
       } else {
         await firebaseUser.delete();
@@ -318,8 +313,7 @@ export function AuthProvider({ children }) {
       uidRef.current = firebaseUser.uid;
       cacheAuth(basicUser);
 
-      // ── Clear old cached data and fetch fresh ──
-      clearUserData();
+      // Load fresh data
       loadAllData().catch(() => {});
 
       try {
@@ -376,9 +370,7 @@ export function AuthProvider({ children }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           cacheAuth(profileData);
-
-          // ── Clear old cached data and fetch fresh ──
-          clearUserData();
+          // Load fresh data
           loadAllData().catch(() => {});
         } else {
           const updated = { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true };
@@ -386,9 +378,7 @@ export function AuthProvider({ children }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           cacheAuth(updated);
-
-          // ── Clear old cached data and fetch fresh ──
-          clearUserData();
+          // Load fresh data
           loadAllData().catch(() => {});
         }
         uidRef.current = firebaseUser.uid;
@@ -405,7 +395,6 @@ export function AuthProvider({ children }) {
     try {
       await signOut(auth);
       localStorage.removeItem(AUTH_CACHE_KEY);
-      clearUserData();
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);
