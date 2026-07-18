@@ -58,10 +58,10 @@ const copyReferralCode = () => {
   };
 
   const statsItems = [
-    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats.totalCampaigns || 0 },
-    { icon: FiEye, label: 'Total Views', value: stats.totalViews || 0 },
-    { icon: FiUnlock, label: 'Total Unlocks', value: stats.totalUnlocks || 0 },
-    { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
+    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
+    { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
+    { icon: FiUnlock, label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0 },
+    { icon: FiUsers, label: 'Referrals', value: displayUser.referrals ?? 0 },
   ];
 
   // ✅ Quick Actions
@@ -86,7 +86,7 @@ const copyReferralCode = () => {
   ];
 
 // ── Skeleton Loader (show only while profile is loading) ──
-if (loadingState.profile) {
+if (loadingState?.profile) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
