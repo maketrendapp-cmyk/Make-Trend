@@ -3,7 +3,7 @@
 // AUTH PROVIDER + LOGIN UI – No data fetching
 // ============================================================
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import {
   auth,
