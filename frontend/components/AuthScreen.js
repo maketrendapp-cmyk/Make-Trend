@@ -1,11 +1,10 @@
 // components/AuthScreen.js
 // ============================================================
-// INSTANT LOGIN – localStorage + JWT Decode
+// INSTANT LOGIN – Read Firebase's own localStorage synchronously
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
-import jwtDecode from 'jwt-decode';
 import {
   auth,
   onAuthStateChanged,
@@ -17,6 +16,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   FacebookAuthProvider,
+  firebaseApp, // we'll export this from firebase.js
 } from '../services/firebase';
 import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
@@ -32,6 +32,10 @@ import {
 import { FaGoogle, FaFacebook } from 'react-icons/fa';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
+
+// ── Get Firebase API key from the already‑initialized app ──
+const firebaseApiKey = firebaseApp.options.apiKey;
+const FIREBASE_AUTH_KEY = `firebase:authUser:${firebaseApiKey}:DEFAULT`;
 
 // ============================================================
 // BACKEND API HELPER
@@ -55,13 +59,28 @@ async function apiRequest(endpoint, options = {}, token = null) {
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // ── 1️⃣ INSTANT user from Firebase localStorage ──
+  const storedUser = (() => {
+    try {
+      const raw = localStorage.getItem(FIREBASE_AUTH_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      // Firebase stores the user object directly (or under 'value' in some versions)
+      if (parsed && parsed.uid) return parsed;
+      if (parsed && parsed.value && parsed.value.uid) return parsed.value;
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // ── State initialised instantly ──
+  const [user, setUser] = useState(storedUser || null);
+  const [loading, setLoading] = useState(false); // Always false because we have the user
+  const [isAuthenticated, setIsAuthenticated] = useState(!!storedUser);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
-  const cookieUidRef = useRef(null);
-  const fastPathAttemptedRef = useRef(false);
+  const cookieUidRef = useRef(storedUser?.uid || null);
 
   const {
     templates,
@@ -82,7 +101,7 @@ export function AuthProvider({ children }) {
     clearUserData,
   } = useAppData();
 
-  // --- Upload Avatar ---
+  // ── Upload Avatar ──
   const uploadAvatar = async (file) => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) throw new Error('Not authenticated');
@@ -100,7 +119,7 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
-  // --- Fetch user profile (for auth logic) ---
+  // ── Fetch user profile (for auth logic) ──
   const fetchUserProfile = useCallback(async (firebaseUser) => {
     try {
       const token = await firebaseUser.getIdToken();
@@ -111,7 +130,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // --- Check profile status ---
+  // ── Check profile status ──
   const checkProfileStatus = useCallback(async (uid) => {
     try {
       const data = await apiRequest(`/auth/profile?uid=${uid}`);
@@ -122,93 +141,24 @@ export function AuthProvider({ children }) {
   }, []);
 
   // ============================================================
-  // 1️⃣ FASTEST PATH – Read token from localStorage and decode instantly
-  // ============================================================
-  useEffect(() => {
-    let isMounted = true;
-
-    const decodeTokenInstantly = () => {
-      const token = localStorage.getItem('token');
-
-      if (!token) {
-        if (isMounted) {
-          setUser(null);
-          setIsAuthenticated(false);
-          setLoading(false);
-        }
-        fastPathAttemptedRef.current = true;
-        return;
-      }
-
-      try {
-        const decoded = jwtDecode(token);
-        const { uid, email, name, picture } = decoded;
-
-        const basicUser = {
-          uid,
-          email: email || '',
-          displayName: name || '',
-          photoURL: picture || '',
-          username: email?.split('@')[0] || '',
-          fullname: name || '',
-          completed: true,
-        };
-
-        if (isMounted) {
-          setUser(basicUser);
-          setIsAuthenticated(true);
-          setNeedsCompletion(false);
-          setLoading(false);
-          cookieUidRef.current = uid;
-        }
-
-        // ── Fetch full profile in background ──
-        apiRequest('/auth/me', {}, token)
-          .then((data) => {
-            if (data.success && data.user && isMounted) {
-              setUser((prev) => ({ ...prev, ...data.user, completed: true }));
-            }
-          })
-          .catch(() => {});
-
-        // ── Load all other data in background ──
-        loadAllData().catch(() => {});
-
-      } catch (err) {
-        localStorage.removeItem('token');
-        if (isMounted) {
-          setUser(null);
-          setIsAuthenticated(false);
-          setLoading(false);
-        }
-      }
-
-      fastPathAttemptedRef.current = true;
-    };
-
-    decodeTokenInstantly();
-    return () => { isMounted = false; };
-  }, []);
-
-  // ============================================================
-  // 2️⃣ FIREBASE LISTENER – Fallback and real‑time updates
+  // 2️⃣ FIREBASE LISTENER – Real‑time updates (sign‑out, token refresh)
   // ============================================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!fastPathAttemptedRef.current) return;
+      // If we already have the same user, skip heavy logic
+      if (firebaseUser && cookieUidRef.current === firebaseUser.uid) {
+        // Update the localStorage key if needed (though Firebase does it)
+        return;
+      }
 
-      setLoading(true);
       if (firebaseUser) {
-        if (cookieUidRef.current === firebaseUser.uid) {
-          setLoading(false);
-          return;
-        }
-
+        // New login or different user
+        setLoading(true);
         try {
           const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
           if (data.banned) {
             await signOut(auth);
-            localStorage.removeItem('token');
+            localStorage.removeItem(FIREBASE_AUTH_KEY);
             setUser(null);
             setIsAuthenticated(false);
             setNeedsCompletion(false);
@@ -217,6 +167,7 @@ export function AuthProvider({ children }) {
           }
         } catch {}
 
+        // Load all data (will fetch profile, templates, etc.)
         await loadAllData();
 
         const profileData = await fetchUserProfile(firebaseUser);
@@ -224,6 +175,7 @@ export function AuthProvider({ children }) {
           setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
+          cookieUidRef.current = firebaseUser.uid;
         } else {
           const status = await checkProfileStatus(firebaseUser.uid);
           if (status.completed) {
@@ -232,26 +184,45 @@ export function AuthProvider({ children }) {
               setUser(fallback);
               setIsAuthenticated(true);
               setNeedsCompletion(false);
+              cookieUidRef.current = firebaseUser.uid;
             } else {
-              setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
+              const basicUser = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName || '',
+                photoURL: firebaseUser.photoURL || '',
+                completed: false,
+              };
+              setUser(basicUser);
               setIsAuthenticated(true);
               setNeedsCompletion(true);
+              cookieUidRef.current = firebaseUser.uid;
             }
           } else {
-            setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
+            const basicUser = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName || '',
+              photoURL: firebaseUser.photoURL || '',
+              completed: false,
+            };
+            setUser(basicUser);
             setIsAuthenticated(true);
             setNeedsCompletion(true);
+            cookieUidRef.current = firebaseUser.uid;
           }
         }
+        setLoading(false);
       } else {
-        localStorage.removeItem('token');
+        // User signed out
+        localStorage.removeItem(FIREBASE_AUTH_KEY);
         setUser(null);
         setIsAuthenticated(false);
         setNeedsCompletion(false);
         clearUserData();
         cookieUidRef.current = null;
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, [fetchUserProfile, checkProfileStatus, loadAllData, clearUserData]);
@@ -264,7 +235,8 @@ export function AuthProvider({ children }) {
       if (firebaseUser) {
         try {
           const token = await firebaseUser.getIdToken();
-          localStorage.setItem('token', token);
+          // Firebase automatically updates its internal localStorage entry,
+          // so nothing else needed.
         } catch {}
       }
     });
@@ -279,8 +251,6 @@ export function AuthProvider({ children }) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
-      const token = await firebaseUser.getIdToken();
-      localStorage.setItem('token', token);
 
       const profileData = await fetchUserProfile(firebaseUser);
       if (profileData) {
@@ -292,7 +262,9 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(true);
         setNeedsCompletion(true);
       }
-      await loadAllData();
+      cookieUidRef.current = firebaseUser.uid;
+      // Data loads in the background (non‑blocking)
+      loadAllData().catch(() => {});
       return { success: true };
     } catch (error) {
       let message = 'Invalid email or password.';
@@ -307,9 +279,8 @@ export function AuthProvider({ children }) {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
-      const token = await firebaseUser.getIdToken();
-      localStorage.setItem('token', token);
 
+      const token = await firebaseUser.getIdToken();
       const data = await apiRequest('/auth/register', {
         method: 'POST',
         body: { uid: firebaseUser.uid, username, fullname, email, avatar: avatarUrl || '', referralCode, deviceFingerprint: 'web' },
@@ -318,7 +289,8 @@ export function AuthProvider({ children }) {
         setUser({ uid: firebaseUser.uid, email, ...data.user, completed: true });
         setIsAuthenticated(true);
         setNeedsCompletion(false);
-        await loadAllData();
+        cookieUidRef.current = firebaseUser.uid;
+        loadAllData().catch(() => {});
         return { success: true };
       } else {
         await firebaseUser.delete();
@@ -351,14 +323,12 @@ export function AuthProvider({ children }) {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-      const token = await firebaseUser.getIdToken();
-      localStorage.setItem('token', token);
 
       try {
         const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
         if (data.banned) {
           await signOut(auth);
-          localStorage.removeItem('token');
+          localStorage.removeItem(FIREBASE_AUTH_KEY);
           setIsSocialLoading(false);
           return { success: false, error: 'Account suspended.' };
         }
@@ -373,6 +343,7 @@ export function AuthProvider({ children }) {
           setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
+          cookieUidRef.current = firebaseUser.uid;
           setIsSocialLoading(false);
           return { success: true };
         }
@@ -388,6 +359,7 @@ export function AuthProvider({ children }) {
       setUser(socialUserData);
       setIsAuthenticated(true);
       setNeedsCompletion(true);
+      cookieUidRef.current = firebaseUser.uid;
       setIsSocialLoading(false);
       return { success: true, needsCompletion: true, user: socialUserData };
     } catch (error) {
@@ -414,16 +386,14 @@ export function AuthProvider({ children }) {
           setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          await loadAllData();
-          const newToken = await firebaseUser.getIdToken();
-          localStorage.setItem('token', newToken);
+          cookieUidRef.current = firebaseUser.uid;
+          loadAllData().catch(() => {});
           return { success: true };
         } else {
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true });
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          const newToken = await firebaseUser.getIdToken();
-          localStorage.setItem('token', newToken);
+          cookieUidRef.current = firebaseUser.uid;
           return { success: true };
         }
       } else {
@@ -437,11 +407,12 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await signOut(auth);
-      localStorage.removeItem('token');
+      localStorage.removeItem(FIREBASE_AUTH_KEY);
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);
       clearUserData();
+      cookieUidRef.current = null;
       return { success: true };
     } catch {
       return { success: false, error: 'Logout failed' };
