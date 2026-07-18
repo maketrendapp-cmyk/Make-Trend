@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData'; // 👈 import
 import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
@@ -37,9 +38,15 @@ function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pathname = router.pathname;
 
+  // 👇 Start data loading immediately (non‑blocking)
+  // This will fetch and cache profile, templates, stats, etc.
+  // The data will be ready when pages call useAppData().
+  useAppData();
+
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
+  // ── No layout (templates, tasks, share) ──
   if (isNoLayout) {
     return (
       <AuthProvider>
@@ -49,6 +56,7 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
+  // ── Top navbar only (about, rules, terms, privacy) ──
   if (isTopNavOnly) {
     return (
       <AuthProvider>
@@ -61,6 +69,7 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
+  // ── Full layout (default) ──
   return (
     <AuthProvider>
       <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
