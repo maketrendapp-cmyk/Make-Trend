@@ -1,6 +1,6 @@
 // lib/useAppData.js
 // ============================================================
-// FINAL – Persistent Cache for ALL data + Highlight fix
+// PERSISTENT CACHE – All data instantly available on reload
 // ============================================================
 
 import { useState, useCallback, useEffect } from 'react';
@@ -70,7 +70,7 @@ export function useAppData() {
   const [featuredTemplates, setFeaturedTemplates] = useState(getCache('templates_highlight') || []);
   const [comments, setComments] = useState(getCache('comments_all') || []);
 
-  // ── Loading states ──
+  // ── Loading states (for skeletons) ──
   const [loadingState, setLoadingState] = useState({
     profile: false,
     stats: false,
@@ -125,10 +125,9 @@ export function useAppData() {
   const fetchHighlightedTemplates = useCallback(async () => {
     setLoadingState(s => ({ ...s, highlights: true }));
     try {
-      // ✅ FIX: Always filter to only highlighted templates
+      // Fetch and filter highlights client-side to ensure ONLY highlighted
       const data = await apiRequest('/templates?highlight=true');
       const all = data.templates || [];
-      // 🔥 Filter client‑side to ensure ONLY highlighted
       const highlighted = all.filter(t => t.isHighlight === true);
       setFeaturedTemplates(highlighted);
       setCache('templates_highlight', highlighted);
@@ -201,7 +200,7 @@ export function useAppData() {
     }
   }, []);
 
-  // ---- Master loader ──
+  // ---- Master loader ----
   const loadAllData = useCallback(async () => {
     try {
       await Promise.all([
