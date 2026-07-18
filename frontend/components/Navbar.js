@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { useAppData } from '../lib/useAppData';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FiHome,
   FiUser,
