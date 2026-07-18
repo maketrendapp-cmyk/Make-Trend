@@ -1,15 +1,15 @@
 // lib/useAppData.js
 // ============================================================
-// NO CACHING – Fresh data on every load
+// ROUTE-AWARE FETCH – Fetches only what the current page needs
 // ============================================================
 
 import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { auth } from '../services/firebase';
 import toast from 'react-hot-toast';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
-// ── API helper ──
 async function apiRequest(endpoint, options = {}, token = null) {
   const url = `${API_BASE}${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
@@ -23,213 +23,328 @@ async function apiRequest(endpoint, options = {}, token = null) {
   return data;
 }
 
-export function useAppData() {
-  // ── State ──
-  const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState({
-    totalCampaigns: 0,
-    totalViews: 0,
-    totalUnlocks: 0,
-    totalShares: 0,
-    totalCompletions: 0,
-    successfulCampaigns: 0,
+// ── Shared cache ──
+const cache = {
+  profile: null,
+  stats: null,
+  campaigns: [],
+  supportTickets: [],
+  templates: [],
+  featuredTemplates: [],
+  comments: [],
+};
+
+let fetchPromises = {
+  profile: null,
+  stats: null,
+  campaigns: null,
+  supportTickets: null,
+  templates: null,
+  featuredTemplates: null,
+  comments: null,
+};
+
+let isFetching = {};
+
+// ── Subscribers ──
+let subscribers = [];
+
+function notifySubscribers() {
+  subscribers.forEach(fn => fn(cache));
+}
+
+function subscribe(fn) {
+  subscribers.push(fn);
+  return () => {
+    subscribers = subscribers.filter(f => f !== fn);
+  };
+}
+
+// ── Individual fetch functions with deduplication ──
+const fetchWithDedupe = (key, fetchFn) => {
+  if (fetchPromises[key]) return fetchPromises[key];
+  if (isFetching[key]) return fetchPromises[key];
+
+  isFetching[key] = true;
+  fetchPromises[key] = fetchFn()
+    .then((data) => {
+      cache[key] = data;
+      notifySubscribers();
+      return data;
+    })
+    .catch((err) => {
+      toast.error(`Failed to load ${key}`);
+      throw err;
+    })
+    .finally(() => {
+      isFetching[key] = false;
+      fetchPromises[key] = null;
+    });
+  return fetchPromises[key];
+};
+
+// ── Data fetchers ──
+const fetchProfile = () =>
+  fetchWithDedupe('profile', async () => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    const token = await user.getIdToken();
+    const data = await apiRequest('/auth/me', {}, token);
+    return data.user ? { uid: user.uid, ...data.user, completed: true } : null;
   });
-  const [campaigns, setCampaigns] = useState([]);
-  const [supportTickets, setSupportTickets] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [featuredTemplates, setFeaturedTemplates] = useState([]);
-  const [comments, setComments] = useState([]);
+
+const fetchStats = () =>
+  fetchWithDedupe('stats', async () => {
+    const user = auth.currentUser;
+    if (!user) return { totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 };
+    const token = await user.getIdToken();
+    const data = await apiRequest('/stats', {}, token);
+    return data.stats || {};
+  });
+
+const fetchCampaigns = () =>
+  fetchWithDedupe('campaigns', async () => {
+    const user = auth.currentUser;
+    if (!user) return [];
+    const token = await user.getIdToken();
+    const data = await apiRequest('/campaigns?limit=25', {}, token);
+    return data.campaigns || [];
+  });
+
+const fetchSupportTickets = () =>
+  fetchWithDedupe('supportTickets', async () => {
+    const user = auth.currentUser;
+    if (!user) return [];
+    const token = await user.getIdToken();
+    const data = await apiRequest('/support', {}, token);
+    return data.tickets || [];
+  });
+
+const fetchTemplates = () =>
+  fetchWithDedupe('templates', async () => {
+    const data = await apiRequest('/templates');
+    return data.templates || [];
+  });
+
+const fetchFeaturedTemplates = () =>
+  fetchWithDedupe('featuredTemplates', async () => {
+    const data = await apiRequest('/templates?highlight=true');
+    return (data.templates || []).filter(t => t.isHighlight === true);
+  });
+
+const fetchComments = () =>
+  fetchWithDedupe('comments', async () => {
+    const data = await apiRequest('/comments');
+    return data.comments || [];
+  });
+
+// ── React Hook ──
+export function useAppData() {
+  const router = useRouter();
+  const pathname = router.pathname;
+
+  const [data, setData] = useState({
+    profile: cache.profile,
+    stats: cache.stats,
+    campaigns: cache.campaigns,
+    supportTickets: cache.supportTickets,
+    templates: cache.templates,
+    featuredTemplates: cache.featuredTemplates,
+    comments: cache.comments,
+  });
 
   const [loadingState, setLoadingState] = useState({
     profile: false,
     stats: false,
-    highlights: false,
-    allTemplates: false,
     campaigns: false,
-    support: false,
+    supportTickets: false,
+    templates: false,
+    featuredTemplates: false,
     comments: false,
   });
 
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // ---- Fetch functions ----
-  const fetchProfile = useCallback(async () => {
-    const u = auth.currentUser;
-    if (!u) return;
-    setLoadingState(s => ({ ...s, profile: true }));
-    try {
-      const token = await u.getIdToken();
-      const data = await apiRequest('/auth/me', {}, token);
-      if (data.success && data.user) {
-        setProfile({ uid: u.uid, email: u.email, ...data.user, completed: true });
-      }
-    } catch (err) {
-      toast.error('Failed to load profile');
-    } finally {
-      setLoadingState(s => ({ ...s, profile: false }));
-    }
-  }, []);
-
-  const fetchStats = useCallback(async () => {
-    const u = auth.currentUser;
-    if (!u) return;
-    setLoadingState(s => ({ ...s, stats: true }));
-    try {
-      const token = await u.getIdToken();
-      const data = await apiRequest('/stats', {}, token);
-      if (data.success) setStats(data.stats);
-    } catch (err) {
-      console.error('Stats fetch error:', err);
-    } finally {
-      setLoadingState(s => ({ ...s, stats: false }));
-    }
-  }, []);
-
-  const fetchHighlightedTemplates = useCallback(async () => {
-    setLoadingState(s => ({ ...s, highlights: true }));
-    try {
-      const data = await apiRequest('/templates?highlight=true');
-      const all = data.templates || [];
-      setFeaturedTemplates(all.filter(t => t.isHighlight === true));
-    } catch (err) {
-      console.error('Highlights fetch error:', err);
-    } finally {
-      setLoadingState(s => ({ ...s, highlights: false }));
-    }
-  }, []);
-
-  const fetchAllTemplates = useCallback(async () => {
-    setLoadingState(s => ({ ...s, allTemplates: true }));
-    try {
-      const data = await apiRequest('/templates');
-      setTemplates(data.templates || []);
-    } catch (err) {
-      console.error('Templates fetch error:', err);
-    } finally {
-      setLoadingState(s => ({ ...s, allTemplates: false }));
-    }
-  }, []);
-
-  const fetchCampaigns = useCallback(async () => {
-    const u = auth.currentUser;
-    if (!u) return;
-    setLoadingState(s => ({ ...s, campaigns: true }));
-    try {
-      const token = await u.getIdToken();
-      const data = await apiRequest('/campaigns?limit=25', {}, token);
-      setCampaigns(data.campaigns || []);
-    } catch (err) {
-      console.error('Campaigns fetch error:', err);
-    } finally {
-      setLoadingState(s => ({ ...s, campaigns: false }));
-    }
-  }, []);
-
-  const fetchSupportTickets = useCallback(async () => {
-    const u = auth.currentUser;
-    if (!u) return;
-    setLoadingState(s => ({ ...s, support: true }));
-    try {
-      const token = await u.getIdToken();
-      const data = await apiRequest('/support', {}, token);
-      setSupportTickets(data.tickets || []);
-    } catch (err) {
-      console.error('Support tickets fetch error:', err);
-    } finally {
-      setLoadingState(s => ({ ...s, support: false }));
-    }
-  }, []);
-
-  const fetchComments = useCallback(async () => {
-    setLoadingState(s => ({ ...s, comments: true }));
-    try {
-      const data = await apiRequest('/comments');
-      setComments(data.comments || []);
-    } catch (err) {
-      console.error('Comments fetch error:', err);
-    } finally {
-      setLoadingState(s => ({ ...s, comments: false }));
-    }
-  }, []);
-
-  // ---- Master loader ----
-  const loadAllData = useCallback(async () => {
-    try {
-      await Promise.all([
-        fetchProfile(),
-        fetchStats(),
-        fetchHighlightedTemplates(),
-        fetchAllTemplates(),
-      ]);
-      await Promise.all([
-        fetchCampaigns(),
-        fetchSupportTickets(),
-        fetchComments(),
-      ]);
-    } catch (err) {
-      toast.error('Some data failed to load');
-    } finally {
-      setDataLoaded(true);
-    }
-  }, [
-    fetchProfile, fetchStats, fetchHighlightedTemplates, fetchAllTemplates,
-    fetchCampaigns, fetchSupportTickets, fetchComments,
-  ]);
-
-  // ── Load on mount ──
   useEffect(() => {
-    loadAllData().catch(() => {});
+    const update = (newCache) => {
+      setData({
+        profile: newCache.profile,
+        stats: newCache.stats,
+        campaigns: newCache.campaigns,
+        supportTickets: newCache.supportTickets,
+        templates: newCache.templates,
+        featuredTemplates: newCache.featuredTemplates,
+        comments: newCache.comments,
+      });
+    };
+    return subscribe(update);
   }, []);
 
-  // ---- Refetch helpers ----
+  // ── Determine which data to fetch based on route ──
+  useEffect(() => {
+    const fetchPageData = async () => {
+      const user = auth.currentUser;
+
+      // 1. Always fetch profile if user exists (for Navbar)
+      if (user && !cache.profile && !isFetching.profile) {
+        setLoadingState(prev => ({ ...prev, profile: true }));
+        await fetchProfile();
+        setLoadingState(prev => ({ ...prev, profile: false }));
+      }
+
+      // 2. Fetch data specific to the current page
+      const isHome = pathname === '/';
+      const isProfile = pathname === '/profile';
+      const isStats = pathname === '/stats';
+      const isCreate = pathname === '/create' || pathname === '/createcampaign';
+      const isSupport = pathname === '/support';
+      const isRefer = pathname === '/refer-earn';
+      const isAbout = pathname === '/about';
+
+      // Home page: templates, featured, comments (profile already fetched)
+      if (isHome) {
+        if (!cache.templates && !isFetching.templates) {
+          setLoadingState(prev => ({ ...prev, templates: true }));
+          await fetchTemplates();
+          setLoadingState(prev => ({ ...prev, templates: false }));
+        }
+        if (!cache.featuredTemplates && !isFetching.featuredTemplates) {
+          setLoadingState(prev => ({ ...prev, featuredTemplates: true }));
+          await fetchFeaturedTemplates();
+          setLoadingState(prev => ({ ...prev, featuredTemplates: false }));
+        }
+        if (!cache.comments && !isFetching.comments) {
+          setLoadingState(prev => ({ ...prev, comments: true }));
+          await fetchComments();
+          setLoadingState(prev => ({ ...prev, comments: false }));
+        }
+      }
+
+      // Profile, Stats, Refer pages: need profile, stats, campaigns
+      if (isProfile || isStats || isRefer) {
+        if (user) {
+          if (!cache.stats && !isFetching.stats) {
+            setLoadingState(prev => ({ ...prev, stats: true }));
+            await fetchStats();
+            setLoadingState(prev => ({ ...prev, stats: false }));
+          }
+          if (!cache.campaigns && !isFetching.campaigns) {
+            setLoadingState(prev => ({ ...prev, campaigns: true }));
+            await fetchCampaigns();
+            setLoadingState(prev => ({ ...prev, campaigns: false }));
+          }
+        }
+      }
+
+      // Support page: need supportTickets
+      if (isSupport && user) {
+        if (!cache.supportTickets && !isFetching.supportTickets) {
+          setLoadingState(prev => ({ ...prev, supportTickets: true }));
+          await fetchSupportTickets();
+          setLoadingState(prev => ({ ...prev, supportTickets: false }));
+        }
+      }
+
+      // Create page: need templates
+      if (isCreate) {
+        if (!cache.templates && !isFetching.templates) {
+          setLoadingState(prev => ({ ...prev, templates: true }));
+          await fetchTemplates();
+          setLoadingState(prev => ({ ...prev, templates: false }));
+        }
+      }
+
+      // About page: need comments
+      if (isAbout) {
+        if (!cache.comments && !isFetching.comments) {
+          setLoadingState(prev => ({ ...prev, comments: true }));
+          await fetchComments();
+          setLoadingState(prev => ({ ...prev, comments: false }));
+        }
+      }
+
+      // Mark as loaded
+      setDataLoaded(true);
+    };
+
+    fetchPageData().catch(() => {});
+  }, [pathname]); // Re-run when route changes
+
+  // ── Refetch helpers ──
   const refetchProfile = useCallback(async () => {
+    cache.profile = null;
+    fetchPromises.profile = null;
+    setLoadingState(prev => ({ ...prev, profile: true }));
     await fetchProfile();
-  }, [fetchProfile]);
+    setLoadingState(prev => ({ ...prev, profile: false }));
+  }, []);
 
   const refetchStats = useCallback(async () => {
+    cache.stats = null;
+    fetchPromises.stats = null;
+    setLoadingState(prev => ({ ...prev, stats: true }));
     await fetchStats();
-  }, [fetchStats]);
+    setLoadingState(prev => ({ ...prev, stats: false }));
+  }, []);
 
   const refetchCampaigns = useCallback(async () => {
+    cache.campaigns = null;
+    fetchPromises.campaigns = null;
+    setLoadingState(prev => ({ ...prev, campaigns: true }));
     await fetchCampaigns();
-  }, [fetchCampaigns]);
+    setLoadingState(prev => ({ ...prev, campaigns: false }));
+  }, []);
 
   const refetchSupportTickets = useCallback(async () => {
+    cache.supportTickets = null;
+    fetchPromises.supportTickets = null;
+    setLoadingState(prev => ({ ...prev, supportTickets: true }));
     await fetchSupportTickets();
-  }, [fetchSupportTickets]);
-
-  const refetchComments = useCallback(async () => {
-    await fetchComments();
-  }, [fetchComments]);
+    setLoadingState(prev => ({ ...prev, supportTickets: false }));
+  }, []);
 
   const refetchTemplates = useCallback(async () => {
-    await Promise.all([fetchAllTemplates(), fetchHighlightedTemplates()]);
-  }, [fetchAllTemplates, fetchHighlightedTemplates]);
+    cache.templates = null;
+    cache.featuredTemplates = null;
+    fetchPromises.templates = null;
+    fetchPromises.featuredTemplates = null;
+    setLoadingState(prev => ({ ...prev, templates: true, featuredTemplates: true }));
+    await Promise.all([fetchTemplates(), fetchFeaturedTemplates()]);
+    setLoadingState(prev => ({ ...prev, templates: false, featuredTemplates: false }));
+  }, []);
+
+  const refetchComments = useCallback(async () => {
+    cache.comments = null;
+    fetchPromises.comments = null;
+    setLoadingState(prev => ({ ...prev, comments: true }));
+    await fetchComments();
+    setLoadingState(prev => ({ ...prev, comments: false }));
+  }, []);
 
   const clearUserData = useCallback(() => {
-    setProfile(null);
-    setStats({ totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 });
-    setCampaigns([]);
-    setSupportTickets([]);
+    cache.profile = null;
+    cache.stats = null;
+    cache.campaigns = null;
+    cache.supportTickets = null;
+    notifySubscribers();
   }, []);
 
   return {
-    templates,
-    featuredTemplates,
-    profile,
-    campaigns,
-    supportTickets,
-    comments,
-    stats,
+    profile: data.profile,
+    stats: data.stats,
+    campaigns: data.campaigns,
+    supportTickets: data.supportTickets,
+    templates: data.templates,
+    featuredTemplates: data.featuredTemplates,
+    comments: data.comments,
     loadingState,
     dataLoaded,
-    loadAllData,
     refetchProfile,
-    refetchCampaigns,
     refetchStats,
+    refetchCampaigns,
     refetchSupportTickets,
-    refetchComments,
     refetchTemplates,
+    refetchComments,
     clearUserData,
   };
 }
