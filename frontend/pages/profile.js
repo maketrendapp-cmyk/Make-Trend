@@ -15,27 +15,27 @@ import Meta from '../components/Meta';
 export default function Profile() {
   const router = useRouter();
   const { user, logout } = useAuth();
-const { profile: contextProfile, stats, loadingState } = useAppData();
-const [showLogoutModal, setShowLogoutModal] = useState(false);
-const [copySuccess, setCopySuccess] = useState('');
+  const { profile: contextProfile, stats, loadingState } = useAppData();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState('');
 
-const copyReferralCode = () => {
-  const code = contextProfile?.referralCode || '';
-  if (!code) return;
-  navigator.clipboard.writeText(code).then(() => {
-    setCopySuccess('✅ Copied!');
-    setTimeout(() => setCopySuccess(''), 2000);
-  }).catch(() => {
-    const textArea = document.createElement('textarea');
-    textArea.value = code;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-    setCopySuccess('✅ Copied!');
-    setTimeout(() => setCopySuccess(''), 2000);
-  });
-};
+  const copyReferralCode = () => {
+    const code = contextProfile?.referralCode || '';
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setCopySuccess('✅ Copied!');
+      setTimeout(() => setCopySuccess(''), 2000);
+    }).catch(() => {
+      const textArea = document.createElement('textarea');
+      textArea.value = code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopySuccess('✅ Copied!');
+      setTimeout(() => setCopySuccess(''), 2000);
+    });
+  };
 
   const handleLogout = async () => {
     try {
@@ -58,9 +58,9 @@ const copyReferralCode = () => {
   };
 
   const statsItems = [
-    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats.totalCampaigns || 0 },
-    { icon: FiEye, label: 'Total Views', value: stats.totalViews || 0 },
-    { icon: FiUnlock, label: 'Total Unlocks', value: stats.totalUnlocks || 0 },
+    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns || 0 },
+    { icon: FiEye, label: 'Total Views', value: stats?.totalViews || 0 },
+    { icon: FiUnlock, label: 'Total Unlocks', value: stats?.totalUnlocks || 0 },
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals },
   ];
 
@@ -85,12 +85,25 @@ const copyReferralCode = () => {
     { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
   ];
 
-// ── Skeleton Loader (show only while profile is loading) ──
-if (loadingState.profile) {
+  // ── Skeleton Loader ──
+  if (loadingState?.profile) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* ... skeleton unchanged ... */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-24 h-24 rounded-full bg-gray-200"></div>
+              <div className="flex-1 space-y-3">
+                <div className="h-6 bg-gray-200 rounded w-48"></div>
+                <div className="h-4 bg-gray-200 rounded w-32"></div>
+                <div className="h-4 bg-gray-200 rounded w-40"></div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+            {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 h-24 animate-pulse"><div className="bg-gray-200 h-full w-full rounded"></div></div>)}
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mt-6 h-48 animate-pulse"></div>
         </div>
       </div>
     );
