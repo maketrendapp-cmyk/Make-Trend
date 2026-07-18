@@ -1,11 +1,11 @@
 // components/AuthScreen.js
 // ============================================================
-// CENTERED LOGIN/REGISTER – No hero, full viewport, clean
+// INSTANT LOGIN – localStorage + JWT Decode
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
-import jwtDecode from 'jwt-decode'; // <-- ADD THIS
+import jwtDecode from 'jwt-decode';
 import {
   auth,
   onAuthStateChanged,
@@ -34,22 +34,6 @@ import { FaGoogle, FaFacebook } from 'react-icons/fa';
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
 // ============================================================
-// SET SESSION COOKIE (for faster server-side detection)
-// ============================================================
-async function setSessionCookie(token) {
-  try {
-    await fetch(`${API_BASE}/auth/set-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ token }),
-    });
-  } catch {
-    // Silent fail – Firebase client auth still works
-  }
-}
-
-// ============================================================
 // BACKEND API HELPER
 // ============================================================
 async function apiRequest(endpoint, options = {}, token = null) {
@@ -70,18 +54,15 @@ async function apiRequest(endpoint, options = {}, token = null) {
 // ============================================================
 const AuthContext = createContext();
 
-export function AuthProvider({ children, initialUser }) {
-  // --- AUTH STATE ---
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
-  const loadedFromCookieRef = useRef(false);
   const cookieUidRef = useRef(null);
   const fastPathAttemptedRef = useRef(false);
 
-  // --- ALL DATA FROM useAppData ---
   const {
     templates,
     featuredTemplates,
@@ -141,14 +122,15 @@ export function AuthProvider({ children, initialUser }) {
   }, []);
 
   // ============================================================
-  // 1️⃣ FASTEST PATH – Decode token directly from cookie (no network)
+  // 1️⃣ FASTEST PATH – Read token from localStorage and decode instantly
   // ============================================================
   useEffect(() => {
     let isMounted = true;
 
     const decodeTokenInstantly = () => {
-      // Case 1: No cookie – user is not logged in
-      if (!initialUser || !initialUser.token) {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
         if (isMounted) {
           setUser(null);
           setIsAuthenticated(false);
@@ -158,50 +140,45 @@ export function AuthProvider({ children, initialUser }) {
         return;
       }
 
-      // Case 2: Cookie exists – decode token immediately
       try {
-        const decoded = jwtDecode(initialUser.token);
+        const decoded = jwtDecode(token);
         const { uid, email, name, picture } = decoded;
 
-        // Build a basic user object from the token claims
         const basicUser = {
           uid,
           email: email || '',
           displayName: name || '',
           photoURL: picture || '',
-          completed: true, // optimistic; will be corrected later if needed
+          username: email?.split('@')[0] || '',
+          fullname: name || '',
+          completed: true,
         };
 
         if (isMounted) {
           setUser(basicUser);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          setLoading(false); // ✅ RENDER INSTANTLY
-          loadedFromCookieRef.current = true;
+          setLoading(false);
           cookieUidRef.current = uid;
         }
 
-        // ── Fetch full profile in background (non‑blocking) ──
-        apiRequest('/auth/me', {}, initialUser.token)
+        // ── Fetch full profile in background (first priority) ──
+        apiRequest('/auth/me', {}, token)
           .then((data) => {
             if (data.success && data.user && isMounted) {
-              // Merge the full profile (overwrites basic fields)
               setUser((prev) => ({ ...prev, ...data.user, completed: true }));
-              // Also update cookieUidRef in case it changed
-              if (data.user.uid) cookieUidRef.current = data.user.uid;
             }
           })
-          .catch(() => {
-            // If /auth/me fails, we still have the basic user – we're fine.
-          });
+          .catch(() => {});
 
-        // ── Load all other data in background ──
+        // ── Load other data in background (loadAllData will now fetch profile first) ──
         loadAllData().catch(() => {});
 
       } catch (err) {
-        // Token decode failed – fallback to Firebase listener
-        console.log('Invalid token, waiting for Firebase');
+        localStorage.removeItem('token');
         if (isMounted) {
+          setUser(null);
+          setIsAuthenticated(false);
           setLoading(false);
         }
       }
@@ -218,34 +195,27 @@ export function AuthProvider({ children, initialUser }) {
   // ============================================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // ⏳ If fast path hasn't tried yet, let it go first
-      if (!fastPathAttemptedRef.current) {
-        // Keep loading true – fast path will set it false
-        return;
-      }
+      if (!fastPathAttemptedRef.current) return;
 
       setLoading(true);
       if (firebaseUser) {
-        // If we already have the same user from cookie, skip heavy fetch
         if (cookieUidRef.current === firebaseUser.uid) {
           setLoading(false);
           return;
         }
 
-        // Normal flow (new login, token refresh with different UID, etc.)
         try {
           const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
           if (data.banned) {
             await signOut(auth);
+            localStorage.removeItem('token');
             setUser(null);
             setIsAuthenticated(false);
             setNeedsCompletion(false);
             setLoading(false);
             return;
           }
-        } catch (err) {
-          // Ignore ban check errors – proceed anyway
-        }
+        } catch {}
 
         await loadAllData();
 
@@ -263,30 +233,18 @@ export function AuthProvider({ children, initialUser }) {
               setIsAuthenticated(true);
               setNeedsCompletion(false);
             } else {
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName || '',
-                photoURL: firebaseUser.photoURL || '',
-                completed: false,
-              });
+              setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
               setIsAuthenticated(true);
               setNeedsCompletion(true);
             }
           } else {
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName || '',
-              photoURL: firebaseUser.photoURL || '',
-              completed: false,
-            });
+            setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
             setIsAuthenticated(true);
             setNeedsCompletion(true);
           }
         }
       } else {
-        // User signed out – clear all
+        localStorage.removeItem('token');
         setUser(null);
         setIsAuthenticated(false);
         setNeedsCompletion(false);
@@ -299,17 +257,15 @@ export function AuthProvider({ children, initialUser }) {
   }, [fetchUserProfile, checkProfileStatus, loadAllData, clearUserData]);
 
   // ============================================================
-  // 3️⃣ TOKEN REFRESH – Keep the cookie fresh
+  // 3️⃣ TOKEN REFRESH – Update localStorage when Firebase refreshes
   // ============================================================
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
           const token = await firebaseUser.getIdToken();
-          await setSessionCookie(token);
-        } catch {
-          // Silent fail – not critical
-        }
+          localStorage.setItem('token', token);
+        } catch {}
       }
     });
     return () => unsubscribe();
@@ -319,14 +275,12 @@ export function AuthProvider({ children, initialUser }) {
   // 4️⃣ AUTH METHODS
   // ============================================================
 
-  // ── Login ──
   const login = async (email, password) => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
-
       const token = await firebaseUser.getIdToken();
-      await setSessionCookie(token);
+      localStorage.setItem('token', token);
 
       const profileData = await fetchUserProfile(firebaseUser);
       if (profileData) {
@@ -349,14 +303,12 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // ── Register ──
   const register = async (email, password, fullname, username, avatarUrl, referralCode = '') => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
       const token = await firebaseUser.getIdToken();
-
-      await setSessionCookie(token);
+      localStorage.setItem('token', token);
 
       const data = await apiRequest('/auth/register', {
         method: 'POST',
@@ -380,7 +332,6 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // ── Social Login ──
   const socialLogin = async (providerName) => {
     setIsSocialLoading(true);
     let provider;
@@ -400,14 +351,14 @@ export function AuthProvider({ children, initialUser }) {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-
       const token = await firebaseUser.getIdToken();
-      await setSessionCookie(token);
+      localStorage.setItem('token', token);
 
       try {
         const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
         if (data.banned) {
           await signOut(auth);
+          localStorage.removeItem('token');
           setIsSocialLoading(false);
           return { success: false, error: 'Account suspended.' };
         }
@@ -448,7 +399,6 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // ── Complete Social Profile ──
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
     try {
       const firebaseUser = auth.currentUser;
@@ -465,19 +415,15 @@ export function AuthProvider({ children, initialUser }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           await loadAllData();
-
           const newToken = await firebaseUser.getIdToken();
-          await setSessionCookie(newToken);
-
+          localStorage.setItem('token', newToken);
           return { success: true };
         } else {
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true });
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-
           const newToken = await firebaseUser.getIdToken();
-          await setSessionCookie(newToken);
-
+          localStorage.setItem('token', newToken);
           return { success: true };
         }
       } else {
@@ -488,19 +434,10 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // ── Logout ──
   const logout = async () => {
     try {
       await signOut(auth);
-      // ── Clear the session cookie ──
-      try {
-        await fetch(`${API_BASE}/auth/logout`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-      } catch {
-        // If the logout endpoint fails, the cookie will eventually expire
-      }
+      localStorage.removeItem('token');
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);
@@ -511,7 +448,6 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // ── Reset Password ──
   const resetPassword = async (email) => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -523,7 +459,6 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // ── Refresh User ──
   const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
       const profileData = await fetchUserProfile(auth.currentUser);
@@ -537,9 +472,6 @@ export function AuthProvider({ children, initialUser }) {
     return null;
   }, [fetchUserProfile]);
 
-  // ============================================================
-  // CONTEXT VALUE
-  // ============================================================
   const value = {
     user,
     loading,
