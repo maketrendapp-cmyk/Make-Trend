@@ -3,7 +3,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
   onAuthStateChanged,
-  onIdTokenChanged,   // <-- add this
+  onIdTokenChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -23,13 +23,15 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+// Initialize Firebase (singleton)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 
 export {
+  app as firebaseApp,          // <-- needed for AuthScreen to read API key
   auth,
   onAuthStateChanged,
-  onIdTokenChanged,   // <-- add this
+  onIdTokenChanged,            // <-- needed for token refresh
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
