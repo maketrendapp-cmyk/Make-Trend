@@ -381,7 +381,7 @@ export default function Create() {
         </div>
 
         {/* ── Regular Templates Grid ── */}
-        {!dataLoaded ? (
+        {loadingState.allTemplates ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
