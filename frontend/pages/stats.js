@@ -39,7 +39,7 @@ const [stats, setStats] = useState(cachedStats || {
     totalCompletions: 0,
     successfulCampaigns: 0,
   });
-  const [statsLoading, setStatsLoading] = useState(!dataLoaded);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [lastCreatedAt, setLastCreatedAt] = useState(null);
