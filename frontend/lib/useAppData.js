@@ -56,21 +56,23 @@ async function apiRequest(endpoint, options = {}, token = null) {
 }
 
 export function useAppData() {
-  const user = auth.currentUser;
-  const uid = user?.uid;
+  // ── State (initialised with empty defaults – will be filled by effect) ──
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({
+    totalCampaigns: 0,
+    totalViews: 0,
+    totalUnlocks: 0,
+    totalShares: 0,
+    totalCompletions: 0,
+    successfulCampaigns: 0,
+  });
+  const [campaigns, setCampaigns] = useState([]);
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [featuredTemplates, setFeaturedTemplates] = useState([]);
+  const [comments, setComments] = useState([]);
 
-  // ── 💥 INSTANT state from localStorage for ALL data types ──
-  const [profile, setProfile] = useState(uid ? getCache(`profile_${uid}`) : null);
-  const [stats, setStats] = useState(
-    uid ? getCache(`stats_${uid}`) : { totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 }
-  );
-  const [campaigns, setCampaigns] = useState(uid ? getCache(`campaigns_${uid}`) : []);
-  const [supportTickets, setSupportTickets] = useState(uid ? getCache(`support_${uid}`) : []);
-  const [templates, setTemplates] = useState(getCache('templates_all') || []);
-  const [featuredTemplates, setFeaturedTemplates] = useState(getCache('templates_highlight') || []);
-  const [comments, setComments] = useState(getCache('comments_all') || []);
-
-  // ── Loading states (for skeletons) ──
+  // ── Loading states ──
   const [loadingState, setLoadingState] = useState({
     profile: false,
     stats: false,
@@ -81,8 +83,46 @@ export function useAppData() {
     comments: false,
   });
 
-  // ── dataLoaded is ALWAYS true – UI never waits ──
   const [dataLoaded, setDataLoaded] = useState(true);
+
+  // ── 🔄 Sync state with localStorage whenever user changes ──
+  useEffect(() => {
+    const user = auth.currentUser;
+    const uid = user?.uid;
+
+    if (uid) {
+      // Read user-specific data from cache
+      setProfile(getCache(`profile_${uid}`) || null);
+      setStats(getCache(`stats_${uid}`) || {
+        totalCampaigns: 0,
+        totalViews: 0,
+        totalUnlocks: 0,
+        totalShares: 0,
+        totalCompletions: 0,
+        successfulCampaigns: 0,
+      });
+      setCampaigns(getCache(`campaigns_${uid}`) || []);
+      setSupportTickets(getCache(`support_${uid}`) || []);
+    } else {
+      // No user – clear all user-specific data
+      setProfile(null);
+      setStats({
+        totalCampaigns: 0,
+        totalViews: 0,
+        totalUnlocks: 0,
+        totalShares: 0,
+        totalCompletions: 0,
+        successfulCampaigns: 0,
+      });
+      setCampaigns([]);
+      setSupportTickets([]);
+    }
+
+    // Public data (templates, comments) are always read from cache
+    setTemplates(getCache('templates_all') || []);
+    setFeaturedTemplates(getCache('templates_highlight') || []);
+    setComments(getCache('comments_all') || []);
+  }, [auth.currentUser]); // ← React to user changes
 
   // ---- Fetch functions (write to cache after fetch) ----
   const fetchProfile = useCallback(async () => {
@@ -125,7 +165,6 @@ export function useAppData() {
   const fetchHighlightedTemplates = useCallback(async () => {
     setLoadingState(s => ({ ...s, highlights: true }));
     try {
-      // Fetch and filter highlights client-side to ensure ONLY highlighted
       const data = await apiRequest('/templates?highlight=true');
       const all = data.templates || [];
       const highlighted = all.filter(t => t.isHighlight === true);
@@ -217,14 +256,17 @@ export function useAppData() {
     } catch (err) {
       toast.error('Some data failed to load');
     }
-  }, [fetchProfile, fetchStats, fetchHighlightedTemplates, fetchAllTemplates, fetchCampaigns, fetchSupportTickets, fetchComments]);
+  }, [
+    fetchProfile, fetchStats, fetchHighlightedTemplates, fetchAllTemplates,
+    fetchCampaigns, fetchSupportTickets, fetchComments,
+  ]);
 
   // ── Auto‑load on mount (non‑blocking) ──
   useEffect(() => {
     loadAllData().catch(() => {});
   }, []);
 
-  // ---- Refetch helpers (clear cache & force refetch) ----
+  // ---- Refetch helpers ----
   const refetchProfile = useCallback(async () => {
     const u = auth.currentUser;
     if (u) {
@@ -270,16 +312,31 @@ export function useAppData() {
 
   // ---- Clear user data on logout ----
   const clearUserData = useCallback(() => {
+    // Reset all user-specific state
     setProfile(null);
     setStats({ totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 });
     setCampaigns([]);
     setSupportTickets([]);
+
+    // Remove user-specific cache keys
     const u = auth.currentUser;
     if (u) {
       removeCache(`profile_${u.uid}`);
       removeCache(`stats_${u.uid}`);
       removeCache(`campaigns_${u.uid}`);
       removeCache(`support_${u.uid}`);
+    } else {
+      // If no user, clear all user-specific keys (fallback)
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(CACHE_PREFIX)) {
+          if (key.includes('profile_') || key.includes('stats_') || key.includes('campaigns_') || key.includes('support_')) {
+            keysToRemove.push(key);
+          }
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
     }
   }, []);
 
@@ -292,7 +349,7 @@ export function useAppData() {
     comments,
     stats,
     loadingState,
-    dataLoaded,    // always true – UI never waits
+    dataLoaded,
     loadAllData,
     refetchProfile,
     refetchCampaigns,
