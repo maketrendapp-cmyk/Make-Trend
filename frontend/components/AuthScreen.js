@@ -1,14 +1,13 @@
 // components/AuthScreen.js
 // ============================================================
-// INSTANT LOGIN – Read Firebase's own localStorage synchronously
+// AUTH PROVIDER + LOGIN UI – No data fetching
 // ============================================================
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import {
   auth,
   onAuthStateChanged,
-  onIdTokenChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -16,9 +15,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   FacebookAuthProvider,
-  firebaseApp,
 } from '../services/firebase';
-import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
 import { motion } from 'framer-motion';
 import {
@@ -32,14 +29,9 @@ import {
 import { FaGoogle, FaFacebook } from 'react-icons/fa';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
+const AUTH_CACHE_KEY = 'maketrend_auth';
 
-// ── Get Firebase API key from the app instance ──
-const firebaseApiKey = firebaseApp.options.apiKey;
-const FIREBASE_AUTH_KEY = `firebase:authUser:${firebaseApiKey}:DEFAULT`;
-
-// ============================================================
-// BACKEND API HELPER
-// ============================================================
+// ── API helper (only for auth-related calls) ──
 async function apiRequest(endpoint, options = {}, token = null) {
   const url = `${API_BASE}${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
@@ -59,46 +51,63 @@ async function apiRequest(endpoint, options = {}, token = null) {
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // ── 1️⃣ INSTANT user from Firebase localStorage ──
-  const storedUser = (() => {
+  // ── Instant auth from localStorage ──
+  const storedAuth = (() => {
     try {
-      const raw = localStorage.getItem(FIREBASE_AUTH_KEY);
+      const raw = localStorage.getItem(AUTH_CACHE_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (parsed && parsed.uid) return parsed;
-      if (parsed && parsed.value && parsed.value.uid) return parsed.value;
       return null;
     } catch {
       return null;
     }
   })();
 
-  // ── State initialised instantly ──
-  const [user, setUser] = useState(storedUser || null);
-  const [loading, setLoading] = useState(false); // Always false – user known instantly
-  const [isAuthenticated, setIsAuthenticated] = useState(!!storedUser);
+  const [user, setUser] = useState(storedAuth || null);
+  const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!storedAuth);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
-  const cookieUidRef = useRef(storedUser?.uid || null);
+  const uidRef = useRef(storedAuth?.uid || null);
 
-  const {
-    templates,
-    featuredTemplates,
-    profile,
-    campaigns,
-    supportTickets,
-    comments,
-    stats,
-    dataLoaded,
-    loadAllData,
-    refetchProfile,
-    refetchCampaigns,
-    refetchStats,
-    refetchSupportTickets,
-    refetchComments,
-    refetchTemplates,
-    clearUserData,
-  } = useAppData();
+  // ── Helper to cache auth info ──
+  const cacheAuth = (authData) => {
+    if (authData && authData.uid) {
+      localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({
+        uid: authData.uid,
+        email: authData.email || '',
+        displayName: authData.displayName || '',
+        photoURL: authData.photoURL || '',
+      }));
+    } else {
+      localStorage.removeItem(AUTH_CACHE_KEY);
+    }
+  };
+
+  // ── Check profile completion status ──
+  const checkProfileStatus = useCallback(async (uid) => {
+    try {
+      const data = await apiRequest(`/auth/profile?uid=${uid}`);
+      return data || { completed: false };
+    } catch {
+      return { completed: false };
+    }
+  }, []);
+
+  // ── Fetch full profile (for background enrichment) ──
+  const fetchUserProfile = useCallback(async (firebaseUser) => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      const data = await apiRequest('/auth/me', {}, token);
+      if (data.success) {
+        return { uid: firebaseUser.uid, email: firebaseUser.email, ...data.user, completed: true };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // ── Upload Avatar ──
   const uploadAvatar = async (file) => {
@@ -118,61 +127,86 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
-  // ── Fetch user profile (for auth logic) ──
-  const fetchUserProfile = useCallback(async (firebaseUser) => {
-    try {
-      const token = await firebaseUser.getIdToken();
-      const data = await apiRequest('/auth/me', {}, token);
-      return data.success ? { uid: firebaseUser.uid, email: firebaseUser.email, ...data.user, completed: true } : null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // ── Check profile status ──
-  const checkProfileStatus = useCallback(async (uid) => {
-    try {
-      const data = await apiRequest(`/auth/profile?uid=${uid}`);
-      return data || { completed: false };
-    } catch {
-      return { completed: false };
-    }
-  }, []);
-
   // ============================================================
-  // 2️⃣ FIREBASE LISTENER – Real‑time updates (sign‑out, token refresh)
+  // FIREBASE LISTENER – Real‑time updates
   // ============================================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser && cookieUidRef.current === firebaseUser.uid) {
-        // Already have this user – skip
-        return;
-      }
+      if (firebaseUser && uidRef.current === firebaseUser.uid) return;
 
       if (firebaseUser) {
-        // New login or different user
-        setLoading(true);
+        const basicUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || '',
+          photoURL: firebaseUser.photoURL || '',
+        };
+        setUser(basicUser);
+        setIsAuthenticated(true);
+        setNeedsCompletion(false);
+        uidRef.current = firebaseUser.uid;
+        cacheAuth(basicUser);
+
         try {
-          const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
-          if (data.banned) {
-            await signOut(auth);
-            localStorage.removeItem(FIREBASE_AUTH_KEY);
-            setUser(null);
-            setIsAuthenticated(false);
+          const profileData = await fetchUserProfile(firebaseUser);
+          if (profileData) {
+            setUser(profileData);
+            setIsAuthenticated(true);
             setNeedsCompletion(false);
-            setLoading(false);
-            return;
+            cacheAuth(profileData);
+          } else {
+            const status = await checkProfileStatus(firebaseUser.uid);
+            if (status.completed) {
+              const fallback = await fetchUserProfile(firebaseUser);
+              if (fallback) {
+                setUser(fallback);
+                setIsAuthenticated(true);
+                setNeedsCompletion(false);
+                cacheAuth(fallback);
+              }
+            } else {
+              setNeedsCompletion(true);
+            }
           }
         } catch {}
+      } else {
+        localStorage.removeItem(AUTH_CACHE_KEY);
+        setUser(null);
+        setIsAuthenticated(false);
+        setNeedsCompletion(false);
+        uidRef.current = null;
+      }
+    });
+    return () => unsubscribe();
+  }, [fetchUserProfile, checkProfileStatus]);
 
-        await loadAllData();
+  // ============================================================
+  // AUTH METHODS
+  // ============================================================
 
+  const login = async (email, password) => {
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = cred.user;
+      const basicUser = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || '',
+        photoURL: firebaseUser.photoURL || '',
+      };
+      setUser(basicUser);
+      setIsAuthenticated(true);
+      setNeedsCompletion(false);
+      uidRef.current = firebaseUser.uid;
+      cacheAuth(basicUser);
+
+      try {
         const profileData = await fetchUserProfile(firebaseUser);
         if (profileData) {
           setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          cookieUidRef.current = firebaseUser.uid;
+          cacheAuth(profileData);
         } else {
           const status = await checkProfileStatus(firebaseUser.uid);
           if (status.completed) {
@@ -181,83 +215,13 @@ export function AuthProvider({ children }) {
               setUser(fallback);
               setIsAuthenticated(true);
               setNeedsCompletion(false);
-              cookieUidRef.current = firebaseUser.uid;
-            } else {
-              const basicUser = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName || '',
-                photoURL: firebaseUser.photoURL || '',
-                completed: false,
-              };
-              setUser(basicUser);
-              setIsAuthenticated(true);
-              setNeedsCompletion(true);
-              cookieUidRef.current = firebaseUser.uid;
+              cacheAuth(fallback);
             }
           } else {
-            const basicUser = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName || '',
-              photoURL: firebaseUser.photoURL || '',
-              completed: false,
-            };
-            setUser(basicUser);
-            setIsAuthenticated(true);
             setNeedsCompletion(true);
-            cookieUidRef.current = firebaseUser.uid;
           }
         }
-        setLoading(false);
-      } else {
-        // User signed out
-        localStorage.removeItem(FIREBASE_AUTH_KEY);
-        setUser(null);
-        setIsAuthenticated(false);
-        setNeedsCompletion(false);
-        clearUserData();
-        cookieUidRef.current = null;
-        setLoading(false);
-      }
-    });
-    return () => unsubscribe();
-  }, [fetchUserProfile, checkProfileStatus, loadAllData, clearUserData]);
-
-  // ============================================================
-  // 3️⃣ TOKEN REFRESH – Update localStorage when Firebase refreshes
-  // ============================================================
-  useEffect(() => {
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Firebase updates its internal localStorage automatically,
-        // so we don't need to do anything here.
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // ============================================================
-  // 4️⃣ AUTH METHODS (non‑blocking data loading)
-  // ============================================================
-
-  const login = async (email, password) => {
-    try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = cred.user;
-
-      const profileData = await fetchUserProfile(firebaseUser);
-      if (profileData) {
-        setUser(profileData);
-        setIsAuthenticated(true);
-        setNeedsCompletion(false);
-      } else {
-        setUser({ uid: firebaseUser.uid, email: firebaseUser.email, completed: false });
-        setIsAuthenticated(true);
-        setNeedsCompletion(true);
-      }
-      cookieUidRef.current = firebaseUser.uid;
-      loadAllData().catch(() => {});
+      } catch {}
       return { success: true };
     } catch (error) {
       let message = 'Invalid email or password.';
@@ -272,6 +236,17 @@ export function AuthProvider({ children }) {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
+      const basicUser = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: fullname || '',
+        photoURL: avatarUrl || '',
+      };
+      setUser(basicUser);
+      setIsAuthenticated(true);
+      setNeedsCompletion(false);
+      uidRef.current = firebaseUser.uid;
+      cacheAuth(basicUser);
 
       const token = await firebaseUser.getIdToken();
       const data = await apiRequest('/auth/register', {
@@ -279,16 +254,16 @@ export function AuthProvider({ children }) {
         body: { uid: firebaseUser.uid, username, fullname, email, avatar: avatarUrl || '', referralCode, deviceFingerprint: 'web' },
       }, token);
       if (data.success) {
-        setUser({ uid: firebaseUser.uid, email, ...data.user, completed: true });
+        const fullUser = { uid: firebaseUser.uid, email, ...data.user, completed: true };
+        setUser(fullUser);
         setIsAuthenticated(true);
         setNeedsCompletion(false);
-        cookieUidRef.current = firebaseUser.uid;
-        loadAllData().catch(() => {});
-        return { success: true };
+        cacheAuth(fullUser);
       } else {
         await firebaseUser.delete();
         return { success: false, error: data.error || 'Registration failed' };
       }
+      return { success: true };
     } catch (error) {
       let message = 'Registration failed.';
       if (error.code === 'auth/email-already-in-use') message = 'Email already registered.';
@@ -316,18 +291,29 @@ export function AuthProvider({ children }) {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+      const basicUser = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || '',
+        photoURL: firebaseUser.photoURL || '',
+      };
+      setUser(basicUser);
+      setIsAuthenticated(true);
+      setNeedsCompletion(false);
+      uidRef.current = firebaseUser.uid;
+      cacheAuth(basicUser);
 
       try {
         const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
         if (data.banned) {
           await signOut(auth);
-          localStorage.removeItem(FIREBASE_AUTH_KEY);
+          localStorage.removeItem(AUTH_CACHE_KEY);
+          setUser(null);
+          setIsAuthenticated(false);
           setIsSocialLoading(false);
           return { success: false, error: 'Account suspended.' };
         }
       } catch {}
-
-      await loadAllData();
 
       const status = await checkProfileStatus(firebaseUser.uid);
       if (status.completed) {
@@ -336,25 +322,16 @@ export function AuthProvider({ children }) {
           setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          cookieUidRef.current = firebaseUser.uid;
-          setIsSocialLoading(false);
-          return { success: true };
+          cacheAuth(profileData);
+        } else {
+          setNeedsCompletion(true);
         }
+      } else {
+        setNeedsCompletion(true);
       }
 
-      const socialUserData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName || '',
-        photoURL: firebaseUser.photoURL || '',
-        completed: false,
-      };
-      setUser(socialUserData);
-      setIsAuthenticated(true);
-      setNeedsCompletion(true);
-      cookieUidRef.current = firebaseUser.uid;
       setIsSocialLoading(false);
-      return { success: true, needsCompletion: true, user: socialUserData };
+      return { success: true, needsCompletion: true, user: user };
     } catch (error) {
       let message = 'Unable to sign in.';
       if (error.code === 'auth/popup-blocked') message = 'Popup blocked. Please allow popups.';
@@ -379,16 +356,16 @@ export function AuthProvider({ children }) {
           setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          cookieUidRef.current = firebaseUser.uid;
-          loadAllData().catch(() => {});
-          return { success: true };
+          cacheAuth(profileData);
         } else {
-          setUser({ uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true });
+          const updated = { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true };
+          setUser(updated);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          cookieUidRef.current = firebaseUser.uid;
-          return { success: true };
+          cacheAuth(updated);
         }
+        uidRef.current = firebaseUser.uid;
+        return { success: true };
       } else {
         return { success: false, error: data.error || 'Failed to complete profile' };
       }
@@ -400,12 +377,11 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await signOut(auth);
-      localStorage.removeItem(FIREBASE_AUTH_KEY);
+      localStorage.removeItem(AUTH_CACHE_KEY);
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);
-      clearUserData();
-      cookieUidRef.current = null;
+      uidRef.current = null;
       return { success: true };
     } catch {
       return { success: false, error: 'Logout failed' };
@@ -423,19 +399,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const refreshUser = useCallback(async () => {
-    if (auth.currentUser) {
-      const profileData = await fetchUserProfile(auth.currentUser);
-      if (profileData) {
-        setUser(profileData);
-        setIsAuthenticated(true);
-        setNeedsCompletion(false);
-        return profileData;
-      }
-    }
-    return null;
-  }, [fetchUserProfile]);
-
   const value = {
     user,
     loading,
@@ -449,21 +412,6 @@ export function AuthProvider({ children }) {
     uploadAvatar,
     logout,
     resetPassword,
-    refreshUser,
-    templates,
-    featuredTemplates,
-    profile,
-    campaigns,
-    supportTickets,
-    comments,
-    stats,
-    dataLoaded,
-    refetchProfile,
-    refetchCampaigns,
-    refetchStats,
-    refetchSupportTickets,
-    refetchComments,
-    refetchTemplates,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
