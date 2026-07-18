@@ -1,6 +1,6 @@
-// lib/useAppData.js
+// lib/useAppData.js – Simplified Version
 // ============================================================
-// ROUTE-AWARE FETCH – Fetches only what the current page needs
+// SIMPLE APPROACH – Direct setData, no subscriber complexity
 // ============================================================
 
 import { useState, useCallback, useEffect } from 'react';
@@ -34,115 +34,24 @@ const cache = {
   comments: [],
 };
 
-let fetchPromises = {
-  profile: null,
-  stats: null,
-  campaigns: null,
-  supportTickets: null,
-  templates: null,
-  featuredTemplates: null,
-  comments: null,
-};
+// ── Shared promises (deduplication) ──
+let fetchPromises = {};
 
-let isFetching = {};
+// ── Update function that updates cache AND notifies all instances ──
+let updateAllInstances = null;
 
-// ── Subscribers ──
-let subscribers = [];
-
-function notifySubscribers() {
-  subscribers.forEach(fn => fn(cache));
+function setCacheAndNotify(newData) {
+  Object.assign(cache, newData);
+  if (updateAllInstances) {
+    updateAllInstances({ ...cache });
+  }
 }
 
-function subscribe(fn) {
-  subscribers.push(fn);
-  return () => {
-    subscribers = subscribers.filter(f => f !== fn);
-  };
-}
-
-// ── Individual fetch functions with deduplication ──
-const fetchWithDedupe = (key, fetchFn) => {
-  if (fetchPromises[key]) return fetchPromises[key];
-  if (isFetching[key]) return fetchPromises[key];
-
-  isFetching[key] = true;
-  fetchPromises[key] = fetchFn()
-    .then((data) => {
-      cache[key] = data;
-      notifySubscribers();
-      return data;
-    })
-    .catch((err) => {
-      toast.error(`Failed to load ${key}`);
-      throw err;
-    })
-    .finally(() => {
-      isFetching[key] = false;
-      fetchPromises[key] = null;
-    });
-  return fetchPromises[key];
-};
-
-// ── Data fetchers ──
-const fetchProfile = () =>
-  fetchWithDedupe('profile', async () => {
-    const user = auth.currentUser;
-    if (!user) return null;
-    const token = await user.getIdToken();
-    const data = await apiRequest('/auth/me', {}, token);
-    return data.user ? { uid: user.uid, ...data.user, completed: true } : null;
-  });
-
-const fetchStats = () =>
-  fetchWithDedupe('stats', async () => {
-    const user = auth.currentUser;
-    if (!user) return { totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 };
-    const token = await user.getIdToken();
-    const data = await apiRequest('/stats', {}, token);
-    return data.stats || {};
-  });
-
-const fetchCampaigns = () =>
-  fetchWithDedupe('campaigns', async () => {
-    const user = auth.currentUser;
-    if (!user) return [];
-    const token = await user.getIdToken();
-    const data = await apiRequest('/campaigns?limit=25', {}, token);
-    return data.campaigns || [];
-  });
-
-const fetchSupportTickets = () =>
-  fetchWithDedupe('supportTickets', async () => {
-    const user = auth.currentUser;
-    if (!user) return [];
-    const token = await user.getIdToken();
-    const data = await apiRequest('/support', {}, token);
-    return data.tickets || [];
-  });
-
-const fetchTemplates = () =>
-  fetchWithDedupe('templates', async () => {
-    const data = await apiRequest('/templates');
-    return data.templates || [];
-  });
-
-const fetchFeaturedTemplates = () =>
-  fetchWithDedupe('featuredTemplates', async () => {
-    const data = await apiRequest('/templates?highlight=true');
-    return (data.templates || []).filter(t => t.isHighlight === true);
-  });
-
-const fetchComments = () =>
-  fetchWithDedupe('comments', async () => {
-    const data = await apiRequest('/comments');
-    return data.comments || [];
-  });
-
-// ── React Hook ──
 export function useAppData() {
   const router = useRouter();
   const pathname = router.pathname;
 
+  // ── Local state initialized from cache ──
   const [data, setData] = useState({
     profile: cache.profile,
     stats: cache.stats,
@@ -165,110 +74,170 @@ export function useAppData() {
 
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  // ── Register this instance for updates ──
   useEffect(() => {
-    const update = (newCache) => {
-      setData({
-        profile: newCache.profile,
-        stats: newCache.stats,
-        campaigns: newCache.campaigns,
-        supportTickets: newCache.supportTickets,
-        templates: newCache.templates,
-        featuredTemplates: newCache.featuredTemplates,
-        comments: newCache.comments,
-      });
+    const oldUpdate = updateAllInstances;
+    updateAllInstances = (newData) => {
+      setData(newData);
     };
-    return subscribe(update);
+    return () => {
+      updateAllInstances = oldUpdate;
+    };
   }, []);
 
-  // ── Determine which data to fetch based on route ──
+  // ── Individual fetch with deduplication ──
+  const fetchWithDedupe = (key, fetchFn) => {
+    if (fetchPromises[key]) return fetchPromises[key];
+
+    fetchPromises[key] = fetchFn()
+      .then((result) => {
+        setCacheAndNotify({ [key]: result });
+        return result;
+      })
+      .catch((err) => {
+        toast.error(`Failed to load ${key}`);
+        throw err;
+      })
+      .finally(() => {
+        fetchPromises[key] = null;
+      });
+    return fetchPromises[key];
+  };
+
+  // ── Fetch functions ──
+  const fetchProfile = () =>
+    fetchWithDedupe('profile', async () => {
+      const user = auth.currentUser;
+      if (!user) return null;
+      const token = await user.getIdToken();
+      const res = await apiRequest('/auth/me', {}, token);
+      return res.user ? { uid: user.uid, ...res.user, completed: true } : null;
+    });
+
+  const fetchStats = () =>
+    fetchWithDedupe('stats', async () => {
+      const user = auth.currentUser;
+      if (!user) return { totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 };
+      const token = await user.getIdToken();
+      const res = await apiRequest('/stats', {}, token);
+      return res.stats || {};
+    });
+
+  const fetchCampaigns = () =>
+    fetchWithDedupe('campaigns', async () => {
+      const user = auth.currentUser;
+      if (!user) return [];
+      const token = await user.getIdToken();
+      const res = await apiRequest('/campaigns?limit=25', {}, token);
+      return res.campaigns || [];
+    });
+
+  const fetchSupportTickets = () =>
+    fetchWithDedupe('supportTickets', async () => {
+      const user = auth.currentUser;
+      if (!user) return [];
+      const token = await user.getIdToken();
+      const res = await apiRequest('/support', {}, token);
+      return res.tickets || [];
+    });
+
+  const fetchTemplates = () =>
+    fetchWithDedupe('templates', async () => {
+      const res = await apiRequest('/templates');
+      return res.templates || [];
+    });
+
+  const fetchFeaturedTemplates = () =>
+    fetchWithDedupe('featuredTemplates', async () => {
+      const res = await apiRequest('/templates?highlight=true');
+      return (res.templates || []).filter(t => t.isHighlight === true);
+    });
+
+  const fetchComments = () =>
+    fetchWithDedupe('comments', async () => {
+      const res = await apiRequest('/comments');
+      return res.comments || [];
+    });
+
+  // ── Route‑aware auto‑fetch ──
   useEffect(() => {
     const fetchPageData = async () => {
       const user = auth.currentUser;
 
-      // 1. Always fetch profile if user exists (for Navbar)
-      if (user && !cache.profile && !isFetching.profile) {
+      // 1. Profile always (for Navbar)
+      if (user && !cache.profile) {
         setLoadingState(prev => ({ ...prev, profile: true }));
         await fetchProfile();
         setLoadingState(prev => ({ ...prev, profile: false }));
       }
 
-      // 2. Fetch data specific to the current page
+      // 2. Page-specific data
       const isHome = pathname === '/';
-      const isProfile = pathname === '/profile';
-      const isStats = pathname === '/stats';
-      const isCreate = pathname === '/create' || pathname === '/createcampaign';
+      const isProfile = pathname === '/profile' || pathname === '/stats' || pathname === '/refer-earn' || pathname === '/edit-profile';
       const isSupport = pathname === '/support';
-      const isRefer = pathname === '/refer-earn';
+      const isCreate = pathname === '/create' || pathname === '/createcampaign';
       const isAbout = pathname === '/about';
 
-      // Home page: templates, featured, comments (profile already fetched)
       if (isHome) {
-        if (!cache.templates && !isFetching.templates) {
+        if (!cache.templates) {
           setLoadingState(prev => ({ ...prev, templates: true }));
           await fetchTemplates();
           setLoadingState(prev => ({ ...prev, templates: false }));
         }
-        if (!cache.featuredTemplates && !isFetching.featuredTemplates) {
+        if (!cache.featuredTemplates) {
           setLoadingState(prev => ({ ...prev, featuredTemplates: true }));
           await fetchFeaturedTemplates();
           setLoadingState(prev => ({ ...prev, featuredTemplates: false }));
         }
-        if (!cache.comments && !isFetching.comments) {
+        if (!cache.comments) {
           setLoadingState(prev => ({ ...prev, comments: true }));
           await fetchComments();
           setLoadingState(prev => ({ ...prev, comments: false }));
         }
       }
 
-      // Profile, Stats, Refer pages: need profile, stats, campaigns
-      if (isProfile || isStats || isRefer) {
-        if (user) {
-          if (!cache.stats && !isFetching.stats) {
-            setLoadingState(prev => ({ ...prev, stats: true }));
-            await fetchStats();
-            setLoadingState(prev => ({ ...prev, stats: false }));
-          }
-          if (!cache.campaigns && !isFetching.campaigns) {
-            setLoadingState(prev => ({ ...prev, campaigns: true }));
-            await fetchCampaigns();
-            setLoadingState(prev => ({ ...prev, campaigns: false }));
-          }
+      if (isProfile && user) {
+        if (!cache.stats) {
+          setLoadingState(prev => ({ ...prev, stats: true }));
+          await fetchStats();
+          setLoadingState(prev => ({ ...prev, stats: false }));
+        }
+        if (!cache.campaigns) {
+          setLoadingState(prev => ({ ...prev, campaigns: true }));
+          await fetchCampaigns();
+          setLoadingState(prev => ({ ...prev, campaigns: false }));
         }
       }
 
-      // Support page: need supportTickets
       if (isSupport && user) {
-        if (!cache.supportTickets && !isFetching.supportTickets) {
+        if (!cache.supportTickets) {
           setLoadingState(prev => ({ ...prev, supportTickets: true }));
           await fetchSupportTickets();
           setLoadingState(prev => ({ ...prev, supportTickets: false }));
         }
       }
 
-      // Create page: need templates
       if (isCreate) {
-        if (!cache.templates && !isFetching.templates) {
+        if (!cache.templates) {
           setLoadingState(prev => ({ ...prev, templates: true }));
           await fetchTemplates();
           setLoadingState(prev => ({ ...prev, templates: false }));
         }
       }
 
-      // About page: need comments
       if (isAbout) {
-        if (!cache.comments && !isFetching.comments) {
+        if (!cache.comments) {
           setLoadingState(prev => ({ ...prev, comments: true }));
           await fetchComments();
           setLoadingState(prev => ({ ...prev, comments: false }));
         }
       }
 
-      // Mark as loaded
       setDataLoaded(true);
     };
 
     fetchPageData().catch(() => {});
-  }, [pathname]); // Re-run when route changes
+  }, [pathname]);
 
   // ── Refetch helpers ──
   const refetchProfile = useCallback(async () => {
@@ -326,8 +295,16 @@ export function useAppData() {
     cache.stats = null;
     cache.campaigns = null;
     cache.supportTickets = null;
-    notifySubscribers();
-  }, []);
+    setData({
+      profile: null,
+      stats: null,
+      campaigns: [],
+      supportTickets: [],
+      templates: data.templates,
+      featuredTemplates: data.featuredTemplates,
+      comments: data.comments,
+    });
+  }, [data]);
 
   return {
     profile: data.profile,
