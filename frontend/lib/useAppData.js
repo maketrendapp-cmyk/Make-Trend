@@ -1,6 +1,7 @@
 // lib/useAppData.js
 // ============================================================
 // ENHANCED – Caching, Parallel Batches, Loading States, Abort, Retry, Toasts
+// All data is cached and initialised from cache on mount.
 // ============================================================
 
 import { useState, useCallback, useRef } from 'react';
@@ -74,26 +75,45 @@ async function apiRequest(endpoint, options = {}, token = null, signal = null) {
 }
 
 export function useAppData() {
-  // ---- Data states ----
-  const [templates, setTemplates] = useState([]);
-  const [featuredTemplates, setFeaturedTemplates] = useState([]);
-  const [profile, setProfile] = useState(null);
-  const [campaigns, setCampaigns] = useState([]);
-  const [supportTickets, setSupportTickets] = useState([]);
-  const [comments, setComments] = useState([]);
-  const [stats, setStats] = useState({
-    totalCampaigns: 0,
-    totalViews: 0,
-    totalUnlocks: 0,
-    totalShares: 0,
-    totalCompletions: 0,
-    successfulCampaigns: 0,
-  });
+  // ── 1️⃣ INSTANT initialisation from cache (synchronous) ──
+  // Build cache keys for each data type
+  const user = auth.currentUser;
+  const uid = user?.uid;
 
-  // ---- 🚀 dataLoaded is true from the start – UI never waits ──
+  const getInitial = (key) => {
+    const cached = getCached(key);
+    return cached !== null ? cached : (() => {
+      // For arrays, return empty array; for objects, return null/default
+      if (key.startsWith('templates:') || key === 'comments:all' || key.startsWith('campaigns:') || key.startsWith('support:')) {
+        return [];
+      }
+      if (key.startsWith('stats:')) {
+        return { totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 };
+      }
+      if (key.startsWith('profile:')) {
+        return null;
+      }
+      return null;
+    })();
+  };
+
+  const profileKey = uid ? `profile:${uid}` : null;
+  const statsKey = uid ? `stats:${uid}` : null;
+  const campaignsKey = uid ? `campaigns:${uid}` : null;
+  const supportKey = uid ? `support:${uid}` : null;
+
+  const [templates, setTemplates] = useState(getInitial('templates:all'));
+  const [featuredTemplates, setFeaturedTemplates] = useState(getInitial('templates:highlight:true'));
+  const [profile, setProfile] = useState(profileKey ? getInitial(profileKey) : null);
+  const [campaigns, setCampaigns] = useState(campaignsKey ? getInitial(campaignsKey) : []);
+  const [supportTickets, setSupportTickets] = useState(supportKey ? getInitial(supportKey) : []);
+  const [comments, setComments] = useState(getInitial('comments:all'));
+  const [stats, setStats] = useState(statsKey ? getInitial(statsKey) : { totalCampaigns: 0, totalViews: 0, totalUnlocks: 0, totalShares: 0, totalCompletions: 0, successfulCampaigns: 0 });
+
+  // ── dataLoaded is true from the start – UI never waits ──
   const [dataLoaded, setDataLoaded] = useState(true);
 
-  // ---- Loading states (for skeletons) ----
+  // ── Loading states (for skeletons) ──
   const [loadingState, setLoadingState] = useState({
     profile: false,
     stats: false,
@@ -106,7 +126,7 @@ export function useAppData() {
 
   const abortControllerRef = useRef(null);
 
-  // ---- Individual fetch functions (with cache) ----
+  // ---- Individual fetch functions (with cache and dedupe) ----
 
   const fetchProfile = useCallback(async () => {
     const user = auth.currentUser;
@@ -115,11 +135,7 @@ export function useAppData() {
     try {
       const token = await user.getIdToken();
       const key = `profile:${user.uid}`;
-      const cached = getCached(key);
-      if (cached) {
-        setProfile(cached);
-        return;
-      }
+      // getCached already checked in initial state, but we still use fetchWithDedupe
       const data = await fetchWithDedupe(key, async () => {
         const result = await apiRequest('/auth/me', {}, token);
         return result.success ? result.user : null;
@@ -137,11 +153,6 @@ export function useAppData() {
     try {
       const token = await user.getIdToken();
       const key = `stats:${user.uid}`;
-      const cached = getCached(key);
-      if (cached) {
-        setStats(cached);
-        return;
-      }
       const data = await fetchWithDedupe(key, async () => {
         const result = await apiRequest('/stats', {}, token);
         return result.success ? result.stats : null;
@@ -156,11 +167,6 @@ export function useAppData() {
     setLoadingState(s => ({ ...s, highlights: true }));
     try {
       const key = 'templates:highlight:true';
-      const cached = getCached(key);
-      if (cached) {
-        setFeaturedTemplates(cached);
-        return;
-      }
       const data = await fetchWithDedupe(key, async () => {
         const result = await apiRequest('/templates?highlight=true');
         return result.templates || [];
@@ -175,11 +181,6 @@ export function useAppData() {
     setLoadingState(s => ({ ...s, allTemplates: true }));
     try {
       const key = 'templates:all';
-      const cached = getCached(key);
-      if (cached) {
-        setTemplates(cached);
-        return;
-      }
       const data = await fetchWithDedupe(key, async () => {
         const result = await apiRequest('/templates');
         return result.templates || [];
@@ -197,11 +198,6 @@ export function useAppData() {
     try {
       const token = await user.getIdToken();
       const key = `campaigns:${user.uid}`;
-      const cached = getCached(key);
-      if (cached) {
-        setCampaigns(cached);
-        return;
-      }
       const data = await fetchWithDedupe(key, async () => {
         const result = await apiRequest('/campaigns?limit=25', {}, token);
         return result.campaigns || [];
@@ -219,11 +215,6 @@ export function useAppData() {
     try {
       const token = await user.getIdToken();
       const key = `support:${user.uid}`;
-      const cached = getCached(key);
-      if (cached) {
-        setSupportTickets(cached);
-        return;
-      }
       const data = await fetchWithDedupe(key, async () => {
         const result = await apiRequest('/support', {}, token);
         return result.tickets || [];
@@ -238,11 +229,6 @@ export function useAppData() {
     setLoadingState(s => ({ ...s, comments: true }));
     try {
       const key = 'comments:all';
-      const cached = getCached(key);
-      if (cached) {
-        setComments(cached);
-        return;
-      }
       const data = await fetchWithDedupe(key, async () => {
         const result = await apiRequest('/comments');
         return result.comments || [];
@@ -299,7 +285,7 @@ export function useAppData() {
     fetchComments,
   ]);
 
-  // ---- Refetch helpers (clear cache AND pending) ----
+  // ---- Refetch helpers (clear cache AND pending, then refetch) ----
   const refetchProfile = useCallback(async () => {
     const user = auth.currentUser;
     if (user) {
@@ -380,7 +366,7 @@ export function useAppData() {
     comments,
     stats,
     loadingState,
-    dataLoaded,        // ✅ now true from the start – UI never waits
+    dataLoaded,        // true from start – UI never waits
     loadAllData,
     refetchProfile,
     refetchCampaigns,
