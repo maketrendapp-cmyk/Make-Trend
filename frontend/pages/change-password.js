@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import { auth } from '../services/firebase';
 import {
   EmailAuthProvider,
@@ -11,8 +12,9 @@ import {
 
 export default function ChangePassword() {
   const router = useRouter();
-  const { user, dataLoaded } = useAuth();
-  const [loading, setLoading] = useState(!dataLoaded);
+  const { user } = useAuth();
+const { loadingState } = useAppData();
+  const [loading, setLoading] = useState(loadingState?.profile !== undefined ? false : true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -27,7 +29,10 @@ export default function ChangePassword() {
 
   // ── Check if user has email/password provider ──
   useEffect(() => {
-    if (!dataLoaded) return;
+    // If profile is still loading, wait
+    if (loadingState?.profile === undefined || loadingState?.profile === true) {
+      return;
+    }
 
     if (!user) {
       router.push('/login');
@@ -41,7 +46,7 @@ export default function ChangePassword() {
       setHasPassword(hasEmailProvider);
     }
     setLoading(false);
-  }, [dataLoaded, user, router]);
+  }, [loadingState?.profile, user, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

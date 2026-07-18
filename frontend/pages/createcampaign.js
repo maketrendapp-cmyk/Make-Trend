@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import AuthScreen from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
@@ -16,11 +17,14 @@ export default function CreateCampaign() {
     user, 
     isAuthenticated, 
     loading: authLoading, 
-    refreshUser, 
+    refreshUser
+  } = useAuth();
+  
+  const { 
     templates,
     refetchCampaigns,
     refetchStats 
-  } = useAuth();
+  } = useAppData();
 
   // ── State ──
   const [template, setTemplate] = useState(null);

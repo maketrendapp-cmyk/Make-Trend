@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
 import {
   FiShield,
@@ -13,11 +14,12 @@ import {
 } from 'react-icons/fi';
 
 export default function Privacy() {
-  const { user, profile: contextProfile } = useAuth();
+  const { user } = useAuth();
+const { profile } = useAppData();
 
   // ── Get username for welcome message ──
-  const username = contextProfile?.username || user?.username || user?.email?.split('@')[0] || 'User';
-  const displayName = contextProfile?.fullname || user?.fullName || user?.displayName || 'User';
+  const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
+const displayName = profile?.fullname || user?.fullName || user?.displayName || 'User';
 
   // ── Intersection Observer for scroll animations ──
   useEffect(() => {

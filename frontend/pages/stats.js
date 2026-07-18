@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import AuthScreen from '../components/AuthScreen';
 import Meta from '../components/Meta';
 import { auth } from '../services/firebase';
@@ -26,19 +27,11 @@ import { FaRocket, FaChartLine } from 'react-icons/fa';
 
 export default function Stats() {
   const router = useRouter();
-  const {
-    user,
-    isAuthenticated,
-    needsCompletion,
-    loading,
-    refreshUser,
-    campaigns: contextCampaigns,
-    stats: contextStats,
-    dataLoaded,
-  } = useAuth();
+  const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
+const { campaigns: cachedCampaigns, stats: cachedStats } = useAppData();
 
-  const [campaigns, setCampaigns] = useState(contextCampaigns || []);
-  const [stats, setStats] = useState(contextStats || {
+  const [campaigns, setCampaigns] = useState(cachedCampaigns || []);
+const [stats, setStats] = useState(cachedStats || {
     totalCampaigns: 0,
     totalViews: 0,
     totalUnlocks: 0,
@@ -149,23 +142,23 @@ export default function Stats() {
     [hasMore, lastCreatedAt, lastId, loadingMore]
   );
 
-  // ===== LOAD INITIAL DATA – use context if available =====
+  // ===== LOAD INITIAL DATA – use cached data if available =====
   useEffect(() => {
     if (!isAuthenticated || needsCompletion) {
       setStatsLoading(false);
       return;
     }
 
-    // If data is already loaded from context, use it
-    if (dataLoaded && contextCampaigns && contextCampaigns.length > 0) {
-      setCampaigns(contextCampaigns);
-      if (contextStats) {
-        setStats(contextStats);
+    // If cached campaigns exist, use them and set pagination cursor
+    if (cachedCampaigns && cachedCampaigns.length > 0) {
+      setCampaigns(cachedCampaigns);
+      if (cachedStats) {
+        setStats(cachedStats);
       }
       setStatsLoading(false);
 
       // ── Set pagination cursor from the last item ──
-      const lastCampaign = contextCampaigns[contextCampaigns.length - 1];
+      const lastCampaign = cachedCampaigns[cachedCampaigns.length - 1];
       if (lastCampaign && lastCampaign.id) {
         let createdAtMillis = null;
         const ts = lastCampaign.createdAt;
@@ -192,23 +185,17 @@ export default function Stats() {
       }
 
       // ── Only enable "hasMore" if we have exactly 25 items ──
-      setHasMore(contextCampaigns.length === 25);
+      setHasMore(cachedCampaigns.length === 25);
       return;
     }
 
-    // If data is loaded but user has no campaigns
-    if (dataLoaded && contextCampaigns && contextCampaigns.length === 0) {
-      setStatsLoading(false);
-      return;
-    }
-
-    // Otherwise, fetch initial page from API
+    // If no cached campaigns, fetch initial page from API
     setStatsLoading(true);
     setHasMore(true);
     setLastCreatedAt(null);
     setLastId(null);
     fetchCampaigns(true).finally(() => setStatsLoading(false));
-  }, [isAuthenticated, needsCompletion, dataLoaded, contextCampaigns, contextStats, fetchCampaigns]);
+  }, [isAuthenticated, needsCompletion, cachedCampaigns, cachedStats, fetchCampaigns]);
 
   // ===== INFINITE SCROLL OBSERVER =====
   useEffect(() => {

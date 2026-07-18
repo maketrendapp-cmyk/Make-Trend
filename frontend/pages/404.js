@@ -2,17 +2,19 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
 import { FiHome, FiArrowLeft, FiSearch, FiAlertCircle } from 'react-icons/fi';
 import { useEffect, useState } from 'react';
 
 export default function Custom404() {
   const router = useRouter();
-  const { user, profile: contextProfile } = useAuth();
+  const { user } = useAuth();
+const { profile } = useAppData();
   const [mounted, setMounted] = useState(false);
 
   // ── Get username for welcome message ──
-  const username = contextProfile?.username || user?.username || user?.email?.split('@')[0] || 'User';
+  const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
 
   useEffect(() => {
     setMounted(true);

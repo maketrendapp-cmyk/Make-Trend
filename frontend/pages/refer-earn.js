@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import { auth } from '../services/firebase';
 import Link from 'next/link';
 import Meta from '../components/Meta';
@@ -21,7 +22,8 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 
 export default function ReferEarn() {
   const router = useRouter();
-  const { user, profile: contextProfile, dataLoaded } = useAuth();
+  const { user } = useAuth();
+const { profile, loadingState } = useAppData();
   const [loading, setLoading] = useState(true);
   const [referralData, setReferralData] = useState({
     referralCode: '',
@@ -33,8 +35,8 @@ export default function ReferEarn() {
   const [shouldAnimate, setShouldAnimate] = useState(false);
 
   // ── Get username for welcome message ──
-  const username = contextProfile?.username || user?.username || user?.email?.split('@')[0] || 'User';
-  const displayName = contextProfile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
+  const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
+const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
 
   // ── Fetch referral data ──
   useEffect(() => {
@@ -126,7 +128,7 @@ export default function ReferEarn() {
   };
 
   // ── Skeleton Loading ──
-  if (!dataLoaded || loading) {
+  if (loadingState?.profile === undefined || loadingState?.profile === true || loading) {
     return (
       <>
         <Meta title="Refer & Earn | Make Trend" />

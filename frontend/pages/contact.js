@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import {
@@ -24,11 +25,12 @@ import {
 import { FaWhatsapp, FaTelegram, FaTwitter } from 'react-icons/fa';
 
 export default function Contact() {
-  const { user, profile: contextProfile } = useAuth();
+  const { user } = useAuth();
+const { profile } = useAppData();
 
   // ── Get username for welcome message ──
-  const username = contextProfile?.username || user?.username || user?.email?.split('@')[0] || 'User';
-  const displayName = contextProfile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
+  const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
+const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
 
   const [formData, setFormData] = useState({
     name: user?.fullName || user?.fullname || '',

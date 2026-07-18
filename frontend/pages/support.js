@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import { auth } from '../services/firebase';
 import Link from 'next/link';
 import Meta from '../components/Meta';
@@ -21,8 +22,9 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 
 export default function Support() {
   const router = useRouter();
-  const { user, profile: contextProfile, supportTickets, dataLoaded, refetchSupportTickets } = useAuth();
-  const [loading, setLoading] = useState(!dataLoaded);
+  const { user } = useAuth();
+const { profile, supportTickets, loadingState, refetchSupportTickets } = useAppData();
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [tickets, setTickets] = useState(supportTickets || []);
 
@@ -44,18 +46,18 @@ export default function Support() {
   }, [supportTickets]);
 
   // ── Set loading false when data is loaded ──
-  useEffect(() => {
-    if (dataLoaded) {
-      setLoading(false);
-    }
-  }, [dataLoaded]);
+useEffect(() => {
+  if (loadingState?.profile === false) {
+    setLoading(false);
+  }
+}, [loadingState?.profile]);
 
   // ── Redirect if not authenticated ──
-  useEffect(() => {
-    if (dataLoaded && !user) {
-      router.push('/login');
-    }
-  }, [dataLoaded, user, router]);
+useEffect(() => {
+  if (!loadingState?.profile && !user) {
+    router.push('/login');
+  }
+}, [loadingState?.profile, user, router]);
 
   // ── Image upload handler ──
   const handleImageChange = (e) => {
@@ -233,7 +235,7 @@ export default function Support() {
   };
 
   // ── Loading state ──
-  if (loading || !dataLoaded) {
+  if (loading || loadingState?.profile === true) {
     return (
       <>
         <Meta title="Support | Make Trend" />
@@ -249,10 +251,10 @@ export default function Support() {
 
   // ── Display user ──
   const displayUser = {
-    username: contextProfile?.username || 'User',
-    fullname: contextProfile?.fullname || contextProfile?.name || 'User',
-    email: contextProfile?.email || user?.email || 'user@example.com',
-    avatar: contextProfile?.avatar || contextProfile?.profilePic || user?.photoURL || '',
+    username: profile?.username || 'User',
+    fullname: profile?.fullname || profile?.name || 'User',
+    email: profile?.email || user?.email || 'user@example.com',
+    avatar: profile?.avatar || profile?.profilePic || user?.photoURL || '',
   };
 
   return (

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 
@@ -9,8 +10,9 @@ const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onr
 
 export default function EditProfile() {
   const router = useRouter();
-  const { user, profile: contextProfile, refreshUser, dataLoaded, refetchProfile } = useAuth();
-  const [loading, setLoading] = useState(!dataLoaded);
+  const { user } = useAuth();
+const { profile, loadingState, refetchProfile } = useAppData();
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -38,23 +40,24 @@ export default function EditProfile() {
   const emailTimer = useRef(null);
 
   // ── Populate form from contextProfile ──
-  useEffect(() => {
-    if (contextProfile) {
-      setFullName(contextProfile.fullname || contextProfile.name || '');
-      setUsername(contextProfile.username || '');
-      setEmail(contextProfile.email || '');
-      setCurrentAvatar(contextProfile.avatar || contextProfile.profilePic || '');
-      setAvatarPreview(contextProfile.avatar || contextProfile.profilePic || '');
-      setLoading(false);
-    } else if (dataLoaded) {
-      setLoading(false);
-    }
-  }, [contextProfile, dataLoaded]);
+useEffect(() => {
+  if (profile) {
+    setFullName(profile.fullname || profile.name || '');
+    setUsername(profile.username || '');
+    setEmail(profile.email || '');
+    setCurrentAvatar(profile.avatar || profile.profilePic || '');
+    setAvatarPreview(profile.avatar || profile.profilePic || '');
+    setLoading(false);
+  } else if (!loadingState?.profile) {
+    // Profile loading finished but no profile data (e.g., user not logged in)
+    setLoading(false);
+  }
+}, [profile, loadingState?.profile]);
 
   // ── Track if username changed ──
   useEffect(() => {
     if (contextProfile) {
-      const originalUsername = contextProfile.username || '';
+      const originalUsername = profile?.username || '';
       setUsernameChanged(username !== originalUsername);
     }
   }, [username, contextProfile]);
@@ -62,17 +65,17 @@ export default function EditProfile() {
   // ── Track if email changed ──
   useEffect(() => {
     if (contextProfile) {
-      const originalEmail = contextProfile.email || '';
+      const originalEmail = profile?.email || '';
       setEmailChanged(email !== originalEmail);
     }
   }, [email, contextProfile]);
 
   // ── Redirect if not authenticated ──
-  useEffect(() => {
-    if (dataLoaded && !user) {
-      router.push('/login');
-    }
-  }, [dataLoaded, user, router]);
+useEffect(() => {
+  if (!loadingState?.profile && !user) {
+    router.push('/login');
+  }
+}, [loadingState?.profile, user, router]);
 
   // ── Check username availability ──
   useEffect(() => {
@@ -219,8 +222,7 @@ export default function EditProfile() {
       if (updateData.success) {
         setSuccess('Profile updated successfully!');
         // ── Refresh both auth user AND global profile ──
-        await refreshUser();
-        await refetchProfile();
+     await refetchProfile(); // refreshUser is no longer needed; refetchProfile refreshes the profile
         setTimeout(() => router.push('/profile'), 1500);
       } else {
         setError(updateData.error || 'Update failed');

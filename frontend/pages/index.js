@@ -3,6 +3,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 import {
   FiZap,
   FiTrendingUp,
@@ -105,7 +106,7 @@ const platformBadgeStyles = {
 
 export default function Home() {
   const router = useRouter();
-  const { featuredTemplates } = useAuth();
+  const { featuredTemplates } = useAppData();
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

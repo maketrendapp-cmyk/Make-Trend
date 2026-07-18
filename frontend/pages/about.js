@@ -33,6 +33,7 @@ import {
 } from 'react-icons/fi';
 import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin } from 'react-icons/fa';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
@@ -156,7 +157,8 @@ function Milestone({ year, title, description, icon }) {
 
 export default function About() {
   const router = useRouter();
-  const { user, comments, dataLoaded, refetchComments } = useAuth();
+  const { user } = useAuth();
+const { comments, loadingState, refetchComments } = useAppData();
   const [commentName, setCommentName] = useState('');
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
@@ -164,7 +166,7 @@ export default function About() {
   const [submitMessage, setSubmitMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
-  const [loadingComments, setLoadingComments] = useState(!dataLoaded);
+  const loadingComments = loadingState?.comments === undefined ? false : loadingState.comments;
 
   const toggleFaq = (index) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
@@ -191,13 +193,6 @@ export default function About() {
     { label: 'Total Shares', target: 10000, suffix: '+' },
   ];
   const counters = stats.map(s => useCounter(s.target));
-
-  // ── comments are already loaded from AuthContext ──
-  useEffect(() => {
-    if (dataLoaded) {
-      setLoadingComments(false);
-    }
-  }, [dataLoaded]);
 
   // ── Submit comment ──
   const handleSubmitComment = async (e) => {
@@ -675,7 +670,7 @@ export default function About() {
                 <FiMessageCircle className="w-5 h-5 text-purple-600" />
                 Latest Reviews ({comments?.length || 0})
               </h3>
-              {loadingComments || !dataLoaded ? (
+              {loadingComments ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 animate-pulse">

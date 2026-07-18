@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import { useAuth } from '../components/AuthScreen';
+import { useAppData } from '../lib/useAppData';
 
 // ── Emoji mapping for categories ──
 const categoryEmojis = {
@@ -25,7 +26,8 @@ export default function Create() {
   const { slug: highlightSlug, search: initialSearch } = router.query;
 
   // ── State ──
-  const { templates, dataLoaded } = useAuth();
+  const { templates, loadingState } = useAppData();
+
   const [searchQuery, setSearchQuery] = useState(initialSearch || '');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
@@ -166,7 +168,7 @@ export default function Create() {
   };
 
   // ── No templates state (after data is loaded) ──
-  if (dataLoaded && templates.length === 0) {
+  if (!loadingState.allTemplates && templates.length === 0) {
     return (
       <>
         <Meta title="No Templates" />
