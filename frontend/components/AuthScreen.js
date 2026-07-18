@@ -162,7 +162,7 @@ export function AuthProvider({ children }) {
           cookieUidRef.current = uid;
         }
 
-        // ── Fetch full profile in background (first priority) ──
+        // ── Fetch full profile in background ──
         apiRequest('/auth/me', {}, token)
           .then((data) => {
             if (data.success && data.user && isMounted) {
@@ -171,7 +171,7 @@ export function AuthProvider({ children }) {
           })
           .catch(() => {});
 
-        // ── Load other data in background (loadAllData will now fetch profile first) ──
+        // ── Load all other data in background ──
         loadAllData().catch(() => {});
 
       } catch (err) {
