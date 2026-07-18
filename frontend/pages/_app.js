@@ -1,6 +1,7 @@
 // pages/_app.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { Toaster } from 'react-hot-toast';   // <-- add this
 import { AuthProvider } from '../components/AuthScreen';
 import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
@@ -39,17 +40,21 @@ function MyApp({ Component, pageProps }) {
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
+  // ── No layout (templates, tasks, share) ──
   if (isNoLayout) {
     return (
       <AuthProvider>
+        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
         <Component {...pageProps} />
       </AuthProvider>
     );
   }
 
+  // ── Top navbar only (about, rules, terms, privacy) ──
   if (isTopNavOnly) {
     return (
       <AuthProvider>
+        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
         <div className="min-h-screen bg-bg">
           <Navbar />
           <Component {...pageProps} />
@@ -58,8 +63,10 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
+  // ── Full layout (default) ──
   return (
     <AuthProvider>
+      <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
       <div className="min-h-screen bg-bg pb-20 md:pb-0">
         <Navbar />
         <Component {...pageProps} />
