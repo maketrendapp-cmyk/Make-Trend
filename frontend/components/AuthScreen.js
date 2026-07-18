@@ -27,7 +27,6 @@ import {
   FiUserPlus,
   FiCheckCircle,
   FiAlertCircle,
-  FiArrowRight,
 } from 'react-icons/fi';
 import { FaGoogle, FaFacebook } from 'react-icons/fa';
 
@@ -66,7 +65,7 @@ async function apiRequest(endpoint, options = {}, token = null) {
 }
 
 // ============================================================
-// AUTH CONTEXT (FULL – PRESERVED)
+// AUTH CONTEXT
 // ============================================================
 const AuthContext = createContext();
 
@@ -79,7 +78,7 @@ export function AuthProvider({ children, initialUser }) {
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const loadedFromCookieRef = useRef(false);
   const cookieUidRef = useRef(null);
-  const fastPathAttemptedRef = useRef(false); // ← add this
+  const fastPathAttemptedRef = useRef(false);
 
   // --- ALL DATA FROM useAppData ---
   const {
@@ -140,8 +139,9 @@ export function AuthProvider({ children, initialUser }) {
     }
   }, []);
 
-  // --- AUTH STATE LISTENER ---
-  // 1️⃣ Fast: load user from server-side cookie token
+  // ============================================================
+  // 1️⃣ FAST PATH – Load user from server‑side cookie token
+  // ============================================================
   useEffect(() => {
     let isMounted = true;
     const loadFromCookie = async () => {
@@ -150,7 +150,7 @@ export function AuthProvider({ children, initialUser }) {
         if (isMounted) {
           setUser(null);
           setIsAuthenticated(false);
-          setLoading(false); // ✅ Immediate render as logged out
+          setLoading(false);
         }
         fastPathAttemptedRef.current = true;
         return;
@@ -167,10 +167,10 @@ export function AuthProvider({ children, initialUser }) {
             loadedFromCookieRef.current = true;
             cookieUidRef.current = data.user.uid;
             setLoading(false);
+            // Load data in the background (non‑blocking)
             loadAllData().catch(err => console.warn('Background data load error:', err));
           }
         } catch (err) {
-          // Token invalid – fall back to Firebase
           console.log('Cookie token invalid, waiting for Firebase');
         }
       }
@@ -181,12 +181,14 @@ export function AuthProvider({ children, initialUser }) {
     return () => { isMounted = false; };
   }, []);
 
-  // 2️⃣ Firebase listener (sign‑in / sign‑out / token refresh)
+  // ============================================================
+  // 2️⃣ FIREBASE LISTENER – Fallback and real‑time updates
+  // ============================================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       // ⏳ If fast path hasn't tried yet, let it go first
       if (!fastPathAttemptedRef.current) {
-        setLoading(false); // don't block render
+        // Keep loading true – fast path will set it false
         return;
       }
 
@@ -201,7 +203,7 @@ export function AuthProvider({ children, initialUser }) {
         // Normal flow (new login, token refresh with different UID, etc.)
         try {
           const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
-          // ... rest of the existing logic  if (data.banned) {
+          if (data.banned) {
             await signOut(auth);
             setUser(null);
             setIsAuthenticated(false);
@@ -209,7 +211,9 @@ export function AuthProvider({ children, initialUser }) {
             setLoading(false);
             return;
           }
-        } catch {}
+        } catch (err) {
+          // Ignore ban check errors – proceed anyway
+        }
 
         await loadAllData();
 
@@ -227,12 +231,24 @@ export function AuthProvider({ children, initialUser }) {
               setIsAuthenticated(true);
               setNeedsCompletion(false);
             } else {
-              setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
+              setUser({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName || '',
+                photoURL: firebaseUser.photoURL || '',
+                completed: false,
+              });
               setIsAuthenticated(true);
               setNeedsCompletion(true);
             }
           } else {
-            setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName || '', photoURL: firebaseUser.photoURL || '', completed: false });
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName || '',
+              photoURL: firebaseUser.photoURL || '',
+              completed: false,
+            });
             setIsAuthenticated(true);
             setNeedsCompletion(true);
           }
@@ -243,14 +259,16 @@ export function AuthProvider({ children, initialUser }) {
         setIsAuthenticated(false);
         setNeedsCompletion(false);
         clearUserData();
-        cookieUidRef.current = null; // reset ref
+        cookieUidRef.current = null;
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, [fetchUserProfile, checkProfileStatus, loadAllData, clearUserData]);
 
-  // ── Refresh session cookie whenever Firebase issues a new token (≈ every hour) ──
+  // ============================================================
+  // 3️⃣ TOKEN REFRESH – Keep the cookie fresh
+  // ============================================================
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -258,20 +276,23 @@ export function AuthProvider({ children, initialUser }) {
           const token = await firebaseUser.getIdToken();
           await setSessionCookie(token);
         } catch {
-          // Silent fail – the fast path will fall back to Firebase on next load
+          // Silent fail – not critical
         }
       }
     });
     return () => unsubscribe();
   }, []);
 
-  // --- LOGIN ---
+  // ============================================================
+  // 4️⃣ AUTH METHODS
+  // ============================================================
+
+  // ── Login ──
   const login = async (email, password) => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
 
-      // ── Set cookie for faster detection on next load ──
       const token = await firebaseUser.getIdToken();
       await setSessionCookie(token);
 
@@ -296,14 +317,13 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // --- REGISTER ---
+  // ── Register ──
   const register = async (email, password, fullname, username, avatarUrl, referralCode = '') => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
       const token = await firebaseUser.getIdToken();
 
-      // ── Set cookie for faster detection on next load ──
       await setSessionCookie(token);
 
       const data = await apiRequest('/auth/register', {
@@ -328,7 +348,7 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // --- SOCIAL LOGIN ---
+  // ── Social Login ──
   const socialLogin = async (providerName) => {
     setIsSocialLoading(true);
     let provider;
@@ -349,7 +369,6 @@ export function AuthProvider({ children, initialUser }) {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
-      // ── Set cookie for faster detection on next load ──
       const token = await firebaseUser.getIdToken();
       await setSessionCookie(token);
 
@@ -397,7 +416,7 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // --- COMPLETE SOCIAL PROFILE ---
+  // ── Complete Social Profile ──
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
     try {
       const firebaseUser = auth.currentUser;
@@ -415,7 +434,6 @@ export function AuthProvider({ children, initialUser }) {
           setNeedsCompletion(false);
           await loadAllData();
 
-          // ── Set cookie for faster detection on next load ──
           const newToken = await firebaseUser.getIdToken();
           await setSessionCookie(newToken);
 
@@ -425,7 +443,6 @@ export function AuthProvider({ children, initialUser }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
 
-          // ── Set cookie for faster detection on next load ──
           const newToken = await firebaseUser.getIdToken();
           await setSessionCookie(newToken);
 
@@ -439,7 +456,7 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // --- LOGOUT ---
+  // ── Logout ──
   const logout = async () => {
     try {
       await signOut(auth);
@@ -462,7 +479,7 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
-  // --- RESET PASSWORD ---
+  // ── Reset Password ──
   const resetPassword = async (email) => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -474,6 +491,7 @@ export function AuthProvider({ children, initialUser }) {
     }
   };
 
+  // ── Refresh User ──
   const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
       const profileData = await fetchUserProfile(auth.currentUser);
@@ -487,7 +505,9 @@ export function AuthProvider({ children, initialUser }) {
     return null;
   }, [fetchUserProfile]);
 
-  // --- CONTEXT VALUE ---
+  // ============================================================
+  // CONTEXT VALUE
+  // ============================================================
   const value = {
     user,
     loading,
