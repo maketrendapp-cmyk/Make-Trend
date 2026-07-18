@@ -16,7 +16,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   FacebookAuthProvider,
-  firebaseApp, // we'll export this from firebase.js
+  firebaseApp,
 } from '../services/firebase';
 import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
@@ -33,7 +33,7 @@ import { FaGoogle, FaFacebook } from 'react-icons/fa';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
-// ── Get Firebase API key from the already‑initialized app ──
+// ── Get Firebase API key from the app instance ──
 const firebaseApiKey = firebaseApp.options.apiKey;
 const FIREBASE_AUTH_KEY = `firebase:authUser:${firebaseApiKey}:DEFAULT`;
 
@@ -65,7 +65,6 @@ export function AuthProvider({ children }) {
       const raw = localStorage.getItem(FIREBASE_AUTH_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      // Firebase stores the user object directly (or under 'value' in some versions)
       if (parsed && parsed.uid) return parsed;
       if (parsed && parsed.value && parsed.value.uid) return parsed.value;
       return null;
@@ -76,7 +75,7 @@ export function AuthProvider({ children }) {
 
   // ── State initialised instantly ──
   const [user, setUser] = useState(storedUser || null);
-  const [loading, setLoading] = useState(false); // Always false because we have the user
+  const [loading, setLoading] = useState(false); // Always false – user known instantly
   const [isAuthenticated, setIsAuthenticated] = useState(!!storedUser);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
@@ -145,9 +144,8 @@ export function AuthProvider({ children }) {
   // ============================================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // If we already have the same user, skip heavy logic
       if (firebaseUser && cookieUidRef.current === firebaseUser.uid) {
-        // Update the localStorage key if needed (though Firebase does it)
+        // Already have this user – skip
         return;
       }
 
@@ -167,7 +165,6 @@ export function AuthProvider({ children }) {
           }
         } catch {}
 
-        // Load all data (will fetch profile, templates, etc.)
         await loadAllData();
 
         const profileData = await fetchUserProfile(firebaseUser);
@@ -233,18 +230,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        try {
-          const token = await firebaseUser.getIdToken();
-          // Firebase automatically updates its internal localStorage entry,
-          // so nothing else needed.
-        } catch {}
+        // Firebase updates its internal localStorage automatically,
+        // so we don't need to do anything here.
       }
     });
     return () => unsubscribe();
   }, []);
 
   // ============================================================
-  // 4️⃣ AUTH METHODS
+  // 4️⃣ AUTH METHODS (non‑blocking data loading)
   // ============================================================
 
   const login = async (email, password) => {
@@ -263,7 +257,6 @@ export function AuthProvider({ children }) {
         setNeedsCompletion(true);
       }
       cookieUidRef.current = firebaseUser.uid;
-      // Data loads in the background (non‑blocking)
       loadAllData().catch(() => {});
       return { success: true };
     } catch (error) {
