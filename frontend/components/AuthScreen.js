@@ -16,6 +16,7 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider,
 } from '../services/firebase';
+import { useAppData } from '../lib/useAppData';
 import Meta from '../components/Meta';
 import { motion } from 'framer-motion';
 import {
@@ -70,6 +71,7 @@ export function AuthProvider({ children }) {
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const uidRef = useRef(storedAuth?.uid || null);
+  const { clearUserData } = useAppData();
 
   // ── Helper to cache auth info ──
   const cacheAuth = (authData) => {
@@ -171,6 +173,7 @@ export function AuthProvider({ children }) {
         } catch {}
       } else {
         localStorage.removeItem(AUTH_CACHE_KEY);
+        clearUserData();
         setUser(null);
         setIsAuthenticated(false);
         setNeedsCompletion(false);
@@ -378,6 +381,7 @@ export function AuthProvider({ children }) {
     try {
       await signOut(auth);
       localStorage.removeItem(AUTH_CACHE_KEY);
+      clearUserData();
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);

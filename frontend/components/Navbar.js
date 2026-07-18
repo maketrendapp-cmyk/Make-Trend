@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { useAppData } from '../lib/useAppData';
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FiHome,
   FiUser,
@@ -142,7 +142,6 @@ export default function Navbar() {
                       mx-0.5 sm:mx-1
                     "
                   >
-                    {/* ── Avatar / Skeleton ── */}
                     {isProfileLoading ? (
                       <>
                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0"></div>
