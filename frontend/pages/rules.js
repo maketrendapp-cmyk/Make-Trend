@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile } from '../lib/queries';
 import Meta from '../components/Meta';
 import {
   FiChevronRight,
@@ -19,11 +19,11 @@ import {
 
 export default function Rules() {
   const { user } = useAuth();
-const { profile } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
   // ── Get username for welcome message ──
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
-const displayName = profile?.fullname || user?.fullName || user?.displayName || 'User';
+  const displayName = profile?.fullname || user?.fullName || user?.displayName || 'User';
 
   // ── Intersection Observer for scroll animations ──
   useEffect(() => {
@@ -152,20 +152,28 @@ const displayName = profile?.fullname || user?.fullName || user?.displayName || 
         <section className="py-6 bg-gray-50/50 border-b border-gray-100">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 bg-white rounded-2xl shadow-md border border-gray-100/60 p-5 text-center">
-              <div className="flex items-center justify-center gap-3 text-gray-700">
-                <FiUser className="w-6 h-6 text-purple-600" />
-                <span className="text-lg font-medium">
-                  Welcome,{' '}
-                  <span className="font-bold text-purple-700">
-                    @{user ? username : 'User'}
-                  </span>
-                  {user && (
-                    <span className="text-gray-400 text-sm ml-1">
-                      ({displayName})
+              {profileLoading ? (
+                <div className="flex items-center justify-center gap-3 text-gray-700 animate-pulse">
+                  <div className="w-6 h-6 bg-purple-200 rounded-full" />
+                  <div className="h-6 w-48 bg-gray-200 rounded" />
+                  <div className="h-4 w-24 bg-gray-200 rounded ml-1" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3 text-gray-700">
+                  <FiUser className="w-6 h-6 text-purple-600" />
+                  <span className="text-lg font-medium">
+                    Welcome,{' '}
+                    <span className="font-bold text-purple-700">
+                      @{user ? username : 'User'}
                     </span>
-                  )}
-                </span>
-              </div>
+                    {user && (
+                      <span className="text-gray-400 text-sm ml-1">
+                        ({displayName})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
               <p className="text-sm text-gray-500 mt-1">
                 These rules apply to everyone. Please follow them to keep our community safe.
               </p>

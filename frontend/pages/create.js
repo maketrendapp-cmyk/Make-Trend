@@ -2,8 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
-import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useTemplates, useFeaturedTemplates } from '../lib/queries';
 
 // ── Emoji mapping for categories ──
 const categoryEmojis = {
@@ -25,8 +24,9 @@ export default function Create() {
   const router = useRouter();
   const { slug: highlightSlug, search: initialSearch } = router.query;
 
-  // ── State ──
-  const { templates, loadingState } = useAppData();
+  // ── React Query data ──
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates();
+  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates();
 
   const [searchQuery, setSearchQuery] = useState(initialSearch || '');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -34,19 +34,18 @@ export default function Create() {
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  // retryCount removed – data is globally available
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
 
-  // ── Sync search from URL (when changed via browser back/forward or SPA) ──
+  // ── Sync search from URL ──
   useEffect(() => {
     if (initialSearch !== undefined) {
       setSearchQuery(initialSearch);
     }
   }, [initialSearch]);
 
-  // ── templates are already loaded from AuthContext ──
+  // ── Highlight template from URL slug ──
   useEffect(() => {
     if (highlightSlug && templates.length > 0) {
       const found = templates.find(t => t.slug === highlightSlug);
@@ -90,11 +89,9 @@ export default function Create() {
     return filtered;
   }, [templates, searchQuery, selectedCategory, selectedPlatform]);
 
-  // ── Split into featured and regular ──
-  const { featuredTemplates, regularTemplates } = useMemo(() => {
-    const featured = filteredAll.filter(t => t.isHighlight === true);
-    const regular = filteredAll.filter(t => !t.isHighlight);
-    return { featuredTemplates: featured, regularTemplates: regular };
+  // ── Split into regular (non-featured) ──
+  const regularTemplates = useMemo(() => {
+    return filteredAll.filter(t => !t.isHighlight);
   }, [filteredAll]);
 
   // ── Carousel auto-slide ──
@@ -167,8 +164,11 @@ export default function Create() {
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
-  // ── No templates state (after data is loaded) ──
-  if (!loadingState.allTemplates && templates.length === 0) {
+  // ── Loading state ──
+  const isLoading = templatesLoading || featuredLoading;
+
+  // ── No templates state (after loading finishes) ──
+  if (!isLoading && templates.length === 0) {
     return (
       <>
         <Meta title="No Templates" />
@@ -381,7 +381,7 @@ export default function Create() {
         </div>
 
         {/* ── Regular Templates Grid ── */}
-        {loadingState.allTemplates ? (
+        {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">

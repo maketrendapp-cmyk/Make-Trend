@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile } from '../lib/queries';
 import Meta from '../components/Meta';
 import {
   FiBook,
@@ -15,11 +15,11 @@ import {
 
 export default function Terms() {
   const { user } = useAuth();
-const { profile } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
   // ── Get username for welcome message ──
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
-const displayName = profile?.fullname || user?.fullName || user?.displayName || 'User';
+  const displayName = profile?.fullname || user?.fullName || user?.displayName || 'User';
 
   // ── Intersection Observer for scroll animations ──
   useEffect(() => {
@@ -92,20 +92,28 @@ const displayName = profile?.fullname || user?.fullName || user?.displayName || 
 
             {/* ── Welcome Message ── */}
             <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 bg-white rounded-2xl shadow-md border border-gray-100/60 p-6 mb-8 text-center">
-              <div className="flex items-center justify-center gap-3 text-gray-700">
-                <FiUser className="w-6 h-6 text-purple-600" />
-                <span className="text-lg font-medium">
-                  Welcome,{' '}
-                  <span className="font-bold text-purple-700">
-                    @{user ? username : 'User'}
-                  </span>
-                  {user && (
-                    <span className="text-gray-400 text-sm ml-1">
-                      ({displayName})
+              {profileLoading ? (
+                <div className="flex items-center justify-center gap-3 text-gray-700 animate-pulse">
+                  <div className="w-6 h-6 bg-purple-200 rounded-full" />
+                  <div className="h-6 w-48 bg-gray-200 rounded" />
+                  <div className="h-4 w-24 bg-gray-200 rounded ml-1" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3 text-gray-700">
+                  <FiUser className="w-6 h-6 text-purple-600" />
+                  <span className="text-lg font-medium">
+                    Welcome,{' '}
+                    <span className="font-bold text-purple-700">
+                      @{user ? username : 'User'}
                     </span>
-                  )}
-                </span>
-              </div>
+                    {user && (
+                      <span className="text-gray-400 text-sm ml-1">
+                        ({displayName})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
               <p className="text-sm text-gray-500 mt-1">
                 These terms apply to your use of Make Trend. Please review them thoroughly.
               </p>
@@ -144,7 +152,7 @@ const displayName = profile?.fullname || user?.fullName || user?.displayName || 
                   <li>You must be at least 13 years old to use Make Trend.</li>
                   <li>You are responsible for maintaining the confidentiality of your account credentials.</li>
                   <li>You are solely responsible for all content you post, including campaigns, tasks, and descriptions.</li>
-                  <li>You must not share your account with others or use another user’s account without permission.</li>
+                  <li>You must not share your account with others or use another user's account without permission.</li>
                   <li>You agree to provide accurate and up‑to‑date information during registration.</li>
                 </ul>
               </div>
@@ -197,7 +205,7 @@ const displayName = profile?.fullname || user?.fullName || user?.displayName || 
                   <span className="text-purple-600">7.</span> Disclaimer of Warranties
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
-                  Make Trend is provided “as is” and “as available.” We do not warrant that the service will be uninterrupted, error‑free,
+                  Make Trend is provided "as is" and "as available." We do not warrant that the service will be uninterrupted, error‑free,
                   or secure. We disclaim all warranties, express or implied, to the fullest extent permitted by law.
                 </p>
               </div>
@@ -231,7 +239,7 @@ const displayName = profile?.fullname || user?.fullName || user?.displayName || 
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   We may update these terms from time to time. We will notify you of any significant changes by posting the new terms on this page
-                  and updating the “Last updated” date. Your continued use of the platform after changes constitutes acceptance of the new terms.
+                  and updating the "Last updated" date. Your continued use of the platform after changes constitutes acceptance of the new terms.
                 </p>
               </div>
 

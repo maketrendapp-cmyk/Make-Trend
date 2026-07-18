@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile, useStats, useInvalidateQueries } from '../lib/queries';
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
@@ -15,27 +15,35 @@ import Meta from '../components/Meta';
 export default function Profile() {
   const router = useRouter();
   const { user, logout } = useAuth();
-const { profile: contextProfile, stats, loadingState } = useAppData();
-const [showLogoutModal, setShowLogoutModal] = useState(false);
-const [copySuccess, setCopySuccess] = useState('');
 
-const copyReferralCode = () => {
-  const code = contextProfile?.referralCode || '';
-  if (!code) return;
-  navigator.clipboard.writeText(code).then(() => {
-    setCopySuccess('✅ Copied!');
-    setTimeout(() => setCopySuccess(''), 2000);
-  }).catch(() => {
-    const textArea = document.createElement('textarea');
-    textArea.value = code;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-    setCopySuccess('✅ Copied!');
-    setTimeout(() => setCopySuccess(''), 2000);
-  });
-};
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: stats, isLoading: statsLoading } = useStats();
+  const { invalidateProfile, invalidateStats } = useInvalidateQueries();
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState('');
+
+  const isLoading = profileLoading || statsLoading;
+
+  const copyReferralCode = () => {
+    const code = profile?.referralCode || '';
+    if (!code) return;
+    navigator.clipboard.writeText(code)
+      .then(() => {
+        setCopySuccess('✅ Copied!');
+        setTimeout(() => setCopySuccess(''), 2000);
+      })
+      .catch(() => {
+        const textArea = document.createElement('textarea');
+        textArea.value = code;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopySuccess('✅ Copied!');
+        setTimeout(() => setCopySuccess(''), 2000);
+      });
+  };
 
   const handleLogout = async () => {
     try {
@@ -48,13 +56,13 @@ const copyReferralCode = () => {
   };
 
   const displayUser = {
-    username: contextProfile?.username || 'guest',
-    fullName: contextProfile?.fullname || contextProfile?.name || 'Guest User',
-    email: contextProfile?.email || 'guest@example.com',
-    profilePic: contextProfile?.avatar || contextProfile?.profilePic || null,
-    isPro: contextProfile?.plan === 'pro' || false,
-    referrals: contextProfile?.referrals || 0,
-    referralCode: contextProfile?.referralCode || '',
+    username: profile?.username || 'guest',
+    fullName: profile?.fullname || profile?.name || 'Guest User',
+    email: profile?.email || 'guest@example.com',
+    profilePic: profile?.avatar || profile?.profilePic || null,
+    isPro: profile?.plan === 'pro' || false,
+    referrals: profile?.referrals || 0,
+    referralCode: profile?.referralCode || '',
   };
 
   const statsItems = [
@@ -64,7 +72,6 @@ const copyReferralCode = () => {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals ?? 0 },
   ];
 
-  // ✅ Quick Actions
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -72,7 +79,6 @@ const copyReferralCode = () => {
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
   ];
 
-  // ✅ Explore
   const exploreOptions = [
     { icon: FiGrid, label: 'Follow Us', href: '/follow' },
     { icon: FiInfo, label: 'About Make Trend', href: '/about' },
@@ -85,12 +91,24 @@ const copyReferralCode = () => {
     { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
   ];
 
-// ── Skeleton Loader (show only while profile is loading) ──
-if (loadingState?.profile) {
+  // ── Skeleton ──
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* ... skeleton unchanged ... */}
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 animate-pulse">
+          <div className="bg-white rounded-2xl p-6 mb-6">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-24 h-24 rounded-full bg-gray-200" />
+              <div className="flex-1 space-y-2">
+                <div className="h-6 bg-gray-200 rounded w-48" />
+                <div className="h-4 bg-gray-200 rounded w-32" />
+                <div className="h-4 bg-gray-200 rounded w-40" />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />)}
+          </div>
         </div>
       </div>
     );
@@ -138,7 +156,6 @@ if (loadingState?.profile) {
                 <p className="text-gray-500">@{displayUser.username || 'guest'}</p>
                 <p className="text-gray-400 text-sm">{displayUser.email}</p>
 
-                {/* ── Referral Code ── */}
                 {user && (
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-medium text-gray-500">Referral Code:</span>

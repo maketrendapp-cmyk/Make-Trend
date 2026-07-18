@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile } from '../lib/queries';
 import Meta from '../components/Meta';
 import { FiHome, FiArrowLeft, FiSearch, FiAlertCircle } from 'react-icons/fi';
 import { useEffect, useState } from 'react';
@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 export default function Custom404() {
   const router = useRouter();
   const { user } = useAuth();
-const { profile } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const [mounted, setMounted] = useState(false);
 
   // ── Get username for welcome message ──
@@ -20,6 +20,7 @@ const { profile } = useAppData();
     setMounted(true);
   }, []);
 
+  // Show a skeleton while profile is loading (but only if mounted)
   if (!mounted) return null;
 
   return (
@@ -46,7 +47,13 @@ const { profile } = useAppData();
           {/* ── Welcome Message ── */}
           <div className="mb-4 inline-flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-full px-4 py-1.5 text-sm text-purple-700">
             <span>👋 Welcome,</span>
-            <span className="font-bold">@{mounted ? username : 'User'}</span>
+            <span className="font-bold">
+              {profileLoading ? (
+                <span className="inline-block w-20 h-4 bg-purple-200 rounded animate-pulse" />
+              ) : (
+                `@${username}`
+              )}
+            </span>
           </div>
 
           {/* ── Title ── */}

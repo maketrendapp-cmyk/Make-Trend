@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile } from '../lib/queries';
 import Meta from '../components/Meta';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import {
@@ -26,11 +26,11 @@ import { FaWhatsapp, FaTelegram, FaTwitter } from 'react-icons/fa';
 
 export default function Contact() {
   const { user } = useAuth();
-const { profile } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
   // ── Get username for welcome message ──
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
-const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
+  const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
 
   const [formData, setFormData] = useState({
     name: user?.fullName || user?.fullname || '',
@@ -263,18 +263,27 @@ const displayName = profile?.fullname || user?.fullName || user?.fullname || use
               transition={{ duration: 0.6, delay: 0.4 }}
               className="mt-6 inline-flex items-center gap-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-2xl px-6 py-3 shadow-lg"
             >
-              <FiUser className="w-5 h-5 text-purple-600" />
-              <span className="text-gray-700 font-medium">
-                Welcome,{' '}
-                <span className="font-bold text-purple-700">
-                  @{user ? username : 'User'}
-                </span>
-                {user && (
-                  <span className="text-gray-400 text-sm ml-1">
-                    ({displayName})
+              {profileLoading ? (
+                <>
+                  <div className="w-5 h-5 bg-purple-200 rounded-full animate-pulse" />
+                  <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <FiUser className="w-5 h-5 text-purple-600" />
+                  <span className="text-gray-700 font-medium">
+                    Welcome,{' '}
+                    <span className="font-bold text-purple-700">
+                      @{user ? username : 'User'}
+                    </span>
+                    {user && (
+                      <span className="text-gray-400 text-sm ml-1">
+                        ({displayName})
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
+                </>
+              )}
             </motion.div>
           </div>
         </motion.div>

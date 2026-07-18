@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Link from 'next/link';
 import Meta from '../components/Meta';
@@ -23,7 +23,7 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 export default function ReferEarn() {
   const router = useRouter();
   const { user } = useAuth();
-const { profile, loadingState } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const [loading, setLoading] = useState(true);
   const [referralData, setReferralData] = useState({
     referralCode: '',
@@ -36,7 +36,7 @@ const { profile, loadingState } = useAppData();
 
   // ── Get username for welcome message ──
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
-const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
+  const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
 
   // ── Fetch referral data ──
   useEffect(() => {
@@ -66,7 +66,6 @@ const displayName = profile?.fullname || user?.fullName || user?.fullname || use
         console.error('Fetch referrals error:', err);
       } finally {
         setLoading(false);
-        // ── Allow animations to start after content loads ──
         setTimeout(() => setShouldAnimate(true), 100);
       }
     };
@@ -89,9 +88,8 @@ const displayName = profile?.fullname || user?.fullName || user?.fullname || use
     );
 
     document.querySelectorAll('.fade-up').forEach((el) => observer.observe(el));
-
     return () => observer.disconnect();
-  }, [shouldAnimate]); // Re-run when animations are allowed
+  }, [shouldAnimate]);
 
   const copyReferralCode = () => {
     const code = referralData.referralCode;
@@ -128,7 +126,7 @@ const displayName = profile?.fullname || user?.fullName || user?.fullname || use
   };
 
   // ── Skeleton Loading ──
-  if (loadingState?.profile === undefined || loadingState?.profile === true || loading) {
+  if (profileLoading || loading) {
     return (
       <>
         <Meta title="Refer & Earn | Make Trend" />

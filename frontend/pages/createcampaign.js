@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useTemplates, useInvalidateQueries } from '../lib/queries';
 import AuthScreen from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
@@ -20,11 +20,9 @@ export default function CreateCampaign() {
     refreshUser
   } = useAuth();
   
-  const { 
-    templates,
-    refetchCampaigns,
-    refetchStats 
-  } = useAppData();
+  // ── React Query ──
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates();
+  const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
 
   // ── State ──
   const [template, setTemplate] = useState(null);
@@ -52,7 +50,7 @@ export default function CreateCampaign() {
   // ── Storage key per template slug ──
   const storageKey = `createCampaign_${slug || 'new'}`;
 
-  // ── Load template from global context ──
+  // ── Load template from React Query cache ──
   useEffect(() => {
     if (slug && isAuthenticated && templates.length > 0) {
       const found = templates.find(t => t.slug === slug);
@@ -266,9 +264,9 @@ export default function CreateCampaign() {
         setMessage('✅ Campaign created successfully!');
         // Clear saved form after success
         localStorage.removeItem(storageKey);
-        // 🔥 Update global state so stats page shows new campaign instantly
-        await refetchCampaigns();
-        await refetchStats();
+        // 🔥 Invalidate React Query cache to refresh stats and campaigns
+        await invalidateCampaigns();
+        await invalidateStats();
       } else {
         setMessage(data.error || 'Failed to create campaign');
       }
@@ -433,7 +431,7 @@ export default function CreateCampaign() {
   }
 
   // ── Skeleton Loading ──
-  if (loading) {
+  if (loading || templatesLoading) {
     return (
       <>
         <Meta title="Create Campaign" />

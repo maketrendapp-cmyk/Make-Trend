@@ -2,8 +2,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
-import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useFeaturedTemplates, useTemplates } from '../lib/queries';
 import {
   FiZap,
   FiTrendingUp,
@@ -106,7 +105,7 @@ const platformBadgeStyles = {
 
 export default function Home() {
   const router = useRouter();
-  const { featuredTemplates } = useAppData();
+  const { data: featuredTemplates, isLoading: featuredLoading } = useFeaturedTemplates();
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,11 +132,9 @@ export default function Home() {
   const counter4 = useCounter(1200);
   const counters = [counter1, counter2, counter3, counter4];
 
-  // ── featuredTemplates are already loaded from AuthContext ──
-
-  // ── Carousel auto‑slide (2 seconds) ──
+  // ── Carousel auto‑slide ──
   useEffect(() => {
-    if (featuredTemplates.length > 1 && !isHovering) {
+    if (featuredTemplates?.length > 1 && !isHovering) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
       }, 2000);
@@ -145,19 +142,21 @@ export default function Home() {
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [featuredTemplates.length, isHovering]);
+  }, [featuredTemplates?.length, isHovering]);
 
   const goToSlide = useCallback((index) => {
     setCarouselIndex(index);
   }, []);
 
   const nextSlide = useCallback(() => {
+    if (!featuredTemplates?.length) return;
     setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-  }, [featuredTemplates.length]);
+  }, [featuredTemplates?.length]);
 
   const prevSlide = useCallback(() => {
+    if (!featuredTemplates?.length) return;
     setCarouselIndex((prev) => (prev - 1 + featuredTemplates.length) % featuredTemplates.length);
-  }, [featuredTemplates.length]);
+  }, [featuredTemplates?.length]);
 
   const handleTouchStart = (e) => {
     touchStartXRef.current = e.touches[0].clientX;
@@ -191,7 +190,24 @@ export default function Home() {
 
   // ── Render carousel ──
   const renderCarousel = () => {
-    // No loading or error states needed – data is already loaded globally
+    if (featuredLoading) {
+      return (
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 sm:p-6 animate-pulse">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+            <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-200 rounded-xl" />
+            <div className="flex-1 space-y-3">
+              <div className="h-6 bg-slate-200 rounded w-3/4" />
+              <div className="h-4 bg-slate-200 rounded w-1/2" />
+              <div className="h-4 bg-slate-200 rounded w-2/3" />
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="h-9 bg-slate-200 rounded-xl" />
+                <div className="h-9 bg-slate-200 rounded-xl" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     if (!featuredTemplates || featuredTemplates.length === 0) {
       return (

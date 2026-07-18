@@ -33,7 +33,7 @@ import {
 } from 'react-icons/fi';
 import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin } from 'react-icons/fa';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useComments, useInvalidateQueries } from '../lib/queries';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 
@@ -158,7 +158,8 @@ function Milestone({ year, title, description, icon }) {
 export default function About() {
   const router = useRouter();
   const { user } = useAuth();
-const { comments, loadingState, refetchComments } = useAppData();
+  const { data: comments = [], isLoading: commentsLoading } = useComments();
+  const { invalidateComments } = useInvalidateQueries();
   const [commentName, setCommentName] = useState('');
   const [commentText, setCommentText] = useState('');
   const [commentRating, setCommentRating] = useState(5);
@@ -166,7 +167,7 @@ const { comments, loadingState, refetchComments } = useAppData();
   const [submitMessage, setSubmitMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
-  const loadingComments = loadingState?.comments === undefined ? false : loadingState.comments;
+  const loadingComments = commentsLoading;
 
   const toggleFaq = (index) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
@@ -222,7 +223,7 @@ const { comments, loadingState, refetchComments } = useAppData();
       if (data.success) {
         setSubmitMessage('✅ Thank you for your feedback!');
         setCommentName(''); setCommentText(''); setCommentRating(5);
-        await refetchComments();
+        await invalidateComments();
         setTimeout(() => setSubmitMessage(''), 5000);
       } else {
         setSubmitMessage(data.error || 'Failed to submit comment.');

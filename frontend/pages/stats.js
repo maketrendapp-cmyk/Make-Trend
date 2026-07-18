@@ -1,8 +1,8 @@
 // pages/stats.js
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useStats, useCampaigns, useInvalidateQueries } from '../lib/queries';
 import AuthScreen from '../components/AuthScreen';
 import Meta from '../components/Meta';
 import { auth } from '../services/firebase';
@@ -28,22 +28,21 @@ import { FaRocket, FaChartLine } from 'react-icons/fa';
 export default function Stats() {
   const router = useRouter();
   const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
-const { campaigns: cachedCampaigns, stats: cachedStats } = useAppData();
 
-  const [campaigns, setCampaigns] = useState(cachedCampaigns || []);
-const [stats, setStats] = useState(cachedStats || {
-    totalCampaigns: 0,
-    totalViews: 0,
-    totalUnlocks: 0,
-    totalShares: 0,
-    totalCompletions: 0,
-    successfulCampaigns: 0,
-  });
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [lastCreatedAt, setLastCreatedAt] = useState(null);
-  const [lastId, setLastId] = useState(null);
+  // ── React Query ──
+  const { data: stats, isLoading: statsLoading } = useStats();
+  const {
+    data: campaignPages,
+    isLoading: campaignsLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useCampaigns();
+
+  const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
+
+  // ── Flatten campaigns from all pages ──
+  const campaigns = campaignPages?.pages?.flatMap(page => page.campaigns) || [];
 
   // ── Edit modal states ──
   const [editingCampaign, setEditingCampaign] = useState(null);
@@ -59,8 +58,28 @@ const [stats, setStats] = useState(cachedStats || {
   const [message, setMessage] = useState('');
   const [copiedCampaignId, setCopiedCampaignId] = useState(null);
 
-  // ── IntersectionObserver ref ──
+  // ── IntersectionObserver ref for infinite scroll ──
   const loaderRef = useRef(null);
+
+  // ── Infinite scroll observer ──
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || campaignsLoading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loaderRef.current) {
+      observer.observe(loaderRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, campaignsLoading, fetchNextPage]);
 
   // ===== DATE FORMATTER =====
   const formatDate = (timestamp) => {
@@ -90,129 +109,6 @@ const [stats, setStats] = useState(cachedStats || {
       return 'N/A';
     }
   };
-
-  // ===== FETCH CAMPAIGNS (with pagination + dedup) =====
-  const fetchCampaigns = useCallback(
-    async (isInitial = false) => {
-      if (!isInitial && !hasMore) return;
-      if (loadingMore) return;
-      setLoadingMore(true);
-
-      try {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-          setLoadingMore(false);
-          return;
-        }
-        const token = await firebaseUser.getIdToken();
-        let url = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns?limit=25`;
-        if (!isInitial && lastCreatedAt && lastId) {
-          url += `&lastCreatedAt=${lastCreatedAt}&lastId=${lastId}`;
-        }
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`Server error (${res.status})`);
-        const data = await res.json();
-        if (data.success) {
-          if (isInitial) {
-            setCampaigns(data.campaigns || []);
-          } else {
-            // ── Deduplicate ──
-            setCampaigns((prev) => {
-              const existingIds = new Set(prev.map((c) => c.id));
-              const newCampaigns = (data.campaigns || []).filter((c) => !existingIds.has(c.id));
-              return [...prev, ...newCampaigns];
-            });
-          }
-          setHasMore(data.hasMore || false);
-          if (data.lastCreatedAt && data.lastId) {
-            setLastCreatedAt(data.lastCreatedAt);
-            setLastId(data.lastId);
-          } else {
-            setHasMore(false);
-          }
-        }
-      } catch (error) {
-        console.error('❌ fetchCampaigns error:', error.message);
-      } finally {
-        setLoadingMore(false);
-      }
-    },
-    [hasMore, lastCreatedAt, lastId, loadingMore]
-  );
-
-  // ===== LOAD INITIAL DATA – use cached data if available =====
-  useEffect(() => {
-    if (!isAuthenticated || needsCompletion) {
-      setStatsLoading(false);
-      return;
-    }
-
-    // If cached campaigns exist, use them and set pagination cursor
-    if (cachedCampaigns && cachedCampaigns.length > 0) {
-      setCampaigns(cachedCampaigns);
-      if (cachedStats) {
-        setStats(cachedStats);
-      }
-      setStatsLoading(false);
-
-      // ── Set pagination cursor from the last item ──
-      const lastCampaign = cachedCampaigns[cachedCampaigns.length - 1];
-      if (lastCampaign && lastCampaign.id) {
-        let createdAtMillis = null;
-        const ts = lastCampaign.createdAt;
-        if (ts) {
-          if (typeof ts === 'object' && ts !== null) {
-            if (typeof ts.toMillis === 'function') {
-              createdAtMillis = ts.toMillis();
-            } else if (ts._seconds !== undefined) {
-              createdAtMillis = ts._seconds * 1000 + (ts._nanoseconds || 0) / 1e6;
-            } else if (ts.seconds !== undefined) {
-              createdAtMillis = ts.seconds * 1000 + (ts.nanoseconds || 0) / 1e6;
-            }
-          } else if (typeof ts === 'number') {
-            createdAtMillis = ts;
-          } else if (ts instanceof Date) {
-            createdAtMillis = ts.getTime();
-          }
-        }
-        setLastCreatedAt(createdAtMillis);
-        setLastId(lastCampaign.id);
-      } else {
-        setLastCreatedAt(null);
-        setLastId(null);
-      }
-
-      // ── Only enable "hasMore" if we have exactly 25 items ──
-      setHasMore(cachedCampaigns.length === 25);
-      return;
-    }
-
-    // If no cached campaigns, fetch initial page from API
-    setStatsLoading(true);
-    setHasMore(true);
-    setLastCreatedAt(null);
-    setLastId(null);
-    fetchCampaigns(true).finally(() => setStatsLoading(false));
-  }, [isAuthenticated, needsCompletion, cachedCampaigns, cachedStats, fetchCampaigns]);
-
-  // ===== INFINITE SCROLL OBSERVER =====
-  useEffect(() => {
-    if (loadingMore || !hasMore || statsLoading) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !statsLoading) {
-          fetchCampaigns(false);
-        }
-      },
-      { threshold: 0.1 }
-    );
-    if (loaderRef.current) {
-      observer.observe(loaderRef.current);
-    }
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, statsLoading, fetchCampaigns]);
 
   // ===== HANDLERS =====
   const handleCreateCampaign = () => router.push('/create');
@@ -249,13 +145,11 @@ const [stats, setStats] = useState(cachedStats || {
       );
       const data = await res.json();
       if (data.success) {
-        setCampaigns(campaigns.filter((c) => c.id !== campaignId));
         setMessage('✅ Campaign deleted successfully!');
         setTimeout(() => setMessage(''), 3000);
-        setHasMore(true);
-        setLastCreatedAt(null);
-        setLastId(null);
-        await fetchCampaigns(true);
+        // ── Invalidate cache to refresh the list ──
+        await invalidateCampaigns();
+        await invalidateStats();
       } else {
         alert(data.error || 'Failed to delete campaign');
       }
@@ -301,10 +195,9 @@ const [stats, setStats] = useState(cachedStats || {
       const data = await res.json();
       if (data.success) {
         setMessage('✅ Campaign updated successfully!');
-        setHasMore(true);
-        setLastCreatedAt(null);
-        setLastId(null);
-        await fetchCampaigns(true);
+        // ── Invalidate cache to refresh the list ──
+        await invalidateCampaigns();
+        await invalidateStats();
         setTimeout(() => {
           setShowEditModal(false);
           document.body.style.overflow = 'unset';
@@ -483,10 +376,10 @@ const [stats, setStats] = useState(cachedStats || {
         {/* ── STATS CARDS ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Total Campaigns', value: stats.totalCampaigns, icon: FiBarChart2, color: 'blue' },
-            { label: 'Total Unlocks', value: stats.totalUnlocks, icon: FiUnlock, color: 'purple' },
-            { label: 'Total Views', value: stats.totalViews, icon: FiEye, color: 'green' },
-            { label: 'Total Shares', value: stats.totalShares, icon: FiShare2, color: 'orange' },
+            { label: 'Total Campaigns', value: stats?.totalCampaigns ?? 0, icon: FiBarChart2, color: 'blue' },
+            { label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0, icon: FiUnlock, color: 'purple' },
+            { label: 'Total Views', value: stats?.totalViews ?? 0, icon: FiEye, color: 'green' },
+            { label: 'Total Shares', value: stats?.totalShares ?? 0, icon: FiShare2, color: 'orange' },
           ].map((stat, idx) => (
             <div
               key={idx}
@@ -513,7 +406,7 @@ const [stats, setStats] = useState(cachedStats || {
                 <FiCheckCircle className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-green-700">{stats.successfulCampaigns}</p>
+                <p className="text-2xl font-bold text-green-700">{stats?.successfulCampaigns ?? 0}</p>
                 <p className="text-xs font-medium text-green-600 uppercase tracking-wider">Completed Campaigns</p>
               </div>
             </div>
@@ -524,7 +417,7 @@ const [stats, setStats] = useState(cachedStats || {
                 <FiAward className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-indigo-700">{stats.totalCompletions}</p>
+                <p className="text-2xl font-bold text-indigo-700">{stats?.totalCompletions ?? 0}</p>
                 <p className="text-xs font-medium text-indigo-600 uppercase tracking-wider">Total Completions</p>
               </div>
             </div>
@@ -533,7 +426,7 @@ const [stats, setStats] = useState(cachedStats || {
 
         {/* ── CAMPAIGN LIST ── */}
         <div className="space-y-4">
-          {campaigns.length === 0 && !statsLoading ? (
+          {campaigns.length === 0 && !campaignsLoading ? (
             <div className="text-center py-16 px-4 bg-white rounded-3xl border border-gray-100 shadow-sm">
               <div className="text-6xl mb-4">🚀</div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">No campaigns yet</h3>
@@ -661,9 +554,9 @@ const [stats, setStats] = useState(cachedStats || {
               })}
 
               {/* ── Loader for infinite scroll ── */}
-              {hasMore && (
+              {hasNextPage && (
                 <div ref={loaderRef} className="py-6 text-center">
-                  {loadingMore ? (
+                  {isFetchingNextPage ? (
                     <div className="inline-flex items-center gap-2 text-sm text-gray-500">
                       <svg className="animate-spin h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

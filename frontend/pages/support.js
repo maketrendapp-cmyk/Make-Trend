@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile, useSupportTickets, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Link from 'next/link';
 import Meta from '../components/Meta';
@@ -23,10 +23,11 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 export default function Support() {
   const router = useRouter();
   const { user } = useAuth();
-const { profile, supportTickets, loadingState, refetchSupportTickets } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: tickets = [], isLoading: ticketsLoading } = useSupportTickets();
+  const { invalidateSupportTickets } = useInvalidateQueries();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [tickets, setTickets] = useState(supportTickets || []);
 
   // Form fields
   const [title, setTitle] = useState('');
@@ -38,26 +39,19 @@ const { profile, supportTickets, loadingState, refetchSupportTickets } = useAppD
 
   const fileInputRef = useRef(null);
 
-  // ── Update tickets when context updates ──
-  useEffect(() => {
-    if (supportTickets) {
-      setTickets(supportTickets);
-    }
-  }, [supportTickets]);
-
   // ── Set loading false when data is loaded ──
-useEffect(() => {
-  if (loadingState?.profile === false) {
-    setLoading(false);
-  }
-}, [loadingState?.profile]);
+  useEffect(() => {
+    if (!profileLoading && !ticketsLoading) {
+      setLoading(false);
+    }
+  }, [profileLoading, ticketsLoading]);
 
   // ── Redirect if not authenticated ──
-useEffect(() => {
-  if (!loadingState?.profile && !user) {
-    router.push('/login');
-  }
-}, [loadingState?.profile, user, router]);
+  useEffect(() => {
+    if (!profileLoading && !user) {
+      router.push('/login');
+    }
+  }, [profileLoading, user, router]);
 
   // ── Image upload handler ──
   const handleImageChange = (e) => {
@@ -144,7 +138,7 @@ useEffect(() => {
       const createData = await createRes.json();
       if (createData.success) {
         setSuccess('Report submitted successfully!');
-        await refetchSupportTickets();
+        await invalidateSupportTickets();
         setTitle('');
         setDescription('');
         removeImage();
@@ -167,7 +161,6 @@ useEffect(() => {
     try {
       let date;
 
-      // ── Handle different timestamp types ──
       if (timestamp instanceof Date) {
         date = timestamp;
       } else if (typeof timestamp === 'number') {
@@ -175,7 +168,6 @@ useEffect(() => {
       } else if (typeof timestamp === 'string') {
         date = new Date(timestamp);
       } else if (typeof timestamp === 'object') {
-        // ── Firestore Timestamp (from Admin SDK or client) ──
         if (timestamp.toDate && typeof timestamp.toDate === 'function') {
           date = timestamp.toDate();
         } else if (timestamp.seconds !== undefined) {
@@ -183,19 +175,16 @@ useEffect(() => {
         } else if (timestamp._seconds !== undefined) {
           date = new Date(timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1e6);
         } else {
-          // ── Fallback: try to parse as Date ──
           date = new Date(timestamp);
         }
       } else {
         return 'N/A';
       }
 
-      // ── Validate date ──
       if (!(date instanceof Date) || isNaN(date.getTime())) {
         return 'N/A';
       }
 
-      // ── Return formatted string ──
       return date.toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -235,7 +224,7 @@ useEffect(() => {
   };
 
   // ── Loading state ──
-  if (loading || loadingState?.profile === true) {
+  if (loading || profileLoading || ticketsLoading) {
     return (
       <>
         <Meta title="Support | Make Trend" />

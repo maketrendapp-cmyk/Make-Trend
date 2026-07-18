@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useAppData } from '../lib/useAppData';
+import { useProfile, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 
@@ -11,7 +11,8 @@ const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onr
 export default function EditProfile() {
   const router = useRouter();
   const { user } = useAuth();
-const { profile, loadingState, refetchProfile } = useAppData();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { invalidateProfile } = useInvalidateQueries();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -39,43 +40,43 @@ const { profile, loadingState, refetchProfile } = useAppData();
   const usernameTimer = useRef(null);
   const emailTimer = useRef(null);
 
-  // ── Populate form from contextProfile ──
-useEffect(() => {
-  if (profile) {
-    setFullName(profile.fullname || profile.name || '');
-    setUsername(profile.username || '');
-    setEmail(profile.email || '');
-    setCurrentAvatar(profile.avatar || profile.profilePic || '');
-    setAvatarPreview(profile.avatar || profile.profilePic || '');
-    setLoading(false);
-  } else if (!loadingState?.profile) {
-    // Profile loading finished but no profile data (e.g., user not logged in)
-    setLoading(false);
-  }
-}, [profile, loadingState?.profile]);
+  // ── Populate form from profile ──
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.fullname || profile.name || '');
+      setUsername(profile.username || '');
+      setEmail(profile.email || '');
+      setCurrentAvatar(profile.avatar || profile.profilePic || '');
+      setAvatarPreview(profile.avatar || profile.profilePic || '');
+      setLoading(false);
+    } else if (!profileLoading) {
+      // Profile loading finished but no profile data (e.g., user not logged in)
+      setLoading(false);
+    }
+  }, [profile, profileLoading]);
 
   // ── Track if username changed ──
   useEffect(() => {
-    if (contextProfile) {
+    if (profile) {
       const originalUsername = profile?.username || '';
       setUsernameChanged(username !== originalUsername);
     }
-  }, [username, contextProfile]);
+  }, [username, profile]);
 
   // ── Track if email changed ──
   useEffect(() => {
-    if (contextProfile) {
+    if (profile) {
       const originalEmail = profile?.email || '';
       setEmailChanged(email !== originalEmail);
     }
-  }, [email, contextProfile]);
+  }, [email, profile]);
 
   // ── Redirect if not authenticated ──
-useEffect(() => {
-  if (!loadingState?.profile && !user) {
-    router.push('/login');
-  }
-}, [loadingState?.profile, user, router]);
+  useEffect(() => {
+    if (!profileLoading && !user) {
+      router.push('/login');
+    }
+  }, [profileLoading, user, router]);
 
   // ── Check username availability ──
   useEffect(() => {
@@ -221,8 +222,8 @@ useEffect(() => {
 
       if (updateData.success) {
         setSuccess('Profile updated successfully!');
-        // ── Refresh both auth user AND global profile ──
-     await refetchProfile(); // refreshUser is no longer needed; refetchProfile refreshes the profile
+        // ── Invalidate profile cache so all components get fresh data ──
+        await invalidateProfile();
         setTimeout(() => router.push('/profile'), 1500);
       } else {
         setError(updateData.error || 'Update failed');
