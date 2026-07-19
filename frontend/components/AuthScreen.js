@@ -132,58 +132,58 @@ export function AuthProvider({ children }) {
   // ============================================================
   // FIREBASE LISTENER – Real‑time updates
   // ============================================================
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser && uidRef.current === firebaseUser.uid) return;
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser && uidRef.current === firebaseUser.uid) return;
 
-      if (firebaseUser) {
-        const basicUser = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName || '',
-          photoURL: firebaseUser.photoURL || '',
-        };
-        setUser(basicUser);
-        setIsAuthenticated(true);
-        setNeedsCompletion(false);
-        uidRef.current = firebaseUser.uid;
-        cacheAuth(basicUser);
+    if (firebaseUser) {
+      const basicUser = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || '',
+        photoURL: firebaseUser.photoURL || '',
+      };
+      setUser(basicUser);
+      setIsAuthenticated(true);
+      setNeedsCompletion(false);
+      uidRef.current = firebaseUser.uid;
+      cacheAuth(basicUser);
 
-        // Fetch fresh data
-        invalidateAll();
+      // Fetch fresh data
+      invalidateAll();
 
-        try {
-          const profileData = await fetchUserProfile(firebaseUser);
-          if (profileData) {
-            setUser(profileData);
-            setIsAuthenticated(true);
-            setNeedsCompletion(false);
-            cacheAuth(profileData);
-          } else {
-            const status = await checkProfileStatus(firebaseUser.uid);
-            if (status.completed) {
-              const fallback = await fetchUserProfile(firebaseUser);
-              if (fallback) {
-                setUser(fallback);
-                setIsAuthenticated(true);
-                setNeedsCompletion(false);
-                cacheAuth(fallback);
-              }
-            } else {
-              setNeedsCompletion(true);
+      try {
+        const profileData = await fetchUserProfile(firebaseUser);
+        if (profileData) {
+          setUser(profileData);
+          setIsAuthenticated(true);
+          setNeedsCompletion(false);
+          cacheAuth(profileData);
+        } else {
+          const status = await checkProfileStatus(firebaseUser.uid);
+          if (status.completed) {
+            const fallback = await fetchUserProfile(firebaseUser);
+            if (fallback) {
+              setUser(fallback);
+              setIsAuthenticated(true);
+              setNeedsCompletion(false);
+              cacheAuth(fallback);
             }
+          } else {
+            setNeedsCompletion(true);
           }
-        } catch {}
-      } else {
-        localStorage.removeItem(AUTH_CACHE_KEY);
-        setUser(null);
-        setIsAuthenticated(false);
-        setNeedsCompletion(false);
-        uidRef.current = null;
-      }
-    });
-    return () => unsubscribe();
-  }, [fetchUserProfile, checkProfileStatus, loadAllData]);
+        }
+      } catch {}
+    } else {
+      localStorage.removeItem(AUTH_CACHE_KEY);
+      setUser(null);
+      setIsAuthenticated(false);
+      setNeedsCompletion(false);
+      uidRef.current = null;
+    }
+  });
+  return () => unsubscribe();
+}, [fetchUserProfile, checkProfileStatus]);
 
   // ============================================================
   // AUTH METHODS
