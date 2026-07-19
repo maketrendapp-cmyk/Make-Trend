@@ -20,6 +20,7 @@ async function apiRequest(endpoint, options = {}, token = null) {
 
 // ── Get user token ──
 async function getToken() {
+  await auth.authStateReady();
   const user = auth.currentUser;
   return user ? await user.getIdToken() : null;
 }
