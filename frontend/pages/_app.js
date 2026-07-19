@@ -50,13 +50,16 @@ function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pathname = router.pathname;
 
+  const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
+  const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
+
   // ── No layout (templates, tasks, share) ──
-  if (NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path))) {
+  if (isNoLayout) {
     return (
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
           <Component {...pageProps} />
-          <Toaster position="bottom-center" />
           <ReactQueryDevtools initialIsOpen={false} />
         </AuthProvider>
       </QueryClientProvider>
@@ -64,13 +67,15 @@ function MyApp({ Component, pageProps }) {
   }
 
   // ── Top navbar only (about, rules, terms, privacy) ──
-  if (TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path))) {
+  if (isTopNavOnly) {
     return (
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Navbar />
-          <Component {...pageProps} />
-          <Toaster position="bottom-center" />
+          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+          <div className="min-h-screen bg-bg">
+            <Navbar />
+            <Component {...pageProps} />
+          </div>
           <ReactQueryDevtools initialIsOpen={false} />
         </AuthProvider>
       </QueryClientProvider>
@@ -81,11 +86,13 @@ function MyApp({ Component, pageProps }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Navbar onMenuToggle={() => setIsMenuOpen(true)} />
-        <Component {...pageProps} />
-        <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
-        <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
-        <Toaster position="bottom-center" />
+        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+        <div className="min-h-screen bg-bg pb-20 md:pb-0">
+          <Navbar />
+          <Component {...pageProps} />
+          <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+          <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+        </div>
         <ReactQueryDevtools initialIsOpen={false} />
       </AuthProvider>
     </QueryClientProvider>
