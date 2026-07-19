@@ -21,7 +21,7 @@ import {
 export default function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
