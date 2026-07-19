@@ -1,5 +1,5 @@
 // lib/queries.js
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { auth } from '../services/firebase';
 import toast from 'react-hot-toast';
 
@@ -76,15 +76,27 @@ export function useFeaturedTemplates() {
 }
 
 export function useCampaigns() {
-  return useQuery({
+  const user = auth.currentUser;
+  return useInfiniteQuery({
     queryKey: ['campaigns'],
-    queryFn: async () => {
+    queryFn: async ({ pageParam = null }) => {
       const token = await getToken();
-      if (!token) return [];
-      const data = await apiRequest('/campaigns?limit=25', {}, token);
-      return data.campaigns || [];
+      if (!token) return { campaigns: [], nextCursor: null };
+      let url = '/campaigns?limit=25';
+      if (pageParam) {
+        url += `&lastCreatedAt=${pageParam.lastCreatedAt}&lastId=${pageParam.lastId}`;
+      }
+      const data = await apiRequest(url, {}, token);
+      return {
+        campaigns: data.campaigns || [],
+        nextCursor: data.hasMore ? {
+          lastCreatedAt: data.lastCreatedAt,
+          lastId: data.lastId,
+        } : null,
+      };
     },
-    enabled: !!auth.currentUser,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: !!user,
     staleTime: 2 * 60 * 1000,
   });
 }
