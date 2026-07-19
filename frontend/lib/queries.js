@@ -39,7 +39,7 @@ export function useProfile() {
   });
 }
 
-export function useStats() {
+export function useStats(enabled = false) {
   return useQuery({
     queryKey: ['stats'],
     queryFn: async () => {
@@ -48,7 +48,7 @@ export function useStats() {
       const data = await apiRequest('/stats', {}, token);
       return data.stats || {};
     },
-    enabled: !!auth.currentUser,
+    enabled,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -75,8 +75,7 @@ export function useFeaturedTemplates() {
   });
 }
 
-export function useCampaigns() {
-  const user = auth.currentUser;
+export function useCampaigns(enabled = false) {
   return useInfiniteQuery({
     queryKey: ['campaigns'],
     queryFn: async ({ pageParam = null }) => {
@@ -96,7 +95,7 @@ export function useCampaigns() {
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: !!user,
+    enabled,
     staleTime: 2 * 60 * 1000,
   });
 }
