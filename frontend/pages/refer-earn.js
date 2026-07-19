@@ -23,7 +23,7 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 export default function ReferEarn() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [loading, setLoading] = useState(true);
   const [referralData, setReferralData] = useState({
     referralCode: '',
@@ -32,11 +32,17 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
     referrer: null,
   });
   const [copySuccess, setCopySuccess] = useState('');
-  const [shouldAnimate, setShouldAnimate] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   // ── Get username for welcome message ──
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
   const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
+
+  // ── Force visibility after a short delay (fixes hard‑reload empty UI) ──
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVisible(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ── Fetch referral data ──
   useEffect(() => {
@@ -66,15 +72,15 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
         console.error('Fetch referrals error:', err);
       } finally {
         setLoading(false);
-        setTimeout(() => setShouldAnimate(true), 100);
+        setTimeout(() => setIsVisible(true), 100);
       }
     };
     fetchReferrals();
   }, []);
 
-  // ── Intersection Observer for scroll animations ──
+  // ── Intersection Observer for scroll animations (enhanced) ──
   useEffect(() => {
-    if (!shouldAnimate) return;
+    if (!isVisible) return;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -89,7 +95,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
 
     document.querySelectorAll('.fade-up').forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [shouldAnimate]);
+  }, [isVisible]);
 
   const copyReferralCode = () => {
     const code = referralData.referralCode;
@@ -238,7 +244,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
         <div className="max-w-4xl mx-auto">
 
           {/* ── Welcome Message ── */}
-          <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 bg-white rounded-3xl shadow-lg border border-gray-100/60 p-5 mb-6 text-center">
+          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-lg border border-gray-100/60 p-5 mb-6 text-center`}>
             <div className="flex items-center justify-center gap-3 text-gray-700">
               <FiUser className="w-6 h-6 text-purple-600" />
               <span className="text-lg font-medium">
@@ -259,7 +265,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
           </div>
 
           {/* ── Header ── */}
-          <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-100 bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm">
+          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3">
@@ -278,7 +284,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
 
           {/* ── Stats Cards ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-150 bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300">
+            <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300`}>
               <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <FiUsers className="w-7 h-7 text-purple-600" />
               </div>
@@ -286,7 +292,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
               <p className="text-sm text-gray-500 font-medium">Total Referrals</p>
             </div>
 
-            <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-200 bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300">
+            <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300`}>
               <div className="w-14 h-14 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <FiUserPlus className="w-7 h-7 text-green-600" />
               </div>
@@ -298,7 +304,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
               </p>
             </div>
 
-            <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-250 bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300">
+            <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300`}>
               <div className="w-14 h-14 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <FaCrown className="w-7 h-7 text-yellow-600" />
               </div>
@@ -308,7 +314,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
           </div>
 
           {/* ── Referral Code ── */}
-          <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-300 bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm">
+          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm`}>
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <FiAward className="w-5 h-5 text-purple-600" />
               Your Referral Code
@@ -358,7 +364,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
           </div>
 
           {/* ── Referred Users List ── */}
-          <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-400 bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 backdrop-blur-sm">
+          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 backdrop-blur-sm`}>
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <FiUsers className="w-5 h-5 text-purple-600" />
               People You've Referred
