@@ -16,8 +16,8 @@ export default function Profile() {
   const router = useRouter();
   const { user, logout } = useAuth();
 
-  const { data: profile, isLoading: profileLoading } = useProfile();
-  const { data: stats, isLoading: statsLoading } = useStats();
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
   const { invalidateProfile, invalidateStats } = useInvalidateQueries();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
