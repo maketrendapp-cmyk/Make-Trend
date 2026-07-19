@@ -1000,26 +1000,89 @@ app.post('/api/templates/:id/usage', async (req, res) => {
 app.get('/api/campaigns', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const cacheKey = `campaigns:user:${uid}`;
+    // Parse and cap limit to a safe maximum (e.g., 100)
+    let limit = parseInt(req.query.limit) || 25;
+    const MAX_LIMIT = 100;
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
 
-    const result = await getOrSetCache(cacheKey, async () => {
-      console.log(`📡 Fetching campaigns for user ${uid} from Firestore...`);
-      let query = db.collection('campaigns')
-        .where('userId', '==', uid)
-        .where('status', 'in', ['active', 'paused'])
-        .orderBy('createdAt', 'desc')
-        .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
-        .limit(25);
+    const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
+    const lastId = req.query.lastId || null;
 
-      const snapshot = await query.get();
-      const campaigns = [];
-      snapshot.forEach(doc => {
+    const cacheKey = `campaigns:user:${uid}:limit:${limit}:lastCreatedAt:${req.query.lastCreatedAt || 'null'}:lastId:${lastId || 'null'}`;
+
+    // Try cache (with 60s TTL)
+    let result;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) {
+        console.log(`📦 Cache HIT: ${cacheKey}`);
+        return res.json(JSON.parse(cached));
+      }
+    } catch (error) {
+      console.warn(`⚠️ Cache miss/error for ${cacheKey}:`, error.message);
+    }
+
+    console.log(`📡 Fetching campaigns for user ${uid} (limit=${limit})...`);
+
+    // Build Firestore query
+    let query = db.collection('campaigns')
+      .where('userId', '==', uid)
+      .where('status', 'in', ['active', 'paused'])
+      .orderBy('createdAt', 'desc')
+      .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
+      .limit(limit + 1); // extra to check for more
+
+    if (lastCreatedAt && lastId) {
+      // Use the same fields as orderBy
+      query = query.startAfter(lastCreatedAt, lastId);
+    }
+
+    const snapshot = await query.get();
+    const campaigns = [];
+    let hasMore = false;
+
+    snapshot.forEach(doc => {
+      if (campaigns.length < limit) {
         campaigns.push({ id: doc.id, ...doc.data() });
-      });
-      return { success: true, campaigns, hasMore: snapshot.size === 25 };
+      } else {
+        hasMore = true;
+      }
     });
 
-    res.json(result);
+    // Prepare next cursor
+    let nextLastCreatedAt = null;
+    let nextLastId = null;
+    if (campaigns.length > 0) {
+      const lastCampaign = campaigns[campaigns.length - 1];
+      let createdAtMs = lastCampaign.createdAt;
+      if (createdAtMs && typeof createdAtMs === 'object' && createdAtMs.seconds !== undefined) {
+        createdAtMs = createdAtMs.seconds * 1000 + Math.floor(createdAtMs.nanoseconds / 1e6);
+      } else if (createdAtMs instanceof Date) {
+        createdAtMs = createdAtMs.getTime();
+      } else if (typeof createdAtMs === 'string') {
+        createdAtMs = new Date(createdAtMs).getTime();
+      }
+      nextLastCreatedAt = createdAtMs;
+      nextLastId = lastCampaign.id;
+    }
+
+    const response = {
+      success: true,
+      campaigns,
+      hasMore,
+      lastCreatedAt: nextLastCreatedAt,
+      lastId: nextLastId,
+    };
+
+    // Cache with 60s TTL
+    try {
+      await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
+      console.log(`💾 Campaigns cached: ${cacheKey}`);
+    } catch (err) {
+      // ignore
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('❌ Get campaigns error:', error);
     res.status(500).json({ success: false, error: error.message });
