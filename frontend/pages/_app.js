@@ -55,8 +55,8 @@ function MyApp({ Component, pageProps }) {
     return (
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
           <Component {...pageProps} />
+          <Toaster position="bottom-center" />
           <ReactQueryDevtools initialIsOpen={false} />
         </AuthProvider>
       </QueryClientProvider>
@@ -68,11 +68,9 @@ function MyApp({ Component, pageProps }) {
     return (
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-          <div className="min-h-screen bg-bg">
-            <Navbar />
-            <Component {...pageProps} />
-          </div>
+          <Navbar />
+          <Component {...pageProps} />
+          <Toaster position="bottom-center" />
           <ReactQueryDevtools initialIsOpen={false} />
         </AuthProvider>
       </QueryClientProvider>
@@ -83,13 +81,11 @@ function MyApp({ Component, pageProps }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-        <div className="min-h-screen bg-bg pb-20 md:pb-0">
-          <Navbar />
-          <Component {...pageProps} />
-          <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
-          <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
-        </div>
+        <Navbar onMenuToggle={() => setIsMenuOpen(true)} />
+        <Component {...pageProps} />
+        <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+        <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+        <Toaster position="bottom-center" />
         <ReactQueryDevtools initialIsOpen={false} />
       </AuthProvider>
     </QueryClientProvider>
