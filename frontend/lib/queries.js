@@ -24,7 +24,7 @@ async function getToken() {
   return user ? await user.getIdToken() : null;
 }
 
-// ── Queries (NO enabled) ──
+// ── Queries ──
 export function useProfile() {
   return useQuery({
     queryKey: ['profile'],
@@ -34,6 +34,7 @@ export function useProfile() {
       const data = await apiRequest('/auth/me', {}, token);
       return data.user ? { ...data.user, completed: true } : null;
     },
+    enabled: !!auth.currentUser,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -47,6 +48,7 @@ export function useStats() {
       const data = await apiRequest('/stats', {}, token);
       return data.stats || {};
     },
+    enabled: !!auth.currentUser,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -74,6 +76,7 @@ export function useFeaturedTemplates() {
 }
 
 export function useCampaigns() {
+  const user = auth.currentUser;
   return useInfiniteQuery({
     queryKey: ['campaigns'],
     queryFn: async ({ pageParam = null }) => {
@@ -93,6 +96,7 @@ export function useCampaigns() {
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: !!user,
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -106,6 +110,7 @@ export function useSupportTickets() {
       const data = await apiRequest('/support', {}, token);
       return data.tickets || [];
     },
+    enabled: !!auth.currentUser,
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -121,7 +126,7 @@ export function useComments() {
   });
 }
 
-// ── Invalidation ──
+// ── Mutations (for creating/updating data) ──
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
   return {
