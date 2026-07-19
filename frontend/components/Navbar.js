@@ -77,7 +77,7 @@ export default function Navbar() {
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
 
   // ── Determine if profile is loading ──
-  const isProfileLoading = profileLoading && !profile;
+  const isProfileLoading = profileLoading || (user && !profile);
 
   return (
     <>
