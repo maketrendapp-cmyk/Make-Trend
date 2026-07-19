@@ -101,7 +101,7 @@ export function useCampaigns(enabled = false) {
   });
 }
 
-export function useSupportTickets() {
+export function useSupportTickets(enabled = false) {
   return useQuery({
     queryKey: ['supportTickets'],
     queryFn: async () => {
@@ -110,7 +110,7 @@ export function useSupportTickets() {
       const data = await apiRequest('/support', {}, token);
       return data.tickets || [];
     },
-    enabled: !!auth.currentUser,
+    enabled,
     staleTime: 2 * 60 * 1000,
   });
 }
