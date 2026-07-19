@@ -26,7 +26,7 @@ async function getToken() {
 }
 
 // ── Queries ──
-export function useProfile() {
+export function useProfile(enabled = false) {
   return useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
@@ -35,7 +35,7 @@ export function useProfile() {
       const data = await apiRequest('/auth/me', {}, token);
       return data.user ? { ...data.user, completed: true } : null;
     },
-    enabled: !!auth.currentUser,
+    enabled,
     staleTime: 5 * 60 * 1000,
   });
 }
