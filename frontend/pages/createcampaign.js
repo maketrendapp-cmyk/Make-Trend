@@ -278,9 +278,16 @@ export default function CreateCampaign() {
   };
 
   // ── Handlers for non‑authenticated ──
+  // ── Redirect unauthenticated users to login (client‑side only) ──
+useEffect(() => {
   if (!authLoading && !isAuthenticated) {
-  const redirect = `/createcampaign?slug=${slug}`;
-  router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+    const redirect = `/createcampaign?slug=${slug}`;
+    router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+  }
+}, [authLoading, isAuthenticated, slug]);
+
+// ── Return null or a loading state while checking auth ──
+if (!authLoading && !isAuthenticated) {
   return null;
 }
 
