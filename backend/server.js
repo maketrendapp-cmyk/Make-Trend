@@ -1247,8 +1247,8 @@ app.post('/api/campaigns', verifyToken, async (req, res) => {
     });
 
     // ── Invalidate user campaigns and stats ──
-    await invalidateKey(`campaigns:user:${uid}`);
-    await invalidateKey(`stats:user:${uid}`);
+    await invalidatePattern(`campaigns:user:${uid}:*`);
+await invalidateKey(`stats:user:${uid}`);
 
     res.status(201).json({
       success: true,
@@ -1291,9 +1291,9 @@ app.put('/api/campaigns/:id', verifyToken, async (req, res) => {
     await doc.ref.update(filteredUpdates);
 
     // ── Invalidate caches ──
-    await invalidateKey(`campaigns:user:${uid}`);
-    await invalidateKey(`campaigns:id:${id}`);
-    await invalidateKey(`stats:user:${uid}`);
+    await invalidatePattern(`campaigns:user:${uid}:*`);
+await invalidateKey(`campaigns:id:${id}`);
+await invalidateKey(`stats:user:${uid}`);
 
     res.json({ success: true, message: 'Campaign updated' });
   } catch (error) {
@@ -1322,9 +1322,9 @@ app.delete('/api/campaigns/:id', verifyToken, async (req, res) => {
     });
 
     // ── Invalidate caches ──
-    await invalidateKey(`campaigns:user:${uid}`);
-    await invalidateKey(`campaigns:id:${id}`);
-    await invalidateKey(`stats:user:${uid}`);
+    await invalidatePattern(`campaigns:user:${uid}:*`);
+await invalidateKey(`campaigns:id:${id}`);
+await invalidateKey(`stats:user:${uid}`);
 
     res.json({ success: true, message: 'Campaign deleted' });
   } catch (error) {
