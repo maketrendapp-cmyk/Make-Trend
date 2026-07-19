@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react';
 
 export default function Custom404() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { user, isAuthenticated } = useAuth();
+const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [mounted, setMounted] = useState(false);
 
   // ── Get username for welcome message ──

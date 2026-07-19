@@ -24,8 +24,8 @@ import {
 
 export default function ChangePassword() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+ const { user, isAuthenticated } = useAuth();
+const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

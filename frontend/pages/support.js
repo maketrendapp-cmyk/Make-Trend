@@ -22,9 +22,9 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 
 export default function Support() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
-  const { data: tickets = [], isLoading: ticketsLoading } = useSupportTickets();
+  const { user, isAuthenticated } = useAuth();
+const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+const { data: tickets = [], isLoading: ticketsLoading } = useSupportTickets(isAuthenticated);
   const { invalidateSupportTickets } = useInvalidateQueries();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

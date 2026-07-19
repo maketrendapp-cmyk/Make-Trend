@@ -14,8 +14,8 @@ import {
 } from 'react-icons/fi';
 
 export default function Privacy() {
-  const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { user, isAuthenticated } = useAuth();
+const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
 
   // ── Get username for welcome message ──
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';

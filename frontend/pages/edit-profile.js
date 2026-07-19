@@ -20,8 +20,8 @@ const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onr
 
 export default function EditProfile() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { user, isAuthenticated } = useAuth();
+const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const { invalidateProfile } = useInvalidateQueries();
 
   const [loading, setLoading] = useState(true);

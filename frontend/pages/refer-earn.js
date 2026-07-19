@@ -22,8 +22,8 @@ const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onre
 
 export default function ReferEarn() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { user, isAuthenticated } = useAuth();
+const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [loading, setLoading] = useState(true);
   const [referralData, setReferralData] = useState({
     referralCode: '',
