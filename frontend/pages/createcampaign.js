@@ -279,13 +279,10 @@ export default function CreateCampaign() {
 
   // ── Handlers for non‑authenticated ──
   if (!authLoading && !isAuthenticated) {
-    return (
-      <>
-        <Meta title="Login Required" />
-        <AuthScreen onSuccess={refreshUser} />
-      </>
-    );
-  }
+  const redirect = `/createcampaign?slug=${slug}`;
+  router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+  return null;
+}
 
   // ── Error state (with Meta) ──
   if (error) {
