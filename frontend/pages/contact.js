@@ -263,7 +263,7 @@ export default function Contact() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="mt-6 inline-flex items-center gap-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-2xl px-6 py-3 shadow-lg"
             >
-              {profileLoading ? (
+              {profileLoading || (user && !profile) ? (
                 <>
                   <div className="w-5 h-5 bg-purple-200 rounded-full animate-pulse" />
                   <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />

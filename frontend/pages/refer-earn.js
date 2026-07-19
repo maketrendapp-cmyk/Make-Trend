@@ -126,7 +126,7 @@ export default function ReferEarn() {
   };
 
   // ── Skeleton Loading ──
-  if (profileLoading || loading) {
+  if (profileLoading || loading || (user && !profile)) {
     return (
       <>
         <Meta title="Refer & Earn | Make Trend" />

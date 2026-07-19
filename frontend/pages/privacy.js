@@ -92,7 +92,7 @@ export default function Privacy() {
 
             {/* ── Welcome Message ── */}
             <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 bg-white rounded-2xl shadow-md border border-gray-100/60 p-6 mb-8 text-center">
-              {profileLoading ? (
+              {profileLoading || (user && !profile) ? (
                 <div className="flex items-center justify-center gap-3 text-gray-700 animate-pulse">
                   <div className="w-6 h-6 bg-purple-200 rounded-full" />
                   <div className="h-6 w-48 bg-gray-200 rounded" />

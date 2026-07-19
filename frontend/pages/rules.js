@@ -152,7 +152,7 @@ export default function Rules() {
         <section className="py-6 bg-gray-50/50 border-b border-gray-100">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 bg-white rounded-2xl shadow-md border border-gray-100/60 p-5 text-center">
-              {profileLoading ? (
+              {profileLoading || (user && !profile) ? (
                 <div className="flex items-center justify-center gap-3 text-gray-700 animate-pulse">
                   <div className="w-6 h-6 bg-purple-200 rounded-full" />
                   <div className="h-6 w-48 bg-gray-200 rounded" />

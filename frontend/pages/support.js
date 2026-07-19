@@ -224,14 +224,82 @@ export default function Support() {
   };
 
   // ── Loading state ──
-  if (loading || profileLoading || ticketsLoading) {
+  if (loading || profileLoading || ticketsLoading || (user && !profile)) {
     return (
       <>
         <Meta title="Support | Make Trend" />
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-14 w-14 border-4 border-purple-600 border-t-transparent mx-auto"></div>
-            <p className="mt-4 text-gray-600 font-medium">Loading...</p>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4">
+          <div className="max-w-4xl mx-auto">
+            {/* ── Header Skeleton ── */}
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 animate-pulse">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="h-8 w-32 bg-gray-200 rounded mb-2" />
+                  <div className="h-4 w-48 bg-gray-200 rounded" />
+                </div>
+                <div className="h-6 w-24 bg-gray-200 rounded" />
+              </div>
+            </div>
+
+            {/* ── User Info Box Skeleton ── */}
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 animate-pulse">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-gray-200" />
+                <div className="flex-1">
+                  <div className="h-5 w-40 bg-gray-200 rounded mb-2" />
+                  <div className="h-4 w-32 bg-gray-200 rounded mb-1" />
+                  <div className="h-4 w-48 bg-gray-200 rounded" />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Submit Report Box Skeleton ── */}
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 animate-pulse">
+              <div className="h-6 w-48 bg-gray-200 rounded mb-4" />
+              <div className="space-y-4">
+                <div>
+                  <div className="h-4 w-24 bg-gray-200 rounded mb-2" />
+                  <div className="h-12 bg-gray-200 rounded-xl" />
+                </div>
+                <div>
+                  <div className="h-4 w-32 bg-gray-200 rounded mb-2" />
+                  <div className="h-24 bg-gray-200 rounded-xl" />
+                </div>
+                <div>
+                  <div className="h-4 w-28 bg-gray-200 rounded mb-2" />
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-28 bg-gray-200 rounded-xl" />
+                    <div className="w-20 h-20 bg-gray-200 rounded-xl" />
+                  </div>
+                </div>
+                <div className="h-12 w-40 bg-gray-200 rounded-xl" />
+              </div>
+            </div>
+
+            {/* ── Previous Reports Skeleton ── */}
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 animate-pulse">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-6 w-32 bg-gray-200 rounded" />
+                <div className="h-6 w-10 bg-gray-200 rounded-full" />
+              </div>
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="border border-gray-200 rounded-2xl p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-40 bg-gray-200 rounded" />
+                          <div className="h-6 w-20 bg-gray-200 rounded-full" />
+                        </div>
+                        <div className="h-4 w-64 bg-gray-200 rounded mt-2" />
+                        <div className="h-4 w-48 bg-gray-200 rounded mt-1" />
+                      </div>
+                      <div className="h-4 w-24 bg-gray-200 rounded mt-2 sm:mt-0" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </>

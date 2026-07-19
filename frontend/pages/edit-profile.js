@@ -5,6 +5,16 @@ import { useAuth } from '../components/AuthScreen';
 import { useProfile, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
+import {
+  FiArrowLeft,
+  FiCamera,
+  FiUser,
+  FiMail,
+  FiLock,
+  FiCheck,
+  FiX,
+  FiLoader,
+} from 'react-icons/fi';
 
 const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com') + '/api';
 
@@ -13,12 +23,13 @@ export default function EditProfile() {
   const { user } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { invalidateProfile } = useInvalidateQueries();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Form fields
+  // ── Form fields ──
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -26,17 +37,17 @@ export default function EditProfile() {
   const [avatarPreview, setAvatarPreview] = useState('');
   const [currentAvatar, setCurrentAvatar] = useState('');
 
-  // Username / email availability states
+  // ── Availability states ──
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [emailAvailable, setEmailAvailable] = useState(null);
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
 
-  // Track if fields have changed from original values
+  // ── Track changes ──
   const [usernameChanged, setUsernameChanged] = useState(false);
   const [emailChanged, setEmailChanged] = useState(false);
 
-  // Debounce timers
+  // ── Debounce timers ──
   const usernameTimer = useRef(null);
   const emailTimer = useRef(null);
 
@@ -50,12 +61,11 @@ export default function EditProfile() {
       setAvatarPreview(profile.avatar || profile.profilePic || '');
       setLoading(false);
     } else if (!profileLoading) {
-      // Profile loading finished but no profile data (e.g., user not logged in)
       setLoading(false);
     }
   }, [profile, profileLoading]);
 
-  // ── Track if username changed ──
+  // ── Track username changes ──
   useEffect(() => {
     if (profile) {
       const originalUsername = profile?.username || '';
@@ -63,7 +73,7 @@ export default function EditProfile() {
     }
   }, [username, profile]);
 
-  // ── Track if email changed ──
+  // ── Track email changes ──
   useEffect(() => {
     if (profile) {
       const originalEmail = profile?.email || '';
@@ -90,12 +100,8 @@ export default function EditProfile() {
       try {
         const res = await fetch(`${API_BASE}/auth/check-username?username=${encodeURIComponent(username)}`);
         const data = await res.json();
-        if (data.success) {
-          setUsernameAvailable(data.available);
-        } else {
-          setUsernameAvailable(false);
-        }
-      } catch (err) {
+        setUsernameAvailable(data.success ? data.available : false);
+      } catch {
         setUsernameAvailable(false);
       } finally {
         setIsCheckingUsername(false);
@@ -116,12 +122,8 @@ export default function EditProfile() {
       try {
         const res = await fetch(`${API_BASE}/auth/check-email?email=${encodeURIComponent(email)}`);
         const data = await res.json();
-        if (data.success) {
-          setEmailAvailable(data.exists ? false : true);
-        } else {
-          setEmailAvailable(false);
-        }
-      } catch (err) {
+        setEmailAvailable(data.success ? !data.exists : false);
+      } catch {
         setEmailAvailable(false);
       } finally {
         setIsCheckingEmail(false);
@@ -158,7 +160,6 @@ export default function EditProfile() {
     setSuccess('');
     setSaving(true);
 
-    // ── Validation ──
     if (fullName.length < 2) {
       setError('Full name must be at least 2 characters.');
       setSaving(false);
@@ -185,7 +186,6 @@ export default function EditProfile() {
       if (!firebaseUser) throw new Error('Not authenticated');
       const token = await firebaseUser.getIdToken();
 
-      // 1) Upload avatar if changed
       let avatarUrl = currentAvatar;
       if (avatarFile) {
         const formData = new FormData();
@@ -203,13 +203,13 @@ export default function EditProfile() {
         }
       }
 
-      // 2) Update profile
       const payload = {
         username: username.trim().toLowerCase(),
         fullname: fullName.trim(),
         email: email.trim().toLowerCase(),
         avatar: avatarUrl,
       };
+
       const updateRes = await fetch(`${API_BASE}/auth/profile`, {
         method: 'PUT',
         headers: {
@@ -221,8 +221,7 @@ export default function EditProfile() {
       const updateData = await updateRes.json();
 
       if (updateData.success) {
-        setSuccess('Profile updated successfully!');
-        // ── Invalidate profile cache so all components get fresh data ──
+        setSuccess('Profile updated successfully! 🎉');
         await invalidateProfile();
         setTimeout(() => router.push('/profile'), 1500);
       } else {
@@ -242,21 +241,59 @@ export default function EditProfile() {
     }
   };
 
-  // ── Loading state ──
-  if (loading) {
+  // ── Show skeleton immediately if user is logged in but profile isn't loaded ──
+  const showSkeleton = loading || profileLoading || (user && !profile);
+
+  // ── Skeleton Loader ──
+  if (showSkeleton) {
     return (
       <>
-        <Meta title="Loading Profile | Make Trend" />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-purple-50/30">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-14 w-14 border-4 border-purple-600 border-t-transparent mx-auto"></div>
-            <p className="mt-4 text-gray-600 font-medium">Loading profile...</p>
+        <Meta title="Edit Profile | Make Trend" />
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4">
+          <div className="max-w-2xl mx-auto">
+            {/* Back Button Skeleton */}
+            <div className="w-20 h-9 bg-gray-200 rounded-lg animate-pulse mb-4" />
+
+            {/* Card Skeleton */}
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-8">
+              <div className="h-8 w-40 bg-gray-200 rounded-lg animate-pulse mb-6" />
+
+              {/* Avatar Skeleton */}
+              <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6 mb-6">
+                <div className="w-28 h-28 rounded-full bg-gray-200 animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-3 w-32 bg-gray-200 rounded animate-pulse" />
+                </div>
+              </div>
+
+              {/* Form Fields Skeleton */}
+              <div className="space-y-5">
+                <div>
+                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-1" />
+                  <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-1" />
+                  <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-1" />
+                  <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <div className="flex-1 h-12 bg-gray-200 rounded-xl animate-pulse" />
+                  <div className="flex-1 h-12 bg-gray-200 rounded-xl animate-pulse" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </>
     );
   }
 
+  // ── Main Render ──
   return (
     <>
       <Meta
@@ -270,49 +307,51 @@ export default function EditProfile() {
             onClick={() => router.back()}
             className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-4 px-3 py-1.5 rounded-lg hover:bg-gray-100"
           >
-            <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
+            <FiArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
             Back
           </button>
 
           <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-8 backdrop-blur-sm transition-all hover:shadow-2xl">
             <h1 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center gap-3">
-              <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Edit</span> Profile
+              <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                Edit
+              </span>
+              Profile
             </h1>
 
             {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-2">
-                <span className="text-red-500 text-lg">⚠️</span>
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-2 animate-fadeIn">
+                <FiX className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
             {success && (
               <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-start gap-2 animate-fadeIn">
-                <span className="text-green-500 text-lg">✅</span>
+                <FiCheck className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                 <span>{success}</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* ── Avatar ── */}
               <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
-                <div className="relative">
-                  <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white shadow-md">
+                <div className="relative group">
+                  <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white shadow-md transition-all duration-300 group-hover:shadow-xl">
                     {avatarPreview ? (
-                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                      <img
+                        src={avatarPreview}
+                        alt="Avatar"
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <span className="text-5xl text-gray-400">👤</span>
+                      <FiUser className="w-12 h-12 text-gray-400" />
                     )}
                   </div>
                   <label
                     htmlFor="avatar-upload"
-                    className="absolute -bottom-1 -right-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full p-2 cursor-pointer hover:shadow-lg transition-all duration-200 shadow-md hover:scale-110"
+                    className="absolute -bottom-1 -right-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full p-2.5 cursor-pointer hover:shadow-lg transition-all duration-200 shadow-md hover:scale-110 hover:shadow-purple-200"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+                    <FiCamera className="w-5 h-5" />
                     <input
                       id="avatar-upload"
                       type="file"
@@ -324,91 +363,118 @@ export default function EditProfile() {
                   </label>
                 </div>
                 <div className="flex-1 text-center sm:text-left">
-                  <p className="text-sm text-gray-600 font-medium">Click the camera icon to change your profile picture.</p>
-                  <p className="text-xs text-gray-400 mt-0.5">JPEG, PNG, WEBP, GIF up to 5MB</p>
+                  <p className="text-sm font-medium text-gray-700">
+                    Click the camera icon to change your profile picture.
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    JPEG, PNG, WEBP, GIF up to 5MB
+                  </p>
                 </div>
               </div>
 
               {/* ── Full Name ── */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   required
                   disabled={saving}
                   placeholder="John Doe"
                 />
+                <p className="mt-1 text-xs text-gray-400">
+                  {fullName.length}/100 characters
+                </p>
               </div>
 
               {/* ── Username ── */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Username <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                    className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:ring-2 transition ${
+                    onChange={(e) =>
+                      setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+                    }
+                    className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 transition disabled:opacity-50 disabled:cursor-not-allowed pr-28 ${
                       !usernameChanged
                         ? 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
                         : usernameAvailable === true && username.length >= 3
-                        ? 'border-green-500 focus:ring-green-200'
+                        ? 'border-green-500 focus:ring-green-200 bg-green-50/30'
                         : usernameAvailable === false && username.length >= 3
-                        ? 'border-red-500 focus:ring-red-200'
+                        ? 'border-red-500 focus:ring-red-200 bg-red-50/30'
                         : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
                     }`}
                     required
                     disabled={saving}
                     placeholder="john_doe"
                   />
-                  {!usernameChanged ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">(unchanged)</span>
-                  ) : isCheckingUsername ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
-                  ) : username.length >= 3 && usernameAvailable === true ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
-                  ) : username.length >= 3 && usernameAvailable === false ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
-                  ) : null}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium">
+                    {!usernameChanged ? (
+                      <span className="text-gray-400">(unchanged)</span>
+                    ) : isCheckingUsername ? (
+                      <span className="text-gray-400 flex items-center gap-1">
+                        <FiLoader className="w-3 h-3 animate-spin" /> Checking…
+                      </span>
+                    ) : username.length >= 3 && usernameAvailable === true ? (
+                      <span className="text-green-600">✓ Available</span>
+                    ) : username.length >= 3 && usernameAvailable === false ? (
+                      <span className="text-red-600">✗ Taken</span>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  3-30 characters, lowercase letters, numbers, underscore.
+                </p>
               </div>
 
               {/* ── Email ── */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Email <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
-                    className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:ring-2 transition ${
+                    className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 transition disabled:opacity-50 disabled:cursor-not-allowed pr-28 ${
                       !emailChanged
                         ? 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
                         : emailAvailable === true && email.includes('@')
-                        ? 'border-green-500 focus:ring-green-200'
+                        ? 'border-green-500 focus:ring-green-200 bg-green-50/30'
                         : emailAvailable === false && email.includes('@')
-                        ? 'border-red-500 focus:ring-red-200'
+                        ? 'border-red-500 focus:ring-red-200 bg-red-50/30'
                         : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
                     }`}
                     required
                     disabled={saving}
                     placeholder="you@example.com"
                   />
-                  {!emailChanged ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">(unchanged)</span>
-                  ) : isCheckingEmail ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">⏳</span>
-                  ) : email.includes('@') && emailAvailable === true ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600 font-medium">✓ Available</span>
-                  ) : email.includes('@') && emailAvailable === false ? (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-red-600 font-medium">✗ Taken</span>
-                  ) : null}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium">
+                    {!emailChanged ? (
+                      <span className="text-gray-400">(unchanged)</span>
+                    ) : isCheckingEmail ? (
+                      <span className="text-gray-400 flex items-center gap-1">
+                        <FiLoader className="w-3 h-3 animate-spin" /> Checking…
+                      </span>
+                    ) : email.includes('@') && emailAvailable === true ? (
+                      <span className="text-green-600">✓ Available</span>
+                    ) : email.includes('@') && emailAvailable === false ? (
+                      <span className="text-red-600">✗ Taken</span>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="mt-1 text-xs text-gray-400">Changing your email will update your login credentials.</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  Changing your email will update your login credentials.
+                </p>
               </div>
 
               {/* ── Buttons ── */}
@@ -416,24 +482,24 @@ export default function EditProfile() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3.5 rounded-xl font-medium hover:shadow-lg transition-all duration-200 shadow-md hover:shadow-purple-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {saving ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
+                    <>
+                      <FiLoader className="w-5 h-5 animate-spin" />
                       Saving...
-                    </span>
+                    </>
                   ) : (
-                    'Save Changes'
+                    <>
+                      <FiCheck className="w-5 h-5" />
+                      Save Changes
+                    </>
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => router.push('/profile')}
-                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200"
+                  className="flex-1 bg-gray-100 text-gray-700 py-3.5 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200 disabled:opacity-50"
                   disabled={saving}
                 >
                   Cancel
@@ -446,8 +512,14 @@ export default function EditProfile() {
 
       <style jsx>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;

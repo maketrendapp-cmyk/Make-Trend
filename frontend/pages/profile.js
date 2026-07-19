@@ -23,7 +23,7 @@ export default function Profile() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
-  const isLoading = profileLoading || statsLoading;
+  const isLoading = profileLoading || statsLoading || (user && !profile);
 
   const copyReferralCode = () => {
     const code = profile?.referralCode || '';

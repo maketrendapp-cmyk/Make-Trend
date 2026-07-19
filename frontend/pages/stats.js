@@ -30,13 +30,14 @@ export default function Stats() {
   const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
 
   // ── React Query ──
-  const { data: stats, isLoading: statsLoading } = useStats();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useStats();
   const {
     data: campaignPages,
     isLoading: campaignsLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
+    refetch: refetchCampaigns,
   } = useCampaigns();
 
   const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
@@ -80,6 +81,14 @@ export default function Stats() {
 
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, campaignsLoading, fetchNextPage]);
+
+  // ── Refetch when user becomes available (fix for full page reload) ──
+  useEffect(() => {
+    if (user) {
+      refetchStats();
+      refetchCampaigns();
+    }
+  }, [user, refetchStats, refetchCampaigns]);
 
   // ===== DATE FORMATTER =====
   const formatDate = (timestamp) => {
