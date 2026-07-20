@@ -129,21 +129,21 @@ export default function CampaignShare() {
     }
     return () => clearInterval(claimTimerRef.current);
   }, [showClaimModal, claimCountdown]);
-
+  // ── Verification timer (using recursive setTimeout for reliability) ──
   useEffect(() => {
-    if (verifying && verifyingCountdown > 0) {
-      timerRef.current = setInterval(() => {
-        setVerifyingCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            finishVerification();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timerRef.current);
+    if (!verifying || verifyingCountdown <= 0) return;
+
+    const timer = setTimeout(() => {
+      if (verifyingCountdown <= 1) {
+        // Time's up – finish verification
+        finishVerification();
+      } else {
+        // Decrement countdown
+        setVerifyingCountdown((prev) => prev - 1);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
   // ── Native Share ──
@@ -207,10 +207,15 @@ export default function CampaignShare() {
   };
 
   const finishVerification = () => {
+    // Guard against multiple calls
+    if (!verifying) return;
+
+    // Mark as done immediately
     setVerifying(false);
     setVerifyingType('');
     setVerifyingCountdown(0);
 
+    // Process the share increment
     if (verifyingType === 'share') {
       if (sharesComplete) return;
 
