@@ -167,8 +167,8 @@ export default function CampaignShare() {
     // Open share dialog
     if (type === 'message') {
       const forwardUrls = {
-        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`, // Only link (pre‑filled message not supported)
-        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareUrl)}`,         // Only link
+        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullText)}`,
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareUrl)}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
       };
       window.open(forwardUrls[platform], '_blank');
@@ -303,7 +303,7 @@ export default function CampaignShare() {
           <div className="max-w-3xl mx-auto animate-pulse">
             <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="h-48 sm:h-56 bg-gray-200" />
+              <div className="aspect-video bg-gray-200" />
               <div className="p-6">
                 <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
                 <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
@@ -365,14 +365,20 @@ export default function CampaignShare() {
 
           {/* ── Hero Card (reduced margin) ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-4 transition-all hover:shadow-md">
-            <div className="relative h-40 sm:h-48 md:h-56 overflow-hidden bg-gray-200">
+            {/* Image container with 16:9 aspect ratio and full width */}
+            <div className="relative aspect-video w-full bg-gray-200 overflow-hidden">
               {campaign.image ? (
-                <img src={campaign.image} alt={campaign.title} className="w-full h-full object-cover" />
+                <img
+                  src={campaign.image}
+                  alt={campaign.title}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300 bg-gradient-to-br from-purple-50 to-indigo-50">
                   📤
                 </div>
               )}
+              {/* Progress bar overlay at bottom */}
               <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/60">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"
