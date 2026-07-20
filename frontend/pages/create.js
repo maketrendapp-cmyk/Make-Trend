@@ -98,8 +98,8 @@ export default function Create() {
   useEffect(() => {
     if (featuredTemplates.length > 1) {
       carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
-      }, 5000);
+  setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
+}, 2000);
     }
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
@@ -111,8 +111,8 @@ export default function Create() {
     if (carouselIntervalRef.current) {
       clearInterval(carouselIntervalRef.current);
       carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
-      }, 5000);
+  setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
+}, 2000);
     }
   }, [featuredTemplates.length]);
 
@@ -342,7 +342,7 @@ export default function Create() {
                             className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                            Use Template
+                            Use
                           </button>
                         </div>
                       </div>
@@ -351,6 +351,33 @@ export default function Create() {
                 ))}
               </div>
 
+              {/* ── Prev / Next Buttons ── */}
+              {featuredTemplates.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => goToSlide((carouselIndex - 1 + featuredTemplates.length) % featuredTemplates.length)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
+                    aria-label="Previous slide"
+                  >
+                    <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToSlide((carouselIndex + 1) % featuredTemplates.length)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
+                    aria-label="Next slide"
+                  >
+                    <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </>
+              )}
+
+              {/* ── Dots ── */}
               {featuredTemplates.length > 1 && (
                 <div className="absolute bottom-24 right-3 flex gap-1 z-20">
                   {featuredTemplates.map((_, idx) => (
