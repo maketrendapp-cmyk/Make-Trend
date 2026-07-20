@@ -456,7 +456,7 @@ export default function CampaignShare() {
                 `}
               >
                 <FaShareAlt className={`w-5 h-5 ${isHovering ? 'animate-bounce' : ''}`} />
-                {verifying ? `Verifying (${verifyingCountdown}s)` : 'Share Now & Unlock'}
+                {verifying ? `Verifying (${verifyingCountdown}s)` : 'Share Now & Claim✨'}
                 <FaArrowRight className="w-4 h-4" />
               </motion.button>
 
