@@ -1,8 +1,8 @@
 // backend/server.js
 // ============================================================
-// COMPLETE PRODUCTION BACKEND
-// Security: Helmet, CORS, Rate Limiting, XSS Protection, JWT
-// Cache: Redis with indefinite TTL – invalidated on data changes
+// COMPLETE PRODUCTION BACKEND – FULLY HARDENED
+// Security: Helmet, CORS, Rate Limiting (global + per‑action),
+//           XSS Protection, JWT, Ban Checks, Redis Caching
 // ============================================================
 
 require('dotenv').config();
@@ -15,6 +15,7 @@ const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const streamifier = require('streamifier');
 const Redis = require('ioredis');
+const sharp = require('sharp');
 
 // ============================================================
 // 0. REDIS CLIENT (with timeout guard)
@@ -41,7 +42,7 @@ async function getOrSetCache(key, fetchFn) {
     }
     console.log(`📡 Cache MISS: ${key}`);
     const data = await fetchFn();
-    await redis.set(key, JSON.stringify(data)); // no TTL = indefinite
+    await redis.set(key, JSON.stringify(data)); // indefinite TTL
     return data;
   } catch (error) {
     console.warn(`⚠️ Cache fallback for ${key}:`, error.message);
@@ -167,7 +168,7 @@ app.use(cors({
   optionsSuccessStatus: 200,
 }));
 
-// ── Rate Limiting ──
+// ── Global Rate Limiting ──
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -184,7 +185,6 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
 const strictLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 5,
@@ -226,7 +226,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// 10. HELPER FUNCTIONS (verifyToken, isAdmin, sanitize, etc.)
+// 10. HELPER FUNCTIONS
 // ============================================================
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -312,6 +312,73 @@ function getClientIp(req) {
          'unknown';
 }
 
+// ── Generic rate limit helper ──
+async function checkRateLimit(identifier, action, limit, windowSeconds) {
+  const key = `rate:${action}:${identifier}:${Math.floor(Date.now() / 1000 / windowSeconds)}`;
+  try {
+    const current = await redis.incr(key);
+    if (current === 1) {
+      await redis.expire(key, windowSeconds);
+    }
+    return current <= limit;
+  } catch (error) {
+    console.error(`Rate limit error (${action}):`, error);
+    return true; // allow on error
+  }
+}
+
+// ── Get ban status with Redis cache (5 min TTL) ──
+async function isUserBanned(uid) {
+  const cacheKey = `banned:${uid}`;
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached !== null) {
+      return cached === 'true';
+    }
+  } catch (error) {
+    // fall through to Firestore
+  }
+  // Fetch from Firestore
+  const doc = await db.collection('users').doc(uid).get();
+  const banned = doc.exists ? (doc.data().isBanned === true) : false;
+  try {
+    await redis.set(cacheKey, banned ? 'true' : 'false', 'EX', 300); // 5 min TTL
+  } catch (err) { /* ignore */ }
+  return banned;
+}
+
+// ── Middleware to check if user is banned (with caching) ──
+async function checkBanned(req, res, next) {
+  try {
+    const uid = req.user.uid;
+    const banned = await isUserBanned(uid);
+    if (banned) {
+      return res.status(403).json({ success: false, error: 'Your account has been suspended.' });
+    }
+    next();
+  } catch (error) {
+    console.error('Ban check error:', error);
+    next(); // allow on error to avoid blocking
+  }
+}
+
+// ── Campaign creation rate limit (3 per minute) ──
+async function checkCampaignRateLimit(uid) {
+  const LIMIT = 3;
+  const WINDOW_SECONDS = 60;
+  const key = `rate:campaigns:${uid}:${Math.floor(Date.now() / 1000 / WINDOW_SECONDS)}`;
+  try {
+    const current = await redis.incr(key);
+    if (current === 1) {
+      await redis.expire(key, WINDOW_SECONDS);
+    }
+    return current <= LIMIT;
+  } catch (error) {
+    console.error('Rate limit error:', error);
+    return true;
+  }
+}
+
 async function hasPerformedAction(campaignId, userId, ip, actionType) {
   try {
     const docId = userId ? `user_${userId}` : `ip_${ip}`;
@@ -348,7 +415,7 @@ async function recordAction(campaignId, userId, ip, actionType) {
 // 11. AUTH ENDPOINTS
 // ============================================================
 
-// ── Check username availability ──
+// ── Check username availability ── (public, already IP-rate-limited via strictLimiter)
 app.get('/api/auth/check-username', async (req, res) => {
   try {
     const username = sanitizeUsername(req.query.username);
@@ -364,7 +431,7 @@ app.get('/api/auth/check-username', async (req, res) => {
   }
 });
 
-// ── Check email availability ──
+// ── Check email availability ── (public, already IP-rate-limited)
 app.get('/api/auth/check-email', async (req, res) => {
   try {
     const email = req.query.email?.trim().toLowerCase();
@@ -380,7 +447,7 @@ app.get('/api/auth/check-email', async (req, res) => {
   }
 });
 
-// ── Register new user ──
+// ── Register new user ── (rate-limited by authLimiter)
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { uid, username, fullname, email, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
@@ -435,10 +502,15 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// ── Complete social profile ──
-app.post('/api/auth/complete-social', verifyToken, async (req, res) => {
+// ── Complete social profile ── (authenticated, with rate limit and ban check)
+app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res) => {
   try {
-    const { uid, email, fullname, username, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
+    const uid = req.user.uid;
+    // ── Rate limit: 10 completions per minute ──
+    if (!(await checkRateLimit(uid, 'complete-social', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many attempts. Please wait.' });
+    }
+    const { email, fullname, username, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -482,13 +554,15 @@ app.post('/api/auth/complete-social', verifyToken, async (req, res) => {
   }
 });
 
-// ── Get current user profile (cached 60 seconds) ──
-app.get('/api/auth/me', verifyToken, async (req, res) => {
+// ── Get current user profile ── (authenticated, with ban check + rate limit)
+app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+    // ── Rate limit: 20 requests per minute ──
+    if (!(await checkRateLimit(uid, 'profile-get', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const cacheKey = `user:profile:${uid}`;
-    // Use a short TTL (60s) – we can still use getOrSetCache but with TTL set
-    // We'll implement a custom cached fetch with TTL
     let result;
     try {
       const cached = await redisGet(cacheKey);
@@ -500,7 +574,6 @@ app.get('/api/auth/me', verifyToken, async (req, res) => {
       console.warn(`⚠️ User cache miss/error for ${uid}:`, error.message);
     }
 
-    // Fetch from Firestore
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -509,13 +582,10 @@ app.get('/api/auth/me', verifyToken, async (req, res) => {
     delete userData.deviceFingerprint;
     result = { success: true, user: { uid, ...userData } };
 
-    // Store in Redis with 60s TTL
     try {
       await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
       console.log(`💾 User profile cached: ${uid}`);
-    } catch (err) {
-      // Ignore
-    }
+    } catch (err) { /* ignore */ }
     res.json(result);
   } catch (error) {
     console.error('Get profile error:', error);
@@ -523,9 +593,14 @@ app.get('/api/auth/me', verifyToken, async (req, res) => {
   }
 });
 
-// ── Check if user is banned ──
+// ── Check if user is banned ── (public, IP rate limit)
 app.get('/api/auth/check-ban', async (req, res) => {
   try {
+    const ip = getClientIp(req);
+    // ── Rate limit: 20 requests per minute per IP ──
+    if (!(await checkRateLimit(ip, 'ban-check', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const uid = req.query.uid;
     if (!uid) {
       return res.status(400).json({ success: false, error: 'Missing uid' });
@@ -542,10 +617,15 @@ app.get('/api/auth/check-ban', async (req, res) => {
   }
 });
 
-// ── Record login (no cache needed) ──
+// ── Record login ── (authenticated, low risk – could add rate limit, but optional)
 app.post('/api/auth/record-login', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
+    // ── Rate limit: 5 login recordings per minute ──
+    if (!(await checkRateLimit(uid, 'record-login', 5, 60))) {
+      // Still return success to not reveal the limit
+      return res.json({ success: true });
+    }
     await db.collection('users').doc(uid).update({
       lastLogin: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -556,9 +636,14 @@ app.post('/api/auth/record-login', verifyToken, async (req, res) => {
   }
 });
 
-// ── Get profile completion status ──
+// ── Get profile completion status ── (public, IP rate limit)
 app.get('/api/auth/profile', async (req, res) => {
   try {
+    const ip = getClientIp(req);
+    // ── Rate limit: 20 requests per minute per IP ──
+    if (!(await checkRateLimit(ip, 'profile-check', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const uid = req.query.uid;
     if (!uid) {
       return res.status(400).json({ success: false, error: 'Missing uid' });
@@ -579,12 +664,15 @@ app.get('/api/auth/profile', async (req, res) => {
   }
 });
 
-// ── Update user profile (invalidate user profile cache) ──
-app.put('/api/auth/profile', verifyToken, async (req, res) => {
+// ── Update user profile ── (authenticated, with ban check + rate limit)
+app.put('/api/auth/profile', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const { username, fullname, email, avatar } = req.body;
+    if (!(await checkRateLimit(uid, 'profile-update', 3, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many profile updates. Please wait.' });
+    }
 
+    const { username, fullname, email, avatar } = req.body;
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -646,13 +734,10 @@ app.put('/api/auth/profile', verifyToken, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     await db.collection('users').doc(uid).update(updateData);
-
-    // ── Invalidate user profile cache ──
     await invalidateKey(`user:profile:${uid}`);
 
     const updatedDoc = await db.collection('users').doc(uid).get();
     const updatedUser = updatedDoc.data();
-
     res.json({
       success: true,
       message: 'Profile updated successfully',
@@ -664,10 +749,13 @@ app.put('/api/auth/profile', verifyToken, async (req, res) => {
   }
 });
 
-// ── Get referrals ──
-app.get('/api/auth/referrals', verifyToken, async (req, res) => {
+// ── Get referrals ── (authenticated, with ban check + rate limit)
+app.get('/api/auth/referrals', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'referrals-get', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -728,7 +816,7 @@ app.get('/api/auth/referrals', verifyToken, async (req, res) => {
   }
 });
 
-// ── SET ADMIN ──
+// ── SET ADMIN ── (protected by secret)
 app.post('/api/auth/set-admin', async (req, res) => {
   try {
     const { email, secret } = req.body;
@@ -764,32 +852,25 @@ app.post('/api/auth/set-admin', async (req, res) => {
   }
 });
 
-// ── Set session cookie (optimized) ──
+// ── Set session cookie ──
 app.post('/api/auth/set-session', async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) {
       return res.status(400).json({ success: false, error: 'Token required' });
     }
-
     const decoded = await admin.auth().verifyIdToken(token);
     if (!decoded) {
       return res.status(401).json({ success: false, error: 'Invalid token' });
     }
-
-    // Set cookie immediately (no Firestore fetch)
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });
-
-    // Return success – frontend will call /auth/me
     res.json({ success: true });
-
-    // Update lastLogin in the background (don't await)
     try {
       await db.collection('users').doc(decoded.uid).update({
         lastLogin: admin.firestore.FieldValue.serverTimestamp(),
@@ -815,18 +896,20 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // ============================================================
-// 12. TEMPLATE ENDPOINTS (cached indefinitely, invalidated on change)
+// 12. TEMPLATE ENDPOINTS
 // ============================================================
 
-// ── Get all templates (cached indefinitely) ──
+// ── Get all templates ── (public, IP rate limit)
 app.get('/api/templates', async (req, res) => {
   try {
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'templates-get', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const cacheKey = 'templates:all';
     const result = await getOrSetCache(cacheKey, async () => {
       console.log('📡 Fetching templates from Firestore...');
-      // Simplified query without orderBy to avoid index requirement
       let query = db.collection('templates').where('isActive', '==', true);
-      // Optional filters – if you need them, they are still fast with indexes
       const { category, platform, highlight, plan, limit = 50 } = req.query;
       if (category) query = query.where('category', '==', category);
       if (platform) query = query.where('platform', '==', platform);
@@ -864,10 +947,13 @@ app.get('/api/templates', async (req, res) => {
   }
 });
 
-// ── Create template (admin) – invalidate all templates cache ──
-app.post('/api/templates', verifyToken, async (req, res) => {
+// ── Create template (admin only) ──
+app.post('/api/templates', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'admin-template-create', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many template creations. Please wait.' });
+    }
     if (!(await isAdmin(uid))) {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
@@ -904,10 +990,7 @@ app.post('/api/templates', verifyToken, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     const docRef = await db.collection('templates').add(templateData);
-
-    // ── Invalidate all templates cache ──
     await invalidatePattern('templates:*');
-
     res.status(201).json({ success: true, template: { id: docRef.id, ...templateData } });
   } catch (error) {
     console.error('Create template error:', error);
@@ -915,11 +998,14 @@ app.post('/api/templates', verifyToken, async (req, res) => {
   }
 });
 
-// ── Update template (admin) ──
-app.put('/api/templates/:id', verifyToken, async (req, res) => {
+// ── Update template (admin only) ──
+app.put('/api/templates/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'admin-template-update', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many template updates. Please wait.' });
+    }
     if (!(await isAdmin(uid))) {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
@@ -943,10 +1029,7 @@ app.put('/api/templates/:id', verifyToken, async (req, res) => {
     }
     updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await db.collection('templates').doc(id).update(updates);
-
-    // ── Invalidate all templates cache ──
     await invalidatePattern('templates:*');
-
     res.json({ success: true, message: 'Template updated' });
   } catch (error) {
     console.error('Update template error:', error);
@@ -954,23 +1037,22 @@ app.put('/api/templates/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ── Delete/archive template (admin) ──
-app.delete('/api/templates/:id', verifyToken, async (req, res) => {
+// ── Delete/archive template (admin only) ──
+app.delete('/api/templates/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'admin-template-delete', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many template deletions. Please wait.' });
+    }
     if (!(await isAdmin(uid))) {
       return res.status(403).json({ success: false, error: 'Admin only' });
     }
-
     await db.collection('templates').doc(id).update({
       isActive: false,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-
-    // ── Invalidate all templates cache ──
     await invalidatePattern('templates:*');
-
     res.json({ success: true, message: 'Template archived' });
   } catch (error) {
     console.error('Delete template error:', error);
@@ -978,10 +1060,15 @@ app.delete('/api/templates/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ── Increment template usage (no cache needed) ──
+// ── Increment template usage ── (public, low risk, IP rate limit optional)
 app.post('/api/templates/:id/usage', async (req, res) => {
   try {
     const { id } = req.params;
+    // optional IP rate limit
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'template-usage', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     await db.collection('templates').doc(id).update({
       usageCount: admin.firestore.FieldValue.increment(1),
     });
@@ -993,14 +1080,16 @@ app.post('/api/templates/:id/usage', async (req, res) => {
 });
 
 // ============================================================
-// 13. CAMPAIGN ENDPOINTS (cached per user, invalidated on change)
+// 13. CAMPAIGN ENDPOINTS
 // ============================================================
 
-// ── Get user's campaigns (cached per user) ──
-app.get('/api/campaigns', verifyToken, async (req, res) => {
+// ── Get user's campaigns ── (authenticated, with ban check + rate limit)
+app.get('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    // Parse and cap limit to a safe maximum (e.g., 100)
+    if (!(await checkRateLimit(uid, 'campaigns-get', 60, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     let limit = parseInt(req.query.limit) || 25;
     const MAX_LIMIT = 100;
     if (limit > MAX_LIMIT) limit = MAX_LIMIT;
@@ -1010,7 +1099,6 @@ app.get('/api/campaigns', verifyToken, async (req, res) => {
 
     const cacheKey = `campaigns:user:${uid}:limit:${limit}:lastCreatedAt:${req.query.lastCreatedAt || 'null'}:lastId:${lastId || 'null'}`;
 
-    // Try cache (with 60s TTL)
     let result;
     try {
       const cached = await redisGet(cacheKey);
@@ -1023,24 +1111,20 @@ app.get('/api/campaigns', verifyToken, async (req, res) => {
     }
 
     console.log(`📡 Fetching campaigns for user ${uid} (limit=${limit})...`);
-
-    // Build Firestore query
     let query = db.collection('campaigns')
       .where('userId', '==', uid)
       .where('status', 'in', ['active', 'paused'])
       .orderBy('createdAt', 'desc')
       .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
-      .limit(limit + 1); // extra to check for more
+      .limit(limit + 1);
 
     if (lastCreatedAt && lastId) {
-      // Use the same fields as orderBy
       query = query.startAfter(lastCreatedAt, lastId);
     }
 
     const snapshot = await query.get();
     const campaigns = [];
     let hasMore = false;
-
     snapshot.forEach(doc => {
       if (campaigns.length < limit) {
         campaigns.push({ id: doc.id, ...doc.data() });
@@ -1049,7 +1133,6 @@ app.get('/api/campaigns', verifyToken, async (req, res) => {
       }
     });
 
-    // Prepare next cursor
     let nextLastCreatedAt = null;
     let nextLastId = null;
     if (campaigns.length > 0) {
@@ -1074,14 +1157,13 @@ app.get('/api/campaigns', verifyToken, async (req, res) => {
       lastId: nextLastId,
     };
 
-    // Cache with 60s TTL
-    try {
-      await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
-      console.log(`💾 Campaigns cached: ${cacheKey}`);
-    } catch (err) {
-      // ignore
-    }
-
+    // Cache with 24 hour TTL – invalidation on change ensures freshness
+try {
+  await redis.set(cacheKey, JSON.stringify(response), 'EX', 86400);
+  console.log(`💾 Campaigns cached (24 hour TTL): ${cacheKey}`);
+} catch (err) {
+  // ignore
+}
     res.json(response);
   } catch (error) {
     console.error('❌ Get campaigns error:', error);
@@ -1089,12 +1171,15 @@ app.get('/api/campaigns', verifyToken, async (req, res) => {
   }
 });
 
-// ── Get campaign by ID (cached indefinitely) ──
+// ── Get campaign by ID ── (public, IP rate limit)
 app.get('/api/campaigns/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'campaign-view', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const cacheKey = `campaigns:id:${id}`;
-
     const result = await getOrSetCache(cacheKey, async () => {
       const doc = await db.collection('campaigns').doc(id).get();
       if (!doc.exists) {
@@ -1113,7 +1198,6 @@ app.get('/api/campaigns/:id', async (req, res) => {
 
     // ── Silent view tracking ──
     try {
-      const ip = getClientIp(req);
       const userId = req.headers['x-user-id'] || null;
       const alreadyViewed = await hasPerformedAction(id, userId, ip, 'views');
       if (!alreadyViewed) {
@@ -1121,9 +1205,7 @@ app.get('/api/campaigns/:id', async (req, res) => {
           views: admin.firestore.FieldValue.increment(1),
         });
         await recordAction(id, userId, ip, 'views');
-        // Invalidate campaign cache and stats (views changed)
         await invalidateKey(`campaigns:id:${id}`);
-        // Also invalidate user stats if userId provided
         if (userId) {
           const campaignDoc = await db.collection('campaigns').doc(id).get();
           const data = campaignDoc.data();
@@ -1135,7 +1217,6 @@ app.get('/api/campaigns/:id', async (req, res) => {
     } catch (err) {
       console.warn('View tracking failed:', err.message);
     }
-
     res.json(result);
   } catch (error) {
     console.error('Error fetching campaign:', error);
@@ -1143,10 +1224,16 @@ app.get('/api/campaigns/:id', async (req, res) => {
   }
 });
 
-// ── Create campaign (invalidate user campaigns & stats) ──
-app.post('/api/campaigns', verifyToken, async (req, res) => {
+// ── Create campaign ── (authenticated, with ban check + creation rate limit)
+app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+    if (!(await checkCampaignRateLimit(uid))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Rate limit exceeded. You can create up to 3 campaigns per minute. Please wait a moment.',
+      });
+    }
     const { templateId, shareCount, tasks, finalUrl, features, title, description, reward } = req.body;
 
     if (!templateId) {
@@ -1241,14 +1328,11 @@ app.post('/api/campaigns', verifyToken, async (req, res) => {
     };
 
     const docRef = await db.collection('campaigns').add(campaignData);
-
-    await templateRef.update({
-      usageCount: admin.firestore.FieldValue.increment(1),
-    });
+    await templateRef.update({ usageCount: admin.firestore.FieldValue.increment(1) });
 
     // ── Invalidate user campaigns and stats ──
     await invalidatePattern(`campaigns:user:${uid}:*`);
-await invalidateKey(`stats:user:${uid}`);
+    await invalidateKey(`stats:user:${uid}`);
 
     res.status(201).json({
       success: true,
@@ -1261,11 +1345,14 @@ await invalidateKey(`stats:user:${uid}`);
   }
 });
 
-// ── Update campaign (invalidate user campaigns, stats, campaign by ID) ──
-app.put('/api/campaigns/:id', verifyToken, async (req, res) => {
+// ── Update campaign ── (authenticated, with ban check + rate limit)
+app.put('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'campaign-update', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many updates. Please wait.' });
+    }
     const updates = req.body;
 
     const doc = await db.collection('campaigns').doc(id).get();
@@ -1292,8 +1379,8 @@ app.put('/api/campaigns/:id', verifyToken, async (req, res) => {
 
     // ── Invalidate caches ──
     await invalidatePattern(`campaigns:user:${uid}:*`);
-await invalidateKey(`campaigns:id:${id}`);
-await invalidateKey(`stats:user:${uid}`);
+    await invalidateKey(`campaigns:id:${id}`);
+    await invalidateKey(`stats:user:${uid}`);
 
     res.json({ success: true, message: 'Campaign updated' });
   } catch (error) {
@@ -1302,11 +1389,14 @@ await invalidateKey(`stats:user:${uid}`);
   }
 });
 
-// ── Delete campaign (invalidate user campaigns, stats, campaign by ID) ──
-app.delete('/api/campaigns/:id', verifyToken, async (req, res) => {
+// ── Delete campaign ── (authenticated, with ban check + rate limit)
+app.delete('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'campaign-delete', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many deletions. Please wait.' });
+    }
     const doc = await db.collection('campaigns').doc(id).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
@@ -1323,8 +1413,8 @@ app.delete('/api/campaigns/:id', verifyToken, async (req, res) => {
 
     // ── Invalidate caches ──
     await invalidatePattern(`campaigns:user:${uid}:*`);
-await invalidateKey(`campaigns:id:${id}`);
-await invalidateKey(`stats:user:${uid}`);
+    await invalidateKey(`campaigns:id:${id}`);
+    await invalidateKey(`stats:user:${uid}`);
 
     res.json({ success: true, message: 'Campaign deleted' });
   } catch (error) {
@@ -1333,66 +1423,93 @@ await invalidateKey(`stats:user:${uid}`);
   }
 });
 
-// ── Record share ──
+// ── Record share ── (public, IP rate limit)
 app.post('/api/campaigns/:id/share', async (req, res) => {
   try {
     const { id } = req.params;
     const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'share-post', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many share requests. Please wait.' });
+    }
     const userId = req.body.userId || null;
 
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
-    const data = doc.data();
-    if (data.status === 'deleted') {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
+    // Use a transaction to ensure atomicity
+    const result = await db.runTransaction(async (transaction) => {
+      const docRef = db.collection('campaigns').doc(id);
+      const doc = await transaction.get(docRef);
+      if (!doc.exists) {
+        throw new Error('Campaign not found');
+      }
+      const data = doc.data();
+      if (data.status === 'deleted') {
+        throw new Error('Campaign not found');
+      }
 
-    const alreadyShared = await hasPerformedAction(id, userId, ip, 'shares');
-    if (alreadyShared) {
+      // Check if already shared
+      const docId = userId ? `user_${userId}` : `ip_${ip}`;
+      const actionDocRef = docRef.collection('shares').doc(docId);
+      const actionDoc = await transaction.get(actionDocRef);
+      if (actionDoc.exists) {
+        return { alreadyDone: true, shares: data.shares || 0, shareCount: data.shareCount || 0 };
+      }
+
+      // Update campaign shares
+      const newShares = (data.shares || 0) + 1;
+      transaction.update(docRef, {
+        shares: newShares,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(actionDocRef, {
+        userId: userId || null,
+        ip: ip || 'unknown',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Also invalidate caches after commit (we'll do it outside)
+      return { alreadyDone: false, shares: newShares, shareCount: data.shareCount || 0 };
+    });
+
+    if (result.alreadyDone) {
       return res.json({
         success: true,
-        shares: data.shares || 0,
-        shareCount: data.shareCount || 0,
+        shares: result.shares,
+        shareCount: result.shareCount,
         message: 'Already shared',
       });
     }
 
-    const targetShareCount = data.shareCount || 0;
-
-    await doc.ref.update({
-      shares: targetShareCount,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await recordAction(id, userId, ip, 'shares');
+    // Invalidate caches after transaction commits
     await invalidateKey(`campaigns:sharecount:${id}`);
-    // Also invalidate stats for the user
-    if (data.userId) {
-      await invalidateKey(`stats:user:${data.userId}`);
+    // Invalidate stats for the user if we have userId
+    if (userId) {
+      const campaignDoc = await db.collection('campaigns').doc(id).get();
+      const data = campaignDoc.data();
+      if (data && data.userId) {
+        await invalidateKey(`stats:user:${data.userId}`);
+      }
     }
-
-    const updatedDoc = await doc.ref.get();
-    const updatedData = updatedDoc.data();
 
     res.json({
       success: true,
-      shares: updatedData.shares || 0,
-      shareCount: updatedData.shareCount || 0,
+      shares: result.shares,
+      shareCount: result.shareCount,
     });
   } catch (error) {
     console.error('❌ Share error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    const msg = error.message || 'Failed to record share';
+    res.status(500).json({ success: false, error: msg });
   }
 });
 
-// ── Get share count (cached) ──
+// ── Get share count ── (public, IP rate limit)
 app.get('/api/campaigns/:id/share-count', async (req, res) => {
   try {
     const { id } = req.params;
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'share-count-get', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const cacheKey = `campaigns:sharecount:${id}`;
-
     const result = await getOrSetCache(cacheKey, async () => {
       const doc = await db.collection('campaigns').doc(id).get();
       if (!doc.exists) {
@@ -1409,7 +1526,6 @@ app.get('/api/campaigns/:id/share-count', async (req, res) => {
         isComplete: (data.shares || 0) >= (data.shareCount || 0),
       };
     });
-
     if (!result.success) {
       return res.status(404).json(result);
     }
@@ -1420,84 +1536,114 @@ app.get('/api/campaigns/:id/share-count', async (req, res) => {
   }
 });
 
-// ── Complete campaign ──
+// ── Complete campaign ── (public, IP rate limit)
 app.post('/api/campaigns/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
     const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'complete-post', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many complete requests. Please wait.' });
+    }
     const userId = req.body.userId || null;
 
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
-    const data = doc.data();
-    if (data.status === 'deleted') {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
+    await db.runTransaction(async (transaction) => {
+      const docRef = db.collection('campaigns').doc(id);
+      const doc = await transaction.get(docRef);
+      if (!doc.exists) {
+        throw new Error('Campaign not found');
+      }
+      const data = doc.data();
+      if (data.status === 'deleted') {
+        throw new Error('Campaign not found');
+      }
 
-    const alreadyCompleted = await hasPerformedAction(id, userId, ip, 'completions');
-    if (alreadyCompleted) {
-      return res.json({ success: true, message: 'Already completed' });
-    }
+      const docId = userId ? `user_${userId}` : `ip_${ip}`;
+      const actionDocRef = docRef.collection('completions').doc(docId);
+      const actionDoc = await transaction.get(actionDocRef);
+      if (actionDoc.exists) {
+        throw new Error('Already completed');
+      }
 
-    await doc.ref.update({
-      completions: admin.firestore.FieldValue.increment(1),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      transaction.update(docRef, {
+        completions: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(actionDocRef, {
+        userId: userId || null,
+        ip: ip || 'unknown',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
-
-    await recordAction(id, userId, ip, 'completions');
 
     res.json({ success: true, message: 'Campaign completed!' });
   } catch (error) {
     console.error('❌ Complete error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    if (error.message === 'Already completed') {
+      return res.json({ success: true, message: 'Already completed' });
+    }
+    res.status(500).json({ success: false, error: error.message || 'Failed to record completion' });
   }
 });
 
-// ── Unlock campaign ──
+// ── Unlock campaign ── (public, IP rate limit)
 app.post('/api/campaigns/:id/unlock', async (req, res) => {
   try {
     const { id } = req.params;
     const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'unlock-post', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many unlock requests. Please wait.' });
+    }
     const userId = req.body.userId || null;
 
-    const doc = await db.collection('campaigns').doc(id).get();
-    if (!doc.exists) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
-    const data = doc.data();
-    if (data.status === 'deleted') {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
+    await db.runTransaction(async (transaction) => {
+      const docRef = db.collection('campaigns').doc(id);
+      const doc = await transaction.get(docRef);
+      if (!doc.exists) {
+        throw new Error('Campaign not found');
+      }
+      const data = doc.data();
+      if (data.status === 'deleted') {
+        throw new Error('Campaign not found');
+      }
 
-    const alreadyUnlocked = await hasPerformedAction(id, userId, ip, 'unlocks');
-    if (alreadyUnlocked) {
-      return res.json({ success: true, message: 'Already unlocked' });
-    }
+      const docId = userId ? `user_${userId}` : `ip_${ip}`;
+      const actionDocRef = docRef.collection('unlocks').doc(docId);
+      const actionDoc = await transaction.get(actionDocRef);
+      if (actionDoc.exists) {
+        throw new Error('Already unlocked');
+      }
 
-    await doc.ref.update({
-      unlockCount: admin.firestore.FieldValue.increment(1),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      transaction.update(docRef, {
+        unlockCount: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(actionDocRef, {
+        userId: userId || null,
+        ip: ip || 'unknown',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
-
-    await recordAction(id, userId, ip, 'unlocks');
 
     res.json({ success: true, message: 'Campaign unlocked!' });
   } catch (error) {
     console.error('❌ Unlock error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    if (error.message === 'Already unlocked') {
+      return res.json({ success: true, message: 'Already unlocked' });
+    }
+    res.status(500).json({ success: false, error: error.message || 'Failed to record unlock' });
   }
 });
 
 // ============================================================
-// 14. USER STATS (cached per user, invalidated on campaign changes)
+// 14. USER STATS (cached, with ban check + rate limit)
 // ============================================================
-app.get('/api/stats', verifyToken, async (req, res) => {
+app.get('/api/stats', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'stats-get', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const cacheKey = `stats:user:${uid}`;
-
     const result = await getOrSetCache(cacheKey, async () => {
       console.log(`📡 Fetching stats for user ${uid} from Firestore...`);
       const snapshot = await db.collection('campaigns')
@@ -1514,7 +1660,6 @@ app.get('/api/stats', verifyToken, async (req, res) => {
       snapshot.forEach(doc => {
         const data = doc.data();
         if (data.status === 'deleted') return;
-
         totalCampaigns++;
         totalViews += data.views || 0;
         totalUnlocks += data.unlockCount || 0;
@@ -1537,7 +1682,6 @@ app.get('/api/stats', verifyToken, async (req, res) => {
         },
       };
     });
-
     res.json(result);
   } catch (error) {
     console.error('❌ Stats error:', error);
@@ -1546,13 +1690,17 @@ app.get('/api/stats', verifyToken, async (req, res) => {
 });
 
 // ============================================================
-// 15. SUPPORT TICKETS (cached per user, invalidated on new ticket)
+// 15. SUPPORT TICKETS
 // ============================================================
-app.get('/api/support', verifyToken, async (req, res) => {
+
+// ── Get tickets ── (authenticated, with ban check + rate limit)
+app.get('/api/support', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'support-get', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const cacheKey = `support:user:${uid}`;
-
     const result = await getOrSetCache(cacheKey, async () => {
       console.log(`📡 Fetching support tickets for user ${uid} from Firestore...`);
       const snapshot = await db.collection('supportTickets')
@@ -1573,10 +1721,8 @@ app.get('/api/support', verifyToken, async (req, res) => {
           updatedAt: data.updatedAt || null,
         });
       });
-
       return { success: true, tickets };
     });
-
     res.json(result);
   } catch (error) {
     console.error('Get support tickets error:', error);
@@ -1584,11 +1730,15 @@ app.get('/api/support', verifyToken, async (req, res) => {
   }
 });
 
-app.post('/api/support', verifyToken, async (req, res) => {
+// ── Create ticket ── (authenticated, with ban check + rate limit)
+app.post('/api/support', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const { title, description, image } = req.body;
+    if (!(await checkRateLimit(uid, 'support', 3, 3600))) {
+      return res.status(429).json({ success: false, error: 'Too many tickets. Please wait an hour.' });
+    }
 
+    const { title, description, image } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ success: false, error: 'Title is required' });
     }
@@ -1608,10 +1758,7 @@ app.post('/api/support', verifyToken, async (req, res) => {
 
     const docRef = await db.collection('supportTickets').add(ticketData);
     const newTicket = { id: docRef.id, ...ticketData };
-
-    // ── Invalidate support cache for this user ──
     await invalidateKey(`support:user:${uid}`);
-
     res.status(201).json({ success: true, ticket: newTicket });
   } catch (error) {
     console.error('Create support ticket error:', error);
@@ -1620,27 +1767,29 @@ app.post('/api/support', verifyToken, async (req, res) => {
 });
 
 // ============================================================
-// 16. COMMENTS (cached indefinitely, invalidated on new comment)
+// 16. COMMENTS
 // ============================================================
+
+// ── Get comments ── (public, IP rate limit)
 app.get('/api/comments', async (req, res) => {
   try {
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'comments-get', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
     const cacheKey = 'comments:all';
-
     const result = await getOrSetCache(cacheKey, async () => {
       console.log('📡 Fetching comments from Firestore...');
       const snapshot = await db.collection('comments')
         .orderBy('createdAt', 'desc')
         .limit(5)
         .get();
-
       const comments = [];
       snapshot.forEach(doc => {
         comments.push({ id: doc.id, ...doc.data() });
       });
-
       return { success: true, comments };
     });
-
     res.json(result);
   } catch (error) {
     console.error('❌ Get comments error:', error);
@@ -1648,10 +1797,15 @@ app.get('/api/comments', async (req, res) => {
   }
 });
 
+// ── Post comment ── (public, IP rate limit)
 app.post('/api/comments', async (req, res) => {
   try {
-    const { name, comment, rating } = req.body;
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'comment', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many comments. Please wait.' });
+    }
 
+    const { name, comment, rating } = req.body;
     if (!name || name.trim().length < 2) {
       return res.status(400).json({ success: false, error: 'Name must be at least 2 characters' });
     }
@@ -1675,10 +1829,7 @@ app.post('/api/comments', async (req, res) => {
 
     const docRef = await db.collection('comments').add(commentData);
     const newComment = { id: docRef.id, ...commentData };
-
-    // ── Invalidate comments cache ──
     await invalidateKey('comments:all');
-
     res.status(201).json({ success: true, comment: newComment });
   } catch (error) {
     console.error('❌ Post comment error:', error);
@@ -1689,10 +1840,22 @@ app.post('/api/comments', async (req, res) => {
 // ============================================================
 // 17. CLOUDINARY UPLOAD
 // ============================================================
-app.post('/api/upload', verifyToken, upload.single('image'), async (req, res) => {
+app.post('/api/upload', verifyToken, checkBanned, upload.single('image'), async (req, res) => {
   try {
+    const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'upload', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many uploads. Please wait a moment.' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No image provided' });
+    }
+
+    // ── Validate image content (sharp) ──
+    try {
+      await sharp(req.file.buffer).metadata();
+    } catch (err) {
+      return res.status(400).json({ success: false, error: 'Invalid image file' });
     }
 
     const result = await new Promise((resolve, reject) => {
