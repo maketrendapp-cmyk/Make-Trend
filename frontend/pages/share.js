@@ -6,7 +6,11 @@ import {
   FaShareAlt,
   FaCopy,
   FaCheckCircle,
+  FaRocket,
+  FaGift,
+  FaArrowRight,
 } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -30,9 +34,9 @@ export default function CampaignShare() {
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimCountdown, setClaimCountdown] = useState(2);
   const [verifying, setVerifying] = useState(false);
-  const [verifyingType, setVerifyingType] = useState('');
   const [verifyingCountdown, setVerifyingCountdown] = useState(0);
   const [toastMessage, setToastMessage] = useState('');
+  const [isHovering, setIsHovering] = useState(false);
 
   const timerRef = useRef(null);
   const claimTimerRef = useRef(null);
@@ -142,7 +146,7 @@ export default function CampaignShare() {
     return () => clearInterval(timerRef.current);
   }, [verifying, verifyingCountdown]);
 
-  // ── Native Share (opens system share sheet) ──
+  // ── Native Share ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
@@ -158,24 +162,20 @@ export default function CampaignShare() {
           text: description,
           url: shareUrl,
         });
-        // Count as a share
         startVerification('share', 6);
       } catch (err) {
         if (err.name !== 'AbortError') {
-          console.error('Share error:', err);
           setToastMessage('Share cancelled or failed.');
           setTimeout(() => setToastMessage(''), 3000);
         }
       }
     } else {
-      // Fallback: copy link
       copyLinkOnly(shareUrl);
       setToastMessage('📋 Link copied! (Native share not supported)');
       setTimeout(() => setToastMessage(''), 3000);
     }
   };
 
-  // ── Copy Link (fallback) ──
   const copyLinkOnly = async (url) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -285,10 +285,10 @@ export default function CampaignShare() {
     return (
       <>
         <Meta title="Loading" />
-        <div className="min-h-screen bg-gray-50 py-4 px-4 sm:py-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 py-8 px-4">
           <div className="max-w-3xl mx-auto animate-pulse">
             <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 overflow-hidden">
               <div className="aspect-video bg-gray-200" />
               <div className="p-6">
                 <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
@@ -329,14 +329,14 @@ export default function CampaignShare() {
 
   return (
     <>
-      <Meta title={`${campaign.title || 'Campaign'} - Share`} />
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-3 px-4 sm:py-4 sm:px-6 lg:px-8">
+      <Meta title={`${campaign.title || 'Campaign'} - Share to Unlock`} />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
 
           {/* ── Back Button ── */}
           <button
-            onClick={() => isComplete ? router.push('/') : router.back()}
-            className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-2 px-3 py-1.5 rounded-lg hover:bg-gray-100"
+            onClick={() => (isComplete ? router.push('/') : router.back())}
+            className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100"
           >
             <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -345,7 +345,7 @@ export default function CampaignShare() {
           </button>
 
           {/* ── Hero Card ── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-4 transition-all hover:shadow-md">
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 overflow-hidden mb-5 transition-all hover:shadow-2xl">
             <div className="relative aspect-video w-full bg-gray-200 overflow-hidden">
               {campaign.image ? (
                 <img
@@ -358,7 +358,8 @@ export default function CampaignShare() {
                   📤
                 </div>
               )}
-              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/60">
+              {/* Progress bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/80">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"
                   style={{ width: `${progress}%` }}
@@ -366,176 +367,211 @@ export default function CampaignShare() {
               </div>
             </div>
 
-            <div className="p-4 sm:p-5">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{campaign.title || 'Campaign'}</h1>
+            <div className="p-5 sm:p-6">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{campaign.title || 'Campaign'}</h1>
               {campaign.description && (
                 <p className="text-gray-500 text-sm sm:text-base mt-1">{campaign.description}</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-2 mt-2">
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 {campaign.reward && (
-                  <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-medium border border-amber-200">
-                    🎁 {campaign.reward}
+                  <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200">
+                    <FaGift className="w-3.5 h-3.5" />
+                    {campaign.reward}
                   </span>
                 )}
                 {shareCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-200">
+                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
                     📤 {shares}/{shareCount} shares
                   </span>
                 )}
                 {isComplete && (
-                  <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium border border-green-200">
-                    ✅ Complete
+                  <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
+                    <FaCheckCircle className="w-3.5 h-3.5" />
+                    Complete
                   </span>
                 )}
               </div>
 
-              {shareCount > 0 && (
-                <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
-                  <span className="flex items-center gap-2">
+              {shareCount > 0 && !isComplete && (
+                <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center gap-2">
                     <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
                     <span>complete</span>
-                  </span>
+                  </div>
                   <span>{shares}/{shareCount} shares</span>
                 </div>
               )}
+
+              {isComplete && (
+                <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-200 text-green-700 text-sm flex items-center gap-2">
+                  <FaCheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="font-medium">All shares completed! 🎉</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* ── Native Share + Copy Link ── */}
-          {shareCount > 0 && (
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 sm:p-5 text-center">
-              {/* Main Share Button */}
-              <button
+          {/* ── Share Section (Call-to-Action) ── */}
+          {shareCount > 0 && !isComplete && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden"
+            >
+              {/* Subtle background sparkle */}
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-100/30 rounded-full blur-2xl" />
+              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-100/20 rounded-full blur-2xl" />
+
+              {/* Icon + Heading */}
+              <div className="relative z-10">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-2xl mb-4 shadow-md">
+                  <FaRocket className="w-8 h-8 text-purple-600" />
+                </div>
+                <h2 className="text-2xl font-extrabold text-gray-900">
+                  {remaining === 1 ? 'Almost There!' : `Share ${remaining} More Time${remaining > 1 ? 's' : ''}`}
+                </h2>
+                <p className="text-gray-500 text-sm mt-1 max-w-sm mx-auto">
+                  {remaining === 1
+                    ? 'One more share unlocks your reward!'
+                    : `Share this campaign with your friends to unlock "${campaign.reward || 'your reward'}"`}
+                </p>
+              </div>
+
+              {/* Share Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onHoverStart={() => setIsHovering(true)}
+                onHoverEnd={() => setIsHovering(false)}
                 onClick={handleNativeShare}
                 disabled={verifying || isSharing}
-                className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-2xl text-lg shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`
+                  relative z-10 mt-5 w-full inline-flex items-center justify-center gap-3 px-6 py-4 
+                  bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg rounded-2xl 
+                  shadow-lg hover:shadow-xl transition-all duration-200 
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  ${isHovering ? 'shadow-purple-200/50' : ''}
+                `}
               >
-                <FaShareAlt className="w-5 h-5" />
-                {verifying ? 'Verifying...' : 'Share Campaign'}
-              </button>
+                <FaShareAlt className={`w-5 h-5 ${isHovering ? 'animate-bounce' : ''}`} />
+                {verifying ? `Verifying (${verifyingCountdown}s)` : 'Share Now & Unlock'}
+                <FaArrowRight className="w-4 h-4" />
+              </motion.button>
 
-              {/* Copy Link fallback */}
-              <button
-                onClick={handleCopyLink}
-                disabled={verifying || isSharing}
-                className="mt-3 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-purple-600 transition-colors duration-200"
-              >
-                <FaCopy className="w-4 h-4" />
-                {isCopied ? 'Copied!' : 'Copy Link'}
-              </button>
-
-              {verifying && (
-                <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-center gap-3 text-amber-700">
-                  <span className="animate-pulse">⏳</span>
-                  <span>Verifying share... {verifyingCountdown}s</span>
-                </div>
-              )}
+              {/* Copy link (fallback) */}
+              <div className="relative z-10 mt-4 flex items-center justify-center gap-2 text-sm">
+                <span className="text-gray-400">or</span>
+                <button
+                  onClick={handleCopyLink}
+                  className="inline-flex items-center gap-1.5 text-purple-600 hover:text-purple-800 transition-colors font-medium"
+                >
+                  <FaCopy className="w-3.5 h-3.5" />
+                  {isCopied ? 'Copied!' : 'Copy Link'}
+                </button>
+              </div>
 
               {toastMessage && (
-                <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative z-10 mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm"
+                >
                   {toastMessage}
-                </div>
+                </motion.div>
               )}
-
-              {!isComplete && (
-                <p className="mt-4 text-sm text-gray-500">
-                  {shareAttempt === 0 && 'Share to start (0% counted)'}
-                  {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount*0.25)} shares (25% progress)`}
-                  {shareAttempt === 2 && `Share again to add ${Math.ceil(shareCount*0.5)} shares (75% progress)`}
-                  {shareAttempt === 3 && `One more share to complete!`}
-                </p>
-              )}
-            </div>
+            </motion.div>
           )}
 
           {/* ── Claim Button ── */}
-          <div className="mt-5">
-            <button
-              onClick={handleClaim}
-              disabled={!isComplete || isCompleting}
-              className={`w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
-                isComplete && !isCompleting
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isCompleting ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Processing...
-                </span>
-              ) : (
-                <>🎁 Claim</>
-              )}
-            </button>
+          {!isComplete && shareCount === 0 && (
+            <div className="mt-6 p-4 bg-amber-50 rounded-2xl border border-amber-200 text-center">
+              <p className="text-amber-700 font-medium">
+                No shares required – you can claim your reward directly!
+              </p>
+              <button
+                onClick={handleClaim}
+                className="mt-3 inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:shadow-lg transition"
+              >
+                <FaGift className="w-4 h-4" />
+                Claim Now
+              </button>
+            </div>
+          )}
 
-            {shareCount > 0 && !isComplete && (
-              <p className="mt-2 text-center text-xs text-gray-400">
-                {remaining} share{remaining > 1 ? 's' : ''} remaining
+          {isComplete && (
+            <div className="mt-6">
+              <button
+                onClick={handleClaim}
+                className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.01] active:scale-[0.98]"
+              >
+                <FaGift className="w-5 h-5" />
+                Claim Your Reward
+                <FaArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {!isComplete && shareCount > 0 && (
+            <div className="mt-5 text-center text-xs text-gray-400">
+              <p>
+                {remaining === 1
+                  ? '🔒 One more share required to unlock the reward!'
+                  : `🔒 ${remaining} more share${remaining > 1 ? 's' : ''} needed to unlock`}
               </p>
-            )}
-            {isComplete && shareCount > 0 && (
-              <p className="mt-2 text-center text-xs text-green-600 font-medium">
-                ✅ All shares completed – claim your reward!
-              </p>
-            )}
-            {shareCount === 0 && (
-              <p className="mt-2 text-center text-xs text-green-600 font-medium">
-                No shares required – claim your reward now!
-              </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── Claim Success Modal ── */}
-      {showClaimModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl animate-scaleIn border border-gray-100 my-8">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center animate-bounce-in">
-              <FaCheckCircle className="w-10 h-10 text-green-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">🎉 Claim Successful!</h2>
-            <p className="text-gray-500 mt-2">
-              {campaign?.reward ? `You've claimed: ${campaign.reward}` : 'Your reward has been claimed successfully!'}
-            </p>
-            <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-sm text-gray-500">
-                Redirecting in <strong className="text-purple-600">{claimCountdown}s</strong>
-              </p>
-              <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 rounded-full"
-                  style={{ width: `${((2 - claimCountdown) / 2) * 100}%` }}
-                />
+      <AnimatePresence>
+        {showClaimModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl border border-gray-100 my-8"
+            >
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+                <FaCheckCircle className="w-10 h-10 text-green-500" />
               </div>
-            </div>
-            <p className="text-xs text-gray-400 mt-4">You will be redirected shortly</p>
-          </div>
-        </div>
-      )}
+              <h2 className="text-2xl font-bold text-gray-900">🎉 Reward Unlocked!</h2>
+              <p className="text-gray-500 mt-2">
+                {campaign?.reward ? `You've claimed: ${campaign.reward}` : 'Your reward has been claimed successfully!'}
+              </p>
+              <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <p className="text-sm text-gray-500">
+                  Redirecting in <strong className="text-purple-600">{claimCountdown}s</strong>
+                </p>
+                <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 rounded-full"
+                    style={{ width: `${((2 - claimCountdown) / 2) * 100}%` }}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-4">You will be redirected shortly</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
         }
-        @keyframes scaleIn {
-          from { transform: scale(0.9); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
+        .animate-bounce {
+          animation: bounce 0.6s infinite;
         }
-        @keyframes bounceIn {
-          0% { transform: scale(0); opacity: 0; }
-          60% { transform: scale(1.1); }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .animate-scaleIn { animation: scaleIn 0.3s ease-out; }
-        .animate-bounce-in { animation: bounceIn 0.5s ease-out; }
       `}</style>
     </>
   );
