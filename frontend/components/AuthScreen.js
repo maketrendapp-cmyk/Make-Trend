@@ -52,28 +52,41 @@ async function apiRequest(endpoint, options = {}, token = null) {
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // ── Instant auth from localStorage ──
-  const storedAuth = (() => {
-    try {
-      const raw = localStorage.getItem(AUTH_CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.uid) return parsed;
-      return null;
-    } catch {
-      return null;
-    }
-  })();
-
-  const [user, setUser] = useState(storedAuth || null);
-  const [loading, setLoading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!storedAuth);
+  // ── State (initialized as false/empty for server-side rendering) ──
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
-  const uidRef = useRef(storedAuth?.uid || null);
+  const uidRef = useRef(null);
   const { invalidateAll } = useInvalidateQueries();
 
-  // ── Helper to cache auth info ──
+  // ── Read from localStorage only on the client after mount ──
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AUTH_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.uid) {
+          setUser({
+            uid: parsed.uid,
+            email: parsed.email || '',
+            displayName: parsed.displayName || '',
+            photoURL: parsed.photoURL || '',
+            username: parsed.username || '',
+          });
+          setIsAuthenticated(true);
+          uidRef.current = parsed.uid;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to read auth cache:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ── Helper to cache auth info (now stores username) ──
   const cacheAuth = (authData) => {
     if (authData && authData.uid) {
       localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({
@@ -81,6 +94,7 @@ export function AuthProvider({ children }) {
         email: authData.email || '',
         displayName: authData.displayName || '',
         photoURL: authData.photoURL || '',
+        username: authData.username || '',
       }));
     } else {
       localStorage.removeItem(AUTH_CACHE_KEY);
@@ -134,7 +148,9 @@ export function AuthProvider({ children }) {
   // ============================================================
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-    if (firebaseUser && uidRef.current === firebaseUser.uid) return;
+    if (firebaseUser) {
+      // If already set to this user, skip re-fetching
+      if (uidRef.current === firebaseUser.uid) return;
 
     if (firebaseUser) {
       const basicUser = {
@@ -190,6 +206,7 @@ useEffect(() => {
   // ============================================================
 
   const login = async (email, password) => {
+    setLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
@@ -237,10 +254,13 @@ useEffect(() => {
       if (error.code === 'auth/wrong-password') message = 'Incorrect password.';
       if (error.code === 'auth/too-many-requests') message = 'Too many attempts. Please wait.';
       return { success: false, error: message };
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async (email, password, fullname, username, avatarUrl, referralCode = '') => {
+    setLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
@@ -279,11 +299,14 @@ useEffect(() => {
       if (error.code === 'auth/email-already-in-use') message = 'Email already registered.';
       if (error.code === 'auth/weak-password') message = 'Password must be at least 6 characters.';
       return { success: false, error: message };
+    } finally {
+      setLoading(false);
     }
   };
 
   const socialLogin = async (providerName) => {
     setIsSocialLoading(true);
+    setLoading(true);
     let provider;
     if (providerName === 'google') {
       provider = new GoogleAuthProvider();
@@ -295,6 +318,7 @@ useEffect(() => {
       provider.addScope('public_profile');
     } else {
       setIsSocialLoading(false);
+      setLoading(false);
       return { success: false, error: 'Unsupported provider' };
     }
 
@@ -323,6 +347,7 @@ useEffect(() => {
           localStorage.removeItem(AUTH_CACHE_KEY);
           setUser(null);
           setIsAuthenticated(false);
+          setLoading(false);
           setIsSocialLoading(false);
           return { success: false, error: 'Account suspended.' };
         }
@@ -343,12 +368,14 @@ useEffect(() => {
         setNeedsCompletion(true);
       }
 
+      setLoading(false);
       setIsSocialLoading(false);
       return { success: true, needsCompletion: true, user: user };
     } catch (error) {
       let message = 'Unable to sign in.';
       if (error.code === 'auth/popup-blocked') message = 'Popup blocked. Please allow popups.';
       if (error.code === 'auth/popup-closed-by-user') message = 'Popup closed. Try again.';
+      setLoading(false);
       setIsSocialLoading(false);
       return { success: false, error: message };
     }
