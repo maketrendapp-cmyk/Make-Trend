@@ -33,7 +33,7 @@ export default function CampaignShare() {
   const [isSharing, setIsSharing] = useState(false);
   const [sharesComplete, setSharesComplete] = useState(false);
   const [shareProgress, setShareProgress] = useState(0);
-  const [shareAttempt, setShareAttempt] = useState(0); // 0,1,2,3
+  const [shareAttempt, setShareAttempt] = useState(0);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimCountdown, setClaimCountdown] = useState(2);
   const [verifying, setVerifying] = useState(false);
@@ -117,7 +117,6 @@ export default function CampaignShare() {
     }
   };
 
-  // ── Claim modal countdown ──
   useEffect(() => {
     if (showClaimModal && claimCountdown > 0) {
       claimTimerRef.current = setInterval(() => {
@@ -134,7 +133,6 @@ export default function CampaignShare() {
     return () => clearInterval(claimTimerRef.current);
   }, [showClaimModal, claimCountdown]);
 
-  // ── Verification timer ──
   useEffect(() => {
     if (verifying && verifyingCountdown > 0) {
       timerRef.current = setInterval(() => {
@@ -151,7 +149,6 @@ export default function CampaignShare() {
     return () => clearInterval(timerRef.current);
   }, [verifying, verifyingCountdown]);
 
-  // ── Handle share click ──
   const handleShare = (platform, type) => {
     if (verifying || isSharing) return;
     if (shareCount === 0) return;
@@ -172,9 +169,9 @@ export default function CampaignShare() {
     // Open share dialog
     if (type === 'message') {
       const forwardUrls = {
-        whatsapp: `https://wa.me/?text=${encodeURIComponent(fullText)}`,
+        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullText)}`,
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareUrl)}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
-        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
       };
       window.open(forwardUrls[platform], '_blank');
     } else if (type === 'post') {
@@ -189,11 +186,9 @@ export default function CampaignShare() {
       return;
     }
 
-    // Start verification for message/post (6 seconds)
     startVerification('share', 6);
   };
 
-  // ── Copy link only (no counting) ──
   const copyLinkOnly = async (url) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -211,21 +206,18 @@ export default function CampaignShare() {
     }
   };
 
-  // ── Start verification ──
   const startVerification = (type, duration) => {
     setVerifying(true);
     setVerifyingType(type);
     setVerifyingCountdown(duration);
   };
 
-  // ── Finish verification ──
   const finishVerification = () => {
     setVerifying(false);
     setVerifyingType('');
     setVerifyingCountdown(0);
 
     if (verifyingType === 'copy') {
-      // Copy adds +1 share (if not complete)
       if (!sharesComplete) {
         const increment = 1;
         const remaining = shareCount - shares;
@@ -237,15 +229,11 @@ export default function CampaignShare() {
       return;
     }
 
-    // For message/post: use the 4‑step algorithm
     if (verifyingType === 'share') {
-      // Only increment if not complete
       if (sharesComplete) return;
 
       let increment = 0;
-      // shareAttempt: 0,1,2,3
       if (shareAttempt === 0) {
-        // First share: +0%, just advance attempt
         increment = 0;
         setShareAttempt(1);
       } else if (shareAttempt === 1) {
@@ -255,15 +243,12 @@ export default function CampaignShare() {
         increment = Math.ceil(shareCount * 0.5);
         setShareAttempt(3);
       } else if (shareAttempt === 3) {
-        // Attempt 3: add remaining to complete
         increment = shareCount - shares;
-        // If shares already at shareCount, increment will be 0
         if (increment > 0) {
-          setShareAttempt(3); // stay at 3
+          setShareAttempt(3);
         }
       }
 
-      // Ensure we don't exceed shareCount
       const remaining = shareCount - shares;
       if (increment > remaining) increment = remaining;
 
@@ -273,7 +258,6 @@ export default function CampaignShare() {
     }
   };
 
-  // ── Increment shares ──
   const incrementShares = async (amount) => {
     try {
       const res = await fetch(`${API_BASE}/campaigns/${id}/share`, {
@@ -296,7 +280,6 @@ export default function CampaignShare() {
     }
   };
 
-  // ── Claim ──
   const handleClaim = () => {
     if (!sharesComplete || isCompleting) return;
     setShowClaimModal(true);
@@ -316,19 +299,20 @@ export default function CampaignShare() {
   const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const remaining = Math.max(shareCount - shares, 0);
 
-  const forwardPlatforms = [
+  // ── Message Platforms (NEW ORDER: Messenger → WhatsApp → Telegram → Instagram) ──
+  const messagePlatforms = [
+    { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
     { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
     { id: 'telegram', label: 'Telegram', icon: FaTelegram, color: 'bg-blue-500 hover:bg-blue-600' },
-    { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
     { id: 'instagram', label: 'Instagram', icon: FaInstagram, color: 'bg-pink-500 hover:bg-pink-600' },
   ];
 
+  // ── Post Platforms ──
   const postPlatforms = [
     { id: 'facebook', label: 'Facebook', icon: FaFacebook, color: 'bg-blue-700 hover:bg-blue-800' },
     { id: 'twitter', label: 'Twitter', icon: FaTwitter, color: 'bg-sky-500 hover:bg-sky-600' },
   ];
 
-  // ── Skeleton Loader ──
   if (loading) {
     return (
       <>
@@ -452,53 +436,15 @@ export default function CampaignShare() {
             </div>
           </div>
 
-          {/* ── Share Link with Copy Button ── */}
-          {shareCount > 0 && (
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
-                <FaLink className="text-purple-500" /> Share Link
-              </h2>
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <input
-                  type="text"
-                  value={shareUrl}
-                  readOnly
-                  className="flex-1 bg-transparent outline-none text-sm font-mono text-gray-600 truncate"
-                />
-                <button
-                  onClick={() => handleShare('copy', 'copy')}
-                  disabled={verifying || isSharing}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
-                    isCopied
-                      ? 'bg-green-500 text-white'
-                      : verifying && verifyingType === 'copy'
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-[0.97]'
-                  }`}
-                >
-                  {verifying && verifyingType === 'copy' ? (
-                    <>Verifying {verifyingCountdown}s</>
-                  ) : isCopied ? (
-                    '✅ Copied!'
-                  ) : (
-                    <>
-                      <FaCopy className="w-3.5 h-3.5" /> Copy
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* ── Share Platforms ── */}
           {shareCount > 0 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7">
-              {/* Forward / Message */}
+              {/* ── Message Section ── */}
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
                 <FaPaperPlane className="text-purple-500" /> Share via Message
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                {forwardPlatforms.map((platform) => {
+                {messagePlatforms.map((platform) => {
                   const Icon = platform.icon;
                   return (
                     <button
@@ -514,7 +460,7 @@ export default function CampaignShare() {
                 })}
               </div>
 
-              {/* Post / Publish */}
+              {/* ── Post Section ── */}
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
                 <FaShareAlt className="text-purple-500" /> Post / Publish
               </h2>
@@ -583,7 +529,6 @@ export default function CampaignShare() {
               )}
             </button>
 
-            {/* Helper text */}
             {shareCount > 0 && !isComplete && (
               <p className="mt-2 text-center text-xs text-gray-400">
                 {remaining} share{remaining > 1 ? 's' : ''} remaining
