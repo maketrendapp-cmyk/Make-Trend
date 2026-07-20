@@ -94,27 +94,61 @@ export default function Create() {
     return filteredAll.filter(t => !t.isHighlight);
   }, [filteredAll]);
 
-  // ── Carousel auto-slide ──
+  // ── Filtered featured templates (respects search & filters) ──
+  const filteredFeatured = useMemo(() => {
+    let filtered = [...featuredTemplates];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q) ||
+        (t.hashtags || []).join(' ').toLowerCase().includes(q) ||
+        (t.category || '').toLowerCase().includes(q) ||
+        (t.platform || '').toLowerCase().includes(q)
+      );
+    }
+    if (selectedCategory && selectedCategory !== 'All') {
+      filtered = filtered.filter(t => t.category === selectedCategory);
+    }
+    if (selectedPlatform && selectedPlatform !== 'All') {
+      filtered = filtered.filter(t => t.platform === selectedPlatform);
+    }
+    return filtered;
+  }, [featuredTemplates, searchQuery, selectedCategory, selectedPlatform]);
+
+  // ── Carousel auto-slide (pauses when filters are active) ──
   useEffect(() => {
-    if (featuredTemplates.length > 1) {
+    const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
+    // Clear any existing interval first
+    if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
+    carouselIntervalRef.current = null;
+
+    if (filteredFeatured.length > 1 && !hasFilters) {
       carouselIntervalRef.current = setInterval(() => {
-  setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
-}, 2000);
+        setCarouselIndex(prev => (prev + 1) % filteredFeatured.length);
+      }, 2000);
+    } else {
+      // Reset to first slide when filters change
+      setCarouselIndex(0);
     }
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [featuredTemplates.length]);
+  }, [filteredFeatured.length, searchQuery, selectedCategory, selectedPlatform]);
 
   const goToSlide = useCallback((index) => {
     setCarouselIndex(index);
+    // Reset auto‑play timer when user manually changes slide
     if (carouselIntervalRef.current) {
       clearInterval(carouselIntervalRef.current);
-      carouselIntervalRef.current = setInterval(() => {
-  setCarouselIndex(prev => (prev + 1) % featuredTemplates.length);
-}, 2000);
+      const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
+      if (filteredFeatured.length > 1 && !hasFilters) {
+        carouselIntervalRef.current = setInterval(() => {
+          setCarouselIndex(prev => (prev + 1) % filteredFeatured.length);
+        }, 2000);
+      }
     }
-  }, [featuredTemplates.length]);
+  }, [filteredFeatured.length, searchQuery, selectedCategory, selectedPlatform]);
 
   // ── Filters dropdown options ──
   const categories = useMemo(() => {
@@ -271,14 +305,18 @@ export default function Create() {
         </div>
 
         {/* ── Featured Templates Spotlight ── */}
-        {featuredTemplates.length > 0 && (
+        {filteredFeatured.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-1 mb-2 px-0.5">
               <span className="text-amber-500 text-sm">★</span>
-              <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Featured Template</h2>
-              <span className="text-[9px] bg-primary/10 text-primary px-1 rounded-full font-extrabold ml-2 flex items-center">
-                Auto-play
-              </span>
+              <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                {searchQuery || selectedCategory || selectedPlatform ? 'Featured Results' : 'Featured Template'}
+              </h2>
+              {!searchQuery && !selectedCategory && !selectedPlatform && (
+                <span className="text-[9px] bg-primary/10 text-primary px-1 rounded-full font-extrabold ml-2 flex items-center">
+                  Auto-play
+                </span>
+              )}
             </div>
 
             <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
@@ -286,7 +324,7 @@ export default function Create() {
                 className="flex transition-transform duration-700 ease-in-out"
                 style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
               >
-                {featuredTemplates.map((template) => (
+                {filteredFeatured.map((template) => (
                   <div key={template.id} className="w-full flex-shrink-0">
                     <div className="flex flex-col">
                       <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
@@ -295,6 +333,7 @@ export default function Create() {
                             src={template.image}
                             alt={template.title}
                             className="w-full h-full object-cover"
+                            loading="lazy"
                           />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
@@ -352,11 +391,11 @@ export default function Create() {
               </div>
 
               {/* ── Prev / Next Buttons ── */}
-              {featuredTemplates.length > 1 && (
+              {filteredFeatured.length > 1 && (
                 <>
                   <button
                     type="button"
-                    onClick={() => goToSlide((carouselIndex - 1 + featuredTemplates.length) % featuredTemplates.length)}
+                    onClick={() => goToSlide((carouselIndex - 1 + filteredFeatured.length) % filteredFeatured.length)}
                     className="absolute left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
                     aria-label="Previous slide"
                   >
@@ -366,7 +405,7 @@ export default function Create() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => goToSlide((carouselIndex + 1) % featuredTemplates.length)}
+                    onClick={() => goToSlide((carouselIndex + 1) % filteredFeatured.length)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
                     aria-label="Next slide"
                   >
@@ -378,9 +417,9 @@ export default function Create() {
               )}
 
               {/* ── Dots ── */}
-              {featuredTemplates.length > 1 && (
+              {filteredFeatured.length > 1 && (
                 <div className="absolute bottom-24 right-3 flex gap-1 z-20">
-                  {featuredTemplates.map((_, idx) => (
+                  {filteredFeatured.map((_, idx) => (
                     <button
                       key={idx}
                       type="button"
