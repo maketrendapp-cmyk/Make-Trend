@@ -152,7 +152,6 @@ useEffect(() => {
       // If already set to this user, skip re-fetching
       if (uidRef.current === firebaseUser.uid) return;
 
-    if (firebaseUser) {
       const basicUser = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
