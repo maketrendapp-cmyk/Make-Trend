@@ -17,6 +17,7 @@ import {
   FacebookAuthProvider,
 } from '../services/firebase';
 import { useInvalidateQueries } from '../lib/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../components/Meta';
 import { motion } from 'framer-motion';
 import {
@@ -418,18 +419,21 @@ useEffect(() => {
   };
 
   const logout = async () => {
-    try {
-      await signOut(auth);
-      localStorage.removeItem(AUTH_CACHE_KEY);
-      setUser(null);
-      setIsAuthenticated(false);
-      setNeedsCompletion(false);
-      uidRef.current = null;
-      return { success: true };
-    } catch {
-      return { success: false, error: 'Logout failed' };
-    }
-  };
+  try {
+    await signOut(auth);
+    localStorage.removeItem(AUTH_CACHE_KEY);
+    setUser(null);
+    setIsAuthenticated(false);
+    setNeedsCompletion(false);
+    uidRef.current = null;
+    // ── Clear React Query cache ──
+    const queryClient = useQueryClient();
+    queryClient.clear();
+    return { success: true };
+  } catch {
+    return { success: false, error: 'Logout failed' };
+  }
+};
 
   const resetPassword = async (email) => {
     try {
