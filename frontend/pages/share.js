@@ -7,7 +7,7 @@ import {
   FaTelegram,
   FaFacebook,
   FaTwitter,
-  FaInstagram,
+  FaCopy,
   FaCheckCircle,
   FaShareAlt,
   FaPaperPlane,
@@ -156,15 +156,15 @@ export default function CampaignShare() {
     const description = campaign?.description || '';
     const fullText = description ? `${title}\n${description}\n\n${shareUrl}` : `${title}\n\n${shareUrl}`;
 
-    // Instagram: copy link and show toast
-    if (platform === 'instagram') {
+    // ── Copy Link (replaces Instagram) ──
+    if (platform === 'copy') {
       copyLinkOnly(shareUrl);
-      setToastMessage('📋 Link copied! Share with your friends.');
+      setToastMessage('📋 Link copied!');
       setTimeout(() => setToastMessage(''), 3000);
       return;
     }
 
-    // Open share dialog
+    // ── Messenger, WhatsApp, Telegram (messages) ──
     if (type === 'message') {
       const forwardUrls = {
         messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullText)}`,
@@ -282,14 +282,15 @@ export default function CampaignShare() {
   const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const remaining = Math.max(shareCount - shares, 0);
 
-  // Message platforms order: Messenger → WhatsApp → Telegram → Instagram
+  // ── Message Platforms: Messenger → WhatsApp → Telegram → Copy Link ──
   const messagePlatforms = [
     { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
     { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
     { id: 'telegram', label: 'Telegram', icon: FaTelegram, color: 'bg-blue-500 hover:bg-blue-600' },
-    { id: 'instagram', label: 'Instagram', icon: FaInstagram, color: 'bg-pink-500 hover:bg-pink-600' },
+    { id: 'copy', label: 'Copy Link', icon: FaCopy, color: 'bg-gray-700 hover:bg-gray-800' },
   ];
 
+  // ── Post Platforms ──
   const postPlatforms = [
     { id: 'facebook', label: 'Facebook', icon: FaFacebook, color: 'bg-blue-700 hover:bg-blue-800' },
     { id: 'twitter', label: 'Twitter', icon: FaTwitter, color: 'bg-sky-500 hover:bg-sky-600' },
@@ -352,7 +353,7 @@ export default function CampaignShare() {
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-3 px-4 sm:py-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
 
-          {/* ── Back Button (tighter spacing) ── */}
+          {/* ── Back Button ── */}
           <button
             onClick={() => isComplete ? router.push('/') : router.back()}
             className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-2 px-3 py-1.5 rounded-lg hover:bg-gray-100"
@@ -363,9 +364,8 @@ export default function CampaignShare() {
             {isComplete ? 'Back to Home' : 'Back'}
           </button>
 
-          {/* ── Hero Card (reduced margin) ── */}
+          {/* ── Hero Card ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-4 transition-all hover:shadow-md">
-            {/* Image container with 16:9 aspect ratio and full width */}
             <div className="relative aspect-video w-full bg-gray-200 overflow-hidden">
               {campaign.image ? (
                 <img
@@ -378,7 +378,6 @@ export default function CampaignShare() {
                   📤
                 </div>
               )}
-              {/* Progress bar overlay at bottom */}
               <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/60">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"
@@ -423,7 +422,7 @@ export default function CampaignShare() {
             </div>
           </div>
 
-          {/* ── Share Platforms (reduced padding) ── */}
+          {/* ── Share Platforms ── */}
           {shareCount > 0 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 sm:p-5">
               {/* ── Message Section ── */}
