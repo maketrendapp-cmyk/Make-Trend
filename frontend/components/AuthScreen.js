@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const uidRef = useRef(null);
   const { invalidateAll } = useInvalidateQueries();
+  const queryClient = useQueryClient();
 
   // ── Read from localStorage only on the client after mount ──
   useEffect(() => {
@@ -419,21 +420,20 @@ useEffect(() => {
   };
 
   const logout = async () => {
-  try {
-    await signOut(auth);
-    localStorage.removeItem(AUTH_CACHE_KEY);
-    setUser(null);
-    setIsAuthenticated(false);
-    setNeedsCompletion(false);
-    uidRef.current = null;
-    // ── Clear React Query cache ──
-    const queryClient = useQueryClient();
-    queryClient.clear();
-    return { success: true };
-  } catch {
-    return { success: false, error: 'Logout failed' };
-  }
-};
+    try {
+      await signOut(auth);
+      localStorage.removeItem(AUTH_CACHE_KEY);
+      setUser(null);
+      setIsAuthenticated(false);
+      setNeedsCompletion(false);
+      uidRef.current = null;
+      // ── Clear React Query cache ──
+      queryClient.clear();
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Logout failed' };
+    }
+  };
 
   const resetPassword = async (email) => {
     try {
