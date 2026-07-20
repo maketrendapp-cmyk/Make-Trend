@@ -3,14 +3,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import {
-  FaWhatsapp,
-  FaTelegram,
-  FaFacebook,
-  FaTwitter,
+  FaShareAlt,
   FaCopy,
   FaCheckCircle,
-  FaShareAlt,
-  FaPaperPlane,
 } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
@@ -147,43 +142,40 @@ export default function CampaignShare() {
     return () => clearInterval(timerRef.current);
   }, [verifying, verifyingCountdown]);
 
-  const handleShare = (platform, type) => {
-    if (verifying || isSharing) return;
+  // ── Native Share (opens system share sheet) ──
+  const handleNativeShare = async () => {
+    if (isSharing || verifying) return;
     if (shareCount === 0) return;
 
     const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
     const title = campaign?.title || 'Check this out!';
     const description = campaign?.description || '';
-    const fullText = description ? `${title}\n${description}\n\n${shareUrl}` : `${title}\n\n${shareUrl}`;
 
-    // ── Copy Link (replaces Instagram) ──
-    if (platform === 'copy') {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: description,
+          url: shareUrl,
+        });
+        // Count as a share
+        startVerification('share', 6);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Share error:', err);
+          setToastMessage('Share cancelled or failed.');
+          setTimeout(() => setToastMessage(''), 3000);
+        }
+      }
+    } else {
+      // Fallback: copy link
       copyLinkOnly(shareUrl);
-      setToastMessage('📋 Link copied!');
+      setToastMessage('📋 Link copied! (Native share not supported)');
       setTimeout(() => setToastMessage(''), 3000);
-      return;
     }
-
-    // ── Messenger, WhatsApp, Telegram (messages) ──
-    if (type === 'message') {
-      const forwardUrls = {
-        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullText)}`,
-        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareUrl)}`,
-        telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
-      };
-      window.open(forwardUrls[platform], '_blank');
-    } else if (type === 'post') {
-      const postUrls = {
-        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(title)}`,
-        twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`,
-      };
-      window.open(postUrls[platform], '_blank');
-    }
-
-    // Start verification for message/post
-    startVerification('share', 6);
   };
 
+  // ── Copy Link (fallback) ──
   const copyLinkOnly = async (url) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -199,6 +191,13 @@ export default function CampaignShare() {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 3000);
     }
+  };
+
+  const handleCopyLink = () => {
+    const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
+    copyLinkOnly(shareUrl);
+    setToastMessage('📋 Link copied!');
+    setTimeout(() => setToastMessage(''), 3000);
   };
 
   const startVerification = (type, duration) => {
@@ -246,7 +245,7 @@ export default function CampaignShare() {
       const res = await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'manual' }),
+        body: JSON.stringify({ platform: 'native' }),
       });
       const data = await res.json();
       if (data.success) {
@@ -282,20 +281,6 @@ export default function CampaignShare() {
   const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const remaining = Math.max(shareCount - shares, 0);
 
-  // ── Message Platforms: Messenger → WhatsApp → Telegram → Copy Link ──
-  const messagePlatforms = [
-    { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
-    { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
-    { id: 'telegram', label: 'Telegram', icon: FaTelegram, color: 'bg-blue-500 hover:bg-blue-600' },
-    { id: 'copy', label: 'Copy Link', icon: FaCopy, color: 'bg-gray-700 hover:bg-gray-800' },
-  ];
-
-  // ── Post Platforms ──
-  const postPlatforms = [
-    { id: 'facebook', label: 'Facebook', icon: FaFacebook, color: 'bg-blue-700 hover:bg-blue-800' },
-    { id: 'twitter', label: 'Twitter', icon: FaTwitter, color: 'bg-sky-500 hover:bg-sky-600' },
-  ];
-
   if (loading) {
     return (
       <>
@@ -310,12 +295,7 @@ export default function CampaignShare() {
                 <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
                 <div className="h-6 w-32 bg-gray-200 rounded-full mb-6" />
                 <div className="h-3 w-full bg-gray-200 rounded mb-4" />
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-14 bg-gray-200 rounded-xl" />
-                  ))}
-                </div>
-                <div className="h-14 bg-gray-200 rounded-xl mt-6" />
+                <div className="h-14 bg-gray-200 rounded-xl" />
               </div>
             </div>
           </div>
@@ -422,67 +402,45 @@ export default function CampaignShare() {
             </div>
           </div>
 
-          {/* ── Share Platforms ── */}
+          {/* ── Native Share + Copy Link ── */}
           {shareCount > 0 && (
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 sm:p-5">
-              {/* ── Message Section ── */}
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
-                <FaPaperPlane className="text-purple-500" /> Share via Message
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                {messagePlatforms.map((platform) => {
-                  const Icon = platform.icon;
-                  return (
-                    <button
-                      key={platform.id}
-                      onClick={() => handleShare(platform.id, 'message')}
-                      disabled={verifying || isSharing}
-                      className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      {platform.label}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 sm:p-5 text-center">
+              {/* Main Share Button */}
+              <button
+                onClick={handleNativeShare}
+                disabled={verifying || isSharing}
+                className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-2xl text-lg shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FaShareAlt className="w-5 h-5" />
+                {verifying ? 'Verifying...' : 'Share Campaign'}
+              </button>
 
-              {/* ── Post Section ── */}
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
-                <FaShareAlt className="text-purple-500" /> Post / Publish
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {postPlatforms.map((platform) => {
-                  const Icon = platform.icon;
-                  return (
-                    <button
-                      key={platform.id}
-                      onClick={() => handleShare(platform.id, 'post')}
-                      disabled={verifying || isSharing}
-                      className={`flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl font-medium transition-all duration-200 ${platform.color} disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      {platform.label}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Copy Link fallback */}
+              <button
+                onClick={handleCopyLink}
+                disabled={verifying || isSharing}
+                className="mt-3 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-purple-600 transition-colors duration-200"
+              >
+                <FaCopy className="w-4 h-4" />
+                {isCopied ? 'Copied!' : 'Copy Link'}
+              </button>
 
-              {verifying && verifyingType !== 'copy' && (
-                <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3 text-amber-700">
+              {verifying && (
+                <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-center gap-3 text-amber-700">
                   <span className="animate-pulse">⏳</span>
                   <span>Verifying share... {verifyingCountdown}s</span>
                 </div>
               )}
 
               {toastMessage && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm">
+                <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm">
                   {toastMessage}
                 </div>
               )}
 
               {!isComplete && (
-                <p className="mt-4 text-sm text-gray-500 text-center">
-                  {shareAttempt === 0 && 'Open any share to start (0% counted)'}
+                <p className="mt-4 text-sm text-gray-500">
+                  {shareAttempt === 0 && 'Share to start (0% counted)'}
                   {shareAttempt === 1 && `Share again to add ${Math.ceil(shareCount*0.25)} shares (25% progress)`}
                   {shareAttempt === 2 && `Share again to add ${Math.ceil(shareCount*0.5)} shares (75% progress)`}
                   {shareAttempt === 3 && `One more share to complete!`}
