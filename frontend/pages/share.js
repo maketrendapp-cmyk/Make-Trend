@@ -8,10 +8,8 @@ import {
   FaFacebook,
   FaTwitter,
   FaInstagram,
-  FaLink,
   FaCheckCircle,
   FaShareAlt,
-  FaCopy,
   FaPaperPlane,
 } from 'react-icons/fa';
 
@@ -169,8 +167,8 @@ export default function CampaignShare() {
     // Open share dialog
     if (type === 'message') {
       const forwardUrls = {
-        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullText)}`,
-        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareUrl)}`,
+        messenger: `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`, // Only link (pre‑filled message not supported)
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareUrl)}`,         // Only link
         telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`,
       };
       window.open(forwardUrls[platform], '_blank');
@@ -180,12 +178,9 @@ export default function CampaignShare() {
         twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`,
       };
       window.open(postUrls[platform], '_blank');
-    } else if (type === 'copy') {
-      copyLinkOnly(shareUrl);
-      startVerification('copy', 7);
-      return;
     }
 
+    // Start verification for message/post
     startVerification('share', 6);
   };
 
@@ -216,18 +211,6 @@ export default function CampaignShare() {
     setVerifying(false);
     setVerifyingType('');
     setVerifyingCountdown(0);
-
-    if (verifyingType === 'copy') {
-      if (!sharesComplete) {
-        const increment = 1;
-        const remaining = shareCount - shares;
-        const finalIncrement = Math.min(increment, remaining);
-        if (finalIncrement > 0) {
-          incrementShares(finalIncrement);
-        }
-      }
-      return;
-    }
 
     if (verifyingType === 'share') {
       if (sharesComplete) return;
@@ -299,7 +282,7 @@ export default function CampaignShare() {
   const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const remaining = Math.max(shareCount - shares, 0);
 
-  // ── Message Platforms (NEW ORDER: Messenger → WhatsApp → Telegram → Instagram) ──
+  // Message platforms order: Messenger → WhatsApp → Telegram → Instagram
   const messagePlatforms = [
     { id: 'messenger', label: 'Messenger', icon: FaFacebook, color: 'bg-indigo-500 hover:bg-indigo-600' },
     { id: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, color: 'bg-green-500 hover:bg-green-600' },
@@ -307,7 +290,6 @@ export default function CampaignShare() {
     { id: 'instagram', label: 'Instagram', icon: FaInstagram, color: 'bg-pink-500 hover:bg-pink-600' },
   ];
 
-  // ── Post Platforms ──
   const postPlatforms = [
     { id: 'facebook', label: 'Facebook', icon: FaFacebook, color: 'bg-blue-700 hover:bg-blue-800' },
     { id: 'twitter', label: 'Twitter', icon: FaTwitter, color: 'bg-sky-500 hover:bg-sky-600' },
@@ -362,19 +344,18 @@ export default function CampaignShare() {
     );
   }
 
-  const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
   const isComplete = sharesComplete;
 
   return (
     <>
       <Meta title={`${campaign.title || 'Campaign'} - Share`} />
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-3 px-4 sm:py-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
 
-          {/* ── Back Button ── */}
+          {/* ── Back Button (tighter spacing) ── */}
           <button
             onClick={() => isComplete ? router.push('/') : router.back()}
-            className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100"
+            className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-2 px-3 py-1.5 rounded-lg hover:bg-gray-100"
           >
             <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -382,9 +363,9 @@ export default function CampaignShare() {
             {isComplete ? 'Back to Home' : 'Back'}
           </button>
 
-          {/* ── Hero Card ── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 transition-all hover:shadow-md">
-            <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gray-200">
+          {/* ── Hero Card (reduced margin) ── */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-4 transition-all hover:shadow-md">
+            <div className="relative h-40 sm:h-48 md:h-56 overflow-hidden bg-gray-200">
               {campaign.image ? (
                 <img src={campaign.image} alt={campaign.title} className="w-full h-full object-cover" />
               ) : (
@@ -400,32 +381,32 @@ export default function CampaignShare() {
               </div>
             </div>
 
-            <div className="p-5 sm:p-7">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{campaign.title || 'Campaign'}</h1>
+            <div className="p-4 sm:p-5">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{campaign.title || 'Campaign'}</h1>
               {campaign.description && (
                 <p className="text-gray-500 text-sm sm:text-base mt-1">{campaign.description}</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 {campaign.reward && (
-                  <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200">
+                  <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-medium border border-amber-200">
                     🎁 {campaign.reward}
                   </span>
                 )}
                 {shareCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
+                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-200">
                     📤 {shares}/{shareCount} shares
                   </span>
                 )}
                 {isComplete && (
-                  <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
+                  <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium border border-green-200">
                     ✅ Complete
                   </span>
                 )}
               </div>
 
               {shareCount > 0 && (
-                <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+                <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
                   <span className="flex items-center gap-2">
                     <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
                     <span>complete</span>
@@ -436,14 +417,14 @@ export default function CampaignShare() {
             </div>
           </div>
 
-          {/* ── Share Platforms ── */}
+          {/* ── Share Platforms (reduced padding) ── */}
           {shareCount > 0 && (
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 sm:p-5">
               {/* ── Message Section ── */}
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
                 <FaPaperPlane className="text-purple-500" /> Share via Message
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                 {messagePlatforms.map((platform) => {
                   const Icon = platform.icon;
                   return (
@@ -461,7 +442,7 @@ export default function CampaignShare() {
               </div>
 
               {/* ── Post Section ── */}
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-3">
                 <FaShareAlt className="text-purple-500" /> Post / Publish
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -506,7 +487,7 @@ export default function CampaignShare() {
           )}
 
           {/* ── Claim Button ── */}
-          <div className="mt-6">
+          <div className="mt-5">
             <button
               onClick={handleClaim}
               disabled={!isComplete || isCompleting}
