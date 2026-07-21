@@ -35,14 +35,14 @@ export default function CampaignShare() {
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimCountdown, setClaimCountdown] = useState(2);
   const [verifying, setVerifying] = useState(false);
-  const [verifyingType, setVerifyingType] = useState(''); // ✅ ADDED – was missing
+  const [verifyingType, setVerifyingType] = useState('');
   const [verifyingCountdown, setVerifyingCountdown] = useState(0);
   const [toastMessage, setToastMessage] = useState('');
   const [isHovering, setIsHovering] = useState(false);
 
   const timerRef = useRef(null);
   const claimTimerRef = useRef(null);
-  const isFinishingRef = useRef(false); // ✅ Guard against double calls
+  const isFinishingRef = useRef(false);
 
   useEffect(() => {
     if (id) fetchCampaignAndTemplate();
@@ -138,17 +138,14 @@ export default function CampaignShare() {
     return () => clearInterval(claimTimerRef.current);
   }, [showClaimModal, claimCountdown]);
 
-  // ── Verification timer (FIXED – using recursive setTimeout) ──
+  // ── Verification timer (recursive setTimeout) ──
   useEffect(() => {
-    // ✅ Don't start if not verifying or countdown is already 0
     if (!verifying || verifyingCountdown <= 0) return;
 
     const timer = setTimeout(() => {
       if (verifyingCountdown <= 1) {
-        // Time's up – finish verification
         finishVerification();
       } else {
-        // Decrement countdown
         setVerifyingCountdown((prev) => prev - 1);
       }
     }, 1000);
@@ -156,7 +153,7 @@ export default function CampaignShare() {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
-  // ── Native Share (with Messenger fix – only link) ──
+  // ── Custom Share Flow: Messenger → WhatsApp → Native Share ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
@@ -166,18 +163,72 @@ export default function CampaignShare() {
     const description = campaign?.description || '';
     const fullMessage = description ? `${title}\n${description}` : title;
 
-    // ── Detect if the user is inside the Messenger app (mobile) ──
-    const isMessenger = navigator.userAgent.includes('FBAN') || navigator.userAgent.includes('FBAV');
+    // ── Helper: try to open a deep link, returns true if successful ──
+    const tryOpenApp = (url) => {
+      const win = window.open(url, '_blank');
+      if (!win) {
+        console.warn('Window open blocked, assuming no app');
+        return false;
+      }
+      return true;
+    };
 
-    // ── If on Messenger, send ONLY the link (no extra message) ──
-    if (isMessenger) {
-      const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`;
-      window.open(messengerUrl, '_blank');
+    let appOpened = false;
+
+    // ── Step 1: Try Messenger (with message) ──
+    const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullMessage)}`;
+    tryOpenApp(messengerUrl);
+
+    // Wait up to 2 seconds to see if the page lost focus (user switched to Messenger)
+    const messengerVisibilityPromise = new Promise((resolve) => {
+      const handler = () => {
+        if (document.hidden) {
+          appOpened = true;
+          document.removeEventListener('visibilitychange', handler);
+          resolve();
+        }
+      };
+      document.addEventListener('visibilitychange', handler);
+      setTimeout(() => {
+        document.removeEventListener('visibilitychange', handler);
+        resolve();
+      }, 2000);
+    });
+
+    await messengerVisibilityPromise;
+
+    if (appOpened) {
       startVerification('share', 6);
       return;
     }
 
-    // ── If Native Share API is available (all other apps) ──
+    // ── Step 2: Messenger failed, try WhatsApp (only link) ──
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareUrl)}`;
+    tryOpenApp(whatsappUrl);
+
+    const whatsappVisibilityPromise = new Promise((resolve) => {
+      const handler = () => {
+        if (document.hidden) {
+          appOpened = true;
+          document.removeEventListener('visibilitychange', handler);
+          resolve();
+        }
+      };
+      document.addEventListener('visibilitychange', handler);
+      setTimeout(() => {
+        document.removeEventListener('visibilitychange', handler);
+        resolve();
+      }, 1500);
+    });
+
+    await whatsappVisibilityPromise;
+
+    if (appOpened) {
+      startVerification('share', 6);
+      return;
+    }
+
+    // ── Step 3: Both failed, fallback to Native Share API ──
     if (navigator.share) {
       try {
         await navigator.share({
@@ -192,7 +243,7 @@ export default function CampaignShare() {
         }
       }
     } else {
-      // ── Fallback: copy link ──
+      // ── Final fallback: copy link ──
       copyLinkOnly(shareUrl);
       setToastMessage('📋 Link copied! (Native share not supported)');
       setTimeout(() => setToastMessage(''), 3000);
@@ -230,16 +281,13 @@ export default function CampaignShare() {
   };
 
   const finishVerification = () => {
-    // ✅ Guard against multiple calls
     if (!verifying || isFinishingRef.current) return;
     isFinishingRef.current = true;
 
-    // Mark as done immediately
     setVerifying(false);
     setVerifyingType('');
     setVerifyingCountdown(0);
 
-    // Process the share increment
     if (verifyingType === 'share') {
       if (sharesComplete) {
         isFinishingRef.current = false;
@@ -271,7 +319,6 @@ export default function CampaignShare() {
       }
     }
 
-    // Reset guard after a delay
     setTimeout(() => {
       isFinishingRef.current = false;
     }, 500);
@@ -463,7 +510,7 @@ export default function CampaignShare() {
             </div>
           </div>
 
-          {/* ── Share Section (Call-to-Action) ── */}
+          {/* ── Share Section ── */}
           {shareCount > 0 && !isComplete && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -471,11 +518,10 @@ export default function CampaignShare() {
               transition={{ duration: 0.5 }}
               className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden"
             >
-              {/* Subtle background sparkle */}
+              {/* Background sparkles */}
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-100/30 rounded-full blur-2xl" />
               <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-100/20 rounded-full blur-2xl" />
 
-              {/* Icon + Heading */}
               <div className="relative z-10">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-2xl mb-4 shadow-md">
                   <FaRocket className="w-8 h-8 text-purple-600" />
@@ -511,7 +557,7 @@ export default function CampaignShare() {
                 <FaArrowRight className="w-4 h-4" />
               </motion.button>
 
-              {/* Copy link (fallback) */}
+              {/* Copy link fallback */}
               <div className="relative z-10 mt-4 flex items-center justify-center gap-2 text-sm">
                 <span className="text-gray-400">or</span>
                 <button
