@@ -153,30 +153,49 @@ export default function CampaignShare() {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
-  // ── Helper: poll visibility to detect if app opened ──
-  const waitForAppOpen = (timeout = 2500) => {
+  // ── Helper: open a URL and wait to see if the app opened ──
+  const tryOpenApp = (url, timeout = 2000) => {
     return new Promise((resolve) => {
-      let elapsed = 0;
-      const interval = 300;
+      // Open the URL
+      const win = window.open(url, '_blank');
 
-      // If page is already hidden, the app opened immediately
-      if (document.hidden) {
-        resolve(true);
+      // If window.open returns null (popup blocked), treat as failure immediately
+      if (!win) {
+        resolve(false);
         return;
       }
 
-      const checkVisibility = () => {
-        elapsed += interval;
-        if (document.hidden) {
+      let resolved = false;
+
+      // Listen for visibility change
+      const handler = () => {
+        if (document.hidden && !resolved) {
+          resolved = true;
+          document.removeEventListener('visibilitychange', handler);
           resolve(true);
-        } else if (elapsed >= timeout) {
-          resolve(false);
-        } else {
-          setTimeout(checkVisibility, interval);
         }
       };
+      document.addEventListener('visibilitychange', handler);
 
-      setTimeout(checkVisibility, interval);
+      // Also check if window is closed (some browsers)
+      const checkClosed = setInterval(() => {
+        if (win.closed && !resolved) {
+          resolved = true;
+          document.removeEventListener('visibilitychange', handler);
+          clearInterval(checkClosed);
+          resolve(false); // closed without opening? treat as fail
+        }
+      }, 300);
+
+      // Timeout: if no visibility change within `timeout`, treat as failure
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          document.removeEventListener('visibilitychange', handler);
+          clearInterval(checkClosed);
+          resolve(false);
+        }
+      }, timeout);
     });
   };
 
@@ -192,9 +211,7 @@ export default function CampaignShare() {
 
     // ── Step 1: Try Messenger (with message) ──
     const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullMessage)}`;
-    window.open(messengerUrl, '_blank');
-
-    const messengerOpened = await waitForAppOpen(2500);
+    const messengerOpened = await tryOpenApp(messengerUrl, 2500);
 
     if (messengerOpened) {
       startVerification('share', 6);
@@ -203,9 +220,7 @@ export default function CampaignShare() {
 
     // ── Step 2: Messenger failed, try WhatsApp (only link) ──
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareUrl)}`;
-    window.open(whatsappUrl, '_blank');
-
-    const whatsappOpened = await waitForAppOpen(2000);
+    const whatsappOpened = await tryOpenApp(whatsappUrl, 2000);
 
     if (whatsappOpened) {
       startVerification('share', 6);
