@@ -153,6 +153,33 @@ export default function CampaignShare() {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
+  // ── Helper: poll visibility to detect if app opened ──
+  const waitForAppOpen = (timeout = 2500) => {
+    return new Promise((resolve) => {
+      let elapsed = 0;
+      const interval = 300;
+
+      // If page is already hidden, the app opened immediately
+      if (document.hidden) {
+        resolve(true);
+        return;
+      }
+
+      const checkVisibility = () => {
+        elapsed += interval;
+        if (document.hidden) {
+          resolve(true);
+        } else if (elapsed >= timeout) {
+          resolve(false);
+        } else {
+          setTimeout(checkVisibility, interval);
+        }
+      };
+
+      setTimeout(checkVisibility, interval);
+    });
+  };
+
   // ── Custom Share Flow: Messenger → WhatsApp → Native Share ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
@@ -163,67 +190,24 @@ export default function CampaignShare() {
     const description = campaign?.description || '';
     const fullMessage = description ? `${title}\n${description}` : title;
 
-    // ── Helper: try to open a deep link, returns true if successful ──
-    const tryOpenApp = (url) => {
-      const win = window.open(url, '_blank');
-      if (!win) {
-        console.warn('Window open blocked, assuming no app');
-        return false;
-      }
-      return true;
-    };
-
-    let appOpened = false;
-
     // ── Step 1: Try Messenger (with message) ──
     const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullMessage)}`;
-    tryOpenApp(messengerUrl);
+    window.open(messengerUrl, '_blank');
 
-    // Wait up to 2 seconds to see if the page lost focus (user switched to Messenger)
-    const messengerVisibilityPromise = new Promise((resolve) => {
-      const handler = () => {
-        if (document.hidden) {
-          appOpened = true;
-          document.removeEventListener('visibilitychange', handler);
-          resolve();
-        }
-      };
-      document.addEventListener('visibilitychange', handler);
-      setTimeout(() => {
-        document.removeEventListener('visibilitychange', handler);
-        resolve();
-      }, 2000);
-    });
+    const messengerOpened = await waitForAppOpen(2500);
 
-    await messengerVisibilityPromise;
-
-    if (appOpened) {
+    if (messengerOpened) {
       startVerification('share', 6);
       return;
     }
 
     // ── Step 2: Messenger failed, try WhatsApp (only link) ──
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareUrl)}`;
-    tryOpenApp(whatsappUrl);
+    window.open(whatsappUrl, '_blank');
 
-    const whatsappVisibilityPromise = new Promise((resolve) => {
-      const handler = () => {
-        if (document.hidden) {
-          appOpened = true;
-          document.removeEventListener('visibilitychange', handler);
-          resolve();
-        }
-      };
-      document.addEventListener('visibilitychange', handler);
-      setTimeout(() => {
-        document.removeEventListener('visibilitychange', handler);
-        resolve();
-      }, 1500);
-    });
+    const whatsappOpened = await waitForAppOpen(2000);
 
-    await whatsappVisibilityPromise;
-
-    if (appOpened) {
+    if (whatsappOpened) {
       startVerification('share', 6);
       return;
     }
