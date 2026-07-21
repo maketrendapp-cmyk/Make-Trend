@@ -34,12 +34,14 @@ export default function CampaignShare() {
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimCountdown, setClaimCountdown] = useState(2);
   const [verifying, setVerifying] = useState(false);
+  const [verifyingType, setVerifyingType] = useState(''); // ✅ ADDED – was missing
   const [verifyingCountdown, setVerifyingCountdown] = useState(0);
   const [toastMessage, setToastMessage] = useState('');
   const [isHovering, setIsHovering] = useState(false);
 
   const timerRef = useRef(null);
   const claimTimerRef = useRef(null);
+  const isFinishingRef = useRef(false); // ✅ Guard against double calls
 
   useEffect(() => {
     if (id) fetchCampaignAndTemplate();
@@ -114,6 +116,7 @@ export default function CampaignShare() {
     }
   };
 
+  // ── Claim modal countdown ──
   useEffect(() => {
     if (showClaimModal && claimCountdown > 0) {
       claimTimerRef.current = setInterval(() => {
@@ -129,8 +132,10 @@ export default function CampaignShare() {
     }
     return () => clearInterval(claimTimerRef.current);
   }, [showClaimModal, claimCountdown]);
-  // ── Verification timer (using recursive setTimeout for reliability) ──
+
+  // ── Verification timer (FIXED – using recursive setTimeout) ──
   useEffect(() => {
+    // ✅ Don't start if not verifying or countdown is already 0
     if (!verifying || verifyingCountdown <= 0) return;
 
     const timer = setTimeout(() => {
@@ -207,8 +212,9 @@ export default function CampaignShare() {
   };
 
   const finishVerification = () => {
-    // Guard against multiple calls
-    if (!verifying) return;
+    // ✅ Guard against multiple calls
+    if (!verifying || isFinishingRef.current) return;
+    isFinishingRef.current = true;
 
     // Mark as done immediately
     setVerifying(false);
@@ -217,7 +223,10 @@ export default function CampaignShare() {
 
     // Process the share increment
     if (verifyingType === 'share') {
-      if (sharesComplete) return;
+      if (sharesComplete) {
+        isFinishingRef.current = false;
+        return;
+      }
 
       let increment = 0;
       if (shareAttempt === 0) {
@@ -243,6 +252,11 @@ export default function CampaignShare() {
         incrementShares(increment);
       }
     }
+
+    // Reset guard after a delay
+    setTimeout(() => {
+      isFinishingRef.current = false;
+    }, 500);
   };
 
   const incrementShares = async (amount) => {
