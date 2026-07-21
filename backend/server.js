@@ -73,6 +73,40 @@ async function invalidatePattern(pattern) {
   }
 }
 
+// ── Update a specific campaign in all cached user list pages ──
+async function updateCampaignInUserListCache(ownerId, campaignId, updates) {
+  try {
+    const pattern = `campaigns:user:${ownerId}:*`;
+    const keys = await redis.keys(pattern);
+    if (keys.length === 0) return;
+
+    for (const key of keys) {
+      const ttl = await redis.ttl(key);
+      const cached = await redis.get(key);
+      if (!cached) continue;
+
+      let data = JSON.parse(cached);
+      if (data.campaigns && Array.isArray(data.campaigns)) {
+        let updated = false;
+        data.campaigns = data.campaigns.map(camp => {
+          if (camp.id === campaignId) {
+            updated = true;
+            return { ...camp, ...updates };
+          }
+          return camp;
+        });
+        if (updated) {
+          const ttlToUse = ttl > 0 ? ttl : 86400; // keep existing TTL, default 24h
+          await redis.set(key, JSON.stringify(data), 'EX', ttlToUse);
+          console.log(`🔄 Updated campaign ${campaignId} in cache ${key}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to update campaign ${campaignId} in user list cache:`, error);
+  }
+}
+
 // ============================================================
 // 1. FIREBASE ADMIN SDK
 // ============================================================
@@ -1240,7 +1274,6 @@ app.get('/api/campaigns/:id', async (req, res) => {
     // ── Silent view tracking (asynchronous, non-blocking) ──
     setImmediate(async () => {
       try {
-        // ── Determine acting user (verify token first) ──
         let userId = null;
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -1248,27 +1281,45 @@ app.get('/api/campaigns/:id', async (req, res) => {
             const token = authHeader.split(' ')[1];
             const decoded = await admin.auth().verifyIdToken(token);
             userId = decoded.uid;
-          } catch (e) { /* ignore invalid token */ }
+          } catch (e) { /* ignore */ }
         }
         if (!userId) {
           userId = req.headers['x-user-id'] || null;
         }
         const deviceId = req.headers['x-device-id'] || null;
 
-        const alreadyViewed = await hasPerformedAction(id, userId, ip, deviceId, 'views');
-        if (!alreadyViewed) {
-          await db.collection('campaigns').doc(id).update({
+        // ── Use transaction to prevent race condition ──
+        await db.runTransaction(async (transaction) => {
+          const docRef = db.collection('campaigns').doc(id);
+          const doc = await transaction.get(docRef);
+          if (!doc.exists) return;
+          const data = doc.data();
+          if (data.status === 'deleted') return;
+
+          const docId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : `ip_${ip}`);
+          const actionDocRef = docRef.collection('views').doc(docId);
+          const actionDoc = await transaction.get(actionDocRef);
+          if (actionDoc.exists) return;
+
+          transaction.update(docRef, {
             views: admin.firestore.FieldValue.increment(1),
           });
-          await recordAction(id, userId, ip, deviceId, 'views');
-          // Invalidate campaign cache
-          await invalidateKey(`campaigns:id:${id}`);
-          // ── Always invalidate owner stats ──
-          const campaignDoc = await db.collection('campaigns').doc(id).get();
-          const data = campaignDoc.data();
-          if (data && data.userId) {
-            await invalidateKey(`stats:user:${data.userId}`);
-          }
+          transaction.set(actionDocRef, {
+            userId: userId || null,
+            deviceId: deviceId || null,
+            ip: ip || 'unknown',
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+
+              // ── Invalidate single campaign cache and update list cache ──
+        await invalidateKey(`campaigns:id:${id}`);
+        const campaignDoc = await db.collection('campaigns').doc(id).get();
+        const data = campaignDoc.data();
+        if (data && data.userId) {
+          // Update the specific campaign in the user's list cache with new views
+          await updateCampaignInUserListCache(data.userId, id, { views: (data.views || 0) });
+          await invalidateKey(`stats:user:${data.userId}`);
         }
       } catch (err) {
         console.warn('View tracking failed:', err.message);
@@ -1529,7 +1580,8 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
         return { alreadyDone: true, shares: data.shares || 0, shareCount: data.shareCount || 0 };
       }
 
-      const newShares = (data.shares || 0) + 1;
+      const shareCountValue = data.shareCount || 0;
+      const newShares = (data.shares || 0) + shareCountValue;
       transaction.update(docRef, {
         shares: newShares,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1553,11 +1605,12 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       });
     }
 
-    // ── Invalidate caches ──
+    // ── Invalidate caches and update list cache ──
     await invalidateKey(`campaigns:sharecount:${id}`);
     await invalidateKey(`campaigns:id:${id}`);
-    // Always invalidate owner stats
     if (campaignData.userId) {
+      // Update the specific campaign in the user's list cache with new shares
+      await updateCampaignInUserListCache(campaignData.userId, id, { shares: result.shares });
       await invalidateKey(`stats:user:${campaignData.userId}`);
     }
 
@@ -1663,8 +1716,11 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
       });
     });
 
-    await invalidateKey(`campaigns:id:${id}`);
+        await invalidateKey(`campaigns:id:${id}`);
     if (campaignData.userId) {
+      // Compute new completions (increment by 1)
+      const newCompletions = (campaignData.completions || 0) + 1;
+      await updateCampaignInUserListCache(campaignData.userId, id, { completions: newCompletions });
       await invalidateKey(`stats:user:${campaignData.userId}`);
     }
 
@@ -1734,8 +1790,11 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
       });
     });
 
-    await invalidateKey(`campaigns:id:${id}`);
+        await invalidateKey(`campaigns:id:${id}`);
     if (campaignData.userId) {
+      // Compute new unlocks (increment by 1)
+      const newUnlocks = (campaignData.unlockCount || 0) + 1;
+      await updateCampaignInUserListCache(campaignData.userId, id, { unlockCount: newUnlocks });
       await invalidateKey(`stats:user:${campaignData.userId}`);
     }
 
