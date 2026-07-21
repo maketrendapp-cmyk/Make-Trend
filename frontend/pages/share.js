@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
+import { getDeviceId } from '../utils/deviceId';
 import {
   FaShareAlt,
   FaCopy,
@@ -50,7 +51,11 @@ export default function CampaignShare() {
   const fetchCampaignAndTemplate = async () => {
     try {
       setLoading(true);
-      const campaignRes = await fetch(`${API_BASE}/campaigns/${id}`);
+      const campaignRes = await fetch(`${API_BASE}/campaigns/${id}`, {
+        headers: {
+          'x-device-id': getDeviceId(),
+        },
+      });
       if (!campaignRes.ok) {
         if (campaignRes.status === 404) {
           setError('Campaign not found');
@@ -261,10 +266,11 @@ export default function CampaignShare() {
 
   const incrementShares = async (amount) => {
     try {
+      const deviceId = getDeviceId();
       const res = await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'native' }),
+        body: JSON.stringify({ platform: 'native', deviceId }),
       });
       const data = await res.json();
       if (data.success) {
@@ -281,10 +287,23 @@ export default function CampaignShare() {
     }
   };
 
-  const handleClaim = () => {
+  const handleClaim = async () => {
     if (!sharesComplete || isCompleting) return;
-    setShowClaimModal(true);
-    document.body.style.overflow = 'hidden';
+    setIsCompleting(true);
+    try {
+      const deviceId = getDeviceId();
+      await fetch(`${API_BASE}/campaigns/${id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId }),
+      });
+    } catch (err) {
+      console.error('Completion error:', err);
+    } finally {
+      setIsCompleting(false);
+      setShowClaimModal(true);
+      document.body.style.overflow = 'hidden';
+    }
   };
 
   const handleRedirect = () => {
