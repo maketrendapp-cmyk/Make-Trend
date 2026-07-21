@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
+import { getDeviceId } from '../utils/deviceId';
 import {
   FaYoutube,
   FaTwitter,
@@ -40,7 +41,11 @@ export default function CampaignTasks() {
   const fetchCampaign = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/campaigns/${id}`);
+      const res = await fetch(`${API_BASE}/campaigns/${id}`, {
+        headers: {
+          'x-device-id': getDeviceId(),
+        },
+      });
       if (!res.ok) {
         if (res.status === 404) {
           setError('Campaign not found');
@@ -117,10 +122,11 @@ export default function CampaignTasks() {
 
     setIsSubmitting(true);
     try {
+      const deviceId = getDeviceId();
       await fetch(`${API_BASE}/campaigns/${id}/unlock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 'anonymous' }),
+        body: JSON.stringify({ deviceId }),
       });
     } catch (err) {
       console.error('Unlock error:', err);
