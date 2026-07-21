@@ -1,7 +1,15 @@
 // pages/admin/templates.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth, auth } from '../../components/Auth';
+import {
+  FiPlus,
+  FiSearch,
+  FiX,
+  FiEdit2,
+  FiTrash2,
+  FiExternalLink,
+} from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
 const API_BASE = BACKEND_URL + '/api';
@@ -10,23 +18,30 @@ export default function AdminTemplates() {
   const router = useRouter();
   const { user, loading, isAuthenticated } = useAuth();
   const [templates, setTemplates] = useState([]);
+  const [filteredTemplates, setFilteredTemplates] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterPlatform, setFilterPlatform] = useState('');
+  const [filterPlan, setFilterPlan] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Form state – all fields editable as text (except plan & isHighlight)
+  // Form state
   const [form, setForm] = useState({
     title: '',
     slug: '',
     description: '',
     image: '',
-    category: '',        // text input – you can type anything
-    platform: '',        // text input – you can type anything
-    hashtags: '',        // comma‑separated text
+    category: '',
+    platform: '',
+    hashtags: '',
     isHighlight: false,
-    plan: 'free',        // dropdown: free, pro
+    plan: 'free',
   });
 
   // Redirect if not admin
@@ -36,14 +51,17 @@ export default function AdminTemplates() {
     }
   }, [loading, isAuthenticated, user, router]);
 
-  // Fetch templates list
+  // Fetch active templates
   const fetchTemplates = async () => {
     setDataLoading(true);
     try {
       const res = await fetch(`${API_BASE}/templates`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.success) setTemplates(data.templates);
+      if (data.success) {
+        setTemplates(data.templates);
+        setFilteredTemplates(data.templates);
+      }
     } catch (e) {
       console.error('Fetch error:', e);
       setMessage('Failed to load templates: ' + e.message);
@@ -56,7 +74,32 @@ export default function AdminTemplates() {
     if (user?.isAdmin) fetchTemplates();
   }, [user]);
 
-  // Form handlers
+  // Apply search & filters
+  useEffect(() => {
+    let result = templates;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.slug || '').toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (filterCategory) {
+      result = result.filter(t => t.category === filterCategory);
+    }
+    if (filterPlatform) {
+      result = result.filter(t => t.platform === filterPlatform);
+    }
+    if (filterPlan) {
+      result = result.filter(t => t.plan === filterPlan);
+    }
+    // Only active templates
+    result = result.filter(t => t.isActive !== false);
+    setFilteredTemplates(result);
+  }, [templates, searchQuery, filterCategory, filterPlatform, filterPlan]);
+
+  // Form handlers (unchanged)
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(prev => ({
@@ -90,7 +133,6 @@ export default function AdminTemplates() {
     setMessage('');
   };
 
-  // Submit create or update
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -105,7 +147,6 @@ export default function AdminTemplates() {
       }
       const token = await firebaseUser.getIdToken();
 
-      // Build payload – convert hashtags to array
       const payload = {
         ...form,
         hashtags: form.hashtags.split(',').map(t => t.trim()).filter(Boolean),
@@ -141,7 +182,6 @@ export default function AdminTemplates() {
     setIsSubmitting(false);
   };
 
-  // Edit handler – fill form with template data
   const handleEdit = (t) => {
     setForm({
       title: t.title || '',
@@ -159,46 +199,73 @@ export default function AdminTemplates() {
     window.scrollTo(0, 0);
   };
 
-  // Delete (archive) template
+  // ── PERMANENT DELETE ──
   const handleDelete = async (id) => {
-    if (!confirm('Archive this template?')) return;
+    if (!confirm('⚠️ Permanently delete this template? This cannot be undone.')) return;
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      const res = await fetch(`${API_BASE}/templates/${id}`, {
+      const res = await fetch(`${API_BASE}/templates/${id}/permanent`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.success) {
-        setMessage('✅ Archived');
+        setMessage('✅ Template permanently deleted.');
         fetchTemplates();
       } else {
-        setMessage(data.error || 'Failed to archive');
+        setMessage(data.error || 'Failed to delete');
       }
     } catch (err) {
-      setMessage('Failed to archive: ' + err.message);
+      setMessage('Failed to delete: ' + err.message);
     }
   };
 
-  // Loading state
+  // Extract unique categories, platforms, plans for filters
+  const categories = useMemo(() => {
+    const set = new Set();
+    templates.forEach(t => { if (t.category) set.add(t.category); });
+    return Array.from(set);
+  }, [templates]);
+
+  const platforms = useMemo(() => {
+    const set = new Set();
+    templates.forEach(t => { if (t.platform) set.add(t.platform); });
+    return Array.from(set);
+  }, [templates]);
+
+  const plans = useMemo(() => {
+    const set = new Set();
+    templates.forEach(t => { if (t.plan) set.add(t.plan); });
+    return Array.from(set);
+  }, [templates]);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterCategory('');
+    setFilterPlatform('');
+    setFilterPlan('');
+  };
+
   if (loading || !user?.isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold">📁 Templates</h1>
-          <p className="text-gray-500 text-sm">
-            {dataLoading ? 'Loading...' : `${templates.length} templates found`}
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <span>📁</span> Templates
+          </h1>
+          <p className="text-sm text-gray-500">
+            {dataLoading ? 'Loading...' : `${filteredTemplates.length} templates found`}
           </p>
         </div>
         <button
@@ -206,174 +273,204 @@ export default function AdminTemplates() {
             resetForm();
             setShowForm(!showForm);
           }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition shadow-md"
         >
-          {showForm ? 'Cancel' : '+ Add Template'}
+          <FiPlus />
+          {showForm ? 'Cancel' : 'Add Template'}
         </button>
       </div>
 
       {/* Message */}
       {message && (
         <div
-          className={`mb-4 p-3 rounded-lg ${
+          className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${
             message.includes('✅')
               ? 'bg-green-50 text-green-700 border border-green-200'
               : 'bg-red-50 text-red-700 border border-red-200'
           }`}
         >
           {message}
+          <button onClick={() => setMessage('')} className="ml-auto text-gray-400 hover:text-gray-600">
+            <FiX />
+          </button>
         </div>
       )}
+
+      {/* Search & Filters */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by title, slug, description..."
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
+            >
+              <option value="">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <select
+              value={filterPlatform}
+              onChange={(e) => setFilterPlatform(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
+            >
+              <option value="">All Platforms</option>
+              {platforms.map(plat => (
+                <option key={plat} value={plat}>{plat}</option>
+              ))}
+            </select>
+            <select
+              value={filterPlan}
+              onChange={(e) => setFilterPlan(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
+            >
+              <option value="">All Plans</option>
+              {plans.map(plan => (
+                <option key={plan} value={plan}>{plan}</option>
+              ))}
+            </select>
+            {(searchQuery || filterCategory || filterPlatform || filterPlan) && (
+              <button
+                onClick={clearFilters}
+                className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition text-sm"
+              >
+                <FiX className="inline mr-1" /> Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Create / Edit Form */}
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="bg-white p-6 rounded-xl shadow border mb-8"
+          className="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-8"
         >
-          <h2 className="text-xl font-semibold mb-4">
-            {editingId ? 'Edit Template' : 'Create New Template'}
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            {editingId ? '✏️ Edit Template' : '✨ Create New Template'}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Title *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
               <input
                 name="title"
                 value={form.title}
                 onChange={handleChange}
                 onBlur={generateSlug}
                 placeholder="TikTok Booster Free"
-                className="w-full border p-2 rounded-lg"
+                className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
                 required
               />
             </div>
-
             {/* Slug */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Slug *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
               <input
                 name="slug"
                 value={form.slug}
                 onChange={handleChange}
                 placeholder="tiktok-booster-free"
-                className="w-full border p-2 rounded-lg font-mono"
+                className="w-full border border-gray-300 p-2.5 rounded-lg font-mono focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
                 required
               />
             </div>
-
             {/* Description */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 name="description"
                 value={form.description}
                 onChange={handleChange}
                 placeholder="Get free TikTok followers, views & likes instantly"
                 rows="2"
-                className="w-full border p-2 rounded-lg"
+                className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
               />
             </div>
-
             {/* Image URL */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Image URL
-              </label>
-              <input
-                name="image"
-                value={form.image}
-                onChange={handleChange}
-                placeholder="https://cloudinary.com/your-image.jpg"
-                className="w-full border p-2 rounded-lg"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+              <div className="flex gap-2">
+                <input
+                  name="image"
+                  value={form.image}
+                  onChange={handleChange}
+                  placeholder="https://cloudinary.com/your-image.jpg"
+                  className="flex-1 border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
+                />
+                {form.image && (
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
+                    <img src={form.image} alt="preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* Category – text input (free typing) */}
+            {/* Category & Platform (free text) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <input
                 name="category"
                 value={form.category}
                 onChange={handleChange}
-                placeholder="e.g., giveaway, growth, contest"
-                className="w-full border p-2 rounded-lg"
+                placeholder="e.g., giveaway, growth"
+                className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Type any category (no dropdown)
-              </p>
             </div>
-
-            {/* Platform – text input (free typing) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Platform
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Platform</label>
               <input
                 name="platform"
                 value={form.platform}
                 onChange={handleChange}
-                placeholder="e.g., tiktok, instagram, youtube"
-                className="w-full border p-2 rounded-lg"
+                placeholder="e.g., tiktok, instagram"
+                className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Type any platform (no dropdown)
-              </p>
             </div>
-
             {/* Hashtags */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Hashtags (comma separated)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Hashtags (comma separated)</label>
               <input
                 name="hashtags"
                 value={form.hashtags}
                 onChange={handleChange}
-                placeholder="#tiktok, #freefollowers, #viral"
-                className="w-full border p-2 rounded-lg"
+                placeholder="#tiktok, #freefollowers"
+                className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
               />
             </div>
-
-            {/* Plan (dropdown) */}
+            {/* Plan & Highlight */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Plan
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
               <select
                 name="plan"
                 value={form.plan}
                 onChange={handleChange}
-                className="w-full border p-2 rounded-lg"
+                className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
               >
                 <option value="free">Free</option>
                 <option value="pro">Pro</option>
               </select>
-              <p className="text-xs text-gray-400 mt-1">
-                Free = all users, Pro = only paid users
-              </p>
             </div>
-
-            {/* Highlight checkbox */}
-            <div className="flex items-center gap-2 self-end pb-1">
+            <div className="flex items-center gap-2 self-end pb-2">
               <input
                 type="checkbox"
                 name="isHighlight"
                 checked={form.isHighlight}
                 onChange={handleChange}
-                className="w-4 h-4"
+                className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
-              <label className="text-sm font-medium text-gray-700">
-                Highlight this template (featured)
-              </label>
+              <label className="text-sm font-medium text-gray-700">Highlight this template (featured)</label>
             </div>
           </div>
 
@@ -381,18 +478,14 @@ export default function AdminTemplates() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:shadow-lg disabled:opacity-50 transition"
             >
-              {isSubmitting
-                ? 'Saving...'
-                : editingId
-                ? 'Update Template'
-                : 'Create Template'}
+              {isSubmitting ? 'Saving...' : (editingId ? 'Update Template' : 'Create Template')}
             </button>
             <button
               type="button"
               onClick={resetForm}
-              className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300"
+              className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition"
             >
               Cancel
             </button>
@@ -400,48 +493,57 @@ export default function AdminTemplates() {
         </form>
       )}
 
-      {/* Template List */}
-      {dataLoading && <div className="text-center py-4">Loading templates...</div>}
+      {/* Template Grid */}
+      {dataLoading && <div className="text-center py-8 text-gray-500">Loading templates...</div>}
 
-      {!dataLoading && templates.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 rounded-xl border border-border">
-          <p className="text-gray-500">No templates created yet.</p>
+      {!dataLoading && filteredTemplates.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-100 shadow-sm">
+          <p className="text-gray-500">No templates found.</p>
+          {(searchQuery || filterCategory || filterPlatform || filterPlan) && (
+            <button onClick={clearFilters} className="mt-2 text-purple-600 hover:underline">
+              Clear filters
+            </button>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {templates.map((t) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filteredTemplates.map((t) => (
           <div
             key={t.id}
-            className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition"
+            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition group"
           >
-            <div className="aspect-video bg-gray-100 rounded-lg mb-3 overflow-hidden">
+            <div className="aspect-video bg-gray-100 rounded-lg mb-3 overflow-hidden relative">
               {t.image ? (
                 <img
                   src={t.image}
                   alt={t.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-4xl text-gray-300">
                   🎨
                 </div>
               )}
-            </div>
-            <div className="flex justify-between items-start">
-              <h3 className="font-semibold">{t.title}</h3>
               {t.isHighlight && (
-                <span className="text-xs bg-yellow-200 px-2 py-0.5 rounded-full">
-                  ⭐
+                <span className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                  ⭐ Featured
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-500 font-mono">/{t.slug}</p>
+
+            <div className="flex justify-between items-start">
+              <h3 className="font-semibold text-gray-900 truncate">{t.title}</h3>
+              <span className="text-xs text-gray-400 font-mono">/{t.slug}</span>
+            </div>
+
+            {t.description && (
+              <p className="text-sm text-gray-500 line-clamp-2 mt-0.5">{t.description}</p>
+            )}
+
             <div className="mt-2 flex flex-wrap gap-1">
               {t.category && (
-                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
-                  {t.category}
-                </span>
+                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{t.category}</span>
               )}
               {t.platform && t.platform !== 'all' && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
@@ -453,22 +555,24 @@ export default function AdminTemplates() {
                   {t.plan.toUpperCase()}
                 </span>
               )}
-              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1">
                 👥 {t.usageCount || 0}
               </span>
             </div>
+
+            {/* Actions */}
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => handleEdit(t)}
-                className="flex-1 px-3 py-1 bg-gray-100 rounded-lg text-sm hover:bg-gray-200"
+                className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center justify-center gap-1"
               >
-                Edit
+                <FiEdit2 className="w-3.5 h-3.5" /> Edit
               </button>
               <button
                 onClick={() => handleDelete(t.id)}
-                className="flex-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100"
+                className="flex-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition flex items-center justify-center gap-1"
               >
-                Archive
+                <FiTrash2 className="w-3.5 h-3.5" /> Delete
               </button>
             </div>
           </div>
