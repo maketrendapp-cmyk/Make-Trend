@@ -156,7 +156,7 @@ export default function CampaignShare() {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
-  // ── Native Share (with Messenger custom handling to avoid duplication) ──
+  // ── Native Share (with Messenger fix – only link) ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
@@ -169,10 +169,9 @@ export default function CampaignShare() {
     // ── Detect if the user is inside the Messenger app (mobile) ──
     const isMessenger = navigator.userAgent.includes('FBAN') || navigator.userAgent.includes('FBAV');
 
-    // ── If on Messenger, use the custom URL scheme ──
+    // ── If on Messenger, send ONLY the link (no extra message) ──
     if (isMessenger) {
-      // Messenger URL scheme: link comes first, then the message text
-      const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullMessage)}`;
+      const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`;
       window.open(messengerUrl, '_blank');
       startVerification('share', 6);
       return;
