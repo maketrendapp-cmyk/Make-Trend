@@ -962,10 +962,16 @@ app.get('/api/templates', async (req, res) => {
     if (!(await checkRateLimit(ip, 'templates-get', 30, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
-    const cacheKey = 'templates:all';
+    // Determine if we need all templates (for admin)
+    const { all } = req.query;
+    const cacheKey = all === 'true' ? 'templates:all' : 'templates:active';
     const result = await getOrSetCache(cacheKey, async () => {
-      console.log('📡 Fetching templates from Firestore...');
-      let query = db.collection('templates').where('isActive', '==', true);
+      console.log(`📡 Fetching templates from Firestore (${all === 'true' ? 'all' : 'active'})...`);
+      let query = db.collection('templates');
+      // Only filter by isActive if not requesting all
+      if (all !== 'true') {
+        query = query.where('isActive', '==', true);
+      }
       const { category, platform, highlight, plan, limit = 50 } = req.query;
       if (category) query = query.where('category', '==', category);
       if (platform) query = query.where('platform', '==', platform);
