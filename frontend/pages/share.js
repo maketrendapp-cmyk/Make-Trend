@@ -10,6 +10,8 @@ import {
   FaRocket,
   FaGift,
   FaArrowRight,
+  FaFacebookMessenger,
+  FaWhatsapp,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -43,6 +45,7 @@ export default function CampaignShare() {
   const timerRef = useRef(null);
   const claimTimerRef = useRef(null);
   const isFinishingRef = useRef(false);
+  const shareApiCalledRef = useRef(false); // ✅ prevents double API calls
 
   useEffect(() => {
     if (id) fetchCampaignAndTemplate();
@@ -52,9 +55,7 @@ export default function CampaignShare() {
     try {
       setLoading(true);
       const campaignRes = await fetch(`${API_BASE}/campaigns/${id}`, {
-        headers: {
-          'x-device-id': getDeviceId(),
-        },
+        headers: { 'x-device-id': getDeviceId() },
       });
       if (!campaignRes.ok) {
         if (campaignRes.status === 404) {
@@ -138,7 +139,7 @@ export default function CampaignShare() {
     return () => clearInterval(claimTimerRef.current);
   }, [showClaimModal, claimCountdown]);
 
-  // ── Verification timer (recursive setTimeout) ──
+  // ── Verification timer ──
   useEffect(() => {
     if (!verifying || verifyingCountdown <= 0) return;
 
@@ -153,87 +154,16 @@ export default function CampaignShare() {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
-  // ── Helper: open a URL and wait to see if the app opened ──
-  const tryOpenApp = (url, timeout = 2000) => {
-    return new Promise((resolve) => {
-      // Open the URL
-      const win = window.open(url, '_blank');
-
-      // If window.open returns null (popup blocked), treat as failure immediately
-      if (!win) {
-        resolve(false);
-        return;
-      }
-
-      let resolved = false;
-
-      // Listen for visibility change
-      const handler = () => {
-        if (document.hidden && !resolved) {
-          resolved = true;
-          document.removeEventListener('visibilitychange', handler);
-          resolve(true);
-        }
-      };
-      document.addEventListener('visibilitychange', handler);
-
-      // Also check if window is closed (some browsers)
-      const checkClosed = setInterval(() => {
-        if (win.closed && !resolved) {
-          resolved = true;
-          document.removeEventListener('visibilitychange', handler);
-          clearInterval(checkClosed);
-          resolve(false); // closed without opening? treat as fail
-        }
-      }, 300);
-
-      // Timeout: if no visibility change within `timeout`, treat as failure
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          document.removeEventListener('visibilitychange', handler);
-          clearInterval(checkClosed);
-          resolve(false);
-        }
-      }, timeout);
-    });
-  };
-
-  // ── Custom Share Flow: Messenger → WhatsApp → Native Share ──
+  // ── Native Share (only URL) ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
 
     const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
-    const title = campaign?.title || 'Check this out!';
-    const description = campaign?.description || '';
-    const fullMessage = description ? `${title}\n${description}` : title;
 
-    // ── Step 1: Try Messenger (with message) ──
-    const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullMessage)}`;
-    const messengerOpened = await tryOpenApp(messengerUrl, 2500);
-
-    if (messengerOpened) {
-      startVerification('share', 6);
-      return;
-    }
-
-    // ── Step 2: Messenger failed, try WhatsApp (only link) ──
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareUrl)}`;
-    const whatsappOpened = await tryOpenApp(whatsappUrl, 2000);
-
-    if (whatsappOpened) {
-      startVerification('share', 6);
-      return;
-    }
-
-    // ── Step 3: Both failed, fallback to Native Share API ──
     if (navigator.share) {
       try {
-        await navigator.share({
-          text: fullMessage,
-          url: shareUrl,
-        });
+        await navigator.share({ url: shareUrl });
         startVerification('share', 6);
       } catch (err) {
         if (err.name !== 'AbortError') {
@@ -242,11 +172,30 @@ export default function CampaignShare() {
         }
       }
     } else {
-      // ── Final fallback: copy link ──
       copyLinkOnly(shareUrl);
       setToastMessage('📋 Link copied! (Native share not supported)');
       setTimeout(() => setToastMessage(''), 3000);
     }
+  };
+
+  // ── Messenger share (only URL) ──
+  const handleMessengerShare = () => {
+    if (isSharing || verifying) return;
+    if (shareCount === 0) return;
+
+    const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
+    window.open(`fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`, '_blank');
+    startVerification('share', 6);
+  };
+
+  // ── WhatsApp share (only URL) ──
+  const handleWhatsAppShare = () => {
+    if (isSharing || verifying) return;
+    if (shareCount === 0) return;
+
+    const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareUrl)}`, '_blank');
+    startVerification('share', 6);
   };
 
   const copyLinkOnly = async (url) => {
@@ -314,7 +263,17 @@ export default function CampaignShare() {
       if (increment > remaining) increment = remaining;
 
       if (increment > 0) {
-        incrementShares(increment);
+        const newShares = Math.min(shares + increment, shareCount);
+        setShares(newShares);
+        setShareProgress(Math.min((newShares / shareCount) * 100, 100));
+
+        // ── Only call share API when target is reached ──
+        if (newShares >= shareCount && !shareApiCalledRef.current) {
+          shareApiCalledRef.current = true;
+          callShareAPI(shareCount); // send the full target count
+          setSharesComplete(true);
+          setShareAttempt(3);
+        }
       }
     }
 
@@ -323,29 +282,21 @@ export default function CampaignShare() {
     }, 500);
   };
 
-  const incrementShares = async (amount) => {
+  // ── Share API – called only once when target is reached ──
+  const callShareAPI = async (totalShares) => {
     try {
       const deviceId = getDeviceId();
-      const res = await fetch(`${API_BASE}/campaigns/${id}/share`, {
+      await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'native', deviceId }),
+        body: JSON.stringify({ platform: 'native', deviceId, shares: totalShares }),
       });
-      const data = await res.json();
-      if (data.success) {
-        const newShares = Math.min(shares + amount, shareCount);
-        setShares(newShares);
-        setShareProgress(Math.min((newShares / shareCount) * 100, 100));
-        if (newShares >= shareCount) {
-          setSharesComplete(true);
-          setShareAttempt(3);
-        }
-      }
     } catch (err) {
-      console.error('Error recording share:', err);
+      console.error('Error recording share completion:', err);
     }
   };
 
+  // ── Claim handler – calls COMPLETION API ──
   const handleClaim = async () => {
     if (!sharesComplete || isCompleting) return;
     setIsCompleting(true);
@@ -517,7 +468,6 @@ export default function CampaignShare() {
               transition={{ duration: 0.5 }}
               className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden"
             >
-              {/* Background sparkles */}
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-100/30 rounded-full blur-2xl" />
               <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-100/20 rounded-full blur-2xl" />
 
@@ -535,7 +485,7 @@ export default function CampaignShare() {
                 </p>
               </div>
 
-              {/* Share Button */}
+              {/* ── Main Native Share Button ── */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -556,8 +506,28 @@ export default function CampaignShare() {
                 <FaArrowRight className="w-4 h-4" />
               </motion.button>
 
-              {/* Copy link fallback */}
-              <div className="relative z-10 mt-4 flex items-center justify-center gap-2 text-sm">
+              {/* ── Messenger & WhatsApp Buttons ── */}
+              <div className="relative z-10 mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={handleMessengerShare}
+                  disabled={verifying || isSharing}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50"
+                >
+                  <FaFacebookMessenger className="w-4 h-4" />
+                  Messenger
+                </button>
+                <button
+                  onClick={handleWhatsAppShare}
+                  disabled={verifying || isSharing}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50"
+                >
+                  <FaWhatsapp className="w-4 h-4" />
+                  WhatsApp
+                </button>
+              </div>
+
+              {/* ── Copy Link ── */}
+              <div className="relative z-10 mt-3 flex items-center justify-center gap-2 text-sm">
                 <span className="text-gray-400">or</span>
                 <button
                   onClick={handleCopyLink}
