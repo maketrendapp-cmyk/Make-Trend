@@ -1116,6 +1116,28 @@ app.delete('/api/templates/:id', verifyToken, checkBanned, async (req, res) => {
   }
 });
 
+// ── Permanently delete template (admin only) ──
+app.delete('/api/templates/:id/permanent', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    // Actually delete the document from Firestore
+    await db.collection('templates').doc(id).delete();
+
+    // Invalidate templates cache
+    await invalidatePattern('templates:*');
+
+    res.json({ success: true, message: 'Template permanently deleted' });
+  } catch (error) {
+    console.error('❌ Permanent delete error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ── Increment template usage ── (public, low risk, IP rate limit optional)
 app.post('/api/templates/:id/usage', async (req, res) => {
   try {
