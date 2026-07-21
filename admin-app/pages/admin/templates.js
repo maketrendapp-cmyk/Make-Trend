@@ -7,8 +7,11 @@ import {
   FiSearch,
   FiX,
   FiEdit2,
+  FiArchive,
   FiTrash2,
-  FiExternalLink,
+  FiRefreshCw,
+  FiEye,
+  FiEyeOff,
 } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
@@ -28,6 +31,7 @@ export default function AdminTemplates() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('');
   const [filterPlan, setFilterPlan] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -51,11 +55,13 @@ export default function AdminTemplates() {
     }
   }, [loading, isAuthenticated, user, router]);
 
-  // Fetch active templates
+  // Fetch templates (with all flag)
   const fetchTemplates = async () => {
     setDataLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/templates`);
+      // If showing archived, fetch all; else only active
+      const url = showArchived ? `${API_BASE}/templates?all=true` : `${API_BASE}/templates`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.success) {
@@ -72,7 +78,7 @@ export default function AdminTemplates() {
 
   useEffect(() => {
     if (user?.isAdmin) fetchTemplates();
-  }, [user]);
+  }, [user, showArchived]);
 
   // Apply search & filters
   useEffect(() => {
@@ -94,12 +100,14 @@ export default function AdminTemplates() {
     if (filterPlan) {
       result = result.filter(t => t.plan === filterPlan);
     }
-    // Only active templates
-    result = result.filter(t => t.isActive !== false);
+    // If not showing archived, filter out inactive
+    if (!showArchived) {
+      result = result.filter(t => t.isActive !== false);
+    }
     setFilteredTemplates(result);
-  }, [templates, searchQuery, filterCategory, filterPlatform, filterPlan]);
+  }, [templates, searchQuery, filterCategory, filterPlatform, filterPlan, showArchived]);
 
-  // Form handlers (unchanged)
+  // Form handlers
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(prev => ({
@@ -199,8 +207,57 @@ export default function AdminTemplates() {
     window.scrollTo(0, 0);
   };
 
+  // ── ARCHIVE (soft delete) ──
+  const handleArchive = async (id) => {
+    if (!confirm('Archive this template? It will be hidden from users.')) return;
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return;
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${API_BASE}/templates/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessage('✅ Template archived.');
+        fetchTemplates();
+      } else {
+        setMessage(data.error || 'Failed to archive');
+      }
+    } catch (err) {
+      setMessage('Failed to archive: ' + err.message);
+    }
+  };
+
+  // ── RESTORE ──
+  const handleRestore = async (id) => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return;
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${API_BASE}/templates/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isActive: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessage('✅ Template restored.');
+        fetchTemplates();
+      } else {
+        setMessage(data.error || 'Failed to restore');
+      }
+    } catch (err) {
+      setMessage('Failed to restore: ' + err.message);
+    }
+  };
+
   // ── PERMANENT DELETE ──
-  const handleDelete = async (id) => {
+  const handlePermanentDelete = async (id) => {
     if (!confirm('⚠️ Permanently delete this template? This cannot be undone.')) return;
     try {
       const firebaseUser = auth.currentUser;
@@ -248,6 +305,9 @@ export default function AdminTemplates() {
     setFilterPlan('');
   };
 
+  // Count archived templates
+  const archivedCount = templates.filter(t => t.isActive === false).length;
+
   if (loading || !user?.isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -266,18 +326,37 @@ export default function AdminTemplates() {
           </h1>
           <p className="text-sm text-gray-500">
             {dataLoading ? 'Loading...' : `${filteredTemplates.length} templates found`}
+            {archivedCount > 0 && !showArchived && (
+              <span className="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">
+                {archivedCount} archived
+              </span>
+            )}
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(!showForm);
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition shadow-md"
-        >
-          <FiPlus />
-          {showForm ? 'Cancel' : 'Add Template'}
-        </button>
+        <div className="flex gap-2">
+          {/* Toggle archived */}
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
+              showArchived
+                ? 'bg-purple-100 text-purple-700 border border-purple-300'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {showArchived ? <FiEyeOff /> : <FiEye />}
+            {showArchived ? 'Hide Archived' : `Show Archived${archivedCount > 0 ? ` (${archivedCount})` : ''}`}
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowForm(!showForm);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition shadow-md"
+          >
+            <FiPlus />
+            {showForm ? 'Cancel' : 'Add Template'}
+          </button>
+        </div>
       </div>
 
       {/* Message */}
@@ -508,75 +587,103 @@ export default function AdminTemplates() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredTemplates.map((t) => (
-          <div
-            key={t.id}
-            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition group"
-          >
-            <div className="aspect-video bg-gray-100 rounded-lg mb-3 overflow-hidden relative">
-              {t.image ? (
-                <img
-                  src={t.image}
-                  alt={t.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-4xl text-gray-300">
-                  🎨
-                </div>
+        {filteredTemplates.map((t) => {
+          const isArchived = t.isActive === false;
+          return (
+            <div
+              key={t.id}
+              className={`bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition group ${
+                isArchived ? 'border-gray-300 bg-gray-50/50' : 'border-gray-200'
+              }`}
+            >
+              <div className="aspect-video bg-gray-100 rounded-lg mb-3 overflow-hidden relative">
+                {t.image ? (
+                  <img
+                    src={t.image}
+                    alt={t.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-4xl text-gray-300">
+                    🎨
+                  </div>
+                )}
+                {isArchived && (
+                  <span className="absolute top-2 right-2 bg-gray-700/80 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm">
+                    Archived
+                  </span>
+                )}
+                {t.isHighlight && !isArchived && (
+                  <span className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                    ⭐ Featured
+                  </span>
+                )}
+              </div>
+
+              <div className="flex justify-between items-start">
+                <h3 className="font-semibold text-gray-900 truncate">{t.title}</h3>
+                <span className="text-xs text-gray-400 font-mono">/{t.slug}</span>
+              </div>
+
+              {t.description && (
+                <p className="text-sm text-gray-500 line-clamp-2 mt-0.5">{t.description}</p>
               )}
-              {t.isHighlight && (
-                <span className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                  ⭐ Featured
+
+              <div className="mt-2 flex flex-wrap gap-1">
+                {t.category && (
+                  <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{t.category}</span>
+                )}
+                {t.platform && t.platform !== 'all' && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                    {t.platform}
+                  </span>
+                )}
+                {t.plan && t.plan !== 'free' && (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
+                    {t.plan.toUpperCase()}
+                  </span>
+                )}
+                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  👥 {t.usageCount || 0}
                 </span>
-              )}
-            </div>
+              </div>
 
-            <div className="flex justify-between items-start">
-              <h3 className="font-semibold text-gray-900 truncate">{t.title}</h3>
-              <span className="text-xs text-gray-400 font-mono">/{t.slug}</span>
-            </div>
+              {/* Actions */}
+              <div className="mt-3 flex gap-2 flex-wrap">
+                <button
+                  onClick={() => handleEdit(t)}
+                  className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center justify-center gap-1"
+                >
+                  <FiEdit2 className="w-3.5 h-3.5" /> Edit
+                </button>
 
-            {t.description && (
-              <p className="text-sm text-gray-500 line-clamp-2 mt-0.5">{t.description}</p>
-            )}
-
-            <div className="mt-2 flex flex-wrap gap-1">
-              {t.category && (
-                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{t.category}</span>
-              )}
-              {t.platform && t.platform !== 'all' && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                  {t.platform}
-                </span>
-              )}
-              {t.plan && t.plan !== 'free' && (
-                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
-                  {t.plan.toUpperCase()}
-                </span>
-              )}
-              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                👥 {t.usageCount || 0}
-              </span>
+                {isArchived ? (
+                  <>
+                    <button
+                      onClick={() => handleRestore(t.id)}
+                      className="flex-1 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-sm hover:bg-green-100 transition flex items-center justify-center gap-1"
+                    >
+                      <FiRefreshCw className="w-3.5 h-3.5" /> Restore
+                    </button>
+                    <button
+                      onClick={() => handlePermanentDelete(t.id)}
+                      className="flex-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition flex items-center justify-center gap-1"
+                    >
+                      <FiTrash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleArchive(t.id)}
+                    className="flex-1 px-3 py-1.5 bg-yellow-50 text-yellow-600 rounded-lg text-sm hover:bg-yellow-100 transition flex items-center justify-center gap-1"
+                  >
+                    <FiArchive className="w-3.5 h-3.5" /> Archive
+                  </button>
+                )}
+              </div>
             </div>
-
-            {/* Actions */}
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => handleEdit(t)}
-                className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center justify-center gap-1"
-              >
-                <FiEdit2 className="w-3.5 h-3.5" /> Edit
-              </button>
-              <button
-                onClick={() => handleDelete(t.id)}
-                className="flex-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition flex items-center justify-center gap-1"
-              >
-                <FiTrash2 className="w-3.5 h-3.5" /> Delete
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
