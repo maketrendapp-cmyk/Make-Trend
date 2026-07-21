@@ -156,7 +156,7 @@ export default function CampaignShare() {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
-  // ── Native Share ──
+  // ── Native Share (with Messenger custom handling) ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
@@ -164,11 +164,25 @@ export default function CampaignShare() {
     const shareUrl = `${window.location.origin}/${templateSlug}/${id}`;
     const title = campaign?.title || 'Check this out!';
     const description = campaign?.description || '';
+    const fullMessage = description ? `${title}\n${description}` : title;
 
+    // ── Detect if the user is inside the Messenger app (mobile) ──
+    const isMessenger = navigator.userAgent.includes('FBAN') || navigator.userAgent.includes('FBAV');
+
+    // ── If on Messenger, use the custom URL scheme ──
+    if (isMessenger) {
+      // Messenger URL scheme: link is the first parameter, message is the text
+      const messengerUrl = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}&message=${encodeURIComponent(fullMessage)}`;
+      window.open(messengerUrl, '_blank');
+      startVerification('share', 6);
+      return;
+    }
+
+    // ── If Native Share API is available (all other apps) ──
     if (navigator.share) {
       try {
         await navigator.share({
-          text: `${title}\n${description}`,
+          text: fullMessage,
           url: shareUrl,
         });
         startVerification('share', 6);
@@ -179,6 +193,7 @@ export default function CampaignShare() {
         }
       }
     } else {
+      // ── Fallback: copy link ──
       copyLinkOnly(shareUrl);
       setToastMessage('📋 Link copied! (Native share not supported)');
       setTimeout(() => setToastMessage(''), 3000);
