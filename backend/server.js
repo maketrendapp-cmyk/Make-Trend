@@ -379,9 +379,17 @@ async function checkCampaignRateLimit(uid) {
   }
 }
 
-async function hasPerformedAction(campaignId, userId, ip, actionType) {
+async function hasPerformedAction(campaignId, userId, ip, deviceId, actionType) {
   try {
-    const docId = userId ? `user_${userId}` : `ip_${ip}`;
+    // Priority: userId > deviceId > ip
+    let docId;
+    if (userId) {
+      docId = `user_${userId}`;
+    } else if (deviceId) {
+      docId = `device_${deviceId}`;
+    } else {
+      docId = `ip_${ip}`;
+    }
     const doc = await db.collection('campaigns').doc(campaignId)
       .collection(actionType)
       .doc(docId)
@@ -393,14 +401,22 @@ async function hasPerformedAction(campaignId, userId, ip, actionType) {
   }
 }
 
-async function recordAction(campaignId, userId, ip, actionType) {
+async function recordAction(campaignId, userId, ip, deviceId, actionType) {
   try {
-    const docId = userId ? `user_${userId}` : `ip_${ip}`;
+    let docId;
+    if (userId) {
+      docId = `user_${userId}`;
+    } else if (deviceId) {
+      docId = `device_${deviceId}`;
+    } else {
+      docId = `ip_${ip}`;
+    }
     await db.collection('campaigns').doc(campaignId)
       .collection(actionType)
       .doc(docId)
       .set({
         userId: userId || null,
+        deviceId: deviceId || null,
         ip: ip || 'unknown',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -819,6 +835,12 @@ app.get('/api/auth/referrals', verifyToken, checkBanned, async (req, res) => {
 // ── SET ADMIN ── (protected by secret)
 app.post('/api/auth/set-admin', async (req, res) => {
   try {
+    const ip = getClientIp(req);
+    // ── Rate limit: 3 attempts per hour per IP ──
+    if (!(await checkRateLimit(ip, 'set-admin', 3, 3600))) {
+      return res.status(429).json({ success: false, error: 'Too many attempts. Please wait an hour.' });
+    }
+
     const { email, secret } = req.body;
     if (secret !== process.env.ADMIN_SECRET_KEY) {
       return res.status(403).json({ success: false, error: 'Invalid secret key' });
@@ -1179,45 +1201,80 @@ app.get('/api/campaigns/:id', async (req, res) => {
     if (!(await checkRateLimit(ip, 'campaign-view', 30, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
+
     const cacheKey = `campaigns:id:${id}`;
-    const result = await getOrSetCache(cacheKey, async () => {
+    let result = null;
+
+    // ── Try cache first ──
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) {
+        result = JSON.parse(cached);
+        console.log(`📦 Campaign cache HIT: ${id}`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Cache miss/error for ${cacheKey}:`, error.message);
+    }
+
+    // ── If not in cache, fetch from Firestore ──
+    if (!result) {
       const doc = await db.collection('campaigns').doc(id).get();
       if (!doc.exists) {
-        return { success: false, error: 'Campaign not found' };
+        return res.status(404).json({ success: false, error: 'Campaign not found' });
       }
       const campaignData = doc.data();
       if (campaignData.status === 'deleted') {
-        return { success: false, error: 'Campaign not available' };
+        return res.status(404).json({ success: false, error: 'Campaign not available' });
       }
-      return { success: true, campaign: { id: doc.id, ...campaignData } };
-    });
-
-    if (!result.success) {
-      return res.status(404).json(result);
+      result = { success: true, campaign: { id: doc.id, ...campaignData } };
+      // Store in cache with 60 second TTL
+      try {
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+        console.log(`💾 Campaign cached (60s TTL): ${id}`);
+      } catch (err) { /* ignore */ }
     }
 
-    // ── Silent view tracking ──
-    try {
-      const userId = req.headers['x-user-id'] || null;
-      const alreadyViewed = await hasPerformedAction(id, userId, ip, 'views');
-      if (!alreadyViewed) {
-        await db.collection('campaigns').doc(id).update({
-          views: admin.firestore.FieldValue.increment(1),
-        });
-        await recordAction(id, userId, ip, 'views');
-        await invalidateKey(`campaigns:id:${id}`);
-        if (userId) {
+    // ── Return the result immediately ──
+    res.json(result);
+
+    // ── Silent view tracking (asynchronous, non-blocking) ──
+    setImmediate(async () => {
+      try {
+        // ── Determine acting user (verify token first) ──
+        let userId = null;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          try {
+            const token = authHeader.split(' ')[1];
+            const decoded = await admin.auth().verifyIdToken(token);
+            userId = decoded.uid;
+          } catch (e) { /* ignore invalid token */ }
+        }
+        if (!userId) {
+          userId = req.headers['x-user-id'] || null;
+        }
+        const deviceId = req.headers['x-device-id'] || null;
+
+        const alreadyViewed = await hasPerformedAction(id, userId, ip, deviceId, 'views');
+        if (!alreadyViewed) {
+          await db.collection('campaigns').doc(id).update({
+            views: admin.firestore.FieldValue.increment(1),
+          });
+          await recordAction(id, userId, ip, deviceId, 'views');
+          // Invalidate campaign cache
+          await invalidateKey(`campaigns:id:${id}`);
+          // ── Always invalidate owner stats ──
           const campaignDoc = await db.collection('campaigns').doc(id).get();
           const data = campaignDoc.data();
           if (data && data.userId) {
             await invalidateKey(`stats:user:${data.userId}`);
           }
         }
+      } catch (err) {
+        console.warn('View tracking failed:', err.message);
       }
-    } catch (err) {
-      console.warn('View tracking failed:', err.message);
-    }
-    res.json(result);
+    });
+
   } catch (error) {
     console.error('Error fetching campaign:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch campaign' });
@@ -1431,29 +1488,47 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
     if (!(await checkRateLimit(ip, 'share-post', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many share requests. Please wait.' });
     }
-    const userId = req.body.userId || null;
 
-    // Use a transaction to ensure atomicity
+    // ── Determine acting user (verify token) ──
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        userId = decoded.uid;
+      } catch (e) { /* ignore */ }
+    }
+    if (!userId) {
+      userId = req.body.userId || null;
+    }
+    const deviceId = req.body.deviceId || null;
+
+    // ── Get campaign to invalidate owner stats later ──
+    const campaignDoc = await db.collection('campaigns').doc(id).get();
+    if (!campaignDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const campaignData = campaignDoc.data();
+    if (campaignData.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    // ── Atomic transaction ──
     const result = await db.runTransaction(async (transaction) => {
       const docRef = db.collection('campaigns').doc(id);
       const doc = await transaction.get(docRef);
-      if (!doc.exists) {
-        throw new Error('Campaign not found');
-      }
+      if (!doc.exists) throw new Error('Campaign not found');
       const data = doc.data();
-      if (data.status === 'deleted') {
-        throw new Error('Campaign not found');
-      }
+      if (data.status === 'deleted') throw new Error('Campaign not found');
 
-      // Check if already shared
-      const docId = userId ? `user_${userId}` : `ip_${ip}`;
+      const docId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : `ip_${ip}`);
       const actionDocRef = docRef.collection('shares').doc(docId);
       const actionDoc = await transaction.get(actionDocRef);
       if (actionDoc.exists) {
         return { alreadyDone: true, shares: data.shares || 0, shareCount: data.shareCount || 0 };
       }
 
-      // Update campaign shares
       const newShares = (data.shares || 0) + 1;
       transaction.update(docRef, {
         shares: newShares,
@@ -1461,11 +1536,11 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       });
       transaction.set(actionDocRef, {
         userId: userId || null,
+        deviceId: deviceId || null,
         ip: ip || 'unknown',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Also invalidate caches after commit (we'll do it outside)
       return { alreadyDone: false, shares: newShares, shareCount: data.shareCount || 0 };
     });
 
@@ -1478,15 +1553,12 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       });
     }
 
-    // Invalidate caches after transaction commits
+    // ── Invalidate caches ──
     await invalidateKey(`campaigns:sharecount:${id}`);
-    // Invalidate stats for the user if we have userId
-    if (userId) {
-      const campaignDoc = await db.collection('campaigns').doc(id).get();
-      const data = campaignDoc.data();
-      if (data && data.userId) {
-        await invalidateKey(`stats:user:${data.userId}`);
-      }
+    await invalidateKey(`campaigns:id:${id}`);
+    // Always invalidate owner stats
+    if (campaignData.userId) {
+      await invalidateKey(`stats:user:${campaignData.userId}`);
     }
 
     res.json({
@@ -1496,8 +1568,7 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Share error:', error);
-    const msg = error.message || 'Failed to record share';
-    res.status(500).json({ success: false, error: msg });
+    res.status(500).json({ success: false, error: error.message || 'Failed to record share' });
   }
 });
 
@@ -1544,25 +1615,41 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
     if (!(await checkRateLimit(ip, 'complete-post', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many complete requests. Please wait.' });
     }
-    const userId = req.body.userId || null;
+
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        userId = decoded.uid;
+      } catch (e) { /* ignore */ }
+    }
+    if (!userId) {
+      userId = req.body.userId || null;
+    }
+    const deviceId = req.body.deviceId || null;
+
+    const campaignDoc = await db.collection('campaigns').doc(id).get();
+    if (!campaignDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const campaignData = campaignDoc.data();
+    if (campaignData.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
 
     await db.runTransaction(async (transaction) => {
       const docRef = db.collection('campaigns').doc(id);
       const doc = await transaction.get(docRef);
-      if (!doc.exists) {
-        throw new Error('Campaign not found');
-      }
+      if (!doc.exists) throw new Error('Campaign not found');
       const data = doc.data();
-      if (data.status === 'deleted') {
-        throw new Error('Campaign not found');
-      }
+      if (data.status === 'deleted') throw new Error('Campaign not found');
 
-      const docId = userId ? `user_${userId}` : `ip_${ip}`;
+      const docId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : `ip_${ip}`);
       const actionDocRef = docRef.collection('completions').doc(docId);
       const actionDoc = await transaction.get(actionDocRef);
-      if (actionDoc.exists) {
-        throw new Error('Already completed');
-      }
+      if (actionDoc.exists) throw new Error('Already completed');
 
       transaction.update(docRef, {
         completions: admin.firestore.FieldValue.increment(1),
@@ -1570,10 +1657,16 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
       });
       transaction.set(actionDocRef, {
         userId: userId || null,
+        deviceId: deviceId || null,
         ip: ip || 'unknown',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
+
+    await invalidateKey(`campaigns:id:${id}`);
+    if (campaignData.userId) {
+      await invalidateKey(`stats:user:${campaignData.userId}`);
+    }
 
     res.json({ success: true, message: 'Campaign completed!' });
   } catch (error) {
@@ -1593,25 +1686,41 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
     if (!(await checkRateLimit(ip, 'unlock-post', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many unlock requests. Please wait.' });
     }
-    const userId = req.body.userId || null;
+
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        userId = decoded.uid;
+      } catch (e) { /* ignore */ }
+    }
+    if (!userId) {
+      userId = req.body.userId || null;
+    }
+    const deviceId = req.body.deviceId || null;
+
+    const campaignDoc = await db.collection('campaigns').doc(id).get();
+    if (!campaignDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const campaignData = campaignDoc.data();
+    if (campaignData.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
 
     await db.runTransaction(async (transaction) => {
       const docRef = db.collection('campaigns').doc(id);
       const doc = await transaction.get(docRef);
-      if (!doc.exists) {
-        throw new Error('Campaign not found');
-      }
+      if (!doc.exists) throw new Error('Campaign not found');
       const data = doc.data();
-      if (data.status === 'deleted') {
-        throw new Error('Campaign not found');
-      }
+      if (data.status === 'deleted') throw new Error('Campaign not found');
 
-      const docId = userId ? `user_${userId}` : `ip_${ip}`;
+      const docId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : `ip_${ip}`);
       const actionDocRef = docRef.collection('unlocks').doc(docId);
       const actionDoc = await transaction.get(actionDocRef);
-      if (actionDoc.exists) {
-        throw new Error('Already unlocked');
-      }
+      if (actionDoc.exists) throw new Error('Already unlocked');
 
       transaction.update(docRef, {
         unlockCount: admin.firestore.FieldValue.increment(1),
@@ -1619,10 +1728,16 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
       });
       transaction.set(actionDocRef, {
         userId: userId || null,
+        deviceId: deviceId || null,
         ip: ip || 'unknown',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
+
+    await invalidateKey(`campaigns:id:${id}`);
+    if (campaignData.userId) {
+      await invalidateKey(`stats:user:${campaignData.userId}`);
+    }
 
     res.json({ success: true, message: 'Campaign unlocked!' });
   } catch (error) {
