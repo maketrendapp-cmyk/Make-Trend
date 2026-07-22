@@ -513,16 +513,17 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
   const { invalidateAll } = useInvalidateQueries();
   const {
-    login,
-    register,
-    socialLogin,
-    completeSocialProfile,
-    uploadAvatar,
-    isSocialLoading,
-    resetPassword,
-    user,
-    refreshUserProfile,
-  } = useAuth();
+  login,
+  register,
+  socialLogin,
+  completeSocialProfile,
+  uploadAvatar,
+  isSocialLoading,
+  resetPassword,
+  user,
+  refreshUserProfile,
+  needsCompletion,
+} = useAuth();
 
   // ── State ──
   const [email, setEmail] = useState('');
@@ -559,14 +560,18 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 
   // ── Redirect logic ──
   const performRedirect = useCallback(() => {
-    if (redirectTo && redirectTo !== '/login' && redirectTo !== '/register') {
-      router.push(redirectTo);
-    } else if (user && user.completed) {
-      router.push('/profile');
-    } else {
-      router.push('/');
-    }
-  }, [redirectTo, router, user]);
+  // If the user's profile is incomplete, stay on the AuthScreen (completion form)
+  if (needsCompletion) {
+    return;
+  }
+  if (redirectTo && redirectTo !== '/login' && redirectTo !== '/register') {
+    router.push(redirectTo);
+  } else if (user && user.completed) {
+    router.push('/profile');
+  } else {
+    router.push('/');
+  }
+}, [redirectTo, router, user, needsCompletion]);
 
   const handleSuccess = (msg = 'Welcome to Make Trend! 🎉') => {
     setSuccessMessage(msg);
