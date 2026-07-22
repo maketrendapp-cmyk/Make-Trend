@@ -84,9 +84,9 @@ function StudentScholarshipNepalV1({ campaign }) {
 
     setIsLoading(true);
 
+    // If campaign ID is missing, redirect to create page (SPA)
     if (!id) {
-      setError('Campaign ID missing. Please check the link.');
-      setIsLoading(false);
+      router.push('/create');
       return;
     }
 

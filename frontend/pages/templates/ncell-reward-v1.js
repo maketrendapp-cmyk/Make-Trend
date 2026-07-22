@@ -43,7 +43,8 @@ function NcellRewardV1({ campaign }) {
     if (id) {
       router.push(`/tasks?id=${id}`);
     } else {
-      alert('Missing campaign ID. Please check the link.');
+      // Redirect to create page if campaign ID is missing (SPA)
+      router.push('/create');
     }
   };
 

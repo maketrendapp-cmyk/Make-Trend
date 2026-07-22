@@ -104,10 +104,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       return;
     }
     if (isRedeemed) return;
-    if (!id) {
-      showToast('Campaign ID missing in URL.');
-      return;
-    }
 
     const fullCode = codeParts.join('');
     if (fullCode.length !== 12) {
@@ -118,7 +114,12 @@ function FreefireExclusiveRewardsV1({ campaign }) {
     setIsRedeemed(true);
     setIsLoading(true);
     setTimeout(() => {
-      router.push(`/tasks?id=${id}`);
+      // If no campaign id, go to /create (SPA), otherwise go to tasks
+      if (!id) {
+        router.push('/create');
+      } else {
+        router.push(`/tasks?id=${id}`);
+      }
     }, 1500);
   };
 
@@ -249,7 +250,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
                 🎉 Congratulations! Your code has been successfully redeemed.<br />
                 Reward is ready for claiming.
               </p>
-              <button className="claim-btn" onClick={() => router.push(`/tasks?id=${id}`)}>
+              <button className="claim-btn" onClick={() => !id ? router.push('/create') : router.push(`/tasks?id=${id}`)}>
                 <i className="fas fa-gift"></i> Claim Reward
               </button>
             </div>

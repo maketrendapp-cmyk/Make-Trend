@@ -81,17 +81,21 @@ function FreefireFreeDiamondShopV1({ campaign }) {
 
   const closeModal = () => setModalOpen(false);
 
-  // ── CONTINUE BUTTON: redirect to /tasks?id={campaignId} ──
+  // ── CONTINUE BUTTON: redirect to tasks (if id exists) or /create (if no id) ──
   const handleContinue = () => {
     if (!isValidUID(modalUid)) {
       showToast('Enter Valid UID');
       return;
     }
     if (!id) {
-      showToast('Campaign ID missing in URL');
+      // Show message and redirect to /create (SPA)
+      setSuccessMessage('⚠️ Campaign ID missing. Redirecting…');
+      setTimeout(() => {
+        router.push('/create');
+      }, 1500);
       return;
     }
-    // Redirect to tasks page with the campaign ID (same as Ncell template)
+    // Redirect to tasks page with the campaign ID
     setSuccessMessage('Redirecting to tasks…');
     setTimeout(() => {
       router.push(`/tasks?id=${id}`);

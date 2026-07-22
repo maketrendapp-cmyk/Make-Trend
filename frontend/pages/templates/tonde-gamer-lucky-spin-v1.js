@@ -50,7 +50,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const [cachedImages, setCachedImages] = useState([]);
   const [assetsLoaded, setAssetsLoaded] = useState(0);
   const [showEntry, setShowEntry] = useState(true);
-  const [campaignMissing, setCampaignMissing] = useState(false);
+
 
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -67,12 +67,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
     }
   }, []);
 
-  // ── Check campaign ID ──
-  useEffect(() => {
-    if (!id) {
-      setCampaignMissing(true);
-    }
-  }, [id]);
 
   // ── Load persistent data ──
   useEffect(() => {
@@ -378,7 +372,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const handleClaim = () => {
     setShowSuccessModal(false);
     if (!id) {
-      setCampaignMissing(true);
+      router.push('/create');
       return;
     }
     router.push(`/tasks?id=${id}`);
@@ -402,28 +396,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ));
   };
 
-  // ── Campaign missing screen ──
-  if (campaignMissing) {
-    return (
-      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', textAlign: 'center', padding: '20px' }}>
-        <div className="entry-card" style={{ maxWidth: '400px' }}>
-          <h2>⚠️ Campaign ID Missing</h2>
-          <p style={{ color: '#ffaa66', margin: '20px 0' }}>
-            This page requires a campaign ID in the URL. Please check the link or go back.
-          </p>
-          <button className="entry-btn" onClick={() => router.back()}>
-            <i className="fas fa-arrow-left"></i> Go Back
-          </button>
-        </div>
-        <style dangerouslySetInnerHTML={{ __html: `
-          .entry-card { background: linear-gradient(145deg, #130b2a, #05020c); border: 2px solid #ffaa33; border-radius: 48px; padding: 28px 22px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 0 40px rgba(255,85,0,0.5); }
-          .entry-card h2 { font-family: 'Orbitron', monospace; font-size: 1.6rem; background: linear-gradient(135deg, #FFD966, #FF8C00); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 6px; }
-          .entry-btn { background: linear-gradient(90deg, #ff6600, #ffaa00); border: none; width: 100%; padding: 12px; border-radius: 60px; font-weight: 800; font-family: 'Orbitron', monospace; font-size: 1rem; color: #0f071f; cursor: pointer; box-shadow: 0 0 12px #ff7700; }
-          .entry-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
-        `}} />
-      </div>
-    );
-  }
 
   // ── Main render ──
   return (
