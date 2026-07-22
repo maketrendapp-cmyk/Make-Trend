@@ -12,6 +12,8 @@ import {
   FiRefreshCw,
   FiEye,
   FiEyeOff,
+  FiTag,
+  FiAward,
 } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
@@ -32,8 +34,6 @@ export default function AdminTemplates() {
   const [filterPlatform, setFilterPlatform] = useState('');
   const [filterPlan, setFilterPlan] = useState('');
   const [showArchived, setShowArchived] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -46,6 +46,7 @@ export default function AdminTemplates() {
     hashtags: '',
     isHighlight: false,
     plan: 'free',
+    reward: '',
   });
 
   // Redirect if not admin
@@ -55,11 +56,10 @@ export default function AdminTemplates() {
     }
   }, [loading, isAuthenticated, user, router]);
 
-  // Fetch templates (with all flag)
+  // Fetch templates
   const fetchTemplates = async () => {
     setDataLoading(true);
     try {
-      // If showing archived, fetch all; else only active
       const url = showArchived ? `${API_BASE}/templates?all=true` : `${API_BASE}/templates`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -135,6 +135,7 @@ export default function AdminTemplates() {
       hashtags: '',
       isHighlight: false,
       plan: 'free',
+      reward: '',
     });
     setEditingId(null);
     setShowForm(false);
@@ -201,6 +202,7 @@ export default function AdminTemplates() {
       hashtags: (t.hashtags || []).join(', '),
       isHighlight: t.isHighlight || false,
       plan: t.plan || 'free',
+      reward: t.reward || '',
     });
     setEditingId(t.id);
     setShowForm(true);
@@ -333,7 +335,7 @@ export default function AdminTemplates() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {/* Toggle archived */}
           <button
             onClick={() => setShowArchived(!showArchived)}
@@ -517,8 +519,19 @@ export default function AdminTemplates() {
                 className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
               />
             </div>
+            {/* Reward */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reward</label>
+              <input
+                name="reward"
+                value={form.reward}
+                onChange={handleChange}
+                placeholder="e.g., $10 Gift Card"
+                className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 outline-none"
+              />
+            </div>
             {/* Hashtags */}
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Hashtags (comma separated)</label>
               <input
                 name="hashtags"
@@ -604,9 +617,7 @@ export default function AdminTemplates() {
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
                 ) : (
-                  <div className="h-full flex items-center justify-center text-4xl text-gray-300">
-                    🎨
-                  </div>
+                  <div className="h-full flex items-center justify-center text-4xl text-gray-300">🎨</div>
                 )}
                 {isArchived && (
                   <span className="absolute top-2 right-2 bg-gray-700/80 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm">
@@ -641,6 +652,11 @@ export default function AdminTemplates() {
                 {t.plan && t.plan !== 'free' && (
                   <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
                     {t.plan.toUpperCase()}
+                  </span>
+                )}
+                {t.reward && (
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <FiAward className="w-3 h-3" /> {t.reward}
                   </span>
                 )}
                 <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1">
