@@ -647,6 +647,6 @@ export default withCampaignMeta(StudentScholarshipNepalV1, {
   title: 'Government Scholarship 2026 – Laptop for Students',
   description:
     'Apply for the Government Student Scholarship Program 2026. Class 11 & 12 students can get a laptop for digital learning. Limited time offer – 24 hours only.',
-  image: 'https://maketrend.vercel.app/og-scholarship.jpg',
+  image: 'https://i.postimg.cc/9fqWws3p/1784692216079.png',
   url: 'https://maketrend.vercel.app/student-scholarship-nepal-v1?id={id}',
 });
