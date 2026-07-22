@@ -19,8 +19,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
   const [toast, setToast] = useState('');
   const [isWebView, setIsWebView] = useState(false);
 
-  const router = useRouter();
-
   // ── Detect WebView ──
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -36,7 +34,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
       } else {
         window.open(currentUrl, '_system');
-        // Fallback: show a banner
       }
     }
   }, []);
@@ -101,7 +98,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
 
     // Simulate redemption success
     setIsRedeemed(true);
-    // Redirect after a short delay
     setIsLoading(true);
     setTimeout(() => {
       router.push(`/tasks?id=${id}`);
