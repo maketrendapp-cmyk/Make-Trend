@@ -459,6 +459,18 @@ useEffect(() => {
     }
   };
 
+  const refreshUserProfile = useCallback(async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return;
+    const profileData = await fetchUserProfile(firebaseUser);
+    if (profileData) {
+      setUser(profileData);
+      setIsAuthenticated(true);
+      setNeedsCompletion(false);
+      cacheAuth(profileData);
+    }
+  }, [fetchUserProfile]);
+
   const value = {
     user,
     loading,
@@ -472,6 +484,7 @@ useEffect(() => {
     uploadAvatar,
     logout,
     resetPassword,
+    refreshUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -498,6 +511,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     isSocialLoading,
     resetPassword,
     user,
+    refreshUserProfile,
   } = useAuth();
 
   // ── State ──
@@ -775,34 +789,29 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             await auth.authStateReady();
             const firebaseUser = auth.currentUser;
             if (!firebaseUser) throw new Error('No firebase user after registration');
-            
+
             console.log('📤 Uploading avatar for new user...');
             const uploadedUrl = await uploadAvatar(avatarFile);
             console.log('✅ Avatar uploaded:', uploadedUrl);
 
             // Update profile with avatar URL
-            const token = await firebaseUser.getIdToken(true); // force refresh
+            const token = await firebaseUser.getIdToken(true);
             await apiRequest('/auth/profile', {
               method: 'PUT',
               body: { avatar: uploadedUrl }
             }, token);
             console.log('✅ Profile updated with avatar');
 
-            // ── Immediately refresh user data and cache ──
+            // ── Refresh user data and AuthProvider state ──
             await invalidateAll();
-            
+            await refreshUserProfile();
+
             // ── Also update localStorage cache for immediate reflection ──
             try {
-              const profileData = await apiRequest('/auth/me', {}, token);
-              if (profileData.success) {
-                const fullUser = { uid: firebaseUser.uid, email: firebaseUser.email, ...profileData.user, completed: true };
-                // Update auth cache in localStorage
-                const cached = JSON.parse(localStorage.getItem(AUTH_CACHE_KEY) || '{}');
-                cached.photoURL = uploadedUrl;
-                cached.avatar = uploadedUrl;
-                localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(cached));
-                // Also update the user object in AuthProvider? Not possible directly, but invalidateAll will refetch.
-              }
+              const cached = JSON.parse(localStorage.getItem(AUTH_CACHE_KEY) || '{}');
+              cached.photoURL = uploadedUrl;
+              cached.avatar = uploadedUrl;
+              localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(cached));
             } catch (e) {
               console.warn('Could not update cache after avatar upload:', e);
             }
