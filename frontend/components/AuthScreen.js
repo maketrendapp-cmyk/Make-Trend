@@ -13,6 +13,7 @@ import {
   signOut,
   sendPasswordResetEmail,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   FacebookAuthProvider,
 } from '../services/firebase';
@@ -342,67 +343,90 @@ useEffect(() => {
       return { success: false, error: 'Unsupported provider' };
     }
 
+    // ── For Facebook, use redirect to avoid popup issues ──
+    if (providerName === 'facebook') {
+      try {
+        await signInWithRedirect(auth, provider);
+        // The page will redirect to Facebook and then back.
+        // The auth state will be updated by onAuthStateChanged.
+        // Keep loading true; the listener will handle the rest.
+        return { success: true, redirecting: true };
+      } catch (error) {
+        let message = 'Unable to sign in with Facebook.';
+        setLoading(false);
+        setIsSocialLoading(false);
+        return { success: false, error: message };
+      }
+    }
+
+    // ── For Google, use popup ──
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-      const basicUser = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName || '',
-        photoURL: firebaseUser.photoURL || '',
-      };
-      setUser(basicUser);
-      setIsAuthenticated(true);
-      setNeedsCompletion(false);
-      uidRef.current = firebaseUser.uid;
-      cacheAuth(basicUser);
-
-      // Load fresh data
-      invalidateAll();
-
-      try {
-        const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
-        if (data.banned) {
-          await signOut(auth);
-          localStorage.removeItem(AUTH_CACHE_KEY);
-          setUser(null);
-          setIsAuthenticated(false);
-          setLoading(false);
-          setIsSocialLoading(false);
-          return { success: false, error: 'Account suspended.' };
-        }
-      } catch {}
-
-      const status = await checkProfileStatus(firebaseUser.uid);
-      if (status.completed) {
-        const profileData = await fetchUserProfile(firebaseUser);
-        if (profileData) {
-          setUser(profileData);
-          setIsAuthenticated(true);
-          setNeedsCompletion(false);
-          cacheAuth(profileData);
-        } else {
-          // Profile exists but fetch failed – mark as incomplete to force completion
-          setNeedsCompletion(true);
-          setUser({ ...basicUser, completed: false });
-        }
-      } else {
-        // Profile not completed – trigger social completion flow
-        setNeedsCompletion(true);
-        setUser({ ...basicUser, completed: false });
-      }
-
-      setLoading(false);
-      setIsSocialLoading(false);
-      return { success: true, needsCompletion: true, user: user };
+      // Process after login (reuse logic)
+      return await processSocialLoginResult(firebaseUser);
     } catch (error) {
-      let message = 'Unable to sign in.';
+      let message = 'Unable to sign in with Google.';
       if (error.code === 'auth/popup-blocked') message = 'Popup blocked. Please allow popups.';
       if (error.code === 'auth/popup-closed-by-user') message = 'Popup closed. Try again.';
       setLoading(false);
       setIsSocialLoading(false);
       return { success: false, error: message };
     }
+  };
+
+  // ── Shared helper to process social login result ──
+  const processSocialLoginResult = async (firebaseUser) => {
+    const basicUser = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName || '',
+      photoURL: firebaseUser.photoURL || '',
+    };
+    setUser(basicUser);
+    setIsAuthenticated(true);
+    setNeedsCompletion(false);
+    uidRef.current = firebaseUser.uid;
+    cacheAuth(basicUser);
+
+    invalidateAll();
+
+    try {
+      const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
+      if (data.banned) {
+        await signOut(auth);
+        localStorage.removeItem(AUTH_CACHE_KEY);
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        setIsSocialLoading(false);
+        return { success: false, error: 'Account suspended.' };
+      }
+    } catch {}
+
+    let needsCompletion = false;
+    const status = await checkProfileStatus(firebaseUser.uid);
+    if (status.completed) {
+      const profileData = await fetchUserProfile(firebaseUser);
+      if (profileData) {
+        setUser(profileData);
+        setIsAuthenticated(true);
+        setNeedsCompletion(false);
+        cacheAuth(profileData);
+      } else {
+        needsCompletion = true;
+        setNeedsCompletion(true);
+        setUser({ ...basicUser, completed: false });
+      }
+    } else {
+      needsCompletion = true;
+      setNeedsCompletion(true);
+      setUser({ ...basicUser, completed: false });
+    }
+
+    setLoading(false);
+    setIsSocialLoading(false);
+    return { success: true, needsCompletion, user: basicUser };
   };
 
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
@@ -661,6 +685,11 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
     setError('');
     const result = await socialLogin(provider);
     if (result.success) {
+      if (result.redirecting) {
+        // The page is redirecting to Facebook – nothing else to do.
+        // The loading overlay will stay until the user returns.
+        return;
+      }
       if (result.needsCompletion) {
         const userData = result.user || {};
         setSocialUser(userData);
@@ -674,6 +703,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       }
     } else {
       setError(result.error || `Failed to sign in with ${provider}.`);
+      setIsSubmitting(false); // reset if error
     }
   };
 
