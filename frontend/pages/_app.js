@@ -26,6 +26,7 @@ const queryClient = new QueryClient({
 // ============================================================
 const NO_LAYOUT_PAGES = [
   '/templates/ncell-reward-v1',
+'/templates/student-scholarship-nepal-v1',
   '/ncell-reward-v1',
   '/tasks',
   '/share',
