@@ -774,19 +774,46 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             // Wait for auth to be fully ready
             await auth.authStateReady();
             const uploadedUrl = await uploadAvatar(avatarFile);
+            console.log('✅ Avatar uploaded to Cloudinary:', uploadedUrl);
+
             // Update profile with avatar URL
             const firebaseUser = auth.currentUser;
             if (firebaseUser) {
               const token = await firebaseUser.getIdToken();
+              console.log('🔄 Updating profile with avatar...');
               await apiRequest('/auth/profile', {
                 method: 'PUT',
                 body: { avatar: uploadedUrl }
               }, token);
-              // Refresh user data
+              console.log('✅ Profile updated with avatar');
+
+              // ── Immediately update local user state ──
+              const updatedUser = { ...user, avatar: uploadedUrl, photoURL: uploadedUrl };
+              // We need to set user state – but we don't have setUser here! 
+              // We'll rely on invalidateAll to refetch, but we can also call a function.
+              // Since we can't directly setUser, we'll invalidate and also update cache manually.
+              // But we can use the auth provider's setUser? Not accessible here.
+              // We'll just call invalidateAll, which will refetch profile.
               await invalidateAll();
+              // Also update cache manually for immediate effect
+              try {
+                const profileData = await apiRequest('/auth/me', {}, token);
+                if (profileData.success) {
+                  const fullUser = { uid: firebaseUser.uid, email: firebaseUser.email, ...profileData.user, completed: true };
+                  // We can't setUser here because we don't have setUser in AuthScreen.
+                  // But we can use the useAuth's refresh mechanism? Actually invalidateAll will trigger refetch in AuthProvider.
+                  // Let's also update localStorage directly for next page loads.
+                  const cached = JSON.parse(localStorage.getItem(AUTH_CACHE_KEY) || '{}');
+                  cached.photoURL = uploadedUrl;
+                  cached.avatar = uploadedUrl;
+                  localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(cached));
+                }
+              } catch (e) {
+                console.warn('Failed to update cache after avatar upload:', e);
+              }
             }
           } catch (err) {
-            console.warn('Avatar upload after registration failed:', err);
+            console.error('❌ Avatar upload failed:', err);
             setError('Avatar upload failed: ' + err.message);
             // Registration succeeded but avatar failed – we continue
           }
