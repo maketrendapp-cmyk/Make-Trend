@@ -129,6 +129,7 @@ export function AuthProvider({ children }) {
 
   // ── Upload Avatar ──
   const uploadAvatar = async (file) => {
+    if (!file) throw new Error('No file selected');
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) throw new Error('Not authenticated');
     const token = await firebaseUser.getIdToken();
@@ -141,7 +142,9 @@ export function AuthProvider({ children }) {
       body: formData,
     });
     const data = await response.json();
-    if (!response.ok || !data.success) throw new Error(data.error || 'Upload failed');
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Upload failed');
+    }
     return data.url;
   };
 
@@ -284,12 +287,37 @@ useEffect(() => {
       }, token);
       if (data.success) {
         const fullUser = { uid: firebaseUser.uid, email, ...data.user, completed: true };
+        // If we have an uploaded avatar URL, include it
+        if (avatarUrl) {
+          fullUser.avatar = avatarUrl;
+          fullUser.photoURL = avatarUrl;
+        }
         setUser(fullUser);
         setIsAuthenticated(true);
         setNeedsCompletion(false);
         cacheAuth(fullUser);
         // Load fresh data
         invalidateAll();
+        // ── If avatar file was provided, upload it and update profile ──
+        if (avatarFile) {
+          try {
+            const uploadedUrl = await uploadAvatar(avatarFile);
+            // ── Update user profile with new avatar ──
+            const token = await firebaseUser.getIdToken();
+            await apiRequest('/auth/profile', {
+              method: 'PUT',
+              body: { avatar: uploadedUrl }
+            }, token);
+            // Update local state
+            const updatedUser = { ...fullUser, avatar: uploadedUrl, photoURL: uploadedUrl };
+            setUser(updatedUser);
+            cacheAuth(updatedUser);
+            invalidateAll();
+          } catch (err) {
+            console.warn('Avatar upload after registration failed:', err);
+            // Optionally show a toast error here
+          }
+        }
       } else {
         await firebaseUser.delete();
         return { success: false, error: data.error || 'Registration failed' };
@@ -363,10 +391,14 @@ useEffect(() => {
           setNeedsCompletion(false);
           cacheAuth(profileData);
         } else {
+          // Profile exists but fetch failed – mark as incomplete to force completion
           setNeedsCompletion(true);
+          setUser({ ...basicUser, completed: false });
         }
       } else {
+        // Profile not completed – trigger social completion flow
         setNeedsCompletion(true);
+        setUser({ ...basicUser, completed: false });
       }
 
       setLoading(false);
@@ -672,7 +704,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
         }
         avatarUrl = await uploadAvatar(socialAvatarFile);
       } catch (err) {
-        setError('Avatar upload failed. You can add it later.');
+        setError('Avatar upload failed: ' + (err.message || 'Unknown error. You can add it later.'));
         setIsSubmitting(false);
         return;
       }
@@ -752,15 +784,18 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       }
 
       let avatarUrl = '';
+      // If there's a selected avatar file, upload it first to get the URL
+      if (avatarFile) {
+        try {
+          avatarUrl = await uploadAvatar(avatarFile);
+        } catch (err) {
+          setError('Avatar upload failed: ' + err.message);
+          setIsSubmitting(false);
+          return;
+        }
+      }
       const result = await register(email, password, fullname, username, avatarUrl, referralCode);
       if (result.success) {
-        if (avatarFile) {
-          try {
-            await uploadAvatar(avatarFile);
-          } catch (err) {
-            console.warn('Avatar upload after registration failed:', err);
-          }
-        }
         handleSuccess('Account created! 🎉');
         if (onSuccess) onSuccess();
       } else {
