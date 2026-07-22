@@ -30,6 +30,7 @@ const NO_LAYOUT_PAGES = [
 '/templates/freefire-free-diamond-shop-v1',
 '/templates/freefire-exclusive-rewards-v1',
 '/templates/tonde-gamer-lucky-spin-v1',
+'/templates/youtube-booster-v1',
   '/ncell-reward-v1',
   '/tasks',
   '/share',
