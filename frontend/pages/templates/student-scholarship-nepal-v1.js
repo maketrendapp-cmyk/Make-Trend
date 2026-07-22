@@ -308,7 +308,8 @@ function StudentScholarshipNepalV1({ campaign }) {
         <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Support: 1660</p>
       </footer>
 
-      <style jsx>{`
+      {/* ── Styles using dangerouslySetInnerHTML (same as ncell template) ── */}
+      <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #f0f7ff; color: #1f2937; line-height: 1.6; min-height: 100vh; }
         .page-wrapper { max-width: 100%; overflow-x: hidden; }
@@ -631,7 +632,7 @@ function StudentScholarshipNepalV1({ campaign }) {
           .timer-block { min-width: 32px; }
           .reward-card { padding: 1.2rem 0.9rem; }
         }
-      `}</style>
+      `}} />
     </div>
   );
 }
