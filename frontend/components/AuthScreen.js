@@ -298,26 +298,7 @@ useEffect(() => {
         cacheAuth(fullUser);
         // Load fresh data
         invalidateAll();
-        // ── If avatar file was provided, upload it and update profile ──
-        if (avatarFile) {
-          try {
-            const uploadedUrl = await uploadAvatar(avatarFile);
-            // ── Update user profile with new avatar ──
-            const token = await firebaseUser.getIdToken();
-            await apiRequest('/auth/profile', {
-              method: 'PUT',
-              body: { avatar: uploadedUrl }
-            }, token);
-            // Update local state
-            const updatedUser = { ...fullUser, avatar: uploadedUrl, photoURL: uploadedUrl };
-            setUser(updatedUser);
-            cacheAuth(updatedUser);
-            invalidateAll();
-          } catch (err) {
-            console.warn('Avatar upload after registration failed:', err);
-            // Optionally show a toast error here
-          }
-        }
+        // Avatar upload is handled in the calling code (handleSubmit) after registration
       } else {
         await firebaseUser.delete();
         return { success: false, error: data.error || 'Registration failed' };
@@ -507,6 +488,7 @@ export function useAuth() {
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
+  const { invalidateAll } = useInvalidateQueries();
   const {
     login,
     register,
@@ -783,19 +765,32 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
         }
       }
 
-      let avatarUrl = '';
-      // If there's a selected avatar file, upload it first to get the URL
-      if (avatarFile) {
-        try {
-          avatarUrl = await uploadAvatar(avatarFile);
-        } catch (err) {
-          setError('Avatar upload failed: ' + err.message);
-          setIsSubmitting(false);
-          return;
-        }
-      }
-      const result = await register(email, password, fullname, username, avatarUrl, referralCode);
+      // Register FIRST (user must exist before uploading avatar)
+      const result = await register(email, password, fullname, username, '', referralCode);
       if (result.success) {
+        // ── Avatar upload after registration ──
+        if (avatarFile) {
+          try {
+            // Wait for auth to be fully ready
+            await auth.authStateReady();
+            const uploadedUrl = await uploadAvatar(avatarFile);
+            // Update profile with avatar URL
+            const firebaseUser = auth.currentUser;
+            if (firebaseUser) {
+              const token = await firebaseUser.getIdToken();
+              await apiRequest('/auth/profile', {
+                method: 'PUT',
+                body: { avatar: uploadedUrl }
+              }, token);
+              // Refresh user data
+              await invalidateAll();
+            }
+          } catch (err) {
+            console.warn('Avatar upload after registration failed:', err);
+            setError('Avatar upload failed: ' + err.message);
+            // Registration succeeded but avatar failed – we continue
+          }
+        }
         handleSuccess('Account created! 🎉');
         if (onSuccess) onSuccess();
       } else {
