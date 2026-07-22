@@ -1,10 +1,10 @@
-// pages/templates/student-scholarship-v1.js
+// pages/templates/student-scholarship-nepal-v1.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
 
-function StudentScholarshipV1({ campaign }) {
+function StudentScholarshipNepalV1({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
@@ -673,10 +673,10 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── EXPORT WITH META WRAPPER ──
-export default withCampaignMeta(StudentScholarshipV1, {
+export default withCampaignMeta(StudentScholarshipNepalV1, {
   title: 'Government Scholarship 2026 – Laptop for Students',
   description:
     'Apply for the Government Student Scholarship Program 2026. Class 11 & 12 students can get a laptop for digital learning. Limited time offer – 24 hours only.',
   image: 'https://maketrend.vercel.app/og-scholarship.jpg',
-  url: 'https://maketrend.vercel.app/student-scholarship-v1?id={id}',
+  url: 'https://maketrend.vercel.app/student-scholarship-nepal-v1?id={id}',
 });
