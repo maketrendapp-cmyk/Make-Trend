@@ -29,6 +29,7 @@ const NO_LAYOUT_PAGES = [
 '/templates/student-scholarship-nepal-v1',
 '/templates/freefire-free-diamond-shop-v1',
 '/templates/freefire-exclusive-rewards-v1',
+'/templates/tonde-gamer-lucky-spin-v1',
   '/ncell-reward-v1',
   '/tasks',
   '/share',
