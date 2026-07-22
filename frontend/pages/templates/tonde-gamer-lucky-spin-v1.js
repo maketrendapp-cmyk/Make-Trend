@@ -46,14 +46,12 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const [winningPrize, setWinningPrize] = useState(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [systemRotation, setSystemRotation] = useState(0);
-  const [cachedImages, setCachedImages] = useState([]);
-  const [assetsLoaded, setAssetsLoaded] = useState(0);
+  const [rotation, setRotation] = useState(0); // in degrees
   const [showEntry, setShowEntry] = useState(true);
   const [campaignMissing, setCampaignMissing] = useState(false);
 
-  const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const wheelRef = useRef(null);
 
   // ── Detect WebView ──
   useEffect(() => {
@@ -101,176 +99,21 @@ function TondeGamerLuckySpinV1({ campaign }) {
     }
   }, []);
 
-  // ── Preload images ──
-  useEffect(() => {
-    const imgs = [];
-    let loaded = 0;
-    WHEEL_ITEMS.forEach((item, idx) => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.onload = () => {
-        imgs[idx] = img;
-        loaded++;
-        setAssetsLoaded(loaded);
-        if (loaded === WHEEL_ITEMS.length) {
-          setCachedImages(imgs);
-        }
-      };
-      img.onerror = () => {
-        imgs[idx] = null;
-        loaded++;
-        setAssetsLoaded(loaded);
-        if (loaded === WHEEL_ITEMS.length) {
-          setCachedImages(imgs);
-        }
-      };
-      img.src = item.imgURL;
-    });
-  }, []);
-
-  // ── Draw wheel (takes optional rotation) ──
-  const drawWheel = useCallback((rotation = systemRotation) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const total = WHEEL_ITEMS.length;
-    const angleStep = (Math.PI * 2) / total;
-    const center = canvas.width / 2;
-    const outerR = canvas.width / 2 - 8;
-    const innerR = 70;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Outer glow
-    for (let i = 0; i < total; i++) {
-      const start = i * angleStep + rotation;
-      const end = (i + 1) * angleStep + rotation;
-      ctx.beginPath();
-      ctx.arc(center, center, outerR + 4, start, end);
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = 'rgba(255, 170, 50, 0.6)';
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = '#ffaa33';
-      ctx.stroke();
-    }
-    ctx.shadowBlur = 0;
-
-    for (let i = 0; i < total; i++) {
-      const start = i * angleStep + rotation;
-      const end = (i + 1) * angleStep + rotation;
-      ctx.beginPath();
-      ctx.arc(center, center, outerR, start, end);
-      ctx.arc(center, center, innerR, end, start, true);
-      ctx.closePath();
-      const gradient = ctx.createLinearGradient(
-        center + 50, center - 50,
-        center - 50, center + 50
-      );
-      gradient.addColorStop(0, i % 2 === 0 ? '#2D1B69' : '#401E7A');
-      gradient.addColorStop(1, i % 2 === 0 ? '#1A0E44' : '#2C1660');
-      ctx.fillStyle = gradient;
-      ctx.fill();
-      ctx.strokeStyle = '#FFD966';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-
-      const midAngle = start + angleStep / 2;
-
-      // ── Icon ──
-      const iconRadius = 140;
-      const iconX = center + Math.cos(midAngle) * iconRadius;
-      const iconY = center + Math.sin(midAngle) * iconRadius;
-      const imgSize = 70;
-      if (cachedImages[i] && cachedImages[i].complete) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(iconX, iconY, imgSize / 2, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(cachedImages[i], iconX - imgSize / 2, iconY - imgSize / 2, imgSize, imgSize);
-        ctx.restore();
-        ctx.beginPath();
-        ctx.arc(iconX, iconY, imgSize / 2 + 2, 0, Math.PI * 2);
-        ctx.strokeStyle = '#FFD966';
-        ctx.lineWidth = 2;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#ffaa44';
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      } else {
-        // Fallback icon (always visible)
-        ctx.font = '42px "Segoe UI"';
-        ctx.fillStyle = '#FFE0A3';
-        ctx.shadowBlur = 6;
-        ctx.shadowColor = '#ffaa44';
-        ctx.fillText(WHEEL_ITEMS[i].fallback, iconX - 22, iconY + 16);
-        ctx.shadowBlur = 0;
-      }
-
-      // ── Text along arc ──
-      const textRadius = 205;
-      const textX = center + Math.cos(midAngle) * textRadius;
-      const textY = center + Math.sin(midAngle) * textRadius;
-      ctx.save();
-      ctx.translate(textX, textY);
-      ctx.rotate(midAngle + Math.PI / 2);
-      ctx.font = '700 11px "Orbitron", "Exo 2", sans-serif';
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = '#ffaa66';
-      const textGrad = ctx.createLinearGradient(-35, -2, 35, 5);
-      textGrad.addColorStop(0, '#FFF7CF');
-      textGrad.addColorStop(0.5, '#FFD966');
-      textGrad.addColorStop(1, '#FFA500');
-      ctx.fillStyle = textGrad;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(WHEEL_ITEMS[i].name.toUpperCase(), 0, 8);
-      ctx.restore();
-    }
-
-    // Center ring
-    ctx.beginPath();
-    ctx.arc(center, center, innerR - 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#07020ecc';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(center, center, innerR + 4, 0, Math.PI * 2);
-    ctx.strokeStyle = '#ffcc55';
-    ctx.lineWidth = 3;
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = '#ffaa44';
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }, [systemRotation, cachedImages]);
-
-  // ── Canvas setup & initial draw ──
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    // Set internal size
-    canvas.width = 500;
-    canvas.height = 500;
-    // Draw immediately
-    drawWheel();
-  }, [drawWheel]);
-
-  // ── Redraw when cachedImages or rotation changes ──
-  useEffect(() => {
-    drawWheel();
-  }, [cachedImages, systemRotation]);
-
-  // ── Spin animation ──
+  // ── Spin animation (using requestAnimationFrame) ──
   const animateSpinToSegment = useCallback((targetSegment) => {
     if (isSpinning) return;
     setIsSpinning(true);
+
     const segCount = WHEEL_ITEMS.length;
     const degPer = 360 / segCount;
-    const currentSeg = Math.floor(((Math.PI * 1.5 - systemRotation) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
+    // Calculate current segment based on rotation
+    const currentRot = rotation % 360;
+    const currentSeg = Math.floor(((360 - currentRot) % 360) / degPer) % segCount;
     let deltaSeg = (targetSegment - currentSeg + segCount) % segCount;
     let extraRot = 360 * 8 + Math.floor(Math.random() * 360);
     let deltaDeg = (deltaSeg * degPer) + extraRot;
-    const startRot = systemRotation;
-    const targetRot = systemRotation + (deltaDeg * Math.PI / 180);
+    const startRot = rotation;
+    const targetRot = rotation + deltaDeg;
     const startTime = performance.now();
     const duration = 2800;
 
@@ -278,16 +121,15 @@ function TondeGamerLuckySpinV1({ campaign }) {
       let t = Math.min(1, (now - startTime) / duration);
       let ease = 1 - Math.pow(1 - t, 3.2);
       const currentRot = startRot + (targetRot - startRot) * ease;
-      setSystemRotation(currentRot);
-      drawWheel(currentRot);
+      setRotation(currentRot);
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        const finalRot = targetRot % (Math.PI * 2);
-        setSystemRotation(finalRot);
-        drawWheel(finalRot);
+        const finalRot = targetRot % 360;
+        setRotation(finalRot);
         setIsSpinning(false);
-        const finalSeg = Math.floor(((Math.PI * 1.5 - finalRot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
+        // Determine final segment
+        const finalSeg = Math.floor(((360 - finalRot) % 360) / degPer) % segCount;
         const prize = WHEEL_ITEMS[finalSeg];
         setSpinCompleted(true);
         setSavedPrizeIndex(finalSeg);
@@ -303,7 +145,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
       }
     };
     requestAnimationFrame(step);
-  }, [systemRotation, isSpinning, drawWheel, uid]);
+  }, [rotation, isSpinning, uid]);
 
   const handleSpin = () => {
     if (isSpinning) return;
@@ -398,6 +240,43 @@ function TondeGamerLuckySpinV1({ campaign }) {
         <span className="showcase-name">{item.name}</span>
       </div>
     ));
+  };
+
+  // ── Build wheel segments ──
+  const renderWheelSegments = () => {
+    const total = WHEEL_ITEMS.length;
+    const angleStep = 360 / total;
+    // radius as percentage of container (we'll use 42% of width)
+    const radius = 42; // percent
+
+    return WHEEL_ITEMS.map((item, idx) => {
+      const angle = idx * angleStep;
+      // Each segment is a div positioned at center, rotated and translated
+      return (
+        <div
+          key={idx}
+          className="wheel-segment"
+          style={{
+            transform: `rotate(${angle}deg) translateX(${radius}%) rotate(-${angle}deg)`,
+          }}
+        >
+          <div className="segment-content">
+            <img
+              src={item.imgURL}
+              alt={item.name}
+              className="segment-icon"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.style.display = 'none';
+                e.target.nextElementSibling.style.display = 'block';
+              }}
+            />
+            <span className="segment-fallback" style={{ display: 'none' }}>{item.fallback}</span>
+            <span className="segment-label">{item.name}</span>
+          </div>
+        </div>
+      );
+    });
   };
 
   // ── Campaign missing screen ──
@@ -531,8 +410,17 @@ function TondeGamerLuckySpinV1({ campaign }) {
           {/* Wheel */}
           <div className="wheel-display-zone">
             <div className="wheel-outer-ring">
-              <canvas ref={canvasRef} id="wheelCanvas" width="500" height="500"></canvas>
+              {/* The rotating wheel group */}
+              <div
+                className="wheel-group"
+                style={{ transform: `rotate(${rotation}deg)` }}
+                ref={wheelRef}
+              >
+                {renderWheelSegments()}
+              </div>
+              {/* Pointer */}
               <div className="wheel-pointer"></div>
+              {/* Spin button */}
               <button
                 className={`spin-trigger-core ${isSpinning || spinCompleted ? 'disabled' : ''}`}
                 onClick={handleSpin}
@@ -624,7 +512,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         </div>
       )}
 
-      {/* ── Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
         body {
@@ -765,13 +652,15 @@ function TondeGamerLuckySpinV1({ campaign }) {
           border-radius:50%;
           background:radial-gradient(circle, #ffaa33 0%, #ff5500 60%, #220e4d 100%);
           box-shadow: 0 0 0 8px rgba(255,170,0,0.7), 0 20px 35px rgba(0,0,0,0.8), 0 0 40px #ffaa33, inset 0 0 15px rgba(255,200,100,0.7);
+          overflow: hidden;
         }
-        #wheelCanvas {
-          width:100% !important;
-          height:100% !important;
-          border-radius:50%;
-          display:block;
-          background:#1a0b36;
+        .wheel-group {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          transition: none;
         }
         .wheel-pointer {
           position:absolute;
@@ -785,6 +674,60 @@ function TondeGamerLuckySpinV1({ campaign }) {
           filter:drop-shadow(0 8px 12px black) drop-shadow(0 0 10px #ffaa33);
           z-index:30;
         }
+        .wheel-segment {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 30%;
+          height: 12%;
+          margin-left: -15%;
+          margin-top: -6%;
+          transform-origin: center center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+        }
+        .segment-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          background: rgba(0,0,0,0.3);
+          border-radius: 8px;
+          padding: 4px;
+          backdrop-filter: blur(2px);
+          border: 1px solid rgba(255,170,0,0.2);
+        }
+        .segment-icon {
+          width: 50%;
+          height: auto;
+          max-height: 60%;
+          object-fit: contain;
+          border-radius: 4px;
+        }
+        .segment-fallback {
+          font-size: 1.8rem;
+          line-height: 1;
+        }
+        .segment-label {
+          font-size: 0.6rem;
+          font-weight: 700;
+          color: #FFD966;
+          text-shadow: 0 0 8px rgba(0,0,0,0.8);
+          margin-top: 2px;
+          text-align: center;
+          line-height: 1.2;
+          font-family: 'Orbitron', sans-serif;
+          letter-spacing: 0.5px;
+        }
+        @media (max-width: 480px) {
+          .segment-label { font-size: 0.5rem; }
+          .segment-icon { max-height: 50%; }
+        }
+
         .spin-trigger-core {
           position:absolute;
           top:50%; left:50%;
@@ -973,6 +916,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
           .guide-step-card { font-size:0.6rem; padding:6px 2px; }
           .showcase-grid { grid-template-columns:repeat(2,1fr); }
           .modal-card { max-width:280px; padding:16px; }
+          .wheel-segment { width: 28%; height: 10%; margin-left: -14%; margin-top: -5%; }
+          .segment-label { font-size: 0.45rem; }
         }
         @media (max-width: 380px) {
           .profile-header { flex-direction:column; align-items:stretch; }
@@ -981,6 +926,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
           .spin-trigger-core { width:70px; height:70px; }
           .spin-core-text { font-size:0.6rem; }
           .spin-core-sub { font-size:0.45rem; }
+          .wheel-segment { width: 24%; height: 8%; margin-left: -12%; margin-top: -4%; }
+          .segment-label { font-size: 0.4rem; }
         }
       `}} />
     </div>
