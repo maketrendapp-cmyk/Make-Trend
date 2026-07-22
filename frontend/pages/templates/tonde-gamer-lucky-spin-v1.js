@@ -50,9 +50,11 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const [cachedImages, setCachedImages] = useState([]);
   const [assetsLoaded, setAssetsLoaded] = useState(0);
   const [showEntry, setShowEntry] = useState(true);
+  const [campaignMissing, setCampaignMissing] = useState(false);
 
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
   // ── Detect WebView ──
   useEffect(() => {
@@ -66,6 +68,13 @@ function TondeGamerLuckySpinV1({ campaign }) {
     }
   }, []);
 
+  // ── Check campaign ID ──
+  useEffect(() => {
+    if (!id) {
+      setCampaignMissing(true);
+    }
+  }, [id]);
+
   // ── Load persistent data ──
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -77,7 +86,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
           setSpinCompleted(data.spinCompleted === true);
           setSavedPrizeIndex(data.prizeIndex !== undefined ? data.prizeIndex : null);
           if (data.spinCompleted && data.prizeIndex !== null) {
-            // Force a spin to show the prize again
             setSpinCompleted(false);
             setForcePrizeIndex(true);
           } else {
@@ -171,7 +179,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
 
       const midAngle = start + angleStep / 2;
 
-      // Icon
+      // ── Icon ──
       const iconRadius = 140;
       const iconX = center + Math.cos(midAngle) * iconRadius;
       const iconY = center + Math.sin(midAngle) * iconRadius;
@@ -194,14 +202,16 @@ function TondeGamerLuckySpinV1({ campaign }) {
         ctx.stroke();
         ctx.shadowBlur = 0;
       } else {
+        // Fallback icon (always shows)
         ctx.font = '42px "Segoe UI"';
         ctx.fillStyle = '#FFE0A3';
         ctx.shadowBlur = 6;
+        ctx.shadowColor = '#ffaa44';
         ctx.fillText(WHEEL_ITEMS[i].fallback, iconX - 22, iconY + 16);
         ctx.shadowBlur = 0;
       }
 
-      // Text along outer arc
+      // ── Text along arc ──
       const textRadius = 205;
       const textX = center + Math.cos(midAngle) * textRadius;
       const textY = center + Math.sin(midAngle) * textRadius;
@@ -237,8 +247,9 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ctx.shadowBlur = 0;
   }, [systemRotation, cachedImages]);
 
+  // ── Draw on mount and when assets load ──
   useEffect(() => {
-    if (assetsLoaded === WHEEL_ITEMS.length) {
+    if (assetsLoaded === WHEEL_ITEMS.length || assetsLoaded > 0) {
       drawWheel();
     }
   }, [assetsLoaded, drawWheel]);
@@ -249,7 +260,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
     setIsSpinning(true);
     const segCount = WHEEL_ITEMS.length;
     const degPer = 360 / segCount;
-    let currentSeg = Math.floor(((Math.PI * 1.5 - systemRotation) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
+    // Calculate current segment
+    const currentSeg = Math.floor(((Math.PI * 1.5 - systemRotation) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
     let deltaSeg = (targetSegment - currentSeg + segCount) % segCount;
     let extraRot = 360 * 8 + Math.floor(Math.random() * 360);
     let deltaDeg = (deltaSeg * degPer) + extraRot;
@@ -258,7 +270,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
     const startTime = performance.now();
     const duration = 2800;
 
-    function step(now) {
+    const step = (now) => {
       let t = Math.min(1, (now - startTime) / duration);
       let ease = 1 - Math.pow(1 - t, 3.2);
       const currentRot = startRot + (targetRot - startRot) * ease;
@@ -267,10 +279,11 @@ function TondeGamerLuckySpinV1({ campaign }) {
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        setSystemRotation(targetRot % (Math.PI * 2));
+        const finalRot = targetRot % (Math.PI * 2);
+        setSystemRotation(finalRot);
         drawWheel();
         setIsSpinning(false);
-        const finalSeg = Math.floor(((Math.PI * 1.5 - systemRotation) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
+        const finalSeg = Math.floor(((Math.PI * 1.5 - finalRot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
         // finalize win
         const prize = WHEEL_ITEMS[finalSeg];
         setSpinCompleted(true);
@@ -285,7 +298,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
         setShowSuccessModal(true);
         playSound('win');
       }
-    }
+    };
     requestAnimationFrame(step);
   }, [systemRotation, isSpinning, drawWheel, uid]);
 
@@ -333,7 +346,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
       return;
     }
     setUidError('');
-    // Check local storage for existing
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try {
@@ -368,11 +380,12 @@ function TondeGamerLuckySpinV1({ campaign }) {
   // ── Claim redirect ──
   const handleClaim = () => {
     setShowSuccessModal(false);
-    if (id) {
-      router.push(`/tasks?id=${id}`);
-    } else {
-      router.push('/');
+    if (!id) {
+      // Show error or go back
+      setCampaignMissing(true);
+      return;
     }
+    router.push(`/tasks?id=${id}`);
   };
 
   // ── Render showcase ──
@@ -393,13 +406,36 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ));
   };
 
+  // ── Campaign missing screen ──
+  if (campaignMissing) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', textAlign: 'center', padding: '20px' }}>
+        <div className="entry-card" style={{ maxWidth: '400px' }}>
+          <h2>⚠️ Campaign ID Missing</h2>
+          <p style={{ color: '#ffaa66', margin: '20px 0' }}>
+            This page requires a campaign ID in the URL. Please check the link or go back.
+          </p>
+          <button className="entry-btn" onClick={() => router.back()}>
+            <i className="fas fa-arrow-left"></i> Go Back
+          </button>
+        </div>
+        <style dangerouslySetInnerHTML={{ __html: `
+          .entry-card { background: linear-gradient(145deg, #130b2a, #05020c); border: 2px solid #ffaa33; border-radius: 48px; padding: 28px 22px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 0 40px rgba(255,85,0,0.5); }
+          .entry-card h2 { font-family: 'Orbitron', monospace; font-size: 1.6rem; background: linear-gradient(135deg, #FFD966, #FF8C00); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 6px; }
+          .entry-btn { background: linear-gradient(90deg, #ff6600, #ffaa00); border: none; width: 100%; padding: 12px; border-radius: 60px; font-weight: 800; font-family: 'Orbitron', monospace; font-size: 1rem; color: #0f071f; cursor: pointer; box-shadow: 0 0 12px #ff7700; }
+          .entry-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
+        `}} />
+      </div>
+    );
+  }
+
   // ── Main render ──
   return (
     <div className="page-container">
 
       {/* ── WebView Modal ── */}
       {showWebViewModal && (
-        <div className="modal-overlay">
+        <div className="modal-overlay active">
           <div className="modal-card">
             <h2><i className="fas fa-external-link-alt"></i> Open in Browser</h2>
             <p>This page works best in a full browser.</p>
@@ -594,7 +630,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
         </div>
       )}
 
-      {/* ── Styles ── */}
+      {/* ── Styles (unchanged, kept from earlier) ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ── Reset & base ── */
         * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
