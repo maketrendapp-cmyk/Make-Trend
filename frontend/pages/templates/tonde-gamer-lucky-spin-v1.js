@@ -51,10 +51,10 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const [assetsLoaded, setAssetsLoaded] = useState(0);
   const [showEntry, setShowEntry] = useState(true);
   const [campaignMissing, setCampaignMissing] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
 
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
-  const animationFrameRef = useRef(null);
 
   // ── Detect WebView ──
   useEffect(() => {
@@ -102,7 +102,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
     }
   }, []);
 
-  // ── Preload images (optional, not required for wheel to show) ──
+  // ── Preload images (optional) ──
   useEffect(() => {
     const imgs = [];
     let loaded = 0;
@@ -129,10 +129,20 @@ function TondeGamerLuckySpinV1({ campaign }) {
     });
   }, []);
 
-  // ── Draw wheel (accepts an optional rotation) ──
-  const drawWheel = useCallback((rotation = systemRotation) => {
+  // ── Canvas setup ──
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Set internal canvas size
+    canvas.width = 500;
+    canvas.height = 500;
+    setCanvasReady(true);
+  }, []);
+
+  // ── Draw wheel ──
+  const drawWheel = useCallback((rotation = systemRotation) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !canvasReady) return;
     const ctx = canvas.getContext('2d');
     const total = WHEEL_ITEMS.length;
     const angleStep = (Math.PI * 2) / total;
@@ -190,7 +200,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         ctx.clip();
         ctx.drawImage(cachedImages[i], iconX - imgSize / 2, iconY - imgSize / 2, imgSize, imgSize);
         ctx.restore();
-        // border
         ctx.beginPath();
         ctx.arc(iconX, iconY, imgSize / 2 + 2, 0, Math.PI * 2);
         ctx.strokeStyle = '#FFD966';
@@ -200,7 +209,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
         ctx.stroke();
         ctx.shadowBlur = 0;
       } else {
-        // Fallback icon (always shows)
+        // Fallback icon (always visible)
         ctx.font = '42px "Segoe UI"';
         ctx.fillStyle = '#FFE0A3';
         ctx.shadowBlur = 6;
@@ -243,14 +252,15 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ctx.shadowColor = '#ffaa44';
     ctx.stroke();
     ctx.shadowBlur = 0;
-  }, [systemRotation, cachedImages]);
+  }, [systemRotation, cachedImages, canvasReady]);
 
-  // ── Draw on mount and when rotation/images change ──
+  // ── Draw on canvas ready, rotation change, or images loaded ──
   useEffect(() => {
-    drawWheel();
-  }, [drawWheel]);
+    if (canvasReady) {
+      drawWheel();
+    }
+  }, [canvasReady, drawWheel]);
 
-  // Re-draw when images load or rotation changes
   useEffect(() => {
     drawWheel();
   }, [assetsLoaded, cachedImages]);
@@ -276,7 +286,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
       let ease = 1 - Math.pow(1 - t, 3.2);
       const currentRot = startRot + (targetRot - startRot) * ease;
       setSystemRotation(currentRot);
-      drawWheel(currentRot); // pass current rotation to draw
+      drawWheel(currentRot);
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
@@ -285,7 +295,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         drawWheel(finalRot);
         setIsSpinning(false);
         const finalSeg = Math.floor(((Math.PI * 1.5 - finalRot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
-        // finalize win
         const prize = WHEEL_ITEMS[finalSeg];
         setSpinCompleted(true);
         setSavedPrizeIndex(finalSeg);
@@ -305,10 +314,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
 
   const handleSpin = () => {
     if (isSpinning) return;
-    if (spinCompleted) {
-      // Already claimed
-      return;
-    }
+    if (spinCompleted) return;
     let targetIdx;
     if (forcePrizeIndex && savedPrizeIndex !== null) {
       targetIdx = savedPrizeIndex;
