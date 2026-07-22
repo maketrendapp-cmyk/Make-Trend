@@ -31,7 +31,7 @@ const STORAGE_KEY = 'TondeGamerLuckySpin_FinalV2';
 
 function TondeGamerLuckySpinV1({ campaign }) {
   const router = useRouter();
-  const { id } = router.query; // campaign ID
+  const { id } = router.query;
 
   // ── State ──
   const [uid, setUid] = useState('');
@@ -51,7 +51,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const [assetsLoaded, setAssetsLoaded] = useState(0);
   const [showEntry, setShowEntry] = useState(true);
   const [campaignMissing, setCampaignMissing] = useState(false);
-  const [canvasReady, setCanvasReady] = useState(false);
 
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -102,7 +101,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
     }
   }, []);
 
-  // ── Preload images (optional) ──
+  // ── Preload images ──
   useEffect(() => {
     const imgs = [];
     let loaded = 0;
@@ -129,20 +128,10 @@ function TondeGamerLuckySpinV1({ campaign }) {
     });
   }, []);
 
-  // ── Canvas setup ──
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    // Set internal canvas size
-    canvas.width = 500;
-    canvas.height = 500;
-    setCanvasReady(true);
-  }, []);
-
-  // ── Draw wheel ──
+  // ── Draw wheel (takes optional rotation) ──
   const drawWheel = useCallback((rotation = systemRotation) => {
     const canvas = canvasRef.current;
-    if (!canvas || !canvasReady) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const total = WHEEL_ITEMS.length;
     const angleStep = (Math.PI * 2) / total;
@@ -252,18 +241,23 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ctx.shadowColor = '#ffaa44';
     ctx.stroke();
     ctx.shadowBlur = 0;
-  }, [systemRotation, cachedImages, canvasReady]);
+  }, [systemRotation, cachedImages]);
 
-  // ── Draw on canvas ready, rotation change, or images loaded ──
+  // ── Canvas setup & initial draw ──
   useEffect(() => {
-    if (canvasReady) {
-      drawWheel();
-    }
-  }, [canvasReady, drawWheel]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Set internal size
+    canvas.width = 500;
+    canvas.height = 500;
+    // Draw immediately
+    drawWheel();
+  }, [drawWheel]);
 
+  // ── Redraw when cachedImages or rotation changes ──
   useEffect(() => {
     drawWheel();
-  }, [assetsLoaded, cachedImages]);
+  }, [cachedImages, systemRotation]);
 
   // ── Spin animation ──
   const animateSpinToSegment = useCallback((targetSegment) => {
@@ -271,7 +265,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
     setIsSpinning(true);
     const segCount = WHEEL_ITEMS.length;
     const degPer = 360 / segCount;
-    // Calculate current segment
     const currentSeg = Math.floor(((Math.PI * 1.5 - systemRotation) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
     let deltaSeg = (targetSegment - currentSeg + segCount) % segCount;
     let extraRot = 360 * 8 + Math.floor(Math.random() * 360);
@@ -315,12 +308,9 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const handleSpin = () => {
     if (isSpinning) return;
     if (spinCompleted) return;
-    let targetIdx;
-    if (forcePrizeIndex && savedPrizeIndex !== null) {
-      targetIdx = savedPrizeIndex;
-    } else {
-      targetIdx = Math.floor(Math.random() * WHEEL_ITEMS.length);
-    }
+    let targetIdx = forcePrizeIndex && savedPrizeIndex !== null
+      ? savedPrizeIndex
+      : Math.floor(Math.random() * WHEEL_ITEMS.length);
     playSound('click');
     animateSpinToSegment(targetIdx);
   };
@@ -369,12 +359,10 @@ function TondeGamerLuckySpinV1({ campaign }) {
           }
           setIsAuthenticated(true);
           setShowEntry(false);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({ uid: val, spinCompleted: spinCompleted, prizeIndex: savedPrizeIndex }));
           return;
         }
       } catch (e) {}
     }
-    // New UID
     setUid(val);
     setSpinCompleted(false);
     setSavedPrizeIndex(null);
@@ -638,7 +626,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
 
       {/* ── Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
-        /* ── Reset & base ── */
         * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
         body {
           background: radial-gradient(circle at 50% 0%, #1a0b36, #070314, #020107);
@@ -661,8 +648,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
           gap: 20px;
           padding: 16px 0 24px;
         }
-
-        /* ── Entry Overlay ── */
         .entry-overlay {
           position: fixed;
           top:0; left:0; width:100%; height:100%;
@@ -710,7 +695,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         .entry-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
         .warning-text { margin-top:14px; font-size:0.65rem; color:#ffaa66; }
 
-        /* ── Header ── */
         .profile-header {
           background: rgba(10,5,25,0.9);
           border-top:1px solid rgba(255,170,0,0.4);
@@ -749,7 +733,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         .diamond-area i { color:#00ddff; font-size:0.9rem; }
         .wallet-balance { font-weight:800; font-size:0.85rem; }
 
-        /* ── Branding ── */
         .branding-banner { text-align:center; margin:4px 0; }
         .flame-wrapper { display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap; }
         .flame-graphic { font-size:1.6rem; animation:flamePulse 0.6s infinite alternate; }
@@ -765,7 +748,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
           line-height:1.1;
         }
 
-        /* ── Wheel ── */
         .wheel-display-zone {
           display:flex;
           flex-direction:column;
@@ -840,7 +822,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
           margin-top:5px;
         }
 
-        /* ── Guide ── */
         .guide-panel {
           background:rgba(14,7,31,0.7);
           border:1px solid rgba(255,170,0,0.4);
@@ -854,7 +835,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         .guide-step-card { background:rgba(255,255,255,0.04); padding:8px 4px; border-radius:18px; font-size:0.7rem; font-weight:600; flex:1; min-width:60px; }
         .claim-limitation-badge { margin-top:10px; background:rgba(255,68,0,0.2); border:1px solid #ffaa44; border-radius:30px; padding:4px 16px; display:inline-block; font-size:0.7rem; }
 
-        /* ── Showcase ── */
         .showcase-panel {
           background:linear-gradient(180deg,#130a2a 0%,#080314 100%);
           border-top:1px solid #ffaa00;
@@ -891,7 +871,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         }
         .showcase-name { font-size:0.7rem; font-weight:700; margin:6px 0; text-align:center; }
 
-        /* ── Featured Banner ── */
         .featured-banner {
           margin:0 16px;
           border-radius:28px;
@@ -902,7 +881,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         }
         .featured-banner img { width:100%; height:auto; display:block; object-fit:cover; }
 
-        /* ── Footer ── */
         .footer-branding-zone { text-align:center; margin-top:6px; }
         .social-link-row { display:flex; justify-content:center; gap:32px; margin-bottom:10px; }
         .social-link-row a { color:#ffaa00; font-size:1.8rem; transition:0.2s; }
@@ -920,7 +898,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
           align-items:center;
         }
 
-        /* ── Modals ── */
         .modal-overlay {
           position:fixed;
           top:0; left:0; width:100%; height:100%;
@@ -981,7 +958,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         .prize-image { width:90px; margin:8px auto; object-fit:contain; border-radius:12px; }
         .success-desc { font-size:0.7rem; color:#ffaa66; margin:8px 0; }
 
-        /* ── Responsive ── */
         @media (max-width: 520px) {
           .text-main-glow { font-size:1.8rem; }
           .profile-name { font-size:0.8rem; }
@@ -1011,14 +987,12 @@ function TondeGamerLuckySpinV1({ campaign }) {
   );
 }
 
-// ── Server‑Side Props ──
 export async function getServerSideProps({ query }) {
   const campaignId = query.id || query.campaign || null;
   const campaign = campaignId ? await fetchCampaign(campaignId) : null;
   return { props: { campaign } };
 }
 
-// ── Wrap with Meta ──
 export default withCampaignMeta(TondeGamerLuckySpinV1, {
   title: 'TONDE GAMER – Free Fire Lucky Spin Event',
   description: 'Join TONDE GAMER’s exclusive Free Fire Lucky Spin event. Win exclusive in-game rewards!',
