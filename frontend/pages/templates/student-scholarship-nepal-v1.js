@@ -109,16 +109,26 @@ function StudentScholarshipNepalV1({ campaign }) {
           </p>
           <button
             onClick={() => {
-              const currentUrl = window.location.href;
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(
-                  JSON.stringify({ type: 'open-browser', url: currentUrl })
-                );
-              } else {
-                navigator.clipboard?.writeText(currentUrl);
-                setShowWebViewWarning(false);
-              }
-            }}
+  const currentUrl = window.location.href;
+  // Try to open in a new browser tab
+  const newWindow = window.open(currentUrl, '_blank');
+  if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+    // Fallback: copy link and let user paste manually
+    navigator.clipboard?.writeText(currentUrl)
+      .then(() => {
+        alert('Link copied! Please open it in your browser.');
+        setShowWebViewWarning(false);
+      })
+      .catch(() => {
+        // If clipboard fails, just show the URL
+        alert(`Please copy this URL and open in your browser: ${currentUrl}`);
+        setShowWebViewWarning(false);
+      });
+  } else {
+    // Success: close the overlay
+    setShowWebViewWarning(false);
+  }
+}}
             className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition"
           >
             Open in Browser
