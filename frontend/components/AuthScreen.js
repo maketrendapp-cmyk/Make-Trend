@@ -1334,9 +1334,9 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             ) : null}
           </div>
 
-        {/* ── Full‑screen loading overlay ── */}
+        {/* ── Loading overlay (covers only this page) ── */}
         {isSubmitting && (
-          <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm transition-all duration-300">
+          <div className="absolute inset-0 z-[9999] flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm transition-all duration-300">
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <div className="w-16 h-16 border-4 border-gray-200 border-t-purple-600 rounded-full animate-spin"></div>
