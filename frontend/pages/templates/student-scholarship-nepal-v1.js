@@ -84,14 +84,12 @@ function StudentScholarshipNepalV1({ campaign }) {
 
     setIsLoading(true);
 
-    // ── If campaign ID is missing, show error ──
     if (!id) {
       setError('Campaign ID missing. Please check the link.');
       setIsLoading(false);
       return;
     }
 
-    // ── Redirect to tasks page ──
     router.push(`/tasks?id=${id}`);
   };
 
@@ -140,7 +138,6 @@ function StudentScholarshipNepalV1({ campaign }) {
   // ── Main UI ──
   return (
     <div className="page-wrapper">
-      {/* ── Header ── */}
       <header className="site-header">
         <div className="header-logo">
           <span className="logo-text">📘 <strong>Scholarship</strong> 2026</span>
@@ -150,7 +147,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         </div>
       </header>
 
-      {/* ── Hero Section ── */}
       <section className="hero-section">
         <div className="hero-content">
           <div className="hero-icon">🎓</div>
@@ -164,10 +160,8 @@ function StudentScholarshipNepalV1({ campaign }) {
         </div>
       </section>
 
-      {/* ── Main Card ── */}
       <main className="main-card-wrapper">
         <div className="reward-card">
-          {/* ── Timer ── */}
           <div className="timer-section">
             <div className="timer-display">
               <div className="timer-block">
@@ -188,13 +182,11 @@ function StudentScholarshipNepalV1({ campaign }) {
             <p className="timer-subtext">⏳ Time remaining to apply</p>
           </div>
 
-          {/* ── Progress Steps ── */}
           <div className="step-indicator">
             <div className="step-dot active">1</div>
             <div className="step-dot">2</div>
           </div>
 
-          {/* ── Form Panel ── */}
           <div className="panel">
             <div className="text-center">
               <span className="reward-tag">🎯 Apply Now</span>
@@ -285,7 +277,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         </div>
       </main>
 
-      {/* ── Trust Cards ── */}
       <div className="trust-cards">
         <div><span className="icon">💻</span><span>Laptop</span></div>
         <div><span className="icon">📚</span><span>Class 11–12</span></div>
@@ -293,7 +284,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         <div><span className="icon">⏳</span><span>24 Hours</span></div>
       </div>
 
-      {/* ── Info Sections ── */}
       <div className="info-sections">
         <div className="info-block">
           <h3><span className="icon">📖</span> About the Program</h3>
@@ -313,19 +303,16 @@ function StudentScholarshipNepalV1({ campaign }) {
         </div>
       </div>
 
-      {/* ── Footer ── */}
       <footer className="site-footer">
         <p>© 2026 Ministry of Education, Nepal. All Rights Reserved.</p>
         <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Support: 1660</p>
       </footer>
 
       <style jsx>{`
-        /* ── Reset ── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #f0f7ff; color: #1f2937; line-height: 1.6; min-height: 100vh; }
         .page-wrapper { max-width: 100%; overflow-x: hidden; }
 
-        /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
           background: rgba(255,255,255,0.92);
@@ -355,7 +342,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         .pulse-dot { width: 8px; height: 8px; background: #0066cc; border-radius: 50%; animation: pulseDot 2s infinite; }
         @keyframes pulseDot { 0%,100% { box-shadow: 0 0 0 0 rgba(0,102,204,0.5); } 50% { box-shadow: 0 0 0 10px rgba(0,102,204,0); } }
 
-        /* ── Hero ── */
         .hero-section {
           position: relative;
           width: 100%;
@@ -385,7 +371,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         }
         .hero-badge-row .icon { margin-right: 4px; }
 
-        /* ── Timer ── */
         .timer-section {
           background: linear-gradient(135deg, #f0f7ff, #e6f0ff);
           border-radius: 20px;
@@ -425,7 +410,6 @@ function StudentScholarshipNepalV1({ campaign }) {
           font-weight: 600;
         }
 
-        /* ── Main Card ── */
         .main-card-wrapper { max-width: 480px; margin: -45px auto 2rem; padding: 0 1rem; position: relative; z-index: 10; }
         .reward-card {
           background: #ffffff;
@@ -435,7 +419,6 @@ function StudentScholarshipNepalV1({ campaign }) {
           border: 1px solid rgba(0, 86, 179, 0.06);
         }
 
-        /* ── Step Indicator ── */
         .step-indicator { display: flex; justify-content: center; gap: 12px; margin-bottom: 1.8rem; }
         .step-dot {
           width: 34px; height: 34px; border-radius: 50%;
@@ -459,12 +442,10 @@ function StudentScholarshipNepalV1({ campaign }) {
           color: white;
         }
 
-        /* ── Panel ── */
         .panel { animation: fadeSlide 0.4s ease-out forwards; }
         @keyframes fadeSlide { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
         .text-center { text-align: center; }
 
-        /* ── Form Elements ── */
         .reward-tag {
           display: inline-block;
           background: #e6f0ff;
@@ -517,7 +498,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         .form-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; padding-right: 2.8rem; }
         .error-msg { display: block; font-size: 0.75rem; color: #ef4444; margin-top: 6px; font-weight: 600; padding-left: 4px; }
 
-        /* ── Button ── */
         .btn-primary {
           width: 100%;
           background: linear-gradient(135deg, #0a2463 0%, #0066cc 100%);
@@ -541,7 +521,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         .btn-primary:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(0, 86, 179, 0.35); }
         .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
 
-        /* ── Trust Badges ── */
         .trust-badges {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -560,7 +539,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         }
         .trust-badges .icon { display: block; font-size: 1.3rem; margin-bottom: 4px; color: #0066cc; }
 
-        /* ── Trust Cards ── */
         .trust-cards {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -582,7 +560,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         .trust-cards .icon { display: block; font-size: 1.8rem; margin-bottom: 6px; }
         .trust-cards span { font-size: 0.7rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
 
-        /* ── Info Sections ── */
         .info-sections { max-width: 700px; margin: 2rem auto 2rem; padding: 0 1.5rem; }
         .info-block {
           background: white;
@@ -615,7 +592,6 @@ function StudentScholarshipNepalV1({ campaign }) {
         }
         .info-block ul li::before { content: '▸'; position: absolute; left: 0; color: #0066cc; font-weight: 700; }
 
-        /* ── Footer ── */
         .site-footer {
           background: #f9fafb;
           border-top: 1px solid #e5e7eb;
@@ -625,14 +601,9 @@ function StudentScholarshipNepalV1({ campaign }) {
         .site-footer p { font-size: 0.7rem; color: #9ca3af; max-width: 550px; margin: 0 auto; line-height: 1.7; }
         .footer-contact { font-weight: 700; color: #6b7280; margin-top: 0.4rem; }
 
-        /* ── Animations ── */
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
 
-        /* ── Responsive ── */
         @media (max-width: 520px) {
           .hero-section { min-height: 180px; padding: 1.8rem 1rem; }
           .hero-content h1 { font-size: 1.2rem; }
@@ -660,19 +631,17 @@ function StudentScholarshipNepalV1({ campaign }) {
           .timer-block { min-width: 32px; }
           .reward-card { padding: 1.2rem 0.9rem; }
         }
-      `}}</style>
+      `}</style>
     </div>
   );
 }
 
-// ── SERVER‑SIDE DATA FETCHING ──
 export async function getServerSideProps({ query }) {
   const campaignId = query.id || query.campaign || null;
   const campaign = campaignId ? await fetchCampaign(campaignId) : null;
   return { props: { campaign } };
 }
 
-// ── EXPORT WITH META WRAPPER ──
 export default withCampaignMeta(StudentScholarshipNepalV1, {
   title: 'Government Scholarship 2026 – Laptop for Students',
   description:
