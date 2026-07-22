@@ -571,7 +571,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const handleSuccess = (msg = 'Welcome to Make Trend! 🎉') => {
     setSuccessMessage(msg);
     setShowSuccess(true);
-    setTimeout(() => performRedirect(), 1500);
+    setTimeout(() => performRedirect(), 800);
   };
 
   // ── Effects ──
@@ -1334,6 +1334,23 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             ) : null}
           </div>
 
+        {/* ── Full‑screen loading overlay ── */}
+        {isSubmitting && (
+          <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm transition-all duration-300">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-gray-200 border-t-purple-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+              <p className="text-gray-700 font-medium text-sm">
+                {emailExists === false ? 'Creating your account...' : 'Logging in...'}
+              </p>
+              <p className="text-gray-400 text-xs">Please wait a moment</p>
+            </div>
+          </div>
+        )}
         </motion.div>
       </div>
     </>
