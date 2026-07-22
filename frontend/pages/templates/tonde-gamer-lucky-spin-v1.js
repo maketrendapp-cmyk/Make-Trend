@@ -101,7 +101,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
     }
   }, []);
 
-  // ── Preload images (optional) ──
+  // ── Preload images ──
   useEffect(() => {
     const imgs = [];
     let loaded = 0;
@@ -113,7 +113,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
         loaded++;
         setAssetsLoaded(loaded);
         if (loaded === WHEEL_ITEMS.length) {
-          setCachedImages(imgs);
+          setCachedImages([...imgs]);
         }
       };
       img.onerror = () => {
@@ -121,28 +121,24 @@ function TondeGamerLuckySpinV1({ campaign }) {
         loaded++;
         setAssetsLoaded(loaded);
         if (loaded === WHEEL_ITEMS.length) {
-          setCachedImages(imgs);
+          setCachedImages([...imgs]);
         }
       };
       img.src = item.imgURL;
     });
   }, []);
 
-  // ── Canvas setup ──
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    // Set internal size
-    canvas.width = 500;
-    canvas.height = 500;
-    // Draw immediately on mount
-    drawWheel(systemRotation);
-  }, []);
-
   // ── Draw wheel (takes optional rotation) ──
   const drawWheel = useCallback((rotation = systemRotation) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // Ensure proper canvas internal resolution
+    if (canvas.width !== 500 || canvas.height !== 500) {
+      canvas.width = 500;
+      canvas.height = 500;
+    }
+
     const ctx = canvas.getContext('2d');
     const total = WHEEL_ITEMS.length;
     const angleStep = (Math.PI * 2) / total;
@@ -210,7 +206,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
         ctx.shadowBlur = 0;
       } else {
         // Fallback icon (always visible)
-        ctx.font = '42px "Segoe UI"';
+        ctx.font = '42px "Segoe UI", sans-serif';
         ctx.fillStyle = '#FFE0A3';
         ctx.shadowBlur = 6;
         ctx.shadowColor = '#ffaa44';
@@ -254,10 +250,16 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ctx.shadowBlur = 0;
   }, [systemRotation, cachedImages]);
 
-  // ── Redraw when rotation or images change ──
+  // ── Redraw whenever rotation, cachedImages, or canvas visibility changes ──
   useEffect(() => {
-    drawWheel(systemRotation);
-  }, [systemRotation, cachedImages]);
+    if (!showEntry && !showWebViewModal) {
+      // Use requestAnimationFrame to ensure canvas element is mounted in DOM before drawing
+      const frameId = requestAnimationFrame(() => {
+        drawWheel(systemRotation);
+      });
+      return () => cancelAnimationFrame(frameId);
+    }
+  }, [showEntry, showWebViewModal, systemRotation, cachedImages, drawWheel]);
 
   // ── Spin animation ──
   const animateSpinToSegment = useCallback((targetSegment) => {
@@ -626,6 +628,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
 
       {/* ── Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800;900&family=Orbitron:wght@600;800;900&display=swap');
+
         * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
         body {
           background: radial-gradient(circle at 50% 0%, #1a0b36, #070314, #020107);
