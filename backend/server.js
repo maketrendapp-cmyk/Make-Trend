@@ -962,9 +962,18 @@ app.get('/api/templates', async (req, res) => {
     if (!(await checkRateLimit(ip, 'templates-get', 30, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
-    // Determine if we need all templates (for admin)
-    const { all } = req.query;
-    const cacheKey = all === 'true' ? 'templates:all' : 'templates:active';
+    // ── Build cache key from all filter parameters ──
+    const { category, platform, highlight, plan, limit, all } = req.query;
+    const filterKey = [
+      'templates',
+      all === 'true' ? 'all' : 'active',
+      category || '',
+      platform || '',
+      highlight || '',
+      plan || '',
+      limit || 50
+    ].join(':');
+    const cacheKey = filterKey;
     const result = await getOrSetCache(cacheKey, async () => {
       console.log(`📡 Fetching templates from Firestore (${all === 'true' ? 'all' : 'active'})...`);
       let query = db.collection('templates');
