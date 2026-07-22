@@ -102,7 +102,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
     }
   }, []);
 
-  // ── Preload images ──
+  // ── Preload images (optional, not required for wheel to show) ──
   useEffect(() => {
     const imgs = [];
     let loaded = 0;
@@ -115,7 +115,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         setAssetsLoaded(loaded);
         if (loaded === WHEEL_ITEMS.length) {
           setCachedImages(imgs);
-          drawWheel();
         }
       };
       img.onerror = () => {
@@ -124,15 +123,14 @@ function TondeGamerLuckySpinV1({ campaign }) {
         setAssetsLoaded(loaded);
         if (loaded === WHEEL_ITEMS.length) {
           setCachedImages(imgs);
-          drawWheel();
         }
       };
       img.src = item.imgURL;
     });
   }, []);
 
-  // ── Draw wheel ──
-  const drawWheel = useCallback(() => {
+  // ── Draw wheel (accepts an optional rotation) ──
+  const drawWheel = useCallback((rotation = systemRotation) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -146,8 +144,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
 
     // Outer glow
     for (let i = 0; i < total; i++) {
-      const start = i * angleStep + systemRotation;
-      const end = (i + 1) * angleStep + systemRotation;
+      const start = i * angleStep + rotation;
+      const end = (i + 1) * angleStep + rotation;
       ctx.beginPath();
       ctx.arc(center, center, outerR + 4, start, end);
       ctx.lineWidth = 6;
@@ -159,8 +157,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ctx.shadowBlur = 0;
 
     for (let i = 0; i < total; i++) {
-      const start = i * angleStep + systemRotation;
-      const end = (i + 1) * angleStep + systemRotation;
+      const start = i * angleStep + rotation;
+      const end = (i + 1) * angleStep + rotation;
       ctx.beginPath();
       ctx.arc(center, center, outerR, start, end);
       ctx.arc(center, center, innerR, end, start, true);
@@ -247,12 +245,15 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ctx.shadowBlur = 0;
   }, [systemRotation, cachedImages]);
 
-  // ── Draw on mount and when assets load ──
+  // ── Draw on mount and when rotation/images change ──
   useEffect(() => {
-    if (assetsLoaded === WHEEL_ITEMS.length || assetsLoaded > 0) {
-      drawWheel();
-    }
-  }, [assetsLoaded, drawWheel]);
+    drawWheel();
+  }, [drawWheel]);
+
+  // Re-draw when images load or rotation changes
+  useEffect(() => {
+    drawWheel();
+  }, [assetsLoaded, cachedImages]);
 
   // ── Spin animation ──
   const animateSpinToSegment = useCallback((targetSegment) => {
@@ -275,13 +276,13 @@ function TondeGamerLuckySpinV1({ campaign }) {
       let ease = 1 - Math.pow(1 - t, 3.2);
       const currentRot = startRot + (targetRot - startRot) * ease;
       setSystemRotation(currentRot);
-      drawWheel();
+      drawWheel(currentRot); // pass current rotation to draw
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
         const finalRot = targetRot % (Math.PI * 2);
         setSystemRotation(finalRot);
-        drawWheel();
+        drawWheel(finalRot);
         setIsSpinning(false);
         const finalSeg = Math.floor(((Math.PI * 1.5 - finalRot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / ((Math.PI * 2) / segCount)) % segCount;
         // finalize win
@@ -381,7 +382,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const handleClaim = () => {
     setShowSuccessModal(false);
     if (!id) {
-      // Show error or go back
       setCampaignMissing(true);
       return;
     }
@@ -630,7 +630,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
         </div>
       )}
 
-      {/* ── Styles (unchanged, kept from earlier) ── */}
+      {/* ── Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ── Reset & base ── */
         * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
