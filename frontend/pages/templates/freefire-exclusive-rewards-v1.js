@@ -6,14 +6,15 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 
 function FreefireExclusiveRewardsV1({ campaign }) {
   const router = useRouter();
-  const { id } = router.query; // campaign ID from URL (e.g. ?id=abc123)
+  const { id } = router.query;
 
   // ── State ──
   const [uid, setUid] = useState('');
   const [codeParts, setCodeParts] = useState(['', '', '']);
   const [isRedeemed, setIsRedeemed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showModal, setShowModal] = useState(true);
+  const [showWebViewModal, setShowWebViewModal] = useState(false);
+  const [showUidModal, setShowUidModal] = useState(false);
   const [modalUid, setModalUid] = useState('');
   const [uidError, setUidError] = useState('');
   const [toast, setToast] = useState('');
@@ -28,17 +29,15 @@ function FreefireExclusiveRewardsV1({ campaign }) {
                       (navigator.userAgent.indexOf('wv') > -1);
     setIsWebView(isWebView);
     if (isWebView) {
-      // Auto‑redirect to browser
-      const currentUrl = window.location.href;
-      if (navigator.userAgent.indexOf('Android') > -1) {
-        window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
-      } else {
-        window.open(currentUrl, '_system');
-      }
+      // Show WebView modal instead of auto‑redirect
+      setShowWebViewModal(true);
+    } else {
+      // If not in WebView, show UID modal directly
+      setShowUidModal(true);
     }
   }, []);
 
-  // ── Generate a random 12‑character code ──
+  // ── Generate random code ──
   const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -48,7 +47,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
     return code;
   };
 
-  // ── Set random code on mount ──
   useEffect(() => {
     const code = generateRandomCode();
     setCodeParts([code.slice(0,4), code.slice(4,8), code.slice(8,12)]);
@@ -57,12 +55,33 @@ function FreefireExclusiveRewardsV1({ campaign }) {
   // ── Helpers ──
   const isValidUid = (uid) => /^\d{5,12}$/.test(uid);
 
-  const showToast = (msg, isError = false) => {
+  const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2500);
   };
 
-  // ── Modal handlers ──
+  // ── WebView modal handlers ──
+  const handleCopyLink = () => {
+    navigator.clipboard?.writeText(window.location.href)
+      .then(() => showToast('Link copied!'))
+      .catch(() => showToast('Failed to copy link'));
+  };
+
+  const handleOpenInBrowser = () => {
+    const currentUrl = window.location.href;
+    if (navigator.userAgent.indexOf('Android') > -1) {
+      window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
+    } else {
+      window.open(currentUrl, '_system');
+    }
+  };
+
+  const handleContinueAnyway = () => {
+    setShowWebViewModal(false);
+    setShowUidModal(true);
+  };
+
+  // ── UID modal handlers ──
   const handleModalContinue = () => {
     const enteredUid = modalUid.trim();
     if (!enteredUid) {
@@ -74,11 +93,11 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       return;
     }
     setUid(enteredUid);
-    setShowModal(false);
+    setShowUidModal(false);
     setUidError('');
   };
 
-  // ── Redeem button handler ──
+  // ── Redeem handler ──
   const handleRedeem = () => {
     if (!uid) {
       showToast('Please enter your Game UID first.');
@@ -96,7 +115,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       return;
     }
 
-    // Simulate redemption success
     setIsRedeemed(true);
     setIsLoading(true);
     setTimeout(() => {
@@ -104,12 +122,11 @@ function FreefireExclusiveRewardsV1({ campaign }) {
     }, 1500);
   };
 
-  // ── Handle code input changes ──
+  // ── Code input handler ──
   const handleCodeChange = (index, value) => {
     const newParts = [...codeParts];
     newParts[index] = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     setCodeParts(newParts);
-    // Auto‑advance to next input
     if (newParts[index].length === 4 && index < 2) {
       const nextInput = document.getElementById(`codePart${index + 2}`);
       if (nextInput) nextInput.focus();
@@ -120,26 +137,62 @@ function FreefireExclusiveRewardsV1({ campaign }) {
   return (
     <div className="page-container">
 
-      {/* ── WebView Banner ── */}
-      {isWebView && (
-        <div className="webview-banner">
-          📱 For a better experience, open this page in your browser.
-          <button onClick={() => window.location.href = window.location.href}>
-            Open in Browser
-          </button>
+      {/* ── WebView Modal ── */}
+      {showWebViewModal && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2><i className="fas fa-external-link-alt"></i> Open in Browser</h2>
+            <p style={{ color: '#ccc', fontSize: '0.9rem', margin: '1rem 0' }}>
+              This page works best in a full browser. Please open it in your default browser to continue.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button className="modal-btn" onClick={handleCopyLink}>
+                <i className="fas fa-copy"></i> Copy Link
+              </button>
+              <button className="modal-btn primary" onClick={handleOpenInBrowser}>
+                <i className="fas fa-external-link-alt"></i> Open in Browser
+              </button>
+            </div>
+            <button
+              className="modal-btn ghost"
+              onClick={handleContinueAnyway}
+              style={{ marginTop: '1rem', background: 'transparent', color: '#8f9bb3' }}
+            >
+              Continue Anyway (not recommended)
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── Main Card ── */}
+      {/* ── UID Modal ── */}
+      {showUidModal && !showWebViewModal && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2><i className="fas fa-gamepad"></i> Enter Game UID</h2>
+            <p style={{ color: '#ccc', fontSize: '0.8rem' }}>Only numeric digits allowed</p>
+            <input
+              type="text"
+              placeholder="e.g., 123456789"
+              maxLength="12"
+              inputMode="numeric"
+              value={modalUid}
+              onChange={(e) => setModalUid(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={(e) => e.key === 'Enter' && handleModalContinue()}
+            />
+            {uidError && <div className="error-txt">{uidError}</div>}
+            <button className="modal-btn primary" onClick={handleModalContinue}>Continue</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Main Content ── */}
       <div className="container">
         <div className="redemption-card">
-          {/* UID Display */}
           <div className="uid-display-bar">
             <span className="uid-label"><i className="fas fa-id-card"></i> Game UID</span>
             <span className="uid-value">{uid || '—'}</span>
           </div>
 
-          {/* Code Input */}
           <div className="code-section">
             <div className="code-title"><i className="fas fa-ticket-alt"></i> Enter Redemption Code</div>
             <div className="code-input-group">
@@ -175,7 +228,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
             </div>
           </div>
 
-          {/* Redeem Button */}
           <button
             className="redeem-btn"
             onClick={handleRedeem}
@@ -190,7 +242,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
             )}
           </button>
 
-          {/* Success Message */}
           {isRedeemed && (
             <div className="redeem-success">
               <i className="fas fa-check-circle" style={{ color: '#10b981', fontSize: '1.5rem' }}></i>
@@ -204,7 +255,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
             </div>
           )}
 
-          {/* Notice Box */}
           <div className="notice-box">
             <div className="notice-title"><i className="fas fa-info-circle"></i> Important Notice:</div>
             <p>1. Redemption code has 12 characters, consisting of capital letters and numbers.</p>
@@ -219,27 +269,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           <p>Copyright © Garena International. Trademarks belong to their own respects. All rights Reserved.</p>
         </div>
       </div>
-
-      {/* ── UID Modal ── */}
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-card">
-            <h2><i className="fas fa-gamepad"></i> Enter Game UID</h2>
-            <p style={{ color: '#ccc', fontSize: '0.8rem' }}>Only numeric digits allowed</p>
-            <input
-              type="text"
-              placeholder="e.g., 123456789"
-              maxLength="12"
-              inputMode="numeric"
-              value={modalUid}
-              onChange={(e) => setModalUid(e.target.value.replace(/\D/g, ''))}
-              onKeyDown={(e) => e.key === 'Enter' && handleModalContinue()}
-            />
-            {uidError && <div className="error-txt">{uidError}</div>}
-            <button onClick={handleModalContinue}>Continue</button>
-          </div>
-        </div>
-      )}
 
       {/* ── Toast ── */}
       {toast && <div className="toast">{toast}</div>}
@@ -527,19 +556,38 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         .modal-card input:focus {
           border-color: #ffcc00;
         }
-        .modal-card button {
-          background: linear-gradient(135deg, #ffcc00, #ffa500);
-          border: none;
-          padding: 0.8rem 1.8rem;
+        .modal-btn {
+          background: rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.15);
+          padding: 0.7rem 1.5rem;
           border-radius: 60px;
-          font-weight: 800;
-          color: #1e1e2a;
+          font-weight: 700;
+          color: #fff;
           cursor: pointer;
           transition: 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
         }
-        .modal-card button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 14px rgba(255,204,0,0.3);
+        .modal-btn:hover {
+          background: rgba(255,255,255,0.2);
+        }
+        .modal-btn.primary {
+          background: #ffcc00;
+          color: #1a1a2e;
+          border: none;
+        }
+        .modal-btn.primary:hover {
+          background: #ffa500;
+        }
+        .modal-btn.ghost {
+          background: transparent;
+          border: none;
+          color: #8f9bb3;
+          font-size: 0.8rem;
+        }
+        .modal-btn.ghost:hover {
+          color: #fff;
         }
         .error-txt {
           color: #ff6b6b;
@@ -561,37 +609,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           z-index: 3000;
           border: 1px solid rgba(255,204,0,0.2);
           animation: fadeInUp 0.3s ease;
-        }
-
-        /* ── WebView Banner ── */
-        .webview-banner {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          background: rgba(0,0,0,0.92);
-          color: #fff;
-          text-align: center;
-          padding: 12px;
-          z-index: 9999;
-          font-family: 'Inter', sans-serif;
-          font-size: 14px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-          backdrop-filter: blur(8px);
-        }
-        .webview-banner button {
-          background: #ffcc00;
-          color: #1a1a2e;
-          border: none;
-          padding: 6px 20px;
-          margin-left: 10px;
-          border-radius: 40px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: 0.2s;
-        }
-        .webview-banner button:hover {
-          background: #ffa500;
         }
 
         /* ── Animations ── */
@@ -627,6 +644,10 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           }
           .modal-card {
             padding: 1.5rem;
+          }
+          .modal-btn {
+            padding: 0.6rem 1.2rem;
+            font-size: 0.85rem;
           }
         }
       `}} />
