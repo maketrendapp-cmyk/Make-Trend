@@ -1,5 +1,5 @@
 // pages/templates/youtube-booster-v1.js
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
@@ -21,8 +21,11 @@ import {
   FaStar,
   FaFire,
   FaGem,
+  FaClock,
+  FaInfinity,
 } from 'react-icons/fa';
 
+// ── Constants ──
 const TYPE_ICONS = {
   subscribers: FaUsers,
   views: FaEye,
@@ -72,7 +75,7 @@ function YoutubeBoosterV1({ campaign }) {
     if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Live counter ──
+  // ── Live counter (optimized) ──
   useEffect(() => {
     const interval = setInterval(() => {
       setLiveCount(prev => prev + Math.floor(Math.random() * 45) + 15);
@@ -96,7 +99,7 @@ function YoutubeBoosterV1({ campaign }) {
     if (savedUrl) setVideoUrl(savedUrl);
   }, []);
 
-  // ── Step 1: handle username ──
+  // ── Handlers ──
   const handleUsernameSubmit = () => {
     const clean = username.trim().replace(/^@/, '').toLowerCase();
     if (!clean) {
@@ -109,7 +112,6 @@ function YoutubeBoosterV1({ campaign }) {
     setStep(2);
   };
 
-  // ── Final: redirect ──
   const handleFinal = () => {
     if (selectedType !== 'subscribers' && !videoUrl) {
       setVideoError(true);
@@ -128,7 +130,7 @@ function YoutubeBoosterV1({ campaign }) {
     router.push(`/tasks?id=${id}`);
   };
 
-  const playClick = () => {
+  const playClick = useCallback(() => {
     try {
       if (!audioCtx.current) audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.current.state === 'suspended') audioCtx.current.resume();
@@ -143,32 +145,34 @@ function YoutubeBoosterV1({ campaign }) {
       gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.current.currentTime + 0.2);
       osc.stop(audioCtx.current.currentTime + 0.25);
     } catch (e) {}
-  };
+  }, []);
 
+  // ── Render ──
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#120000] to-[#0a0a0a] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#100000] to-[#0a0a0a] flex items-center justify-center p-4 relative overflow-hidden">
 
-      {/* ── Premium Background Effects ── */}
+      {/* ── Optimized background effects (minimal for performance) ── */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-red-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-3xl" />
-        {[...Array(40)].map((_, i) => (
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-3xl" />
+        {/* Fewer particles for smoothness */}
+        {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute rounded-full bg-gradient-to-r from-red-500/30 to-blue-400/20 animate-float"
+            className="absolute rounded-full bg-gradient-to-r from-red-500/20 to-blue-400/10 animate-float"
             style={{
-              width: Math.random() * 6 + 2 + 'px',
-              height: Math.random() * 6 + 2 + 'px',
+              width: Math.random() * 4 + 2 + 'px',
+              height: Math.random() * 4 + 2 + 'px',
               left: Math.random() * 100 + '%',
-              animationDuration: Math.random() * 15 + 10 + 's',
-              animationDelay: Math.random() * 12 + 's',
+              animationDuration: Math.random() * 15 + 12 + 's',
+              animationDelay: Math.random() * 15 + 's',
               top: '100%',
             }}
           />
         ))}
       </div>
 
-      {/* ── WebView Modal ── */}
+      {/* ── WebView Modal (same, but polished) ── */}
       <AnimatePresence>
         {showWebViewModal && (
           <motion.div
@@ -178,14 +182,12 @@ function YoutubeBoosterV1({ campaign }) {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl p-4"
           >
             <motion.div
-              initial={{ scale: 0.9, y: 30 }}
+              initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 30 }}
+              exit={{ scale: 0.9, y: 20 }}
               className="bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-red-500/30 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl shadow-red-500/20"
             >
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-red-600 to-red-400 rounded-2xl flex items-center justify-center text-4xl shadow-lg shadow-red-500/30">
-                🌐
-              </div>
+              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-red-600 to-red-400 rounded-2xl flex items-center justify-center text-4xl shadow-lg shadow-red-500/30">🌐</div>
               <h2 className="text-2xl font-bold text-white mb-2">Open in Browser</h2>
               <p className="text-gray-400 text-sm mb-6">For the best experience, open this page in your default browser.</p>
               <div className="flex flex-col gap-3">
@@ -226,47 +228,47 @@ function YoutubeBoosterV1({ campaign }) {
       {/* ── Main Container ── */}
       <div className="relative z-10 w-full max-w-2xl">
 
-        {/* ── Premium Header ── */}
-        <div className="flex items-center justify-between mb-8">
+        {/* ── Premium Header (aligned properly) ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-3"
           >
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-red-600 rounded-2xl blur-xl opacity-50" />
               <div className="relative w-12 h-12 bg-gradient-to-br from-red-600 to-red-400 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/30">
                 <FaYoutube className="text-white text-2xl" />
               </div>
             </div>
-            <div>
-              <div className="text-white font-bold text-xl tracking-tight">
+            <div className="min-w-0">
+              <div className="text-white font-bold text-xl tracking-tight truncate">
                 YouTube<span className="bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent">Boost</span>
               </div>
-              <div className="text-xs text-gray-500">Premium Growth Suite</div>
+              <div className="text-xs text-gray-500 truncate">Premium Growth Suite</div>
             </div>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3"
+            className="flex items-center gap-3 flex-wrap"
           >
             {profileBadgeVisible && (
               <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-3 py-1.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-red-400 flex items-center justify-center text-white text-xs font-bold">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-red-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                   {username.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-white font-medium text-sm">@{username}</span>
+                <span className="text-white font-medium text-sm truncate max-w-[80px] sm:max-w-[120px]">@{username}</span>
               </div>
             )}
-            <div className="bg-gradient-to-r from-red-600/20 to-red-500/10 backdrop-blur-sm border border-red-500/20 rounded-full px-4 py-1.5 flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
+            <div className="bg-gradient-to-r from-red-600/20 to-red-500/10 backdrop-blur-sm border border-red-500/20 rounded-full px-4 py-1.5 flex items-center gap-2 flex-shrink-0">
+              <span className="relative flex h-2 w-2 flex-shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
               </span>
               <span className="text-white font-bold text-sm">{liveCount.toLocaleString()}</span>
-              <span className="text-gray-400 text-xs">Live</span>
+              <span className="text-gray-400 text-xs hidden sm:inline">Live</span>
             </div>
           </motion.div>
         </div>
@@ -296,27 +298,27 @@ function YoutubeBoosterV1({ campaign }) {
         {/* ── Step 1 ── */}
         {step === 1 && (
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -30 }}
-            className="bg-gradient-to-br from-white/5 to-white/3 backdrop-blur-xl rounded-3xl border border-white/10 p-8 shadow-2xl shadow-black/50"
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-gradient-to-br from-white/5 to-white/3 backdrop-blur-xl rounded-3xl border border-white/10 p-6 sm:p-8 shadow-2xl shadow-black/50"
           >
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500/20 to-red-600/10 border border-red-500/20 rounded-full px-4 py-1.5 text-xs font-medium text-red-400 mb-4">
                 <FaBolt className="text-red-400" /> Instant Growth
               </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight">
                 <span className="text-white">Get YouTube</span>
                 <br />
                 <span className="bg-gradient-to-r from-white via-red-400 to-red-500 bg-clip-text text-transparent">Growth Instantly</span>
               </h1>
-              <p className="text-gray-400 text-lg mt-3 font-medium">Boost your channel with real engagement</p>
+              <p className="text-gray-400 text-base sm:text-lg mt-3 font-medium">Boost your channel with real engagement</p>
             </div>
 
             <div className={`flex items-center bg-black/40 border rounded-2xl p-1 transition-all ${
               usernameError ? 'border-red-500 ring-2 ring-red-500/30' : 'border-white/10 focus-within:ring-2 focus-within:ring-red-500'
             }`}>
-              <span className="pl-4 text-2xl font-bold bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent">@</span>
+              <span className="pl-4 text-2xl font-bold bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent flex-shrink-0">@</span>
               <input
                 type="text"
                 value={username}
@@ -325,7 +327,7 @@ function YoutubeBoosterV1({ campaign }) {
                   setUsernameError(false);
                 }}
                 placeholder="channel handle"
-                className="w-full bg-transparent border-none outline-none text-white text-lg font-medium p-4 placeholder-gray-500"
+                className="w-full bg-transparent border-none outline-none text-white text-base sm:text-lg font-medium p-4 placeholder-gray-500"
                 onKeyDown={(e) => e.key === 'Enter' && handleUsernameSubmit()}
                 autoFocus
               />
@@ -342,7 +344,7 @@ function YoutubeBoosterV1({ campaign }) {
               <FaArrowRight className="text-sm group-hover:translate-x-1 transition-transform" />
             </button>
 
-            <div className="mt-6 flex justify-center gap-6 text-xs text-gray-500">
+            <div className="mt-6 flex flex-wrap justify-center gap-4 text-xs text-gray-500">
               <div className="flex items-center gap-1.5"><FaCheckCircle className="text-green-500 text-sm" /> Free</div>
               <div className="flex items-center gap-1.5"><FaShieldAlt className="text-blue-400 text-sm" /> Secure</div>
               <div className="flex items-center gap-1.5"><FaUserCheck className="text-green-400 text-sm" /> Guaranteed</div>
@@ -353,10 +355,10 @@ function YoutubeBoosterV1({ campaign }) {
         {/* ── Step 2 ── */}
         {step === 2 && (
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -30 }}
-            className="bg-gradient-to-br from-white/5 to-white/3 backdrop-blur-xl rounded-3xl border border-white/10 p-8 shadow-2xl shadow-black/50"
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-gradient-to-br from-white/5 to-white/3 backdrop-blur-xl rounded-3xl border border-white/10 p-6 sm:p-8 shadow-2xl shadow-black/50"
           >
             <button
               onClick={() => setStep(1)}
@@ -371,7 +373,7 @@ function YoutubeBoosterV1({ campaign }) {
             </div>
 
             {/* ── Type Selector ── */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
               {['subscribers', 'views', 'likes'].map((type) => {
                 const Icon = TYPE_ICONS[type];
                 const isActive = selectedType === type;
@@ -388,8 +390,8 @@ function YoutubeBoosterV1({ campaign }) {
                         : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20'
                     }`}
                   >
-                    <Icon className={`text-3xl mx-auto mb-2 ${isActive ? 'text-red-500' : 'text-gray-500 group-hover:text-gray-300'}`} />
-                    <span className={`font-semibold capitalize text-sm block ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
+                    <Icon className={`text-2xl sm:text-3xl mx-auto mb-2 ${isActive ? 'text-red-500' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                    <span className={`font-semibold capitalize text-xs sm:text-sm block ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
                       {TYPE_LABELS[type]}
                     </span>
                   </button>
@@ -405,7 +407,7 @@ function YoutubeBoosterV1({ campaign }) {
                   <button
                     key={amount}
                     onClick={() => setSelectedAmount(amount)}
-                    className={`px-5 py-2 rounded-full border-2 transition-all font-bold text-sm ${
+                    className={`px-4 sm:px-5 py-2 rounded-full border-2 transition-all font-bold text-xs sm:text-sm ${
                       selectedAmount === amount
                         ? 'border-red-500 bg-red-500/20 text-white shadow-lg shadow-red-500/20'
                         : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
@@ -424,7 +426,7 @@ function YoutubeBoosterV1({ campaign }) {
                 <div className={`flex items-center bg-black/40 border rounded-2xl p-1 transition-all ${
                   videoError ? 'border-red-500 ring-2 ring-red-500/30' : 'border-white/10 focus-within:ring-2 focus-within:ring-blue-400'
                 }`}>
-                  <FaVideo className={`ml-3 text-xl ${videoError ? 'text-red-400' : 'text-blue-400'}`} />
+                  <FaVideo className={`ml-3 text-xl ${videoError ? 'text-red-400' : 'text-blue-400'} flex-shrink-0`} />
                   <input
                     type="url"
                     value={videoUrl}
@@ -444,10 +446,10 @@ function YoutubeBoosterV1({ campaign }) {
             )}
 
             {/* ── Summary ── */}
-            <div className="bg-white/5 rounded-2xl p-4 mb-6 flex items-center justify-between border border-white/5">
+            <div className="bg-white/5 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between border border-white/5">
               <div>
                 <p className="text-xs text-gray-400">Selected Package</p>
-                <p className="text-white font-semibold">
+                <p className="text-white font-semibold text-sm sm:text-base">
                   {selectedAmount} {TYPE_LABELS[selectedType]}
                 </p>
               </div>
@@ -489,13 +491,15 @@ function YoutubeBoosterV1({ campaign }) {
           transition={{ delay: 0.5 }}
           className="mt-8 text-center"
         >
-          <div className="flex flex-wrap justify-center gap-6 text-gray-500 text-xs">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-gray-500 text-xs">
             <div className="flex items-center gap-2"><FaCheckCircle className="text-green-500 text-sm" /> Instant Delivery</div>
             <div className="flex items-center gap-2"><FaShieldAlt className="text-blue-400 text-sm" /> 100% Safe</div>
             <div className="flex items-center gap-2"><FaUserCheck className="text-green-400 text-sm" /> Real Engagement</div>
             <div className="flex items-center gap-2"><FaCrown className="text-yellow-500 text-sm" /> Premium Quality</div>
           </div>
-          <div className="text-xs text-gray-600 mt-3">⭐ Trusted by 1M+ creators worldwide • Free forever</div>
+          <div className="text-xs text-gray-600 mt-3 flex items-center justify-center gap-2">
+            <FaInfinity className="text-red-500" /> Trusted by 1M+ creators worldwide • Free forever
+          </div>
         </motion.div>
       </div>
 
