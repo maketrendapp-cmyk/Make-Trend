@@ -183,6 +183,7 @@ const allowedOrigins = [
   'https://make-trend-system.vercel.app',
   'https://maketrend.vercel.app',
   'https://make-trend.vercel.app',
+'https://maketrend.app',
 ];
 if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.push('http://localhost:3000');
