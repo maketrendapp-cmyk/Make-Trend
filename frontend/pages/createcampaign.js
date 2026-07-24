@@ -49,6 +49,7 @@ export default function CreateCampaign() {
 
   // ── Load template from React Query cache ──
   useEffect(() => {
+    // Only attempt to load if slug exists and user is authenticated
     if (slug && isAuthenticated && templates.length > 0) {
       const found = templates.find(t => t.slug === slug);
       if (found) {
@@ -65,6 +66,9 @@ export default function CreateCampaign() {
         setError('Template not found');
         setLoading(false);
       }
+    } else if (!slug) {
+      // No slug → not loading, we'll render a different UI
+      setLoading(false);
     } else if (!isAuthenticated) {
       setLoading(false);
     }
@@ -273,14 +277,41 @@ export default function CreateCampaign() {
 
   // ── Redirect unauthenticated users to login ──
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated && slug) {
       const redirect = `/createcampaign?slug=${slug}`;
       router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
     }
   }, [authLoading, isAuthenticated, slug]);
 
-  // ── Return null while checking auth ──
-  if (!authLoading && !isAuthenticated) {
+  // ── If no slug, show the "Select a Template" page ──
+  if (!slug && !authLoading) {
+    return (
+      <>
+        <Meta
+          title="Create a Campaign – Select a Template"
+          description="Choose a template to start building your viral campaign with Make Trend."
+        />
+        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-purple-50/20">
+          <div className="max-w-md w-full text-center">
+            <div className="text-6xl mb-6">📋</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Select a Template</h1>
+            <p className="text-gray-500 text-sm mb-6">
+              You need to choose a template before creating a campaign. Browse our collection and pick the one that fits your goal.
+            </p>
+            <button
+              onClick={() => router.push('/create')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 shadow-md"
+            >
+              <span>✨</span> Browse Templates
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── Return null while checking auth (but only if slug exists) ──
+  if (!authLoading && !isAuthenticated && slug) {
     return null;
   }
 
@@ -357,7 +388,10 @@ export default function CreateCampaign() {
   // ── Main Form ──
   return (
     <>
-      <Meta title={`Create Campaign - ${template?.title || 'Campaign'}`} />
+      <Meta
+        title={`Create Campaign – ${template?.title || 'Untitled'}`}
+        description={`Start your ${template?.title || 'campaign'} using this template. Customize and launch your campaign in minutes.`}
+      />
       <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Back Button */}
         <button
