@@ -29,6 +29,7 @@ import {
   FiAlertCircle,
 } from 'react-icons/fi';
 import { FaGoogle, FaTwitter } from 'react-icons/fa';
+import { getDeviceId } from '../utils/deviceId'; // unified device ID
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -287,9 +288,10 @@ export function AuthProvider({ children }) {
       }
 
       const token = await firebaseUser.getIdToken();
+      const deviceId = getDeviceId(); // unified device ID
       const data = await apiRequest('/auth/register', {
         method: 'POST',
-        body: { uid: firebaseUser.uid, username, fullname, email, avatar: finalAvatarUrl, referralCode, deviceFingerprint: 'web' },
+        body: { uid: firebaseUser.uid, username, fullname, email, avatar: finalAvatarUrl, referralCode, deviceId },
       }, token);
       if (data.success) {
         const fullUser = { uid: firebaseUser.uid, email, ...data.user, completed: true };
@@ -402,15 +404,16 @@ export function AuthProvider({ children }) {
   };
 
   // ── Complete social profile (NO password) ──
-  const completeSocialProfile = async (fullname, username, avatarUrl) => {
+  const completeSocialProfile = async (fullname, username, avatarUrl, referralCode = '') => {
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) throw new Error('Not authenticated');
 
       const token = await firebaseUser.getIdToken();
+      const deviceId = getDeviceId(); // unified device ID
       const data = await apiRequest('/auth/complete-social', {
         method: 'POST',
-        body: { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', referralCode: '', deviceFingerprint: 'web' },
+        body: { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', referralCode, deviceId },
       }, token);
       if (data.success) {
         const profileData = await fetchUserProfile(firebaseUser);
@@ -524,6 +527,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const [needsSocialCompletion, setNeedsSocialCompletion] = useState(false);
   const [socialFullname, setSocialFullname] = useState('');
   const [socialUsername, setSocialUsername] = useState('');
+  const [socialReferralCode, setSocialReferralCode] = useState('');
   const [socialAvatarPreview, setSocialAvatarPreview] = useState('');
   const [socialAvatarFile, setSocialAvatarFile] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -704,7 +708,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       }
     }
 
-    const result = await completeSocialProfile(socialFullname, socialUsername, avatarUrl);
+    const result = await completeSocialProfile(socialFullname, socialUsername, avatarUrl, socialReferralCode);
     if (result.success) {
       setNeedsSocialCompletion(false);
       handleSuccess('Profile completed! 🎉');
@@ -936,6 +940,19 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                 <div className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
                   {socialUser?.email || '—'}
                 </div>
+              </div>
+
+              {/* ── Social Referral Code ── */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Referral Code (optional)</label>
+                <input
+                  type="text"
+                  value={socialReferralCode}
+                  onChange={(e) => setSocialReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                  placeholder="ENTER CODE"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 uppercase transition"
+                  disabled={isSubmitting}
+                />
               </div>
 
               <button
