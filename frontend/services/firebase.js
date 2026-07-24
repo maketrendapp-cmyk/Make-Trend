@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
   signInWithPopup,
   GoogleAuthProvider,
+  TwitterAuthProvider,
   FacebookAuthProvider,
 } from 'firebase/auth';
 
@@ -37,5 +38,6 @@ export {
   sendPasswordResetEmail,
   signInWithPopup,
   GoogleAuthProvider,
+  TwitterAuthProvider,
   FacebookAuthProvider,
 };
