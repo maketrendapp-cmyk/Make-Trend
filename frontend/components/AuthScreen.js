@@ -1,6 +1,6 @@
 // components/AuthScreen.js
 // ============================================================
-// AUTH PROVIDER + LOGIN UI – with instant token-based profile fetch
+// AUTH PROVIDER + LOGIN UI – Instant cache + no logout on reload
 // ============================================================
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, startTransition } from 'react';
@@ -56,7 +56,7 @@ async function apiRequest(endpoint, options = {}, token = null) {
 // ============================================================
 const AuthContext = createContext();
 
-// ── Helper: get cached user synchronously ──
+// ── Helpers: get cached user & token synchronously ──
 function getCachedUser() {
   try {
     const raw = localStorage.getItem(AUTH_CACHE_KEY);
@@ -68,7 +68,6 @@ function getCachedUser() {
   }
 }
 
-// ── Helper: get cached token if not expired ──
 function getCachedToken() {
   try {
     const token = localStorage.getItem(TOKEN_CACHE_KEY);
@@ -84,8 +83,8 @@ function getCachedToken() {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getCachedUser());
-  const [loading, setLoading] = useState(false); // only used for async ops (login/register)
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getCachedToken() && !!getCachedUser());
+  const [loading, setLoading] = useState(false); // only for async ops (login/register)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getCachedUser());
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const uidRef = useRef(user?.uid || null);
@@ -192,48 +191,43 @@ export function AuthProvider({ children }) {
   }, [fetchUserProfile, cacheAuth]);
 
   // ============================================================
-  // ON MOUNT: read cache and immediately fetch profile
+  // ON MOUNT: read cache and set optimistic state
   // ============================================================
   useEffect(() => {
     const cachedUser = getCachedUser();
     const cachedToken = getCachedToken();
 
-    if (cachedUser && cachedToken) {
-      // Already set user from lazy initializer, but we also want to fetch profile
-      // and update if needed.
+    if (cachedUser) {
+      // Optimistic: assume authenticated, even if token expired
       setUser(cachedUser);
       setIsAuthenticated(true);
       uidRef.current = cachedUser.uid;
 
-      // Immediately fetch profile using cached token
-      fetchProfileWithToken(cachedToken)
-        .then(profile => {
-          if (profile) {
-            setUser(profile);
-            setIsAuthenticated(true);
-            setNeedsCompletion(false);
-            cacheAuth(profile, cachedToken);
-            // Invalidate queries to refresh any stale data
-            startTransition(() => {
-              invalidateAll();
-            });
-          } else {
-            // Token invalid or profile fetch failed – clear cache
+      // If we have a valid token, fetch profile immediately
+      if (cachedToken) {
+        fetchProfileWithToken(cachedToken)
+          .then(profile => {
+            if (profile) {
+              setUser(profile);
+              cacheAuth(profile, cachedToken);
+              startTransition(() => {
+                invalidateAll();
+              });
+            } else {
+              // Token invalid – just clear the token cache, keep user
+              localStorage.removeItem(TOKEN_CACHE_KEY);
+              localStorage.removeItem(TOKEN_EXPIRY_KEY);
+            }
+          })
+          .catch(() => {
+            // On error, clear token cache but keep user
             localStorage.removeItem(TOKEN_CACHE_KEY);
             localStorage.removeItem(TOKEN_EXPIRY_KEY);
-            setIsAuthenticated(false);
-            setUser(null);
-          }
-        })
-        .catch(() => {
-          // If the token is invalid, clear it
-          localStorage.removeItem(TOKEN_CACHE_KEY);
-          localStorage.removeItem(TOKEN_EXPIRY_KEY);
-          setIsAuthenticated(false);
-          setUser(null);
-        });
+          });
+      }
+      // If no token, wait for Firebase listener to refresh
     } else {
-      // No valid cached token → not authenticated
+      // No cached user → definitely not authenticated
       setIsAuthenticated(false);
       setUser(null);
     }
@@ -295,7 +289,7 @@ export function AuthProvider({ children }) {
           console.warn('Profile fetch in listener failed:', err);
         }
       } else {
-        // User signed out
+        // User signed out – clear everything
         localStorage.removeItem(AUTH_CACHE_KEY);
         localStorage.removeItem(TOKEN_CACHE_KEY);
         localStorage.removeItem(TOKEN_EXPIRY_KEY);
@@ -310,7 +304,7 @@ export function AuthProvider({ children }) {
   }, [fetchUserProfile, checkProfileStatus, invalidateAll, cacheAuth, queryClient]);
 
   // ============================================================
-  // AUTH METHODS (login, register, social, etc.)
+  // AUTH METHODS (unchanged except token caching added)
   // ============================================================
 
   const login = async (email, password) => {
@@ -590,7 +584,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI (unchanged – all logic is in the provider)
+// AUTH SCREEN UI – Same as before (unchanged)
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
