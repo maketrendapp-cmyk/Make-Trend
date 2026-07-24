@@ -86,15 +86,26 @@ const {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      if (timestamp.seconds !== undefined) {
+      // ── If it's a Firestore Timestamp object (has toDate) ──
+      if (typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      }
+      // ── If it has seconds (or _seconds) ──
+      else if (timestamp.seconds !== undefined) {
         date = new Date(timestamp.seconds * 1000);
       } else if (timestamp._seconds !== undefined) {
         date = new Date(timestamp._seconds * 1000);
-      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      }
+      // ── If it's a string or number ──
+      else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
         date = new Date(timestamp);
-      } else if (timestamp instanceof Date) {
+      }
+      // ── If it's already a Date object ──
+      else if (timestamp instanceof Date) {
         date = timestamp;
-      } else {
+      }
+      // ── Fallback ──
+      else {
         date = new Date(timestamp);
       }
       if (isNaN(date.getTime())) return 'N/A';
