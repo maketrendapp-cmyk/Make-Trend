@@ -36,7 +36,8 @@ import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin } fro
 import { useAuth } from '../components/AuthScreen';
 import { useComments, useInvalidateQueries } from '../lib/queries';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 
 // ── Custom hooks ──
 function useFadeUp(threshold = 0.1) {
@@ -215,7 +216,7 @@ export default function About() {
     setIsSubmitting(true);
     try {
       const payload = { name: commentName.trim(), comment: commentText.trim(), rating: commentRating };
-      const res = await fetch(`${API_BASE}/comments`, {
+      const res = await fetch(`${BACKEND_URL}/api/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

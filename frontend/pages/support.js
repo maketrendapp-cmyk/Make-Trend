@@ -18,7 +18,9 @@ import {
   FiMail,
 } from 'react-icons/fi';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = BACKEND_URL; // Keep as BASE (without /api) – code appends /api in fetch calls
 
 export default function Support() {
   const router = useRouter();
@@ -112,7 +114,7 @@ let imageUrl = '';
 if (imageFile) {
   const formData = new FormData();
   formData.append('image', imageFile);
-  const uploadRes = await fetch(`${API_BASE}/api/upload?folder=support`, {
+  const uploadRes = await fetch(`${BACKEND_URL}/api/upload?folder=support`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -127,7 +129,7 @@ if (imageFile) {
 
       // 2) Create ticket
       const payload = { title: title.trim(), description: description.trim(), image: imageUrl };
-      const createRes = await fetch(`${API_BASE}/api/support`, {
+      const createRes = await fetch(`${BACKEND_URL}/api/support`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

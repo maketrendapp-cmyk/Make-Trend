@@ -629,8 +629,10 @@ export default function Home({ initialFeaturedTemplates }) {
 
 // ── Pre‑fetch featured templates at build time ──
 export async function getStaticProps() {
-  const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-  const res = await fetch(`${apiBase}/api/templates?highlight=true&limit=10`);
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+  
+  const res = await fetch(`${BACKEND_URL}/api/templates?highlight=true&limit=10`);
   const data = await res.json();
   const featuredTemplates = data.templates || [];
 

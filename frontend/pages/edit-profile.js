@@ -16,7 +16,9 @@ import {
   FiLoader,
 } from 'react-icons/fi';
 
-const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com') + '/api';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = `${BACKEND_URL}/api`;
 
 export default function EditProfile() {
   const router = useRouter();

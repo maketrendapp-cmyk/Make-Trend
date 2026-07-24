@@ -18,7 +18,8 @@ import {
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 
 export default function ReferEarn() {
   const router = useRouter();
@@ -54,7 +55,7 @@ export default function ReferEarn() {
           return;
         }
         const token = await firebaseUser.getIdToken();
-        const res = await fetch(`${API_BASE}/api/auth/referrals`, {
+        const res = await fetch(`${BACKEND_URL}/api/auth/referrals`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();

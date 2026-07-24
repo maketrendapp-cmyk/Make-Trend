@@ -15,8 +15,8 @@ import {
   FaExternalLinkAlt,
 } from 'react-icons/fa';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-const API_BASE = BACKEND_URL + '/api';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 
 export default function CampaignTasks() {
   const router = useRouter();
@@ -41,7 +41,7 @@ export default function CampaignTasks() {
   const fetchCampaign = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/campaigns/${id}`, {
+      const res = await fetch(`${BACKEND_URL}/api/campaigns/${id}`, {
         headers: {
           'x-device-id': getDeviceId(),
         },
@@ -123,7 +123,7 @@ export default function CampaignTasks() {
     setIsSubmitting(true);
     try {
       const deviceId = getDeviceId();
-      await fetch(`${API_BASE}/campaigns/${id}/unlock`, {
+      await fetch(`${BACKEND_URL}/api/campaigns/${id}/unlock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId }),

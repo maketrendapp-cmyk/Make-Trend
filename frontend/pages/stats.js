@@ -6,24 +6,13 @@ import { useStats, useCampaigns, useInvalidateQueries } from '../lib/queries';
 import AuthScreen from '../components/AuthScreen';
 import Meta from '../components/Meta';
 import { auth } from '../services/firebase';
-import {
-  FiBarChart2,
-  FiEye,
-  FiUnlock,
-  FiShare2,
-  FiCheckCircle,
-  FiAward,
-  FiPlusCircle,
-  FiEdit2,
-  FiTrash2,
-  FiClock,
-  FiLink,
-  FiLogIn,
-  FiArrowRight,
-  FiTrendingUp,
-  FiUsers,
-} from 'react-icons/fi';
+import { FiBarChart2, FiEye, FiUnlock, FiShare2, FiCheckCircle, FiAward, FiPlusCircle, FiEdit2, FiTrash2, FiClock, FiLink, FiLogIn, FiArrowRight, FiTrendingUp, FiUsers } from 'react-icons/fi';
 import { FaRocket, FaChartLine } from 'react-icons/fa';
+
+// ── Backend URL ──
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = `${BACKEND_URL}/api`;
 
 export default function Stats() {
   const router = useRouter();
@@ -148,7 +137,7 @@ const {
       }
       const token = await firebaseUser.getIdToken();
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${campaignId}`,
+        `${API_BASE}/campaigns/${campaignId}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
@@ -192,7 +181,7 @@ const {
       };
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com'}/api/campaigns/${editingCampaign.id}`,
+        `${API_BASE}/campaigns/${editingCampaign.id}`,
         {
           method: 'PUT',
           headers: {

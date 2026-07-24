@@ -6,8 +6,9 @@ import { useTemplates, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-const API_BASE = BACKEND_URL + '/api';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = `${BACKEND_URL}/api`;
 
 export default function CreateCampaign() {
   const router = useRouter();

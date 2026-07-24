@@ -710,12 +710,14 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platf
 
 // ── Pre‑fetch templates at build time ──
 export async function getStaticProps() {
-  const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-  const res = await fetch(`${apiBase}/api/templates`);
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+  
+  const res = await fetch(`${BACKEND_URL}/api/templates`);
   const data = await res.json();
   const templates = data.templates || [];
 
-  const featuredRes = await fetch(`${apiBase}/api/templates?highlight=true`);
+  const featuredRes = await fetch(`${BACKEND_URL}/api/templates?highlight=true`);
   const featuredData = await featuredRes.json();
   const featuredTemplates = featuredData.templates || [];
 
