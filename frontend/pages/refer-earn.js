@@ -1,5 +1,5 @@
 // pages/refer-earn.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { useProfile } from '../lib/queries';
@@ -15,6 +15,8 @@ import {
   FiLogIn,
   FiUser,
   FiAward,
+  FiClock,
+  FiCheckCircle,
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
@@ -33,19 +35,24 @@ export default function ReferEarn() {
     referrer: null,
   });
   const [copySuccess, setCopySuccess] = useState('');
-  const [isVisible, setIsVisible] = useState(false);
+  const [visible, setVisible] = useState(false);
 
-  // ── Get username for welcome message ──
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
   const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
+  const isPro = profile?.plan === 'pro';
+  const proExpiry = profile?.proExpiry?.toDate?.() || null;
+  const referralsCount = referralData.totalReferrals;
 
-  // ── Force visibility after a short delay (fixes hard‑reload empty UI) ──
+  // ── Calculate progress to next reward ──
+  const nextRewardAt = (Math.floor(referralsCount / 5) + 1) * 5;
+  const remaining = Math.max(nextRewardAt - referralsCount, 0);
+  const progress = Math.min((referralsCount % 5) / 5 * 100, 100);
+
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 100);
+    const timer = setTimeout(() => setVisible(true), 100);
     return () => clearTimeout(timer);
   }, []);
 
-  // ── Fetch referral data ──
   useEffect(() => {
     const fetchReferrals = async () => {
       try {
@@ -66,37 +73,15 @@ export default function ReferEarn() {
             referredUsers: data.referredUsers || [],
             referrer: data.referrer || null,
           });
-        } else {
-          console.error('Failed to fetch referrals:', data.error);
         }
       } catch (err) {
         console.error('Fetch referrals error:', err);
       } finally {
         setLoading(false);
-        setTimeout(() => setIsVisible(true), 100);
       }
     };
     fetchReferrals();
   }, []);
-
-  // ── Intersection Observer for scroll animations (enhanced) ──
-  useEffect(() => {
-    if (!isVisible) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('opacity-100', 'translate-y-0');
-            entry.target.classList.remove('opacity-0', 'translate-y-8');
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    document.querySelectorAll('.fade-up').forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [isVisible]);
 
   const copyReferralCode = () => {
     const code = referralData.referralCode;
@@ -132,37 +117,27 @@ export default function ReferEarn() {
     }
   };
 
-  // ── Skeleton Loading ──
+  // ── Skeleton Loader ──
   if (profileLoading || loading || (user && !profile)) {
     return (
       <>
         <Meta title="Refer & Earn | Make Trend" />
-        <div className="min-h-screen bg-gray-50/50 py-8 px-4">
+        <div className="min-h-screen bg-gray-50 py-8 px-4">
           <div className="max-w-4xl mx-auto animate-pulse">
-            {/* Header Skeleton */}
-            <div className="bg-white rounded-3xl shadow-lg border border-gray-100/60 p-6 mb-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <div className="h-8 w-40 bg-gray-200 rounded-lg mb-2" />
-                  <div className="h-4 w-48 bg-gray-200 rounded" />
-                </div>
-                <div className="h-10 w-32 bg-gray-200 rounded-xl" />
-              </div>
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 mb-6">
+              <div className="h-8 w-40 bg-gray-200 rounded-lg mb-2" />
+              <div className="h-4 w-48 bg-gray-200 rounded" />
             </div>
-
-            {/* Stats Cards Skeleton */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-2xl shadow-lg border border-gray-100/60 p-6 text-center">
+              {[1,2,3].map(i => (
+                <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
                   <div className="w-12 h-12 bg-gray-200 rounded-full mx-auto mb-3" />
                   <div className="h-8 w-16 bg-gray-200 rounded mx-auto mb-2" />
                   <div className="h-4 w-24 bg-gray-200 rounded mx-auto" />
                 </div>
               ))}
             </div>
-
-            {/* Referral Code Skeleton */}
-            <div className="bg-white rounded-3xl shadow-lg border border-gray-100/60 p-6 mb-6">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 mb-6">
               <div className="h-6 w-40 bg-gray-200 rounded mb-4" />
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="h-12 w-48 bg-gray-200 rounded-xl" />
@@ -172,12 +147,10 @@ export default function ReferEarn() {
                 </div>
               </div>
             </div>
-
-            {/* Referred Users Skeleton */}
-            <div className="bg-white rounded-3xl shadow-lg border border-gray-100/60 p-6">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6">
               <div className="h-6 w-56 bg-gray-200 rounded mb-4" />
               <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
+                {[1,2,3].map(i => (
                   <div key={i} className="flex items-center gap-4 p-3 border-b border-gray-100">
                     <div className="w-10 h-10 bg-gray-200 rounded-full" />
                     <div className="flex-1">
@@ -195,26 +168,22 @@ export default function ReferEarn() {
     );
   }
 
-  // ── Unauthenticated – Show Login Prompt ──
   if (!user) {
     return (
       <>
-        <Meta
-          title="Refer & Earn | Make Trend"
-          description="Invite your friends to Make Trend and earn rewards for every successful referral."
-        />
-        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-gray-50 to-purple-50/30">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-gray-100/60 p-8 text-center">
-            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+        <Meta title="Refer & Earn | Make Trend" />
+        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-gray-200 p-8 text-center">
+            <div className="w-24 h-24 bg-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
               <FiUsers className="w-12 h-12 text-white" />
             </div>
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Refer & Earn</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Refer & Earn</h2>
             <p className="text-gray-500 text-sm mb-6">
-              Sign in to get your referral code and start earning rewards by inviting friends.
+              Sign in to get your referral code and start earning rewards.
             </p>
             <button
               onClick={() => router.push('/login')}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 shadow-md w-full"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 transition w-full"
             >
               <FiLogIn className="w-5 h-5" />
               Sign In
@@ -234,46 +203,24 @@ export default function ReferEarn() {
     );
   }
 
-  // ── Main Content ──
   return (
     <>
       <Meta
-        title="Refer & Earn | Make Trend"
-        description="Invite your friends to Make Trend and earn rewards for every successful referral."
+        title="Refer & Earn – Make Trend"
+        description="Invite friends to Make Trend and earn free PRO access for every 5 referrals."
       />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4">
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-4xl mx-auto">
 
-          {/* ── Welcome Message ── */}
-          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-lg border border-gray-100/60 p-5 mb-6 text-center`}>
-            <div className="flex items-center justify-center gap-3 text-gray-700">
-              <FiUser className="w-6 h-6 text-purple-600" />
-              <span className="text-lg font-medium">
-                Welcome,{' '}
-                <span className="font-bold text-purple-700">
-                  @{username}
-                </span>
-                {user && (
-                  <span className="text-gray-400 text-sm ml-1">
-                    ({displayName})
-                  </span>
-                )}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500 mt-1">
-              Invite friends and earn rewards for every successful referral.
-            </p>
-          </div>
-
           {/* ── Header ── */}
-          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm`}>
+          <div className={`bg-white rounded-3xl shadow-sm border border-gray-200 p-6 mb-6 transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3">
+                <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-2">
                   <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Refer</span>
                   & Earn
                 </h1>
-                <p className="text-gray-500 text-sm mt-0.5">Invite friends and earn rewards</p>
+                <p className="text-gray-500 text-sm mt-0.5">Invite friends and unlock PRO access</p>
               </div>
               <Link href="/profile">
                 <button className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-800 text-sm font-medium transition-colors">
@@ -281,23 +228,27 @@ export default function ReferEarn() {
                 </button>
               </Link>
             </div>
+            <div className="flex items-center gap-2 mt-3 text-sm text-gray-600">
+              <FiUser className="w-4 h-4 text-purple-600" />
+              <span>Welcome, <strong className="text-gray-900">@{username}</strong> ({displayName})</span>
+            </div>
           </div>
 
           {/* ── Stats Cards ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300`}>
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <FiUsers className="w-7 h-7 text-purple-600" />
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <FiUsers className="w-6 h-6 text-purple-600" />
               </div>
-              <p className="text-3xl font-extrabold text-gray-900">{referralData.totalReferrals}</p>
+              <p className="text-3xl font-bold text-gray-900">{referralData.totalReferrals}</p>
               <p className="text-sm text-gray-500 font-medium">Total Referrals</p>
             </div>
 
-            <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300`}>
-              <div className="w-14 h-14 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <FiUserPlus className="w-7 h-7 text-green-600" />
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <FiUserPlus className="w-6 h-6 text-green-600" />
               </div>
-              <p className="text-3xl font-extrabold text-gray-900">
+              <p className="text-3xl font-bold text-gray-900">
                 {referralData.referrer ? '✅' : '—'}
               </p>
               <p className="text-sm text-gray-500 font-medium">
@@ -305,30 +256,77 @@ export default function ReferEarn() {
               </p>
             </div>
 
-            <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-2xl shadow-xl border border-gray-100/60 p-6 text-center hover:shadow-2xl transition-shadow duration-300`}>
-              <div className="w-14 h-14 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <FaCrown className="w-7 h-7 text-yellow-600" />
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <FaCrown className="w-6 h-6 text-yellow-600" />
               </div>
-              <p className="text-3xl font-extrabold text-gray-900">—</p>
-              <p className="text-sm text-gray-500 font-medium">Rewards (coming soon)</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {isPro ? '👑' : '—'}
+              </p>
+              <p className="text-sm text-gray-500 font-medium">
+                {isPro ? 'PRO Active' : 'Free Plan'}
+              </p>
+              {isPro && proExpiry && (
+                <p className="text-xs text-gray-400 mt-1 flex items-center justify-center gap-1">
+                  <FiClock className="w-3 h-3" />
+                  Expires: {proExpiry.toLocaleDateString()} {proExpiry.toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Reward Explanation & Progress ── */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <FiAward className="w-5 h-5 text-purple-600" />
+              Reward System
+            </h2>
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
+              <p className="text-purple-800 text-sm font-medium">
+                🎉 For every <strong>5 friends</strong> you refer, you get <strong>24 hours of PRO access</strong> – absolutely free!
+              </p>
+              {isPro && (
+                <div className="mt-2 flex items-center gap-2 text-green-700 text-sm bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                  <FiCheckCircle className="w-4 h-4" />
+                  <span>You're currently PRO – enjoy the premium features!</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Progress to next reward</span>
+                <span className="font-medium text-gray-900">
+                  {remaining === 0 ? '✅ Ready for PRO!' : `${remaining} more referral${remaining > 1 ? 's' : ''} needed`}
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                {referralsCount} referral{referralsCount !== 1 ? 's' : ''} • {nextRewardAt} needed for PRO
+              </p>
             </div>
           </div>
 
           {/* ── Referral Code ── */}
-          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 mb-6 backdrop-blur-sm`}>
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 mb-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <FiAward className="w-5 h-5 text-purple-600" />
               Your Referral Code
             </h2>
             {referralData.referralCode ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <code className="bg-gradient-to-r from-gray-50 to-gray-100/80 px-5 py-3 rounded-xl text-xl font-mono border border-gray-200 text-gray-800 shadow-sm">
+                <code className="bg-gray-50 border border-gray-200 px-5 py-3 rounded-xl text-xl font-mono text-gray-800 shadow-sm">
                   {referralData.referralCode}
                 </code>
                 <div className="flex items-center gap-3 flex-wrap">
                   <button
                     onClick={copyReferralCode}
-                    className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition-all duration-200 shadow-md hover:-translate-y-0.5 text-sm font-medium"
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
                   >
                     <FiCopy className="w-4 h-4" />
                     {copySuccess || 'Copy'}
@@ -349,7 +347,7 @@ export default function ReferEarn() {
                         });
                       }
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:shadow-lg transition-all duration-200 shadow-md hover:-translate-y-0.5 text-sm font-medium"
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition text-sm font-medium shadow-sm"
                   >
                     <FiShare2 className="w-4 h-4" />
                     Share
@@ -359,13 +357,10 @@ export default function ReferEarn() {
             ) : (
               <p className="text-gray-500">No referral code assigned.</p>
             )}
-            {copySuccess && !copySuccess.includes('Copied!') && (
-              <p className="mt-3 text-sm text-green-600 font-medium">{copySuccess}</p>
-            )}
           </div>
 
           {/* ── Referred Users List ── */}
-          <div className={`fade-up transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 backdrop-blur-sm`}>
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <FiUsers className="w-5 h-5 text-purple-600" />
               People You've Referred
@@ -391,15 +386,12 @@ export default function ReferEarn() {
                   </thead>
                   <tbody>
                     {referralData.referredUsers.map((ref) => (
-                      <tr
-                        key={ref.uid}
-                        className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors duration-150"
-                      >
+                      <tr key={ref.uid} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center text-gray-600 text-sm font-medium overflow-hidden">
+                            <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-gray-600 text-sm font-medium overflow-hidden">
                               {ref.avatar ? (
-                                <img src={ref.avatar} alt={ref.fullname} className="w-full h-full rounded-full object-cover" />
+                                <img src={ref.avatar} alt={ref.fullname} className="w-full h-full object-cover" />
                               ) : (
                                 ref.fullname?.charAt(0) || ref.username?.charAt(0) || '?'
                               )}
@@ -419,6 +411,7 @@ export default function ReferEarn() {
               </div>
             )}
           </div>
+
         </div>
       </div>
     </>
