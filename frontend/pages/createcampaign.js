@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { useTemplates, useInvalidateQueries } from '../lib/queries';
-import AuthScreen from '../components/AuthScreen';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 
@@ -30,8 +29,6 @@ export default function CreateCampaign() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
-  const [campaignUrl, setCampaignUrl] = useState('');
-  const [campaignId, setCampaignId] = useState('');
 
   // ── Form State ──
   const [campaignTitle, setCampaignTitle] = useState('');
@@ -257,16 +254,13 @@ export default function CreateCampaign() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        const cId = data.campaignId;
-        setCampaignId(cId);
-        const url = `/${slug}/${cId}`;
-        setCampaignUrl(url);
-        setMessage('✅ Campaign created successfully!');
         // Clear saved form after success
         localStorage.removeItem(storageKey);
         // 🔥 Invalidate React Query cache to refresh stats and campaigns
         await invalidateCampaigns();
         await invalidateStats();
+        // Redirect to the new success page
+        router.push(`/campaign-created?id=${data.campaignId}`);
       } else {
         setMessage(data.error || 'Failed to create campaign');
       }
@@ -277,21 +271,20 @@ export default function CreateCampaign() {
     setIsSubmitting(false);
   };
 
-  // ── Handlers for non‑authenticated ──
-  // ── Redirect unauthenticated users to login (client‑side only) ──
-useEffect(() => {
+  // ── Redirect unauthenticated users to login ──
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      const redirect = `/createcampaign?slug=${slug}`;
+      router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+    }
+  }, [authLoading, isAuthenticated, slug]);
+
+  // ── Return null while checking auth ──
   if (!authLoading && !isAuthenticated) {
-    const redirect = `/createcampaign?slug=${slug}`;
-    router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+    return null;
   }
-}, [authLoading, isAuthenticated, slug]);
 
-// ── Return null or a loading state while checking auth ──
-if (!authLoading && !isAuthenticated) {
-  return null;
-}
-
-  // ── Error state (with Meta) ──
+  // ── Error state ──
   if (error) {
     return (
       <>
@@ -306,129 +299,6 @@ if (!authLoading && !isAuthenticated) {
           >
             Browse Templates
           </button>
-        </main>
-      </>
-    );
-  }
-
-  // ── Success Screen ──
-  if (campaignUrl) {
-    const fullUrl = `${window.location.origin}${campaignUrl}`;
-    return (
-      <>
-        <Meta title="Campaign Created!" />
-        <main className="min-h-screen flex items-center justify-center px-4 py-5 bg-gradient-to-b from-gray-50 to-white">
-          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 sm:px-7 sm:py-5">
-              <div className="flex items-center gap-4 text-white">
-                <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-2xl flex-shrink-0">
-                  🎉
-                </div>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold">Campaign Created!</h1>
-                  <p className="text-purple-100 text-sm">Your campaign is ready to share.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 sm:p-6 space-y-5">
-              {/* Preview Card */}
-              <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Preview</h2>
-                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className="sm:w-48 h-40 sm:h-auto bg-gray-200 flex-shrink-0">
-                      {template?.image ? (
-                        <img
-                          src={template.image}
-                          alt={campaignTitle}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
-                          🎯
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 p-4 space-y-2">
-                      <h3 className="text-lg font-bold text-gray-900">{campaignTitle}</h3>
-                      {campaignDescription && (
-                        <p className="text-gray-600 text-sm">{campaignDescription}</p>
-                      )}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full text-xs font-medium border border-amber-200">
-                          🎁 {campaignReward}
-                        </span>
-                        {shareCountEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-medium border border-blue-200">
-                            📢 {shareCount} shares
-                          </span>
-                        )}
-                        {tasksEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-2.5 py-1 rounded-full text-xs font-medium border border-purple-200">
-                            📋 {tasks.length} tasks
-                          </span>
-                        )}
-                        {finalUrlEnabled && (
-                          <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-medium border border-green-200">
-                            🔗 Redirect
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Copy URL */}
-              <div>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Share Link</h2>
-                <div className="flex flex-col sm:flex-row items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <input
-                    type="text"
-                    value={fullUrl}
-                    readOnly
-                    className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-gray-700 truncate"
-                  />
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(fullUrl);
-                      setMessage('✅ Link copied!');
-                      setTimeout(() => setMessage(''), 3000);
-                    }}
-                    className="flex-shrink-0 w-full sm:w-auto px-5 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm"
-                  >
-                    Copy Link
-                  </button>
-                </div>
-                {message && <p className="mt-2 text-sm text-green-600 text-center">{message}</p>}
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => router.push(campaignUrl)}
-                  className="inline-flex items-center justify-center px-5 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm"
-                >
-                  👁️ View Campaign
-                </button>
-                <button
-                  onClick={() => router.push('/stats')}
-                  className="inline-flex items-center justify-center px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-all duration-200"
-                >
-                  📊 View Stats
-                </button>
-                <button
-                  onClick={() => router.push('/create')}
-                  className="inline-flex items-center justify-center px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-all duration-200"
-                >
-                  ✨ Create Another
-                </button>
-              </div>
-            </div>
-          </div>
         </main>
       </>
     );
