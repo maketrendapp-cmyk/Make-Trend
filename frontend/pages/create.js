@@ -278,7 +278,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   const templateNames = templates.map(t => t.title).slice(0, 10);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.vercel.app';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.app';
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "ItemList",
