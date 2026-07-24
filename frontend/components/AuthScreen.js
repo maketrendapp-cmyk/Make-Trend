@@ -29,7 +29,7 @@ import {
   FiAlertCircle,
 } from 'react-icons/fi';
 import { FaGoogle, FaTwitter } from 'react-icons/fa';
-import { getDeviceId } from '../utils/deviceId'; // unified device ID
+import { getDeviceId, refreshDeviceId } from '../utils/deviceId'; // unified device ID
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -287,12 +287,12 @@ export function AuthProvider({ children }) {
         }
       }
 
-      const token = await firebaseUser.getIdToken();
-      const deviceId = getDeviceId(); // unified device ID
-      const data = await apiRequest('/auth/register', {
-        method: 'POST',
-        body: { uid: firebaseUser.uid, username, fullname, email, avatar: finalAvatarUrl, referralCode, deviceId },
-      }, token);
+     const token = await firebaseUser.getIdToken();
+const deviceId = await refreshDeviceId(); // Force upgrade to fingerprint (or get fallback)
+const data = await apiRequest('/auth/register', {
+  method: 'POST',
+  body: { uid: firebaseUser.uid, username, fullname, email, avatar: finalAvatarUrl, referralCode, deviceId },
+}, token);
       if (data.success) {
         const fullUser = { uid: firebaseUser.uid, email, ...data.user, completed: true };
         if (finalAvatarUrl) {
@@ -410,11 +410,11 @@ export function AuthProvider({ children }) {
       if (!firebaseUser) throw new Error('Not authenticated');
 
       const token = await firebaseUser.getIdToken();
-      const deviceId = getDeviceId(); // unified device ID
-      const data = await apiRequest('/auth/complete-social', {
-        method: 'POST',
-        body: { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', referralCode, deviceId },
-      }, token);
+const deviceId = await refreshDeviceId(); // Force upgrade
+const data = await apiRequest('/auth/complete-social', {
+  method: 'POST',
+  body: { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', referralCode, deviceId },
+}, token);
       if (data.success) {
         const profileData = await fetchUserProfile(firebaseUser);
         if (profileData) {
