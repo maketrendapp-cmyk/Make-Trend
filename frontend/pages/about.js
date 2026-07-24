@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Meta from '../components/Meta';
 import {
   FiTarget,
@@ -279,12 +280,13 @@ export default function About() {
     { question: 'What platforms does Make Trend support?', answer: 'Our templates are optimised for TikTok, Instagram, YouTube, Facebook, and more. You can also customise campaigns for any platform by editing the tasks and redirect URLs.' },
   ];
 
+  // ── Partners (text only, no placeholder images) ──
   const partners = [
-    { name: 'TikTok', logo: 'https://via.placeholder.com/80x40?text=TikTok' },
-    { name: 'Instagram', logo: 'https://via.placeholder.com/80x40?text=Instagram' },
-    { name: 'YouTube', logo: 'https://via.placeholder.com/80x40?text=YouTube' },
-    { name: 'Facebook', logo: 'https://via.placeholder.com/80x40?text=Facebook' },
-    { name: 'Twitter', logo: 'https://via.placeholder.com/80x40?text=Twitter' },
+    { name: 'TikTok' },
+    { name: 'Instagram' },
+    { name: 'YouTube' },
+    { name: 'Facebook' },
+    { name: 'Twitter' },
   ];
 
   const usps = [
@@ -297,15 +299,50 @@ export default function About() {
   // ── Current year for "last updated" ──
   const currentYear = new Date().getFullYear();
 
+  // ── Structured Data (JSON‑LD) ──
+  const siteUrl = 'https://maketrend.app';
+  const organizationData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Make Trend",
+    "url": siteUrl,
+    "logo": `${siteUrl}/og-image.png`,
+    "description": "Make Trend helps creators launch viral share‑to‑unlock campaigns with free templates, real‑time analytics, and referral tracking.",
+    "sameAs": [
+      "https://twitter.com/maketrend",
+      "https://instagram.com/maketrend",
+      "https://youtube.com/@rockyxsiyu"
+    ],
+    "founder": {
+      "@type": "Person",
+      "name": "Rocky Axis",
+      "url": "https://youtube.com/@rockyxsiyu"
+    }
+  };
+  const webpageData = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "About Make Trend – Viral Campaign Platform",
+    "description": "Make Trend helps creators launch viral share‑to‑unlock campaigns. Free templates, real‑time analytics, and built‑in referral tracking.",
+    "url": `${siteUrl}/about`,
+    "mainEntity": {
+      "@type": "Organization",
+      "name": "Make Trend"
+    }
+  };
+
   return (
     <>
-      {/* ── META for SEO + SSR ── */}
       <Meta
         title="About Make Trend – Viral Campaign Platform"
         description="Make Trend helps creators launch viral share‑to‑unlock campaigns in minutes. Free templates, real‑time analytics, and built‑in referral tracking. Built by Rocky Axis."
-        image="https://maketrend.vercel.app/og-about.jpg"
-        url="https://maketrend.vercel.app/about"
+        image="https://maketrend.app/og-image.png"
+        url="https://maketrend.app/about"
       />
+      <Head>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageData) }} />
+      </Head>
 
       <div className="min-h-screen bg-white">
         {/* ── Hero ── */}
@@ -340,7 +377,6 @@ export default function About() {
               </form>
             </div>
             <div className="text-center">
-              {/* ── Est. & Last Updated badges ── */}
               <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
                 <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-white/10">
                   <FiCalendar className="w-3.5 h-3.5" />
@@ -410,7 +446,6 @@ export default function About() {
               Today, we’re proud to help thousands of users grow their audience and turn their ideas into movements.
             </p>
 
-            {/* ── Developer credit (authority signal) ── */}
             <div className="mt-6 pt-6 border-t border-gray-200 max-w-md mx-auto">
               <p className="text-sm text-gray-500">
                 Built with ❤️ by{' '}
@@ -662,6 +697,7 @@ export default function About() {
                   <FiSend className="w-4 h-4" />
                   {isSubmitting ? 'Submitting...' : 'Submit Review'}
                 </button>
+                <p className="text-xs text-gray-400 mt-2">Your name and comment will be publicly visible.</p>
               </form>
             </div>
 
