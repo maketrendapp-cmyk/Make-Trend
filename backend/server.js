@@ -311,7 +311,6 @@ const allowedOrigins = [
   'https://make-trend-system.vercel.app',
   'https://maketrend.vercel.app',
   'https://make-trend.vercel.app',
-'https://maketrend.app',
 ];
 if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.push('http://localhost:3000');
@@ -1698,18 +1697,17 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
     const docRef = await db.collection('campaigns').add(campaignData);
     await templateRef.update({ usageCount: admin.firestore.FieldValue.increment(1) });
 
-    // ── Add the new campaign to the user's list cache ──
+    // ── Fetch the actual campaign data (with server timestamp) ──
+    const docSnapshot = await docRef.get();
+    const actualCampaignData = docSnapshot.data();
     const newCampaign = {
       id: docRef.id,
-      ...campaignData,
+      ...actualCampaignData,
     };
     await addCampaignToUserListCache(uid, newCampaign);
     await invalidateKey(`stats:user:${uid}`);
 
     // ── Update template cache with new usageCount ──
-    // We already incremented usageCount in Firestore above.
-    // Now we update the cache for that template.
-    // We need to know the new usageCount. We can read it from the updated templateDoc
     const updatedTemplateDoc = await templateRef.get();
     const newUsageCount = updatedTemplateDoc.data().usageCount || 0;
     await updateTemplateInAllCaches(templateId, { usageCount: newUsageCount });
