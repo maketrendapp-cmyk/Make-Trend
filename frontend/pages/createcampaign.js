@@ -261,10 +261,11 @@ export default function CreateCampaign() {
       if (res.ok && data.success) {
         // Clear saved form after success
         localStorage.removeItem(storageKey);
-        // 🔥 Invalidate React Query cache to refresh stats and campaigns
-        await invalidateCampaigns();
-        await invalidateStats();
-        // Redirect to the new success page
+        // 🔥 Invalidate React Query cache asynchronously (non‑blocking)
+        // This prevents the redirect from being delayed.
+        invalidateCampaigns().catch(() => {});
+        invalidateStats().catch(() => {});
+        // Redirect immediately to the success page
         router.push(`/campaign-created?id=${data.campaignId}`);
       } else {
         setMessage(data.error || 'Failed to create campaign');
@@ -272,8 +273,9 @@ export default function CreateCampaign() {
     } catch (err) {
       console.error('Error:', err);
       setMessage('Network error: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   // ── Redirect unauthenticated users to login ──
