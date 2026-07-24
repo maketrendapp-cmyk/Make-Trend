@@ -36,7 +36,7 @@ import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin } fro
 import { useAuth } from '../components/AuthScreen';
 import { useComments, useInvalidateQueries } from '../lib/queries';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 
 // ── Custom hooks ──
 function useFadeUp(threshold = 0.1) {
