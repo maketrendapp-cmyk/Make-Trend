@@ -225,11 +225,11 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   return (
     <>
-      <Meta
-        title="Choose a Template"
-        description="Select a template to launch your campaign."
-        extraKeywords={templateNames}
-      />
+     <Meta
+  title="Browse Campaign Templates – Make Trend"
+  description="Explore a curated collection of viral campaign templates. Customize, launch, and start growing your audience in minutes."
+  extraKeywords={templateNames}
+/>
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
         {/* ── Search & Quick Filters ── */}
