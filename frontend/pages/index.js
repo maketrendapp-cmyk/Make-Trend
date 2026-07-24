@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
+import Head from 'next/head';
 import Meta from '../components/Meta';
 import { useFeaturedTemplates, useTemplates } from '../lib/queries';
 import {
@@ -352,13 +353,54 @@ export default function Home({ initialFeaturedTemplates }) {
     return value + '+';
   };
 
+  // ── SEO: Structured Data ──
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.vercel.app';
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Make Trend",
+    "url": siteUrl,
+    "description": "Create viral share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": `${siteUrl}/create?search={search_term_string}`
+      },
+      "query-input": "required name=search_term_string"
+    }
+  };
+  const organizationData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Make Trend",
+    "url": siteUrl,
+    "logo": `${siteUrl}/favicon.ico`,
+    "sameAs": [
+      "https://twitter.com/maketrendapp",
+      "https://instagram.com/maketrendapp"
+    ]
+  };
+
   return (
     <>
       <Meta
-  title="Make Trend – Viral Campaign Platform for Creators"
-  description="Create share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates."
-  url="/"
-/>
+        title="Make Trend – Viral Campaign Platform for Creators"
+        description="Create share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates."
+        url="/"
+        image="https://maketrend.vercel.app/og-image.png"
+        type="website"
+      />
+      <Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }}
+        />
+      </Head>
       <main className="min-h-screen bg-gradient-to-b from-white to-gray-50/80">
         {/* ── Hero ── */}
         <section
