@@ -11,18 +11,21 @@ export default function CampaignCreated() {
   const { id } = router.query;
 
   const [campaign, setCampaign] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (id) fetchCampaign();
+    if (id) {
+      setLoading(true);
+      fetchCampaign();
+    }
+    // If no id, we show the "no campaign" state without loading
   }, [id]);
 
   const fetchCampaign = async () => {
     try {
-      setLoading(true);
       const res = await fetch(`${API_BASE}/campaigns/${id}`);
       if (!res.ok) {
         if (res.status === 404) {
@@ -57,34 +60,36 @@ export default function CampaignCreated() {
     }, 3000);
   };
 
+  // ── LOADING STATE ──
   if (loading) {
     return (
       <>
-        <Meta title="Loading Campaign..." />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white">
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
-            <p className="text-gray-500 text-sm">Loading your campaign...</p>
-          </div>
+        <Meta title="Loading..." />
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-white px-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
+          <p className="mt-4 text-gray-500 text-sm">Loading your campaign...</p>
         </div>
       </>
     );
   }
 
-  if (error || !campaign) {
+  // ── NO ID PROVIDED ──
+  if (!id) {
     return (
       <>
-        <Meta title="Campaign Not Found" />
-        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-gray-50 to-white">
-          <div className="text-center max-w-md">
-            <div className="text-5xl mb-4">😕</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign not found</h2>
-            <p className="text-gray-500">{error || 'The campaign you\'re looking for doesn\'t exist.'}</p>
+        <Meta title="Create a Campaign" />
+        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-purple-50/20">
+          <div className="max-w-md w-full text-center">
+            <div className="text-6xl mb-6">🚀</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your First Campaign</h1>
+            <p className="text-gray-500 text-sm mb-8">
+              You haven't created a campaign yet. Start building your viral campaign now!
+            </p>
             <button
               onClick={() => router.push('/create')}
-              className="mt-6 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 shadow-md"
             >
-              Create Another Campaign
+              <span>✨</span> Create Campaign
             </button>
           </div>
         </div>
@@ -92,6 +97,39 @@ export default function CampaignCreated() {
     );
   }
 
+  // ── ERROR STATE ──
+  if (error || !campaign) {
+    return (
+      <>
+        <Meta title="Campaign Not Found" />
+        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-red-50/20">
+          <div className="max-w-md w-full text-center">
+            <div className="text-6xl mb-6">😕</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h2>
+            <p className="text-gray-500 text-sm mb-6">
+              {error || 'The campaign you are looking for does not exist or may have been deleted.'}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => router.push('/create')}
+                className="px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition shadow-sm"
+              >
+                Create New Campaign
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition"
+              >
+                Go Home
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── SUCCESS STATE ──
   const {
     title,
     description,
@@ -109,22 +147,22 @@ export default function CampaignCreated() {
 
   return (
     <>
-      <Meta title="Campaign Created! 🎉" />
+      <Meta title="🎉 Campaign Created!" />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
 
-          {/* ── Success Card ── */}
-          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 overflow-hidden transition-all hover:shadow-2xl">
+          {/* ── Main Card ── */}
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100/60 overflow-hidden transition-all hover:shadow-3xl">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-6 sm:px-8 sm:py-7">
-              <div className="flex items-center gap-4 text-white">
+              <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-3xl flex-shrink-0">
                   🎉
                 </div>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold">Campaign Created!</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white">Campaign Created!</h1>
                   <p className="text-purple-100 text-sm mt-0.5">
-                    Your campaign is ready to share with the world.
+                    Your campaign is live – start sharing and watch the engagement grow!
                   </p>
                 </div>
               </div>
@@ -132,23 +170,23 @@ export default function CampaignCreated() {
 
             {/* Body */}
             <div className="p-6 sm:p-8 space-y-6">
-              {/* ── Preview ── */}
+              {/* ── Campaign Preview ── */}
               <div>
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                   <span>📋</span> Campaign Preview
                 </h2>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
-                    {/* Image */}
-                    <div className="sm:w-48 h-40 sm:h-auto bg-gray-200 flex-shrink-0">
+                    {/* Image - fixed height and object-cover */}
+                    <div className="sm:w-52 h-48 sm:h-auto bg-gray-200 flex-shrink-0 overflow-hidden">
                       {image ? (
                         <img
                           src={image}
                           alt={title}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover object-center"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">
+                        <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300 bg-gray-100">
                           🎯
                         </div>
                       )}
@@ -157,7 +195,7 @@ export default function CampaignCreated() {
                     <div className="flex-1 p-4 space-y-2">
                       <h3 className="text-lg font-bold text-gray-900">{title}</h3>
                       {description && (
-                        <p className="text-gray-600 text-sm">{description}</p>
+                        <p className="text-gray-600 text-sm line-clamp-2">{description}</p>
                       )}
                       <div className="flex flex-wrap gap-2 pt-1">
                         {reward && (
@@ -200,9 +238,9 @@ export default function CampaignCreated() {
                   />
                   <button
                     onClick={handleCopyLink}
-                    className={`flex-shrink-0 w-full sm:w-auto px-5 py-2 text-sm font-medium rounded-xl transition-all duration-200 shadow-sm ${
+                    className={`flex-shrink-0 w-full sm:w-auto px-5 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 shadow-sm ${
                       copied
-                        ? 'bg-green-500 text-white'
+                        ? 'bg-green-500 text-white hover:bg-green-600'
                         : 'bg-purple-600 text-white hover:bg-purple-700'
                     }`}
                   >
@@ -214,7 +252,7 @@ export default function CampaignCreated() {
                 )}
               </div>
 
-              {/* ── Actions ── */}
+              {/* ── Action Buttons ── */}
               <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200">
                 <button
                   onClick={() => router.push(`/${templateSlug || 'campaign'}/${campaignId}`)}
@@ -234,13 +272,6 @@ export default function CampaignCreated() {
                 >
                   ✨ Create Another
                 </button>
-              </div>
-
-              {/* ── Extra Info (optional) ── */}
-              <div className="text-center text-xs text-gray-400 pt-2 border-t border-gray-100">
-                <p>
-                  Campaign ID: <span className="font-mono">{campaignId}</span>
-                </p>
               </div>
             </div>
           </div>
