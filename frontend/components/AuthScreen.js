@@ -30,12 +30,13 @@ import {
 } from 'react-icons/fi';
 import { FaGoogle, FaTwitter } from 'react-icons/fa';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const AUTH_CACHE_KEY = 'maketrend_auth';
 
 // ── API helper (only for auth-related calls) ──
 async function apiRequest(endpoint, options = {}, token = null) {
-  const url = `${API_BASE}${endpoint}`;
+  const url = `${BACKEND_URL}/api${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (options.body && !(options.body instanceof FormData)) {
@@ -135,7 +136,7 @@ export function AuthProvider({ children }) {
     const formData = new FormData();
     formData.append('image', file);
 
-    const response = await fetch(`${API_BASE}/upload`, {
+    const response = await fetch(`${BACKEND_URL}/api/upload`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
@@ -579,7 +580,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 
       emailTimerRef.current = setTimeout(async () => {
         try {
-          const res = await fetch(`${API_BASE}/auth/check-email?email=${encodeURIComponent(email)}`);
+          const res = await fetch(`${BACKEND_URL}/api/auth/check-email?email=${encodeURIComponent(email)}`);
           if (!res.ok) throw new Error('Backend error');
           const data = await res.json();
           setEmailExists(data.exists);
@@ -609,7 +610,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 
       usernameTimerRef.current = setTimeout(async () => {
         try {
-          const res = await fetch(`${API_BASE}/auth/check-username?username=${encodeURIComponent(usernameToCheck)}`);
+          const res = await fetch(`${BACKEND_URL}/api/auth/check-username?username=${encodeURIComponent(usernameToCheck)}`);
           if (!res.ok) throw new Error('Backend error');
           const data = await res.json();
           setUsernameAvailable(data.available);

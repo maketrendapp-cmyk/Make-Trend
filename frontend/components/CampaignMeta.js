@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import Meta from './Meta';
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 
 export default function CampaignMeta({ 
   children, 
