@@ -1,6 +1,7 @@
 // pages/create.js
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../components/Meta';
 import { useTemplates, useFeaturedTemplates } from '../lib/queries';
 
@@ -20,11 +21,18 @@ const categoryEmojis = {
   default: '✨',
 };
 
-export default function Create() {
+export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   const router = useRouter();
   const { slug: highlightSlug, search: initialSearch } = router.query;
+  const queryClient = useQueryClient();
 
-  // ── React Query data ──
+  // ── Hydrate React Query cache with pre‑fetched data ──
+  useEffect(() => {
+    queryClient.setQueryData(['templates'], initialTemplates);
+    queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
+  }, [initialTemplates, initialFeaturedTemplates, queryClient]);
+
+  // ── React Query data (now from cache, instantly available) ──
   const { data: templates = [], isLoading: templatesLoading } = useTemplates();
   const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates();
 
@@ -119,7 +127,6 @@ export default function Create() {
   // ── Carousel auto-slide (pauses when filters are active) ──
   useEffect(() => {
     const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
-    // Clear any existing interval first
     if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     carouselIntervalRef.current = null;
 
@@ -128,7 +135,6 @@ export default function Create() {
         setCarouselIndex(prev => (prev + 1) % filteredFeatured.length);
       }, 2000);
     } else {
-      // Reset to first slide when filters change
       setCarouselIndex(0);
     }
     return () => {
@@ -138,7 +144,6 @@ export default function Create() {
 
   const goToSlide = useCallback((index) => {
     setCarouselIndex(index);
-    // Reset auto‑play timer when user manually changes slide
     if (carouselIntervalRef.current) {
       clearInterval(carouselIntervalRef.current);
       const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
@@ -198,10 +203,8 @@ export default function Create() {
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
-  // ── Loading state ──
   const isLoading = templatesLoading || featuredLoading;
 
-  // ── No templates state (after loading finishes) ──
   if (!isLoading && templates.length === 0) {
     return (
       <>
@@ -217,9 +220,16 @@ export default function Create() {
     );
   }
 
+  // ── Build keyword list from template titles for SEO ──
+  const templateNames = templates.map(t => t.title).slice(0, 10);
+
   return (
     <>
-      <Meta title="Choose a Template" description="Select a template to launch your campaign." />
+      <Meta
+        title="Choose a Template"
+        description="Select a template to launch your campaign."
+        extraKeywords={templateNames}
+      />
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
         {/* ── Search & Quick Filters ── */}
@@ -582,4 +592,26 @@ export default function Create() {
       </main>
     </>
   );
+}
+
+// ── Pre‑fetch templates at build time ──
+export async function getStaticProps() {
+  const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+  // Fetch all templates
+  const res = await fetch(`${apiBase}/api/templates`);
+  const data = await res.json();
+  const templates = data.templates || [];
+
+  // Fetch featured templates separately
+  const featuredRes = await fetch(`${apiBase}/api/templates?highlight=true`);
+  const featuredData = await featuredRes.json();
+  const featuredTemplates = featuredData.templates || [];
+
+  return {
+    props: {
+      initialTemplates: templates,
+      initialFeaturedTemplates: featuredTemplates,
+    },
+    revalidate: 60, // ISR – refresh every 60 seconds
+  };
 }
