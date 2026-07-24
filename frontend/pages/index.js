@@ -354,7 +354,7 @@ export default function Home({ initialFeaturedTemplates }) {
   };
 
   // ── SEO: Structured Data ──
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.vercel.app';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.app';
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -377,8 +377,8 @@ export default function Home({ initialFeaturedTemplates }) {
     "url": siteUrl,
     "logo": `${siteUrl}/favicon.ico`,
     "sameAs": [
-      "https://twitter.com/maketrendapp",
-      "https://instagram.com/maketrendapp"
+      "https://twitter.com/maketrend",
+      "https://instagram.com/maketrend"
     ]
   };
 
@@ -388,7 +388,7 @@ export default function Home({ initialFeaturedTemplates }) {
         title="Make Trend – Viral Campaign Platform for Creators"
         description="Create share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates."
         url="/"
-        image="https://maketrend.vercel.app/og-image.png"
+        image="https://maketrend.app/og-image.png"
         type="website"
       />
       <Head>
