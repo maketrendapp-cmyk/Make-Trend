@@ -9,9 +9,8 @@ export default function Meta({ title, description, image, url, extraKeywords }) 
     const keywordsStr = extraKeywords.slice(0, 10).join(', ');
     metaDesc = `${metaDesc} Templates: ${keywordsStr}.`;
   }
-  // ── Use the same default image as _document.js ──
-  const metaImage = image || 'https://maketrend.vercel.app/og-image.png';
-  const metaUrl = url || 'https://maketrend.vercel.app';
+  const metaImage = image || 'https://maketrend.app/og-image.png';
+  const metaUrl = url || 'https://maketrend.app/';
 
   return (
     <Head>
