@@ -1,26 +1,28 @@
 // components/Meta.js
 import Head from 'next/head';
 
-export default function Meta({ title, description, image, url }) {
+export default function Meta({ title, description, image, url, extraKeywords }) {
   const siteTitle = title ? `${title} | Make Trend` : 'Make Trend';
-  const metaDesc = description || 'Create and share trending campaigns with Make Trend.';
+  let metaDesc = description || 'Create and share trending campaigns with Make Trend.';
+  // ── Append template names to description if provided ──
+  if (extraKeywords && extraKeywords.length > 0) {
+    const keywordsStr = extraKeywords.slice(0, 10).join(', ');
+    metaDesc = `${metaDesc} Templates: ${keywordsStr}.`;
+  }
   const metaImage = image || 'https://maketrend.vercel.app/og-default.jpg';
   const metaUrl = url || 'https://maketrend.vercel.app';
 
   return (
     <Head>
-      {/* ── Page Title ── */}
       <title>{siteTitle}</title>
       <meta name="description" content={metaDesc} />
 
-      {/* ── Open Graph (OG) Tags ── */}
       <meta property="og:title" content={siteTitle} />
       <meta property="og:description" content={metaDesc} />
       <meta property="og:image" content={metaImage} />
       <meta property="og:url" content={metaUrl} />
       <meta property="og:type" content="website" />
 
-      {/* ── Twitter Card Tags ── */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={siteTitle} />
       <meta name="twitter:description" content={metaDesc} />
