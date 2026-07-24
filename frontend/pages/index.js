@@ -1,6 +1,7 @@
 // pages/index.js
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../components/Meta';
 import { useFeaturedTemplates, useTemplates } from '../lib/queries';
 import {
@@ -103,9 +104,18 @@ const platformBadgeStyles = {
   all: 'bg-slate-800 text-white',
 };
 
-export default function Home() {
+export default function Home({ initialFeaturedTemplates }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // ── Hydrate React Query cache with pre‑fetched data ──
+  useEffect(() => {
+    queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
+  }, [initialFeaturedTemplates, queryClient]);
+
+  // ── React Query data (now from cache, instantly available) ──
   const { data: featuredTemplates, isLoading: featuredLoading } = useFeaturedTemplates();
+
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -345,9 +355,10 @@ export default function Home() {
   return (
     <>
       <Meta
-        title="Make Trend – Create & Share Viral Campaigns"
-        description="Launch share‑to‑unlock campaigns for Instagram, TikTok, YouTube, and more. Grow your audience in minutes."
-      />
+  title="Make Trend – Viral Campaign Platform for Creators"
+  description="Create share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates."
+  url="/"
+/>
       <main className="min-h-screen bg-gradient-to-b from-white to-gray-50/80">
         {/* ── Hero ── */}
         <section
@@ -572,4 +583,19 @@ export default function Home() {
       </main>
     </>
   );
+}
+
+// ── Pre‑fetch featured templates at build time ──
+export async function getStaticProps() {
+  const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
+  const res = await fetch(`${apiBase}/api/templates?highlight=true&limit=10`);
+  const data = await res.json();
+  const featuredTemplates = data.templates || [];
+
+  return {
+    props: {
+      initialFeaturedTemplates: featuredTemplates,
+    },
+    revalidate: 60,
+  };
 }
