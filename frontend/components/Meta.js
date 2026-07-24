@@ -2,9 +2,9 @@
 import Head from 'next/head';
 
 export default function Meta({ title, description, image, url, extraKeywords }) {
+  // ── Fallback values ──
   const siteTitle = title ? `${title} | Make Trend` : 'Make Trend';
   let metaDesc = description || 'Create and share trending campaigns with Make Trend.';
-  // ── Append template names to description if provided ──
   if (extraKeywords && extraKeywords.length > 0) {
     const keywordsStr = extraKeywords.slice(0, 10).join(', ');
     metaDesc = `${metaDesc} Templates: ${keywordsStr}.`;
@@ -14,6 +14,7 @@ export default function Meta({ title, description, image, url, extraKeywords }) 
 
   return (
     <Head key="page-meta">
+      {/* ── Title ── */}
       <title key="title">{siteTitle}</title>
       <meta key="description" name="description" content={metaDesc} />
 
