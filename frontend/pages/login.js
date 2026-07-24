@@ -5,15 +5,16 @@ import AuthScreen, { useAuth } from '../components/AuthScreen';
 
 export default function Login() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, needsCompletion } = useAuth();
 
   const redirectTo = router.query.redirect || '/profile';
 
+  // ── Only redirect if authenticated AND profile is complete ──
   useEffect(() => {
-    if (isAuthenticated && !loading) {
+    if (isAuthenticated && !loading && !needsCompletion) {
       router.replace(redirectTo);
     }
-  }, [isAuthenticated, loading, router, redirectTo]);
+  }, [isAuthenticated, loading, needsCompletion, router, redirectTo]);
 
   // ── Show a loading spinner while auth state is being resolved ──
   if (loading) {
@@ -24,9 +25,9 @@ export default function Login() {
     );
   }
 
-  // ── If authenticated, return null (will redirect) ──
-  if (isAuthenticated) return null;
+  // ── If authenticated and profile is complete, return null (will redirect) ──
+  if (isAuthenticated && !needsCompletion) return null;
 
-  // ── Render AuthScreen (full‑page UI, handles everything) ──
+  // ── Render AuthScreen – it will show the completion form if needed ──
   return <AuthScreen redirectTo={redirectTo} />;
 }
