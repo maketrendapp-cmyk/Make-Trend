@@ -13,7 +13,6 @@ import {
   signOut,
   sendPasswordResetEmail,
   signInWithPopup,
-  signInWithRedirect,
   GoogleAuthProvider,
   FacebookAuthProvider,
 } from '../services/firebase';
@@ -149,62 +148,79 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
+  // ── Refresh user profile (used after login / social login) ──
+  const refreshUserProfile = useCallback(async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return;
+    try {
+      const profileData = await fetchUserProfile(firebaseUser);
+      if (profileData) {
+        setUser(profileData);
+        setIsAuthenticated(true);
+        setNeedsCompletion(false);
+        cacheAuth(profileData);
+      }
+    } catch (err) {
+      console.warn('Profile refresh failed:', err);
+    }
+  }, [fetchUserProfile]);
+
   // ============================================================
   // FIREBASE LISTENER – Real‑time updates
   // ============================================================
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-    if (firebaseUser) {
-      // If already set to this user, skip re-fetching
-      if (uidRef.current === firebaseUser.uid) return;
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // If already set to this user, skip re-fetching
+        if (uidRef.current === firebaseUser.uid) return;
 
-      const basicUser = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName || '',
-        photoURL: firebaseUser.photoURL || '',
-      };
-      setUser(basicUser);
-      setIsAuthenticated(true);
-      setNeedsCompletion(false);
-      uidRef.current = firebaseUser.uid;
-      cacheAuth(basicUser);
+        const basicUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || '',
+          photoURL: firebaseUser.photoURL || '',
+        };
+        setUser(basicUser);
+        setIsAuthenticated(true);
+        setNeedsCompletion(false);
+        uidRef.current = firebaseUser.uid;
+        cacheAuth(basicUser);
 
-      // Fetch fresh data
-      invalidateAll();
+        // Fetch fresh data
+        invalidateAll();
 
-      try {
-        const profileData = await fetchUserProfile(firebaseUser);
-        if (profileData) {
-          setUser(profileData);
-          setIsAuthenticated(true);
-          setNeedsCompletion(false);
-          cacheAuth(profileData);
-        } else {
-          const status = await checkProfileStatus(firebaseUser.uid);
-          if (status.completed) {
-            const fallback = await fetchUserProfile(firebaseUser);
-            if (fallback) {
-              setUser(fallback);
-              setIsAuthenticated(true);
-              setNeedsCompletion(false);
-              cacheAuth(fallback);
-            }
+        try {
+          const profileData = await fetchUserProfile(firebaseUser);
+          if (profileData) {
+            setUser(profileData);
+            setIsAuthenticated(true);
+            setNeedsCompletion(false);
+            cacheAuth(profileData);
           } else {
-            setNeedsCompletion(true);
+            const status = await checkProfileStatus(firebaseUser.uid);
+            if (status.completed) {
+              const fallback = await fetchUserProfile(firebaseUser);
+              if (fallback) {
+                setUser(fallback);
+                setIsAuthenticated(true);
+                setNeedsCompletion(false);
+                cacheAuth(fallback);
+              }
+            } else {
+              setNeedsCompletion(true);
+            }
           }
-        }
-      } catch {}
-    } else {
-      localStorage.removeItem(AUTH_CACHE_KEY);
-      setUser(null);
-      setIsAuthenticated(false);
-      setNeedsCompletion(false);
-      uidRef.current = null;
-    }
-  });
-  return () => unsubscribe();
-}, [fetchUserProfile, checkProfileStatus]);
+        } catch {}
+      } else {
+        localStorage.removeItem(AUTH_CACHE_KEY);
+        setUser(null);
+        setIsAuthenticated(false);
+        setNeedsCompletion(false);
+        uidRef.current = null;
+      }
+    });
+    return () => unsubscribe();
+  }, [fetchUserProfile, checkProfileStatus, invalidateAll]);
 
   // ============================================================
   // AUTH METHODS
@@ -215,6 +231,8 @@ useEffect(() => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
+
+      // ── Basic user data (immediate) ──
       const basicUser = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
@@ -227,31 +245,13 @@ useEffect(() => {
       uidRef.current = firebaseUser.uid;
       cacheAuth(basicUser);
 
-      // Load fresh data
-      invalidateAll();
+      // ── Return success immediately ──
+      // Fetch profile in the background (non-blocking)
+      setTimeout(() => {
+        invalidateAll();
+        refreshUserProfile();
+      }, 100);
 
-      try {
-        const profileData = await fetchUserProfile(firebaseUser);
-        if (profileData) {
-          setUser(profileData);
-          setIsAuthenticated(true);
-          setNeedsCompletion(false);
-          cacheAuth(profileData);
-        } else {
-          const status = await checkProfileStatus(firebaseUser.uid);
-          if (status.completed) {
-            const fallback = await fetchUserProfile(firebaseUser);
-            if (fallback) {
-              setUser(fallback);
-              setIsAuthenticated(true);
-              setNeedsCompletion(false);
-              cacheAuth(fallback);
-            }
-          } else {
-            setNeedsCompletion(true);
-          }
-        }
-      } catch {}
       return { success: true };
     } catch (error) {
       let message = 'Invalid email or password.';
@@ -325,6 +325,65 @@ useEffect(() => {
     }
   };
 
+  // ── Shared helper to process social login result ──
+  const processSocialLoginResult = async (firebaseUser) => {
+    const basicUser = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName || '',
+      photoURL: firebaseUser.photoURL || '',
+    };
+    setUser(basicUser);
+    setIsAuthenticated(true);
+    setNeedsCompletion(false);
+    uidRef.current = firebaseUser.uid;
+    cacheAuth(basicUser);
+
+    // Non-blocking profile fetch
+    setTimeout(() => {
+      invalidateAll();
+      refreshUserProfile();
+    }, 100);
+
+    // Check ban
+    try {
+      const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
+      if (data.banned) {
+        await signOut(auth);
+        localStorage.removeItem(AUTH_CACHE_KEY);
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        setIsSocialLoading(false);
+        return { success: false, error: 'Account suspended.' };
+      }
+    } catch {}
+
+    // Check completion status (non-blocking)
+    let needsCompletion = false;
+    try {
+      const status = await checkProfileStatus(firebaseUser.uid);
+      if (!status.completed) {
+        needsCompletion = true;
+        setNeedsCompletion(true);
+        setUser({ ...basicUser, completed: false });
+      } else {
+        // Profile is complete, but we already fetched it in background.
+        // The refreshUserProfile will handle it.
+        // For now, we don't set needsCompletion.
+      }
+    } catch {
+      // If check fails, assume incomplete
+      needsCompletion = true;
+      setNeedsCompletion(true);
+      setUser({ ...basicUser, completed: false });
+    }
+
+    setLoading(false);
+    setIsSocialLoading(false);
+    return { success: true, needsCompletion, user: basicUser };
+  };
+
   const socialLogin = async (providerName) => {
     setIsSocialLoading(true);
     setLoading(true);
@@ -343,90 +402,24 @@ useEffect(() => {
       return { success: false, error: 'Unsupported provider' };
     }
 
-    // ── For Facebook, use redirect to avoid popup issues ──
-    if (providerName === 'facebook') {
-      try {
-        await signInWithRedirect(auth, provider);
-        // The page will redirect to Facebook and then back.
-        // The auth state will be updated by onAuthStateChanged.
-        // Keep loading true; the listener will handle the rest.
-        return { success: true, redirecting: true };
-      } catch (error) {
-        let message = 'Unable to sign in with Facebook.';
-        setLoading(false);
-        setIsSocialLoading(false);
-        return { success: false, error: message };
-      }
-    }
-
-    // ── For Google, use popup ──
+    // ── Use popup for both providers ──
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-      // Process after login (reuse logic)
-      return await processSocialLoginResult(firebaseUser);
+      // ── Process the result ──
+      const processResult = await processSocialLoginResult(firebaseUser);
+      return processResult;
     } catch (error) {
-      let message = 'Unable to sign in with Google.';
+      let message = `Unable to sign in with ${providerName}.`;
       if (error.code === 'auth/popup-blocked') message = 'Popup blocked. Please allow popups.';
       if (error.code === 'auth/popup-closed-by-user') message = 'Popup closed. Try again.';
+      if (error.code === 'auth/account-exists-with-different-credential') {
+        message = 'An account already exists with the same email address but different sign-in method. Please sign in using your existing method.';
+      }
       setLoading(false);
       setIsSocialLoading(false);
       return { success: false, error: message };
     }
-  };
-
-  // ── Shared helper to process social login result ──
-  const processSocialLoginResult = async (firebaseUser) => {
-    const basicUser = {
-      uid: firebaseUser.uid,
-      email: firebaseUser.email,
-      displayName: firebaseUser.displayName || '',
-      photoURL: firebaseUser.photoURL || '',
-    };
-    setUser(basicUser);
-    setIsAuthenticated(true);
-    setNeedsCompletion(false);
-    uidRef.current = firebaseUser.uid;
-    cacheAuth(basicUser);
-
-    invalidateAll();
-
-    try {
-      const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
-      if (data.banned) {
-        await signOut(auth);
-        localStorage.removeItem(AUTH_CACHE_KEY);
-        setUser(null);
-        setIsAuthenticated(false);
-        setLoading(false);
-        setIsSocialLoading(false);
-        return { success: false, error: 'Account suspended.' };
-      }
-    } catch {}
-
-    let needsCompletion = false;
-    const status = await checkProfileStatus(firebaseUser.uid);
-    if (status.completed) {
-      const profileData = await fetchUserProfile(firebaseUser);
-      if (profileData) {
-        setUser(profileData);
-        setIsAuthenticated(true);
-        setNeedsCompletion(false);
-        cacheAuth(profileData);
-      } else {
-        needsCompletion = true;
-        setNeedsCompletion(true);
-        setUser({ ...basicUser, completed: false });
-      }
-    } else {
-      needsCompletion = true;
-      setNeedsCompletion(true);
-      setUser({ ...basicUser, completed: false });
-    }
-
-    setLoading(false);
-    setIsSocialLoading(false);
-    return { success: true, needsCompletion, user: basicUser };
   };
 
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
@@ -493,18 +486,6 @@ useEffect(() => {
     }
   };
 
-  const refreshUserProfile = useCallback(async () => {
-    const firebaseUser = auth.currentUser;
-    if (!firebaseUser) return;
-    const profileData = await fetchUserProfile(firebaseUser);
-    if (profileData) {
-      setUser(profileData);
-      setIsAuthenticated(true);
-      setNeedsCompletion(false);
-      cacheAuth(profileData);
-    }
-  }, [fetchUserProfile]);
-
   const value = {
     user,
     loading,
@@ -535,19 +516,18 @@ export function useAuth() {
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
-  const { invalidateAll } = useInvalidateQueries();
   const {
-  login,
-  register,
-  socialLogin,
-  completeSocialProfile,
-  uploadAvatar,
-  isSocialLoading,
-  resetPassword,
-  user,
-  refreshUserProfile,
-  needsCompletion,
-} = useAuth();
+    login,
+    register,
+    socialLogin,
+    completeSocialProfile,
+    uploadAvatar,
+    isSocialLoading,
+    resetPassword,
+    user,
+    refreshUserProfile,
+    needsCompletion,
+  } = useAuth();
 
   // ── State ──
   const [email, setEmail] = useState('');
@@ -584,18 +564,18 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 
   // ── Redirect logic ──
   const performRedirect = useCallback(() => {
-  // If the user's profile is incomplete, stay on the AuthScreen (completion form)
-  if (needsCompletion) {
-    return;
-  }
-  if (redirectTo && redirectTo !== '/login' && redirectTo !== '/register') {
-    router.push(redirectTo);
-  } else if (user && user.completed) {
-    router.push('/profile');
-  } else {
-    router.push('/');
-  }
-}, [redirectTo, router, user, needsCompletion]);
+    // If the user's profile is incomplete, stay on the AuthScreen (completion form)
+    if (needsCompletion) {
+      return;
+    }
+    if (redirectTo && redirectTo !== '/login' && redirectTo !== '/register') {
+      router.push(redirectTo);
+    } else if (user && user.completed) {
+      router.push('/profile');
+    } else {
+      router.push('/');
+    }
+  }, [redirectTo, router, user, needsCompletion]);
 
   const handleSuccess = (msg = 'Welcome to Make Trend! 🎉') => {
     setSuccessMessage(msg);
@@ -683,13 +663,10 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   // ── Social login ──
   const handleSocialLogin = async (provider) => {
     setError('');
+    setIsSubmitting(true); // to show loading state
     const result = await socialLogin(provider);
+    setIsSubmitting(false);
     if (result.success) {
-      if (result.redirecting) {
-        // The page is redirecting to Facebook – nothing else to do.
-        // The loading overlay will stay until the user returns.
-        return;
-      }
       if (result.needsCompletion) {
         const userData = result.user || {};
         setSocialUser(userData);
@@ -703,7 +680,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       }
     } else {
       setError(result.error || `Failed to sign in with ${provider}.`);
-      setIsSubmitting(false); // reset if error
     }
   };
 
@@ -1016,7 +992,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
           initial={{ opacity: 0, y: 20, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-          className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100/60 p-6 sm:p-8"
+          className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100/60 p-6 sm:p-8 relative"
         >
 
           {/* ── Heading ── */}
@@ -1369,23 +1345,23 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             ) : null}
           </div>
 
-        {/* ── Loading overlay (covers only this page) ── */}
-        {isSubmitting && (
-          <div className="absolute inset-0 z-[9999] flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm transition-all duration-300">
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-gray-200 border-t-purple-600 rounded-full animate-spin"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full animate-pulse"></div>
+          {/* ── Loading overlay (covers only this page) ── */}
+          {isSubmitting && (
+            <div className="absolute inset-0 z-[9999] flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm transition-all duration-300">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="w-16 h-16 border-4 border-gray-200 border-t-purple-600 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full animate-pulse"></div>
+                  </div>
                 </div>
+                <p className="text-gray-700 font-medium text-sm">
+                  {emailExists === false ? 'Creating your account...' : 'Logging in...'}
+                </p>
+                <p className="text-gray-400 text-xs">Please wait a moment</p>
               </div>
-              <p className="text-gray-700 font-medium text-sm">
-                {emailExists === false ? 'Creating your account...' : 'Logging in...'}
-              </p>
-              <p className="text-gray-400 text-xs">Please wait a moment</p>
             </div>
-          </div>
-        )}
+          )}
         </motion.div>
       </div>
     </>
