@@ -40,6 +40,22 @@ export default function Document() {
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         />
+
+        {/* ── Global SEO / Social Fallbacks ── */}
+        {/* These are used when a page doesn't specify its own meta tags */}
+        <meta property="og:site_name" content="Make Trend" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Make Trend – Viral Campaign Platform" />
+        <meta property="og:description" content="Launch viral campaigns, grow your audience, and track real-time analytics with free templates." />
+        <meta property="og:image" content="https://maketrend.vercel.app/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:url" content="https://maketrend.vercel.app/" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Make Trend – Viral Campaign Platform" />
+        <meta name="twitter:description" content="Launch viral campaigns, grow your audience, and track real-time analytics with free templates." />
+        <meta name="twitter:image" content="https://maketrend.vercel.app/og-image.png" />
       </Head>
       <body>
         <Main />
