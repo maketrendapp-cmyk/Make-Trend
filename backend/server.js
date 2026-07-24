@@ -672,7 +672,7 @@ app.get('/api/auth/check-email', async (req, res) => {
 // ── Register new user ── (rate-limited by authLimiter)
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { uid, username, fullname, email, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
+    const { uid, username, fullname, email, avatar, referralCode: referredByCode, deviceId } = req.body;
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -711,7 +711,7 @@ app.post('/api/auth/register', async (req, res) => {
       avatar: avatar || '',
       referralCode: newReferralCode,
       referredBy: cleanReferredBy || null,
-      deviceFingerprint: deviceFingerprint || '',
+      deviceId: deviceId || '',   // store as deviceFingerprint
       completed: true,
       plan: 'free',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -720,7 +720,7 @@ app.post('/api/auth/register', async (req, res) => {
     };
 
     await db.collection('users').doc(uid).set(userData);
-    delete userData.deviceFingerprint;
+    delete userData.deviceId;
 
     // ── Process referral reward (increment count, grant PRO on every 5) ──
     if (cleanReferredBy) {
@@ -733,20 +733,32 @@ app.post('/api/auth/register', async (req, res) => {
           const referrerUid = referrerSnapshot.docs[0].id;
           const referrerData = referrerSnapshot.docs[0].data();
 
-          const currentReferrals = referrerData.referrals || 0;
-          const newReferrals = currentReferrals + 1;
+          // ── Check if the referrer is using the same device (self-referral prevention) ──
+          const referrerDeviceId = referrerData.deviceId || '';
+          const newUserDeviceId = req.body.deviceId || '';
+          const isSameDevice = referrerDeviceId && newUserDeviceId &&
+                               referrerDeviceId === newUserDeviceId;
 
-          await db.collection('users').doc(referrerUid).update({
-            referrals: newReferrals,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
+          if (isSameDevice) {
+            console.warn(`⚠️ Self‑referral attempt from device ${newUserDeviceId} for referrer ${referrerUid}`);
+            // Still invalidate the cache so future attempts are fresh
+            await invalidateKey(`referrals:${referrerUid}`);
+          } else {
+            const currentReferrals = referrerData.referrals || 0;
+            const newReferrals = currentReferrals + 1;
 
-          if (newReferrals % 5 === 0) {
-            await grantProFor24Hours(referrerUid);
-            console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+            await db.collection('users').doc(referrerUid).update({
+              referrals: newReferrals,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            if (newReferrals % 5 === 0) {
+              await grantProFor24Hours(referrerUid);
+              console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+            }
+
+            await invalidateKey(`referrals:${referrerUid}`);
           }
-
-          await invalidateKey(`referrals:${referrerUid}`);
         }
       } catch (err) {
         console.warn('Failed to process referral reward:', err);
@@ -768,7 +780,7 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
     if (!(await checkRateLimit(uid, 'complete-social', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many attempts. Please wait.' });
     }
-    const { email, fullname, username, avatar, referralCode: referredByCode, deviceFingerprint } = req.body;
+    const { email, fullname, username, avatar, referralCode: referredByCode, deviceId } = req.body;
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -800,7 +812,7 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
       avatar: avatar || '',
       referralCode: newReferralCode,
       referredBy: cleanReferredBy || null,
-      deviceFingerprint: deviceFingerprint || '',
+      deviceId: deviceId || '',   // store as deviceFingerprint
       completed: true,
       plan: 'free',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -821,20 +833,31 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
           const referrerUid = referrerSnapshot.docs[0].id;
           const referrerData = referrerSnapshot.docs[0].data();
 
-          const currentReferrals = referrerData.referrals || 0;
-          const newReferrals = currentReferrals + 1;
+          // ── Check if the referrer is using the same device (self-referral prevention) ──
+          const referrerDeviceId = referrerData.deviceId || '';
+          const newUserDeviceId = req.body.deviceId || '';
+          const isSameDevice = referrerDeviceId && newUserDeviceId &&
+                               referrerDeviceId === newUserDeviceId;
 
-          await db.collection('users').doc(referrerUid).update({
-            referrals: newReferrals,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
+          if (isSameDevice) {
+            console.warn(`⚠️ Self‑referral attempt from device ${newUserDeviceId} for referrer ${referrerUid}`);
+            await invalidateKey(`referrals:${referrerUid}`);
+          } else {
+            const currentReferrals = referrerData.referrals || 0;
+            const newReferrals = currentReferrals + 1;
 
-          if (newReferrals % 5 === 0) {
-            await grantProFor24Hours(referrerUid);
-            console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+            await db.collection('users').doc(referrerUid).update({
+              referrals: newReferrals,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            if (newReferrals % 5 === 0) {
+              await grantProFor24Hours(referrerUid);
+              console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+            }
+
+            await invalidateKey(`referrals:${referrerUid}`);
           }
-
-          await invalidateKey(`referrals:${referrerUid}`);
         }
       } catch (err) {
         console.warn('Failed to process referral reward:', err);
@@ -873,7 +896,7 @@ app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
     const userData = doc.data();
-    delete userData.deviceFingerprint;
+    delete userData.deviceId;
 
     // ── Auto‑downgrade expired PRO ──
     if (userData.plan === 'pro' && userData.proExpiry) {
@@ -1092,7 +1115,7 @@ app.get('/api/auth/referrals', verifyToken, checkBanned, async (req, res) => {
     const referralCode = userData.referralCode;
 
     if (!referralCode) {
-      const response = { success: true, referrals: [], referrer: null };
+      const response = { success: true, referralCode: '', totalReferrals: 0, referredUsers: [], referrer: null };
       await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
       return res.json(response);
     }
