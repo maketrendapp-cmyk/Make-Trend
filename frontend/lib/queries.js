@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tansta
 import { auth } from '../services/firebase';
 import toast from 'react-hot-toast';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 
 async function apiRequest(endpoint, options = {}, token = null) {
-  const url = `${API_BASE}${endpoint}`;
+  const url = `${BACKEND_URL}/api${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (options.body) {

@@ -2,7 +2,9 @@
 import axios from 'axios';
 import { auth } from '../services/firebase';
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = `${BACKEND_URL}/api`;
 
 // ── Client‑side fetcher (adds token if available) ──
 export const apiClient = axios.create({
