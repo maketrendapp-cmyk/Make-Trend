@@ -107,23 +107,23 @@ const { data: tickets = [], isLoading: ticketsLoading } = useSupportTickets(isAu
       }
       const token = await firebaseUser.getIdToken();
 
-      // 1) Upload image if any
-      let imageUrl = '';
-      if (imageFile) {
-        const formData = new FormData();
-        formData.append('image', imageFile);
-        const uploadRes = await fetch(`${API_BASE}/api/upload`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-        const uploadData = await uploadRes.json();
-        if (uploadData.success) {
-          imageUrl = uploadData.url;
-        } else {
-          throw new Error(uploadData.error || 'Image upload failed');
-        }
-      }
+// 1) Upload image if any
+let imageUrl = '';
+if (imageFile) {
+  const formData = new FormData();
+  formData.append('image', imageFile);
+  const uploadRes = await fetch(`${API_BASE}/api/upload?folder=support`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const uploadData = await uploadRes.json();
+  if (uploadData.success) {
+    imageUrl = uploadData.url;
+  } else {
+    throw new Error(uploadData.error || 'Image upload failed');
+  }
+}
 
       // 2) Create ticket
       const payload = { title: title.trim(), description: description.trim(), image: imageUrl };
