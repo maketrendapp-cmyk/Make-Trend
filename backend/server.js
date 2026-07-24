@@ -466,6 +466,18 @@ async function generateUniqueReferralCode() {
   return code;
 }
 
+// ── Grant PRO for 24 hours ──
+async function grantProFor24Hours(uid) {
+  const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await db.collection('users').doc(uid).update({
+    plan: 'pro',
+    proExpiry: admin.firestore.Timestamp.fromDate(expiry),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await invalidateKey(`user:profile:${uid}`);
+  console.log(`👑 PRO granted for 24h to ${uid}`);
+}
+
 function getClientIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
          req.headers['x-real-ip'] ||
@@ -710,7 +722,7 @@ app.post('/api/auth/register', async (req, res) => {
     await db.collection('users').doc(uid).set(userData);
     delete userData.deviceFingerprint;
 
-    // ── Invalidate referrer's referral cache if a referral code was used ──
+    // ── Process referral reward (increment count, grant PRO on every 5) ──
     if (cleanReferredBy) {
       try {
         const referrerSnapshot = await db.collection('users')
@@ -719,10 +731,25 @@ app.post('/api/auth/register', async (req, res) => {
           .get();
         if (!referrerSnapshot.empty) {
           const referrerUid = referrerSnapshot.docs[0].id;
+          const referrerData = referrerSnapshot.docs[0].data();
+
+          const currentReferrals = referrerData.referrals || 0;
+          const newReferrals = currentReferrals + 1;
+
+          await db.collection('users').doc(referrerUid).update({
+            referrals: newReferrals,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          if (newReferrals % 5 === 0) {
+            await grantProFor24Hours(referrerUid);
+            console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+          }
+
           await invalidateKey(`referrals:${referrerUid}`);
         }
       } catch (err) {
-        console.warn('Failed to invalidate referrer cache:', err);
+        console.warn('Failed to process referral reward:', err);
       }
     }
 
@@ -782,6 +809,38 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
     };
 
     await db.collection('users').doc(uid).set(userData, { merge: true });
+
+    // ── Process referral reward (increment count, grant PRO on every 5) ──
+    if (cleanReferredBy) {
+      try {
+        const referrerSnapshot = await db.collection('users')
+          .where('referralCode', '==', cleanReferredBy)
+          .limit(1)
+          .get();
+        if (!referrerSnapshot.empty) {
+          const referrerUid = referrerSnapshot.docs[0].id;
+          const referrerData = referrerSnapshot.docs[0].data();
+
+          const currentReferrals = referrerData.referrals || 0;
+          const newReferrals = currentReferrals + 1;
+
+          await db.collection('users').doc(referrerUid).update({
+            referrals: newReferrals,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          if (newReferrals % 5 === 0) {
+            await grantProFor24Hours(referrerUid);
+            console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+          }
+
+          await invalidateKey(`referrals:${referrerUid}`);
+        }
+      } catch (err) {
+        console.warn('Failed to process referral reward:', err);
+      }
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Complete social profile error:', error);
@@ -815,6 +874,23 @@ app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
     }
     const userData = doc.data();
     delete userData.deviceFingerprint;
+
+    // ── Auto‑downgrade expired PRO ──
+    if (userData.plan === 'pro' && userData.proExpiry) {
+      const now = admin.firestore.Timestamp.now();
+      if (userData.proExpiry.toMillis() < now.toMillis()) {
+        await doc.ref.update({
+          plan: 'free',
+          proExpiry: admin.firestore.FieldValue.delete(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        userData.plan = 'free';
+        delete userData.proExpiry;
+        console.log(`⏰ PRO expired for user ${uid}, downgraded to free`);
+        await invalidateKey(`user:profile:${uid}`);
+      }
+    }
+
     result = { success: true, user: { uid, ...userData } };
 
     try {
@@ -2332,6 +2408,36 @@ app.post('/api/comments', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// ── Get referral status (including PRO expiry) ──
+app.get('/api/auth/referral-status', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'referral-status', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+    const doc = await db.collection('users').doc(uid).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const data = doc.data();
+    const now = admin.firestore.Timestamp.now();
+    const proExpiry = data.proExpiry || null;
+    const isProActive = data.plan === 'pro' && (!proExpiry || proExpiry.toMillis() > now.toMillis());
+
+    res.json({
+      success: true,
+      referrals: data.referrals || 0,
+      plan: data.plan || 'free',
+      proExpiry: proExpiry ? proExpiry.toDate().toISOString() : null,
+      isProActive,
+    });
+  } catch (error) {
+    console.error('Referral status error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch referral status' });
+  }
+});
+
 
 // ============================================================
 // 17. CLOUDINARY UPLOAD
