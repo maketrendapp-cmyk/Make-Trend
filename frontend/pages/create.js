@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
+import Head from 'next/head';
 import Meta from '../components/Meta';
 import { useTemplates, useFeaturedTemplates } from '../lib/queries';
 
@@ -45,6 +46,8 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
+
+  const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
 
   // ── Sync search from URL ──
   useEffect(() => {
@@ -124,13 +127,13 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return filtered;
   }, [featuredTemplates, searchQuery, selectedCategory, selectedPlatform]);
 
-  // ── Carousel auto-slide (pauses when filters are active) ──
+  // ── Carousel auto-slide (only when no filters and more than 1 featured) ──
   useEffect(() => {
-    const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
     if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     carouselIntervalRef.current = null;
 
-    if (filteredFeatured.length > 1 && !hasFilters) {
+    // Only auto‑play when no filters and there are multiple featured templates
+    if (!hasFilters && filteredFeatured.length > 1) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex(prev => (prev + 1) % filteredFeatured.length);
       }, 2000);
@@ -140,33 +143,38 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [filteredFeatured.length, searchQuery, selectedCategory, selectedPlatform]);
+  }, [filteredFeatured.length, hasFilters]);
 
   const goToSlide = useCallback((index) => {
     setCarouselIndex(index);
     if (carouselIntervalRef.current) {
       clearInterval(carouselIntervalRef.current);
-      const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
-      if (filteredFeatured.length > 1 && !hasFilters) {
+      if (!hasFilters && filteredFeatured.length > 1) {
         carouselIntervalRef.current = setInterval(() => {
           setCarouselIndex(prev => (prev + 1) % filteredFeatured.length);
         }, 2000);
       }
     }
-  }, [filteredFeatured.length, searchQuery, selectedCategory, selectedPlatform]);
+  }, [filteredFeatured.length, hasFilters]);
 
-  // ── Filters dropdown options ──
-  const categories = useMemo(() => {
+  // ── Dynamic filter options (link category & platform) ──
+  const availableCategories = useMemo(() => {
     const cats = new Set();
-    templates.forEach(t => { if (t.category) cats.add(t.category); });
+    const source = selectedPlatform
+      ? templates.filter(t => t.platform === selectedPlatform)
+      : templates;
+    source.forEach(t => { if (t.category) cats.add(t.category); });
     return ['All', ...Array.from(cats)];
-  }, [templates]);
+  }, [templates, selectedPlatform]);
 
-  const platforms = useMemo(() => {
+  const availablePlatforms = useMemo(() => {
     const plats = new Set();
-    templates.forEach(t => { if (t.platform) plats.add(t.platform); });
+    const source = selectedCategory
+      ? templates.filter(t => t.category === selectedCategory)
+      : templates;
+    source.forEach(t => { if (t.platform) plats.add(t.platform); });
     return ['All', ...Array.from(plats)];
-  }, [templates]);
+  }, [templates, selectedCategory]);
 
   const handlePreview = useCallback((slug) => {
     router.push(`/${slug}`);
@@ -220,16 +228,62 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     );
   }
 
+  // ── SEO – build dynamic meta ──
+  const pageTitle = useMemo(() => {
+    if (selectedCategory && selectedCategory !== 'All') {
+      return `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Templates – Make Trend`;
+    }
+    if (selectedPlatform && selectedPlatform !== 'All') {
+      return `${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} Templates – Make Trend`;
+    }
+    if (searchQuery) {
+      return `"${searchQuery}" Templates – Make Trend`;
+    }
+    return 'Browse Campaign Templates – Make Trend';
+  }, [selectedCategory, selectedPlatform, searchQuery]);
+
+  const pageDescription = useMemo(() => {
+    if (selectedCategory && selectedCategory !== 'All') {
+      return `Explore the best ${selectedCategory} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
+    }
+    if (selectedPlatform && selectedPlatform !== 'All') {
+      return `Explore ${selectedPlatform} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
+    }
+    if (searchQuery) {
+      return `Search results for "${searchQuery}". Find the perfect template to launch your campaign.`;
+    }
+    return 'Explore a curated collection of viral campaign templates. Customize, launch, and start growing your audience in minutes.';
+  }, [selectedCategory, selectedPlatform, searchQuery]);
+
   // ── Build keyword list from template titles for SEO ──
   const templateNames = templates.map(t => t.title).slice(0, 10);
 
+  // ── Structured Data for Google Carousel ──
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.vercel.app';
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": pageTitle,
+    "description": pageDescription,
+    "itemListElement": templates.map((template, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "url": `${siteUrl}/create?slug=${template.slug}`,
+      "name": template.title,
+      "image": template.image || `${siteUrl}/default-template.png`,
+      "description": template.description || 'Launch your campaign with this template.',
+    })),
+  };
+
   return (
     <>
-     <Meta
-  title="Browse Campaign Templates – Make Trend"
-  description="Explore a curated collection of viral campaign templates. Customize, launch, and start growing your audience in minutes."
-  extraKeywords={templateNames}
-/>
+      <Meta title={pageTitle} description={pageDescription} extraKeywords={templateNames} />
+      <Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      </Head>
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
         {/* ── Search & Quick Filters ── */}
@@ -272,7 +326,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
           {/* ── Dynamic Quick Filter Pills ── */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-            {categories.map((cat) => (
+            {availableCategories.map((cat) => (
               <button
                 key={cat}
                 type="button"
@@ -295,9 +349,10 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 className="w-full appearance-none bg-white border border-slate-200 rounded-lg pl-2 pr-6 py-1.5 text-[11px] font-bold text-slate-700 focus:border-primary focus:outline-none"
               >
-                <option value="">Categories (All)</option>
-                {categories.filter(c => c !== 'All').map(cat => (
-                  <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                {availableCategories.map(cat => (
+                  <option key={cat} value={cat === 'All' ? '' : cat}>
+                    {cat === 'All' ? 'Categories (All)' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </option>
                 ))}
               </select>
               <select
@@ -305,59 +360,178 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                 onChange={(e) => setSelectedPlatform(e.target.value)}
                 className="w-full appearance-none bg-white border border-slate-200 rounded-lg pl-2 pr-6 py-1.5 text-[11px] font-bold text-slate-700 focus:border-primary focus:outline-none"
               >
-                <option value="">Platforms (All)</option>
-                {platforms.filter(p => p !== 'All').map(plat => (
-                  <option key={plat} value={plat}>{plat.charAt(0).toUpperCase() + plat.slice(1)}</option>
+                {availablePlatforms.map(plat => (
+                  <option key={plat} value={plat === 'All' ? '' : plat}>
+                    {plat === 'All' ? 'Platforms (All)' : plat.charAt(0).toUpperCase() + plat.slice(1)}
+                  </option>
                 ))}
               </select>
             </div>
           )}
         </div>
 
-        {/* ── Featured Templates Spotlight ── */}
+        {/* ── Featured Templates Section ── */}
         {filteredFeatured.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-1 mb-2 px-0.5">
               <span className="text-amber-500 text-sm">★</span>
               <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                {searchQuery || selectedCategory || selectedPlatform ? 'Featured Results' : 'Featured Template'}
+                {hasFilters ? 'Featured Results' : 'Featured Template'}
               </h2>
-              {!searchQuery && !selectedCategory && !selectedPlatform && (
+              {!hasFilters && (
                 <span className="text-[9px] bg-primary/10 text-primary px-1 rounded-full font-extrabold ml-2 flex items-center">
                   Auto-play
                 </span>
               )}
+              {hasFilters && filteredFeatured.length > 0 && (
+                <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 rounded-full font-medium ml-2">
+                  {filteredFeatured.length} matches
+                </span>
+              )}
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
-              <div
-                className="flex transition-transform duration-700 ease-in-out"
-                style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
-              >
-                {filteredFeatured.map((template) => (
-                  <div key={template.id} className="w-full flex-shrink-0">
-                    <div className="flex flex-col">
-                      <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
-                        {template.image ? (
-                          <img
-                            src={template.image}
-                            alt={template.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                            <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
+            {/* ── Carousel (only when no filters) ── */}
+            {!hasFilters ? (
+              <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+                <div
+                  className="flex transition-transform duration-700 ease-in-out"
+                  style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+                >
+                  {filteredFeatured.map((template) => (
+                    <div key={template.id} className="w-full flex-shrink-0">
+                      <div className="flex flex-col">
+                        <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
+                          {template.image ? (
+                            <img
+                              src={template.image}
+                              alt={template.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                              <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
+                            </div>
+                          )}
+                          <div className="absolute top-2.5 left-2.5 flex gap-1 z-10">
+                            <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                              ⭐ Featured
+                            </span>
                           </div>
-                        )}
-                        <div className="absolute top-2.5 left-2.5 flex gap-1 z-10">
-                          <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                            ⭐ Featured
-                          </span>
+                        </div>
+
+                        <div className="p-3 bg-white">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                            {template.platform && (
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                                {template.platform}
+                              </span>
+                            )}
+                            <span className="bg-slate-50 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center">
+                              👥 {template.usageCount || 0} Uses
+                            </span>
+                          </div>
+
+                          <h3 className="text-sm font-black leading-tight text-slate-950 mb-0.5">
+                            {template.title}
+                          </h3>
+                          <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
+                            {template.description || 'Launch your campaign with this template.'}
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handlePreview(template.slug)}
+                              className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                              Preview
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUseTemplate(template.slug)}
+                              className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                              Use
+                            </button>
+                          </div>
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
 
-                      <div className="p-3 bg-white">
+                {/* ── Carousel Controls ── */}
+                {filteredFeatured.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => goToSlide((carouselIndex - 1 + filteredFeatured.length) % filteredFeatured.length)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
+                      aria-label="Previous slide"
+                    >
+                      <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => goToSlide((carouselIndex + 1) % filteredFeatured.length)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
+                      aria-label="Next slide"
+                    >
+                      <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    <div className="absolute bottom-24 right-3 flex gap-1 z-20">
+                      {filteredFeatured.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => goToSlide(idx)}
+                          className={`h-1 rounded-full transition-all ${
+                            idx === carouselIndex ? 'bg-primary w-3' : 'bg-slate-300 w-1'
+                          }`}
+                          aria-label={`Go to slide ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              /* ── Grid when filters are active ── */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {filteredFeatured.map((template) => (
+                  <div
+                    key={template.id}
+                    className="group bg-white rounded-2xl border border-amber-200/60 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col justify-between"
+                  >
+                    <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
+                      {template.image ? (
+                        <img
+                          src={template.image}
+                          alt={template.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                          <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
+                        </div>
+                      )}
+                      <div className="absolute top-2.5 left-2.5 z-10">
+                        <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                          ⭐ Featured
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 flex-grow flex flex-col justify-between">
+                      <div>
                         <div className="flex flex-wrap items-center gap-1.5 mb-1">
                           {template.platform && (
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
@@ -368,88 +542,44 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                             👥 {template.usageCount || 0} Uses
                           </span>
                         </div>
-
-                        <h3 className="text-sm font-black leading-tight text-slate-950 mb-0.5">
+                        <h3 className="font-bold text-slate-950 text-xs leading-snug line-clamp-1 group-hover:text-primary transition-colors">
                           {template.title}
                         </h3>
-                        <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
+                        <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-1 leading-relaxed">
                           {template.description || 'Launch your campaign with this template.'}
                         </p>
+                      </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handlePreview(template.slug)}
-                            className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            Preview
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUseTemplate(template.slug)}
-                            className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                            Use
-                          </button>
-                        </div>
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePreview(template.slug)}
+                          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          Preview
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUseTemplate(template.slug)}
+                          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                          Use
+                        </button>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-
-              {/* ── Prev / Next Buttons ── */}
-              {filteredFeatured.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => goToSlide((carouselIndex - 1 + filteredFeatured.length) % filteredFeatured.length)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
-                    aria-label="Previous slide"
-                  >
-                    <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => goToSlide((carouselIndex + 1) % filteredFeatured.length)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
-                    aria-label="Next slide"
-                  >
-                    <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </>
-              )}
-
-              {/* ── Dots ── */}
-              {filteredFeatured.length > 1 && (
-                <div className="absolute bottom-24 right-3 flex gap-1 z-20">
-                  {filteredFeatured.map((_, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => goToSlide(idx)}
-                      className={`h-1 rounded-full transition-all ${
-                        idx === carouselIndex ? 'bg-primary w-3' : 'bg-slate-300 w-1'
-                      }`}
-                      aria-label={`Go to slide ${idx + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
 
         {/* ── Normal Templates Header ── */}
         <div className="flex items-center justify-between mb-2.5 px-0.5">
           <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-            {searchQuery || selectedCategory || selectedPlatform ? 'Search Results' : 'All Templates'}
+            {hasFilters ? 'Search Results' : 'All Templates'}
           </h2>
           <span className="text-[10px] text-slate-400 font-bold">
             Showing {regularTemplates.length} templates
@@ -503,7 +633,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                       <img
                         src={template.image}
                         alt={template.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         loading="lazy"
                       />
                     ) : (
@@ -597,12 +727,10 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 // ── Pre‑fetch templates at build time ──
 export async function getStaticProps() {
   const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com';
-  // Fetch all templates
   const res = await fetch(`${apiBase}/api/templates`);
   const data = await res.json();
   const templates = data.templates || [];
 
-  // Fetch featured templates separately
   const featuredRes = await fetch(`${apiBase}/api/templates?highlight=true`);
   const featuredData = await featuredRes.json();
   const featuredTemplates = featuredData.templates || [];
@@ -612,6 +740,6 @@ export async function getStaticProps() {
       initialTemplates: templates,
       initialFeaturedTemplates: featuredTemplates,
     },
-    revalidate: 60, // ISR – refresh every 60 seconds
+    revalidate: 60,
   };
 }
