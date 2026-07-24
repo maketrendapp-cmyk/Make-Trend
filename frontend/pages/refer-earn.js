@@ -29,7 +29,7 @@ export default function ReferEarn() {
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [loading, setLoading] = useState(true);
   const [referralData, setReferralData] = useState({
-    referralCode: '',
+    referralCode: profile?.referralCode || '', // ✅ start with profile code
     totalReferrals: 0,
     referredUsers: [],
     referrer: null,
@@ -68,7 +68,7 @@ export default function ReferEarn() {
         const data = await res.json();
         if (data.success) {
           setReferralData({
-            referralCode: data.referralCode || '',
+            referralCode: data.referralCode || profile?.referralCode || '', // ✅ fallback
             totalReferrals: data.totalReferrals || 0,
             referredUsers: data.referredUsers || [],
             referrer: data.referrer || null,
@@ -84,7 +84,7 @@ export default function ReferEarn() {
   }, []);
 
   const copyReferralCode = () => {
-    const code = referralData.referralCode;
+    const code = referralData.referralCode || profile?.referralCode;
     if (!code) return;
     navigator.clipboard.writeText(code)
       .then(() => {
@@ -318,10 +318,10 @@ export default function ReferEarn() {
               <FiAward className="w-5 h-5 text-purple-600" />
               Your Referral Code
             </h2>
-            {referralData.referralCode ? (
+            {referralData.referralCode || profile?.referralCode ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <code className="bg-gray-50 border border-gray-200 px-5 py-3 rounded-xl text-xl font-mono text-gray-800 shadow-sm">
-                  {referralData.referralCode}
+                  {referralData.referralCode || profile?.referralCode}
                 </code>
                 <div className="flex items-center gap-3 flex-wrap">
                   <button
@@ -333,11 +333,11 @@ export default function ReferEarn() {
                   </button>
                   <button
                     onClick={() => {
-                      const shareUrl = `${window.location.origin}/signup?ref=${referralData.referralCode}`;
+                      const shareUrl = `${window.location.origin}/signup?ref=${referralData.referralCode || profile?.referralCode}`;
                       if (navigator.share) {
                         navigator.share({
                           title: 'Join Make Trend!',
-                          text: `Use my referral code ${referralData.referralCode} to get started!`,
+                          text: `Use my referral code ${referralData.referralCode || profile?.referralCode} to get started!`,
                           url: shareUrl,
                         }).catch(() => {});
                       } else {
