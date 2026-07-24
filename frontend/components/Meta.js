@@ -13,20 +13,22 @@ export default function Meta({ title, description, image, url, extraKeywords }) 
   const metaUrl = url || 'https://maketrend.app/';
 
   return (
-    <Head>
-      <title>{siteTitle}</title>
-      <meta name="description" content={metaDesc} />
+    <Head key="page-meta">
+      <title key="title">{siteTitle}</title>
+      <meta key="description" name="description" content={metaDesc} />
 
-      <meta property="og:title" content={siteTitle} />
-      <meta property="og:description" content={metaDesc} />
-      <meta property="og:image" content={metaImage} />
-      <meta property="og:url" content={metaUrl} />
-      <meta property="og:type" content="website" />
+      {/* ── Open Graph ── */}
+      <meta key="og-title" property="og:title" content={siteTitle} />
+      <meta key="og-desc" property="og:description" content={metaDesc} />
+      <meta key="og-image" property="og:image" content={metaImage} />
+      <meta key="og-url" property="og:url" content={metaUrl} />
+      <meta key="og-type" property="og:type" content="website" />
 
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={siteTitle} />
-      <meta name="twitter:description" content={metaDesc} />
-      <meta name="twitter:image" content={metaImage} />
+      {/* ── Twitter Card ── */}
+      <meta key="twitter-card" name="twitter:card" content="summary_large_image" />
+      <meta key="twitter-title" name="twitter:title" content={siteTitle} />
+      <meta key="twitter-desc" name="twitter:description" content={metaDesc} />
+      <meta key="twitter-image" name="twitter:image" content={metaImage} />
     </Head>
   );
 }
