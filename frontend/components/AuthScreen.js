@@ -1,9 +1,9 @@
 // components/AuthScreen.js
 // ============================================================
-// AUTH PROVIDER + LOGIN UI – Instant cache + no logout on reload
+// AUTH PROVIDER + LOGIN UI – No data fetching
 // ============================================================
 
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback, startTransition } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import {
   auth,
@@ -31,13 +31,9 @@ import {
 import { FaGoogle, FaTwitter } from 'react-icons/fa';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
-
-// ── Cache keys ──
 const AUTH_CACHE_KEY = 'maketrend_auth';
-const TOKEN_CACHE_KEY = 'maketrend_token';
-const TOKEN_EXPIRY_KEY = 'maketrend_token_expiry';
 
-// ── API helper ──
+// ── API helper (only for auth-related calls) ──
 async function apiRequest(endpoint, options = {}, token = null) {
   const url = `${API_BASE}${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
@@ -56,43 +52,43 @@ async function apiRequest(endpoint, options = {}, token = null) {
 // ============================================================
 const AuthContext = createContext();
 
-// ── Helpers: get cached user & token synchronously ──
-function getCachedUser() {
-  try {
-    const raw = localStorage.getItem(AUTH_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.uid ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function getCachedToken() {
-  try {
-    const token = localStorage.getItem(TOKEN_CACHE_KEY);
-    const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-    if (token && expiry && Date.now() < Number(expiry)) {
-      return token;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => getCachedUser());
-  const [loading, setLoading] = useState(false); // only for async ops (login/register)
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getCachedUser());
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [needsCompletion, setNeedsCompletion] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
-  const uidRef = useRef(user?.uid || null);
+  const uidRef = useRef(null);
   const { invalidateAll } = useInvalidateQueries();
   const queryClient = useQueryClient();
 
-  // ── Helper: cache auth info + token ──
-  const cacheAuth = useCallback((authData, token = null, expiresIn = 3600) => {
+  // ── Read from localStorage only on the client after mount ──
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AUTH_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.uid) {
+          setUser({
+            uid: parsed.uid,
+            email: parsed.email || '',
+            displayName: parsed.displayName || '',
+            photoURL: parsed.photoURL || '',
+            username: parsed.username || '',
+          });
+          setIsAuthenticated(true);
+          uidRef.current = parsed.uid;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to read auth cache:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ── Helper to cache auth info ──
+  const cacheAuth = (authData) => {
     if (authData && authData.uid) {
       localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({
         uid: authData.uid,
@@ -101,17 +97,10 @@ export function AuthProvider({ children }) {
         photoURL: authData.photoURL || '',
         username: authData.username || '',
       }));
-      if (token) {
-        localStorage.setItem(TOKEN_CACHE_KEY, token);
-        const expiry = Date.now() + (expiresIn * 1000);
-        localStorage.setItem(TOKEN_EXPIRY_KEY, String(expiry));
-      }
     } else {
       localStorage.removeItem(AUTH_CACHE_KEY);
-      localStorage.removeItem(TOKEN_CACHE_KEY);
-      localStorage.removeItem(TOKEN_EXPIRY_KEY);
     }
-  }, []);
+  };
 
   // ── Check profile completion status ──
   const checkProfileStatus = useCallback(async (uid) => {
@@ -123,27 +112,13 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ── Fetch full profile with optional token override ──
-  const fetchUserProfile = useCallback(async (firebaseUser, tokenOverride = null) => {
+  // ── Fetch full profile ──
+  const fetchUserProfile = useCallback(async (firebaseUser) => {
     try {
-      const token = tokenOverride || await firebaseUser.getIdToken();
+      const token = await firebaseUser.getIdToken();
       const data = await apiRequest('/auth/me', {}, token);
       if (data.success) {
         return { uid: firebaseUser.uid, email: firebaseUser.email, ...data.user, completed: true };
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // ── Immediate profile fetch using cached token ──
-  const fetchProfileWithToken = useCallback(async (token) => {
-    try {
-      const data = await apiRequest('/auth/me', {}, token);
-      if (data.success) {
-        const userData = { uid: data.user.uid, email: data.user.email, ...data.user, completed: true };
-        return userData;
       }
       return null;
     } catch {
@@ -172,74 +147,29 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
-  // ── Refresh user profile (used after background listener update) ──
+  // ── Refresh user profile ──
   const refreshUserProfile = useCallback(async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return;
     try {
       const profileData = await fetchUserProfile(firebaseUser);
       if (profileData) {
-        const token = await firebaseUser.getIdToken();
         setUser(profileData);
         setIsAuthenticated(true);
         setNeedsCompletion(false);
-        cacheAuth(profileData, token);
+        cacheAuth(profileData);
       }
     } catch (err) {
       console.warn('Profile refresh failed:', err);
     }
-  }, [fetchUserProfile, cacheAuth]);
+  }, [fetchUserProfile]);
 
   // ============================================================
-  // ON MOUNT: read cache and set optimistic state
-  // ============================================================
-  useEffect(() => {
-    const cachedUser = getCachedUser();
-    const cachedToken = getCachedToken();
-
-    if (cachedUser) {
-      // Optimistic: assume authenticated, even if token expired
-      setUser(cachedUser);
-      setIsAuthenticated(true);
-      uidRef.current = cachedUser.uid;
-
-      // If we have a valid token, fetch profile immediately
-      if (cachedToken) {
-        fetchProfileWithToken(cachedToken)
-          .then(profile => {
-            if (profile) {
-              setUser(profile);
-              cacheAuth(profile, cachedToken);
-              startTransition(() => {
-                invalidateAll();
-              });
-            } else {
-              // Token invalid – just clear the token cache, keep user
-              localStorage.removeItem(TOKEN_CACHE_KEY);
-              localStorage.removeItem(TOKEN_EXPIRY_KEY);
-            }
-          })
-          .catch(() => {
-            // On error, clear token cache but keep user
-            localStorage.removeItem(TOKEN_CACHE_KEY);
-            localStorage.removeItem(TOKEN_EXPIRY_KEY);
-          });
-      }
-      // If no token, wait for Firebase listener to refresh
-    } else {
-      // No cached user → definitely not authenticated
-      setIsAuthenticated(false);
-      setUser(null);
-    }
-  }, [fetchProfileWithToken, cacheAuth, invalidateAll]);
-
-  // ============================================================
-  // FIREBASE LISTENER (background sync)
+  // FIREBASE LISTENER
   // ============================================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Prevent duplicate processing if uid hasn't changed
         if (uidRef.current === firebaseUser.uid) return;
 
         const basicUser = {
@@ -252,15 +182,9 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(true);
         setNeedsCompletion(false);
         uidRef.current = firebaseUser.uid;
+        cacheAuth(basicUser);
 
-        // Get fresh token and cache it
-        const token = await firebaseUser.getIdToken();
-        cacheAuth(basicUser, token);
-
-        // Non‑urgent: invalidate queries and refresh profile
-        startTransition(() => {
-          invalidateAll();
-        });
+        invalidateAll();
 
         try {
           const profileData = await fetchUserProfile(firebaseUser);
@@ -268,8 +192,7 @@ export function AuthProvider({ children }) {
             setUser(profileData);
             setIsAuthenticated(true);
             setNeedsCompletion(false);
-            const newToken = await firebaseUser.getIdToken();
-            cacheAuth(profileData, newToken);
+            cacheAuth(profileData);
           } else {
             const status = await checkProfileStatus(firebaseUser.uid);
             if (status.completed) {
@@ -278,33 +201,26 @@ export function AuthProvider({ children }) {
                 setUser(fallback);
                 setIsAuthenticated(true);
                 setNeedsCompletion(false);
-                const newToken = await firebaseUser.getIdToken();
-                cacheAuth(fallback, newToken);
+                cacheAuth(fallback);
               }
             } else {
               setNeedsCompletion(true);
             }
           }
-        } catch (err) {
-          console.warn('Profile fetch in listener failed:', err);
-        }
+        } catch {}
       } else {
-        // User signed out – clear everything
         localStorage.removeItem(AUTH_CACHE_KEY);
-        localStorage.removeItem(TOKEN_CACHE_KEY);
-        localStorage.removeItem(TOKEN_EXPIRY_KEY);
         setUser(null);
         setIsAuthenticated(false);
         setNeedsCompletion(false);
         uidRef.current = null;
-        queryClient.clear();
       }
     });
     return () => unsubscribe();
-  }, [fetchUserProfile, checkProfileStatus, invalidateAll, cacheAuth, queryClient]);
+  }, [fetchUserProfile, checkProfileStatus, invalidateAll]);
 
   // ============================================================
-  // AUTH METHODS (unchanged except token caching added)
+  // AUTH METHODS
   // ============================================================
 
   const login = async (email, password) => {
@@ -312,7 +228,6 @@ export function AuthProvider({ children }) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
-      const token = await firebaseUser.getIdToken();
 
       const basicUser = {
         uid: firebaseUser.uid,
@@ -324,9 +239,8 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true);
       setNeedsCompletion(false);
       uidRef.current = firebaseUser.uid;
-      cacheAuth(basicUser, token);
+      cacheAuth(basicUser);
 
-      // Background refresh
       setTimeout(() => {
         invalidateAll();
         refreshUserProfile();
@@ -349,8 +263,6 @@ export function AuthProvider({ children }) {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
-      const token = await firebaseUser.getIdToken();
-
       const basicUser = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
@@ -361,7 +273,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true);
       setNeedsCompletion(false);
       uidRef.current = firebaseUser.uid;
-      cacheAuth(basicUser, token);
+      cacheAuth(basicUser);
 
       let finalAvatarUrl = avatarUrl || '';
       if (avatarFile) {
@@ -373,6 +285,7 @@ export function AuthProvider({ children }) {
         }
       }
 
+      const token = await firebaseUser.getIdToken();
       const data = await apiRequest('/auth/register', {
         method: 'POST',
         body: { uid: firebaseUser.uid, username, fullname, email, avatar: finalAvatarUrl, referralCode, deviceFingerprint: 'web' },
@@ -386,8 +299,7 @@ export function AuthProvider({ children }) {
         setUser(fullUser);
         setIsAuthenticated(true);
         setNeedsCompletion(false);
-        const newToken = await firebaseUser.getIdToken();
-        cacheAuth(fullUser, newToken);
+        cacheAuth(fullUser);
         invalidateAll();
       } else {
         await firebaseUser.delete();
@@ -406,7 +318,6 @@ export function AuthProvider({ children }) {
 
   // ── Shared helper to process social login result ──
   const processSocialLoginResult = async (firebaseUser) => {
-    const token = await firebaseUser.getIdToken();
     const basicUser = {
       uid: firebaseUser.uid,
       email: firebaseUser.email,
@@ -417,7 +328,7 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(true);
     setNeedsCompletion(false);
     uidRef.current = firebaseUser.uid;
-    cacheAuth(basicUser, token);
+    cacheAuth(basicUser);
 
     setTimeout(() => {
       invalidateAll();
@@ -425,12 +336,10 @@ export function AuthProvider({ children }) {
     }, 100);
 
     try {
-      const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`, {}, token);
+      const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
       if (data.banned) {
         await signOut(auth);
         localStorage.removeItem(AUTH_CACHE_KEY);
-        localStorage.removeItem(TOKEN_CACHE_KEY);
-        localStorage.removeItem(TOKEN_EXPIRY_KEY);
         setUser(null);
         setIsAuthenticated(false);
         setLoading(false);
@@ -491,12 +400,13 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ── Complete social profile (NO password) ──
   const completeSocialProfile = async (fullname, username, avatarUrl) => {
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) throw new Error('Not authenticated');
-      const token = await firebaseUser.getIdToken();
 
+      const token = await firebaseUser.getIdToken();
       const data = await apiRequest('/auth/complete-social', {
         method: 'POST',
         body: { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', referralCode: '', deviceFingerprint: 'web' },
@@ -507,16 +417,14 @@ export function AuthProvider({ children }) {
           setUser(profileData);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          const newToken = await firebaseUser.getIdToken();
-          cacheAuth(profileData, newToken);
+          cacheAuth(profileData);
           invalidateAll();
         } else {
           const updated = { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true };
           setUser(updated);
           setIsAuthenticated(true);
           setNeedsCompletion(false);
-          const newToken = await firebaseUser.getIdToken();
-          cacheAuth(updated, newToken);
+          cacheAuth(updated);
           invalidateAll();
         }
         uidRef.current = firebaseUser.uid;
@@ -534,8 +442,6 @@ export function AuthProvider({ children }) {
     try {
       await signOut(auth);
       localStorage.removeItem(AUTH_CACHE_KEY);
-      localStorage.removeItem(TOKEN_CACHE_KEY);
-      localStorage.removeItem(TOKEN_EXPIRY_KEY);
       setUser(null);
       setIsAuthenticated(false);
       setNeedsCompletion(false);
@@ -584,7 +490,7 @@ export function useAuth() {
 }
 
 // ============================================================
-// AUTH SCREEN UI – Same as before (unchanged)
+// AUTH SCREEN UI – CENTERED FORM (NO HERO)
 // ============================================================
 export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
