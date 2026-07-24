@@ -27,13 +27,13 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   const { slug: highlightSlug, search: initialSearch } = router.query;
   const queryClient = useQueryClient();
 
-  // ── Hydrate React Query cache with pre‑fetched data ──
+  // ── Hydrate React Query cache ──
   useEffect(() => {
     queryClient.setQueryData(['templates'], initialTemplates);
     queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
   }, [initialTemplates, initialFeaturedTemplates, queryClient]);
 
-  // ── React Query data (now from cache, instantly available) ──
+  // ── React Query data ──
   const { data: templates = [], isLoading: templatesLoading } = useTemplates();
   const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates();
 
@@ -56,29 +56,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     }
   }, [initialSearch]);
 
-  // ── Highlight template from URL slug ──
-  useEffect(() => {
-    if (highlightSlug && templates.length > 0) {
-      const found = templates.find(t => t.slug === highlightSlug);
-      if (found) {
-        setHighlightedId(found.id);
-        highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
-      }
-    }
-    return () => {
-      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-      if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
-    };
-  }, [highlightSlug, templates]);
-
-  useEffect(() => {
-    if (highlightedId) {
-      const el = document.getElementById(`template-${highlightedId}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [highlightedId]);
-
-  // ── Apply search & filters to ALL templates ──
+  // ── Apply search & filters ──
   const filteredAll = useMemo(() => {
     let filtered = [...templates];
     if (searchQuery.trim()) {
@@ -100,13 +78,11 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return filtered;
   }, [templates, searchQuery, selectedCategory, selectedPlatform]);
 
-  // ── Split into regular (non-featured) ──
   const regularTemplates = useMemo(() => {
     return filteredAll.filter(t => !t.isHighlight);
   }, [filteredAll]);
 
-  // ── Filtered featured templates (respects search & filters) ──
-  const filteredFeatured = useMemo(() => {
+  const featuredFiltered = useMemo(() => {
     let filtered = [...featuredTemplates];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -127,15 +103,23 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return filtered;
   }, [featuredTemplates, searchQuery, selectedCategory, selectedPlatform]);
 
-  // ── Carousel auto-slide (only when no filters and more than 1 featured) ──
+  // ── Determine if slug is featured ──
+  const isSlugFeatured = useMemo(() => {
+    if (!highlightSlug) return false;
+    return templates.some(t => t.slug === highlightSlug && t.isHighlight);
+  }, [highlightSlug, templates]);
+
+  // ── Should show carousel? ──
+  const showCarousel = !hasFilters && !isSlugFeatured && featuredFiltered.length > 1;
+
+  // ── Carousel auto-slide ──
   useEffect(() => {
     if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     carouselIntervalRef.current = null;
 
-    // Only auto‑play when no filters and there are multiple featured templates
-    if (!hasFilters && filteredFeatured.length > 1) {
+    if (showCarousel) {
       carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex(prev => (prev + 1) % filteredFeatured.length);
+        setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
       }, 2000);
     } else {
       setCarouselIndex(0);
@@ -143,21 +127,21 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [filteredFeatured.length, hasFilters]);
+  }, [featuredFiltered.length, showCarousel]);
 
   const goToSlide = useCallback((index) => {
     setCarouselIndex(index);
     if (carouselIntervalRef.current) {
       clearInterval(carouselIntervalRef.current);
-      if (!hasFilters && filteredFeatured.length > 1) {
+      if (showCarousel) {
         carouselIntervalRef.current = setInterval(() => {
-          setCarouselIndex(prev => (prev + 1) % filteredFeatured.length);
+          setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
         }, 2000);
       }
     }
-  }, [filteredFeatured.length, hasFilters]);
+  }, [featuredFiltered.length, showCarousel]);
 
-  // ── Dynamic filter options (link category & platform) ──
+  // ── Dynamic filter options ──
   const availableCategories = useMemo(() => {
     const cats = new Set();
     const source = selectedPlatform
@@ -176,6 +160,37 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return ['All', ...Array.from(plats)];
   }, [templates, selectedCategory]);
 
+  // ── Handle slug highlight ──
+  useEffect(() => {
+    if (!highlightSlug || templates.length === 0) return;
+
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+
+    const found = templates.find(t => t.slug === highlightSlug);
+    if (!found) return;
+
+    // If the slug is featured, we want to show grid, so we set highlightedId but also we need to scroll to it.
+    // The grid will be displayed because showCarousel will be false.
+    setHighlightedId(found.id);
+    highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
+
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, [highlightSlug, templates]);
+
+  // ── Auto‑scroll to highlighted element ──
+  useEffect(() => {
+    if (highlightedId) {
+      const el = document.getElementById(`template-${highlightedId}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedId]);
+
+  // ── Handlers ──
   const handlePreview = useCallback((slug) => {
     router.push(`/${slug}`);
   }, [router]);
@@ -183,6 +198,12 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   const handleUseTemplate = useCallback((slug) => {
     router.push(`/createcampaign?slug=${slug}`);
   }, [router]);
+
+  const handleCopyLink = (slug) => {
+    const url = `${window.location.origin}/create?slug=${slug}`;
+    navigator.clipboard.writeText(url);
+    alert('🔗 Link copied to clipboard!');
+  };
 
   const clearFilters = useCallback(() => {
     setSearchQuery('');
@@ -228,7 +249,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     );
   }
 
-  // ── SEO – build dynamic meta ──
+  // ── SEO ──
   const pageTitle = useMemo(() => {
     if (selectedCategory && selectedCategory !== 'All') {
       return `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Templates – Make Trend`;
@@ -255,10 +276,8 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return 'Explore a curated collection of viral campaign templates. Customize, launch, and start growing your audience in minutes.';
   }, [selectedCategory, selectedPlatform, searchQuery]);
 
-  // ── Build keyword list from template titles for SEO ──
   const templateNames = templates.map(t => t.title).slice(0, 10);
 
-  // ── Structured Data for Google Carousel ──
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.vercel.app';
   const structuredData = {
     "@context": "https://schema.org",
@@ -371,33 +390,33 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
         </div>
 
         {/* ── Featured Templates Section ── */}
-        {filteredFeatured.length > 0 && (
+        {featuredFiltered.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-1 mb-2 px-0.5">
               <span className="text-amber-500 text-sm">★</span>
               <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                {hasFilters ? 'Featured Results' : 'Featured Template'}
+                {hasFilters || isSlugFeatured ? 'Featured Results' : 'Featured Template'}
               </h2>
-              {!hasFilters && (
+              {!showCarousel && (
+                <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 rounded-full font-medium ml-2">
+                  {featuredFiltered.length} matches
+                </span>
+              )}
+              {showCarousel && (
                 <span className="text-[9px] bg-primary/10 text-primary px-1 rounded-full font-extrabold ml-2 flex items-center">
                   Auto-play
                 </span>
               )}
-              {hasFilters && filteredFeatured.length > 0 && (
-                <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 rounded-full font-medium ml-2">
-                  {filteredFeatured.length} matches
-                </span>
-              )}
             </div>
 
-            {/* ── Carousel (only when no filters) ── */}
-            {!hasFilters ? (
-              <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+            {showCarousel ? (
+              // ── Carousel ──
+              <div id="featured-carousel" className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div
                   className="flex transition-transform duration-700 ease-in-out"
                   style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
                 >
-                  {filteredFeatured.map((template) => (
+                  {featuredFiltered.map((template) => (
                     <div key={template.id} className="w-full flex-shrink-0">
                       <div className="flex flex-col">
                         <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
@@ -441,7 +460,6 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
                           <div className="grid grid-cols-2 gap-2">
                             <button
-                              type="button"
                               onClick={() => handlePreview(template.slug)}
                               className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
                             >
@@ -449,7 +467,6 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                               Preview
                             </button>
                             <button
-                              type="button"
                               onClick={() => handleUseTemplate(template.slug)}
                               className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
                             >
@@ -463,12 +480,10 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                   ))}
                 </div>
 
-                {/* ── Carousel Controls ── */}
-                {filteredFeatured.length > 1 && (
+                {featuredFiltered.length > 1 && (
                   <>
                     <button
-                      type="button"
-                      onClick={() => goToSlide((carouselIndex - 1 + filteredFeatured.length) % filteredFeatured.length)}
+                      onClick={() => goToSlide((carouselIndex - 1 + featuredFiltered.length) % featuredFiltered.length)}
                       className="absolute left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
                       aria-label="Previous slide"
                     >
@@ -477,8 +492,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                       </svg>
                     </button>
                     <button
-                      type="button"
-                      onClick={() => goToSlide((carouselIndex + 1) % filteredFeatured.length)}
+                      onClick={() => goToSlide((carouselIndex + 1) % featuredFiltered.length)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
                       aria-label="Next slide"
                     >
@@ -487,14 +501,11 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                       </svg>
                     </button>
                     <div className="absolute bottom-24 right-3 flex gap-1 z-20">
-                      {filteredFeatured.map((_, idx) => (
+                      {featuredFiltered.map((_, idx) => (
                         <button
                           key={idx}
-                          type="button"
                           onClick={() => goToSlide(idx)}
-                          className={`h-1 rounded-full transition-all ${
-                            idx === carouselIndex ? 'bg-primary w-3' : 'bg-slate-300 w-1'
-                          }`}
+                          className={`h-1 rounded-full transition-all ${idx === carouselIndex ? 'bg-primary w-3' : 'bg-slate-300 w-1'}`}
                           aria-label={`Go to slide ${idx + 1}`}
                         />
                       ))}
@@ -503,73 +514,19 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                 )}
               </div>
             ) : (
-              /* ── Grid when filters are active ── */
+              // ── Grid when filters or slug matches featured ──
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {filteredFeatured.map((template) => (
-                  <div
+                {featuredFiltered.map((template) => (
+                  <TemplateCard
                     key={template.id}
-                    className="group bg-white rounded-2xl border border-amber-200/60 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col justify-between"
-                  >
-                    <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
-                      {template.image ? (
-                        <img
-                          src={template.image}
-                          alt={template.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                          <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
-                        </div>
-                      )}
-                      <div className="absolute top-2.5 left-2.5 z-10">
-                        <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                          ⭐ Featured
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 flex-grow flex flex-col justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                          {template.platform && (
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
-                              {template.platform}
-                            </span>
-                          )}
-                          <span className="bg-slate-50 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center">
-                            👥 {template.usageCount || 0} Uses
-                          </span>
-                        </div>
-                        <h3 className="font-bold text-slate-950 text-xs leading-snug line-clamp-1 group-hover:text-primary transition-colors">
-                          {template.title}
-                        </h3>
-                        <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-1 leading-relaxed">
-                          {template.description || 'Launch your campaign with this template.'}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handlePreview(template.slug)}
-                          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                          Preview
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleUseTemplate(template.slug)}
-                          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                          Use
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    template={template}
+                    isHighlighted={highlightedId === template.id}
+                    onPreview={handlePreview}
+                    onUse={handleUseTemplate}
+                    onCopy={handleCopyLink}
+                    platformBadgeStyles={platformBadgeStyles}
+                    isFeatured
+                  />
                 ))}
               </div>
             )}
@@ -579,7 +536,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
         {/* ── Normal Templates Header ── */}
         <div className="flex items-center justify-between mb-2.5 px-0.5">
           <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-            {hasFilters ? 'Search Results' : 'All Templates'}
+            {hasFilters || isSlugFeatured ? 'Search Results' : 'All Templates'}
           </h2>
           <span className="text-[10px] text-slate-400 font-bold">
             Showing {regularTemplates.length} templates
@@ -618,109 +575,136 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {regularTemplates.map((template) => {
-              const isHighlighted = highlightedId === template.id;
-              return (
-                <div
-                  key={template.id}
-                  id={`template-${template.id}`}
-                  className={`group bg-white rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between shadow-sm ${
-                    isHighlighted ? 'border-primary ring-4 ring-primary/10' : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-                  }`}
-                >
-                  <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
-                    {template.image ? (
-                      <img
-                        src={template.image}
-                        alt={template.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                        <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
-                      </div>
-                    )}
-
-                    <div className="absolute top-2 inset-x-2 flex justify-between items-start pointer-events-none z-20">
-                      <div className="flex flex-col gap-0.5">
-                        {template.isHighlight && (
-                          <span className="bg-amber-400 text-amber-950 text-[8px] font-black px-1.5 py-0.5 rounded shadow-sm">
-                            ⭐ Featured
-                          </span>
-                        )}
-                      </div>
-                      {template.platform && (
-                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
-                          {template.platform}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-3 flex-grow flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-start justify-between gap-1.5">
-                        <h3 className="font-bold text-slate-950 text-xs leading-snug line-clamp-1 group-hover:text-primary transition-colors">
-                          {template.title}
-                        </h3>
-                      </div>
-                      <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-1 leading-relaxed">
-                        {template.description || 'Customizable layout built to match social trends.'}
-                      </p>
-
-                      <div className="mt-1 flex items-center justify-between gap-1 flex-wrap">
-                        <div className="flex flex-wrap gap-1">
-                          {template.hashtags && template.hashtags.length > 0 ? (
-                            template.hashtags.slice(0, 1).map((tag, i) => (
-                              <span key={i} className="text-[9px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded">
-                                {tag}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
-                              Standard
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] font-extrabold text-slate-400 flex items-center">
-                          👥 {template.usageCount || 0}
-                        </div>
-                      </div>
-
-                      {template.reward && (
-                        <div className="mt-1 text-[10px] font-extrabold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-lg w-fit">
-                          🎁 {template.reward}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handlePreview(template.slug)}
-                        className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                        Preview
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleUseTemplate(template.slug)}
-                        className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                        Use
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {regularTemplates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                isHighlighted={highlightedId === template.id}
+                onPreview={handlePreview}
+                onUse={handleUseTemplate}
+                onCopy={handleCopyLink}
+                platformBadgeStyles={platformBadgeStyles}
+                isFeatured={false}
+              />
+            ))}
           </div>
         )}
       </main>
     </>
+  );
+}
+
+// ── Reusable Template Card ──
+function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platformBadgeStyles, isFeatured }) {
+  return (
+    <div
+      id={`template-${template.id}`}
+      className={`group bg-white rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between shadow-sm ${
+        isHighlighted
+          ? 'border-primary ring-4 ring-primary/10'
+          : isFeatured
+          ? 'border-amber-200/60 hover:border-amber-300'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+      }`}
+    >
+      <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
+        {template.image ? (
+          <img
+            src={template.image}
+            alt={template.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+            <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
+          </div>
+        )}
+        <div className="absolute top-2 inset-x-2 flex justify-between items-start pointer-events-none z-20">
+          <div className="flex flex-col gap-0.5">
+            {isFeatured && (
+              <span className="bg-amber-400 text-amber-950 text-[8px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                ⭐ Featured
+              </span>
+            )}
+          </div>
+          {template.platform && (
+            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+              {template.platform}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-3 flex-grow flex flex-col justify-between">
+        <div>
+          <div className="flex items-start justify-between gap-1.5">
+            <h3 className="font-bold text-slate-950 text-xs leading-snug line-clamp-1 group-hover:text-primary transition-colors">
+              {template.title}
+            </h3>
+          </div>
+          <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-1 leading-relaxed">
+            {template.description || 'Customizable layout built to match social trends.'}
+          </p>
+
+          <div className="mt-1 flex items-center justify-between gap-1 flex-wrap">
+            <div className="flex flex-wrap gap-1">
+              {template.hashtags && template.hashtags.length > 0 ? (
+                template.hashtags.slice(0, 1).map((tag, i) => (
+                  <span key={i} className="text-[9px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded">
+                    {tag}
+                  </span>
+                ))
+              ) : (
+                <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                  Standard
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] font-extrabold text-slate-400 flex items-center">
+              👥 {template.usageCount || 0}
+            </div>
+          </div>
+
+          {template.reward && (
+            <div className="mt-1 flex items-center justify-between gap-1">
+              <div className="text-[10px] font-extrabold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-lg">
+                🎁 {template.reward}
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy(template.slug);
+                }}
+                className="text-[10px] text-slate-400 hover:text-primary transition-colors p-1 rounded hover:bg-slate-100"
+                title="Copy link to this template"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
+          <button
+            onClick={() => onPreview(template.slug)}
+            className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+            Preview
+          </button>
+          <button
+            onClick={() => onUse(template.slug)}
+            className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+            Use
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
