@@ -13,8 +13,9 @@ import {
   signOut,
   sendPasswordResetEmail,
   signInWithPopup,
+  updatePassword,
   GoogleAuthProvider,
-  FacebookAuthProvider,
+  TwitterAuthProvider,
 } from '../services/firebase';
 import { useInvalidateQueries } from '../lib/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,7 +29,7 @@ import {
   FiCheckCircle,
   FiAlertCircle,
 } from 'react-icons/fi';
-import { FaGoogle, FaFacebook } from 'react-icons/fa';
+import { FaGoogle, FaTwitter } from 'react-icons/fa';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://make-trend.onrender.com/api';
 const AUTH_CACHE_KEY = 'maketrend_auth';
@@ -53,7 +54,6 @@ async function apiRequest(endpoint, options = {}, token = null) {
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // ── State (initialized as false/empty for server-side rendering) ──
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -88,7 +88,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ── Helper to cache auth info (now stores username) ──
+  // ── Helper to cache auth info ──
   const cacheAuth = (authData) => {
     if (authData && authData.uid) {
       localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({
@@ -113,7 +113,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ── Fetch full profile (for background enrichment) ──
+  // ── Fetch full profile ──
   const fetchUserProfile = useCallback(async (firebaseUser) => {
     try {
       const token = await firebaseUser.getIdToken();
@@ -127,7 +127,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ── Upload Avatar (accepts optional firebaseUser to avoid race condition) ──
+  // ── Upload Avatar ──
   const uploadAvatar = async (file, firebaseUser = null) => {
     if (!file) throw new Error('No file selected');
     const currentUser = firebaseUser || auth.currentUser;
@@ -148,7 +148,7 @@ export function AuthProvider({ children }) {
     return data.url;
   };
 
-  // ── Refresh user profile (used after login / social login) ──
+  // ── Refresh user profile ──
   const refreshUserProfile = useCallback(async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return;
@@ -166,12 +166,11 @@ export function AuthProvider({ children }) {
   }, [fetchUserProfile]);
 
   // ============================================================
-  // FIREBASE LISTENER – Real‑time updates
+  // FIREBASE LISTENER
   // ============================================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // If already set to this user, skip re-fetching
         if (uidRef.current === firebaseUser.uid) return;
 
         const basicUser = {
@@ -186,7 +185,6 @@ export function AuthProvider({ children }) {
         uidRef.current = firebaseUser.uid;
         cacheAuth(basicUser);
 
-        // Fetch fresh data
         invalidateAll();
 
         try {
@@ -232,7 +230,6 @@ export function AuthProvider({ children }) {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = cred.user;
 
-      // ── Basic user data (immediate) ──
       const basicUser = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
@@ -245,8 +242,6 @@ export function AuthProvider({ children }) {
       uidRef.current = firebaseUser.uid;
       cacheAuth(basicUser);
 
-      // ── Return success immediately ──
-      // Fetch profile in the background (non-blocking)
       setTimeout(() => {
         invalidateAll();
         refreshUserProfile();
@@ -281,7 +276,6 @@ export function AuthProvider({ children }) {
       uidRef.current = firebaseUser.uid;
       cacheAuth(basicUser);
 
-      // ── Upload avatar if file provided (using the firebaseUser from credential) ──
       let finalAvatarUrl = avatarUrl || '';
       if (avatarFile) {
         try {
@@ -289,7 +283,6 @@ export function AuthProvider({ children }) {
           finalAvatarUrl = uploadedUrl;
         } catch (err) {
           console.warn('Avatar upload during registration failed:', err);
-          // Continue without avatar if upload fails
         }
       }
 
@@ -308,7 +301,6 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(true);
         setNeedsCompletion(false);
         cacheAuth(fullUser);
-        // Load fresh data
         invalidateAll();
       } else {
         await firebaseUser.delete();
@@ -339,13 +331,11 @@ export function AuthProvider({ children }) {
     uidRef.current = firebaseUser.uid;
     cacheAuth(basicUser);
 
-    // Non-blocking profile fetch
     setTimeout(() => {
       invalidateAll();
       refreshUserProfile();
     }, 100);
 
-    // Check ban
     try {
       const data = await apiRequest(`/auth/check-ban?uid=${firebaseUser.uid}`);
       if (data.banned) {
@@ -359,7 +349,6 @@ export function AuthProvider({ children }) {
       }
     } catch {}
 
-    // Check completion status (non-blocking)
     let needsCompletion = false;
     try {
       const status = await checkProfileStatus(firebaseUser.uid);
@@ -367,13 +356,8 @@ export function AuthProvider({ children }) {
         needsCompletion = true;
         setNeedsCompletion(true);
         setUser({ ...basicUser, completed: false });
-      } else {
-        // Profile is complete, but we already fetched it in background.
-        // The refreshUserProfile will handle it.
-        // For now, we don't set needsCompletion.
       }
     } catch {
-      // If check fails, assume incomplete
       needsCompletion = true;
       setNeedsCompletion(true);
       setUser({ ...basicUser, completed: false });
@@ -392,23 +376,18 @@ export function AuthProvider({ children }) {
       provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
-    } else if (providerName === 'facebook') {
-      provider = new FacebookAuthProvider();
-      provider.addScope('email');
-      provider.addScope('public_profile');
+    } else if (providerName === 'twitter') {
+      provider = new TwitterAuthProvider();
     } else {
       setIsSocialLoading(false);
       setLoading(false);
       return { success: false, error: 'Unsupported provider' };
     }
 
-    // ── Use popup for both providers ──
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-      // ── Process the result ──
-      const processResult = await processSocialLoginResult(firebaseUser);
-      return processResult;
+      return await processSocialLoginResult(firebaseUser);
     } catch (error) {
       let message = `Unable to sign in with ${providerName}.`;
       if (error.code === 'auth/popup-blocked') message = 'Popup blocked. Please allow popups.';
@@ -422,10 +401,16 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const completeSocialProfile = async (fullname, username, avatarUrl) => {
+  const completeSocialProfile = async (fullname, username, avatarUrl, password = null) => {
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) throw new Error('Not authenticated');
+
+      // ── If password provided, set it in Firebase Auth ──
+      if (password) {
+        await updatePassword(firebaseUser, password);
+      }
+
       const token = await firebaseUser.getIdToken();
       const data = await apiRequest('/auth/complete-social', {
         method: 'POST',
@@ -438,7 +423,6 @@ export function AuthProvider({ children }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           cacheAuth(profileData);
-          // Load fresh data
           invalidateAll();
         } else {
           const updated = { uid: firebaseUser.uid, email: firebaseUser.email, fullname, username, avatar: avatarUrl || '', completed: true };
@@ -446,7 +430,6 @@ export function AuthProvider({ children }) {
           setIsAuthenticated(true);
           setNeedsCompletion(false);
           cacheAuth(updated);
-          // Load fresh data
           invalidateAll();
         }
         uidRef.current = firebaseUser.uid;
@@ -455,7 +438,13 @@ export function AuthProvider({ children }) {
         return { success: false, error: data.error || 'Failed to complete profile' };
       }
     } catch (error) {
-      return { success: false, error: 'Could not complete profile.' };
+      let message = 'Could not complete profile.';
+      if (error.code === 'auth/requires-recent-login') {
+        message = 'For security, please re-authenticate and try again.';
+      } else if (error.code === 'auth/weak-password') {
+        message = 'Password must be at least 6 characters.';
+      }
+      return { success: false, error: message };
     }
   };
 
@@ -467,7 +456,6 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(false);
       setNeedsCompletion(false);
       uidRef.current = null;
-      // ── Clear React Query cache ──
       queryClient.clear();
       return { success: true };
     } catch {
@@ -555,6 +543,10 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const [resetSent, setResetSent] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
 
+  // ── Social completion extra states ──
+  const [socialPassword, setSocialPassword] = useState('');
+  const [socialConfirmPassword, setSocialConfirmPassword] = useState('');
+
   // ── Success overlay ──
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -564,7 +556,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 
   // ── Redirect logic ──
   const performRedirect = useCallback(() => {
-    // If the user's profile is incomplete, stay on the AuthScreen (completion form)
     if (needsCompletion) {
       return;
     }
@@ -607,7 +598,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
           const data = await res.json();
           setEmailExists(data.exists);
         } catch {
-          // On error, assume email exists so user can attempt login
           setEmailExists(true);
           setEmailError('Unable to verify email. Please try logging in.');
         } finally {
@@ -663,7 +653,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   // ── Social login ──
   const handleSocialLogin = async (provider) => {
     setError('');
-    setIsSubmitting(true); // to show loading state
+    setIsSubmitting(true);
     const result = await socialLogin(provider);
     setIsSubmitting(false);
     if (result.success) {
@@ -705,6 +695,22 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       return;
     }
 
+    // ── Password validation (optional) ──
+    let finalPassword = null;
+    if (socialPassword) {
+      if (socialPassword.length < 6) {
+        setError('Password must be at least 6 characters.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (socialPassword !== socialConfirmPassword) {
+        setError('Passwords do not match.');
+        setIsSubmitting(false);
+        return;
+      }
+      finalPassword = socialPassword;
+    }
+
     let avatarUrl = socialAvatarPreview || '';
     if (socialAvatarFile) {
       try {
@@ -727,7 +733,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
       }
     }
 
-    const result = await completeSocialProfile(socialFullname, socialUsername, avatarUrl);
+    const result = await completeSocialProfile(socialFullname, socialUsername, avatarUrl, finalPassword);
     if (result.success) {
       setNeedsSocialCompletion(false);
       handleSuccess('Profile completed! 🎉');
@@ -800,7 +806,6 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
         }
       }
 
-      // Register with avatar file – the upload happens inside `register`
       const result = await register(email, password, fullname, username, '', referralCode, avatarFile);
       if (result.success) {
         handleSuccess('Account created! 🎉');
@@ -902,7 +907,9 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             </div>
 
             <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Complete Your Profile</h2>
-            <p className="text-sm text-center text-gray-400 mb-6">One more step to get started</p>
+            <p className="text-sm text-center text-gray-400 mb-6">
+              Set a password (optional) to also sign in with email.
+            </p>
 
             {error && (
               <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600">
@@ -961,6 +968,43 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
                   {socialUser?.email || '—'}
                 </div>
               </div>
+
+              {/* ── Password fields (optional) ── */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Set Password <span className="text-gray-400 text-xs">(optional)</span>
+                </label>
+                <input
+                  type="password"
+                  value={socialPassword}
+                  onChange={(e) => setSocialPassword(e.target.value)}
+                  placeholder="Leave blank to skip"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                  disabled={isSubmitting}
+                  minLength={6}
+                />
+              </div>
+
+              {socialPassword && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                  <input
+                    type="password"
+                    value={socialConfirmPassword}
+                    onChange={(e) => setSocialConfirmPassword(e.target.value)}
+                    placeholder="Confirm your password"
+                    className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition ${
+                      socialConfirmPassword && socialPassword !== socialConfirmPassword
+                        ? 'border-red-500 focus:ring-red-200'
+                        : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                    }`}
+                    disabled={isSubmitting}
+                  />
+                  {socialConfirmPassword && socialPassword !== socialConfirmPassword && (
+                    <p className="mt-1 text-xs text-red-500">Passwords do not match.</p>
+                  )}
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -1309,12 +1353,12 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
               Google
             </button>
             <button
-              onClick={() => handleSocialLogin('facebook')}
+              onClick={() => handleSocialLogin('twitter')}
               disabled={isSocialLoading || isSubmitting}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
             >
-              <FaFacebook className="w-4 h-4" />
-              Facebook
+              <FaTwitter className="w-4 h-4" />
+              Twitter
             </button>
           </div>
 
@@ -1345,7 +1389,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
             ) : null}
           </div>
 
-          {/* ── Loading overlay (covers only this page) ── */}
+          {/* ── Loading overlay ── */}
           {isSubmitting && (
             <div className="absolute inset-0 z-[9999] flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm transition-all duration-300">
               <div className="flex flex-col items-center gap-4">
