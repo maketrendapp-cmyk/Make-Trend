@@ -107,6 +107,134 @@ async function updateCampaignInUserListCache(ownerId, campaignId, updates) {
   }
 }
 
+// ── Helper to parse campaign cache key ──
+function parseCampaignCacheKey(key) {
+  // Example: campaigns:user:abc123:limit:25:lastCreatedAt:null:lastId:null
+  const parts = key.split(':');
+  const uid = parts[2]; // index 2
+  let limit = 25;
+  let lastCreatedAt = null;
+  let lastId = null;
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] === 'limit') limit = parseInt(parts[i+1]) || 25;
+    if (parts[i] === 'lastCreatedAt') lastCreatedAt = parts[i+1] === 'null' ? null : parts[i+1];
+    if (parts[i] === 'lastId') lastId = parts[i+1] === 'null' ? null : parts[i+1];
+  }
+  return { uid, limit, lastCreatedAt, lastId };
+}
+
+// ── Find all cache keys for a user ──
+async function findUserCacheKeys(uid) {
+  const pattern = `campaigns:user:${uid}:*`;
+  return await redis.keys(pattern);
+}
+
+// ── Find the first page key (no cursor) ──
+async function findFirstPageKey(uid) {
+  const keys = await findUserCacheKeys(uid);
+  for (const key of keys) {
+    const parsed = parseCampaignCacheKey(key);
+    if (parsed.lastCreatedAt === null && parsed.lastId === null) {
+      return key;
+    }
+  }
+  return null;
+}
+
+// ── Add a campaign to the user's list cache (first page) ──
+async function addCampaignToUserListCache(uid, campaign) {
+  try {
+    const firstPageKey = await findFirstPageKey(uid);
+    if (!firstPageKey) return; // No cache exists yet – nothing to update
+
+    const ttl = await redis.ttl(firstPageKey);
+    const cached = await redis.get(firstPageKey);
+    if (!cached) return;
+
+    let data = JSON.parse(cached);
+    if (data.campaigns && Array.isArray(data.campaigns)) {
+      // Add to the beginning (most recent)
+      data.campaigns = [campaign, ...data.campaigns];
+      // If the list exceeds the limit, remove the last element
+      const limit = parseCampaignCacheKey(firstPageKey).limit || 25;
+      if (data.campaigns.length > limit) {
+        data.campaigns = data.campaigns.slice(0, limit);
+        // Note: we're not updating hasMore or nextCursor – the cache might become slightly stale for pagination.
+        // But the user will see the new campaign, and the next page might still show the removed item.
+        // This is a trade‑off for avoiding a full refetch. It's acceptable.
+      }
+      const ttlToUse = ttl > 0 ? ttl : 86400;
+      await redis.set(firstPageKey, JSON.stringify(data), 'EX', ttlToUse);
+      console.log(`🔄 Added campaign ${campaign.id} to user ${uid} list cache`);
+    }
+  } catch (error) {
+    console.warn(`Failed to add campaign to user list cache:`, error);
+  }
+}
+
+// ── Remove a campaign from the user's list cache (all pages) ──
+async function removeCampaignFromUserListCache(uid, campaignId) {
+  try {
+    const keys = await findUserCacheKeys(uid);
+    if (keys.length === 0) return;
+
+    for (const key of keys) {
+      const ttl = await redis.ttl(key);
+      const cached = await redis.get(key);
+      if (!cached) continue;
+
+      let data = JSON.parse(cached);
+      if (data.campaigns && Array.isArray(data.campaigns)) {
+        const originalLength = data.campaigns.length;
+        data.campaigns = data.campaigns.filter(c => c.id !== campaignId);
+        if (data.campaigns.length < originalLength) {
+          const ttlToUse = ttl > 0 ? ttl : 86400;
+          await redis.set(key, JSON.stringify(data), 'EX', ttlToUse);
+          console.log(`🔄 Removed campaign ${campaignId} from cache ${key}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to remove campaign from user list cache:`, error);
+  }
+}
+
+// ── Update a specific template in all cached template list pages ──
+async function updateTemplateInAllCaches(templateId, updates) {
+  try {
+    const pattern = 'templates:*';
+    const keys = await redis.keys(pattern);
+    if (keys.length === 0) return;
+
+    for (const key of keys) {
+      const ttl = await redis.ttl(key);
+      const cached = await redis.get(key);
+      if (!cached) continue;
+
+      let data = JSON.parse(cached);
+      if (data.templates && Array.isArray(data.templates)) {
+        let updated = false;
+        data.templates = data.templates.map(t => {
+          if (t.id === templateId) {
+            updated = true;
+            return { ...t, ...updates };
+          }
+          return t;
+        });
+        if (updated) {
+          const ttlToUse = ttl > 0 ? ttl : 86400; // keep existing TTL, default 24h
+          await redis.set(key, JSON.stringify(data), 'EX', ttlToUse);
+          console.log(`🔄 Updated template ${templateId} in cache ${key}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to update template ${templateId} in cache:`, error);
+  }
+}
+
+
+
 // ============================================================
 // 1. FIREBASE ADMIN SDK
 // ============================================================
@@ -183,7 +311,6 @@ const allowedOrigins = [
   'https://make-trend-system.vercel.app',
   'https://maketrend.vercel.app',
   'https://make-trend.vercel.app',
-'https://maketrend.app',
 ];
 if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.push('http://localhost:3000');
@@ -347,6 +474,22 @@ function getClientIp(req) {
          'unknown';
 }
 
+// ── Validate image URL (prevent malicious/invalid URLs) ──
+function validateImageUrl(url) {
+  if (!url) return true; // empty is allowed (optional field)
+  try {
+    const parsed = new URL(url);
+    // Only allow HTTPS URLs (no data:, javascript:, etc.)
+    if (parsed.protocol !== 'https:') return false;
+    // Must be a Cloudinary URL OR have a valid image extension
+    const isCloudinary = parsed.hostname.includes('cloudinary.com') || parsed.hostname.includes('res.cloudinary.com');
+    const isImage = /\.(jpg|jpeg|png|webp|gif|svg|bmp|ico)(\?.*)?$/i.test(parsed.pathname);
+    return isCloudinary || isImage;
+  } catch {
+    return false;
+  }
+}
+
 // ── Generic rate limit helper ──
 async function checkRateLimit(identifier, action, limit, windowSeconds) {
   const key = `rate:${action}:${identifier}:${Math.floor(Date.now() / 1000 / windowSeconds)}`;
@@ -361,6 +504,8 @@ async function checkRateLimit(identifier, action, limit, windowSeconds) {
     return true; // allow on error
   }
 }
+
+
 
 // ── Get ban status with Redis cache (5 min TTL) ──
 async function isUserBanned(uid) {
@@ -473,9 +618,16 @@ app.get('/api/auth/check-username', async (req, res) => {
     if (!username || username.length < 3) {
       return res.status(400).json({ success: false, error: 'Username must be at least 3 characters' });
     }
+    const cacheKey = `check-username:${username}`;
+    let cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
     const snapshot = await db.collection('users').where('username', '==', username).limit(1).get();
     const available = snapshot.empty;
-    res.json({ success: true, available });
+    const response = { success: true, available };
+    await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
+    res.json(response);
   } catch (error) {
     console.error('Check username error:', error);
     res.status(500).json({ success: false, error: 'Failed to check username' });
@@ -489,9 +641,16 @@ app.get('/api/auth/check-email', async (req, res) => {
     if (!email || !email.includes('@')) {
       return res.status(400).json({ success: false, error: 'Invalid email' });
     }
+    const cacheKey = `check-email:${email}`;
+    let cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
     const snapshot = await db.collection('users').where('email', '==', email).limit(1).get();
     const exists = !snapshot.empty;
-    res.json({ success: true, exists });
+    const response = { success: true, exists };
+    await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
+    res.json(response);
   } catch (error) {
     console.error('Check email error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -508,6 +667,10 @@ app.post('/api/auth/register', async (req, res) => {
 
     if (!uid || !cleanUsername || !cleanFullname || !cleanEmail) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    // ── Validate avatar URL ──
+    if (avatar && !validateImageUrl(avatar)) {
+      return res.status(400).json({ success: false, error: 'Invalid avatar URL' });
     }
     if (cleanUsername.length < 3 || cleanUsername.length > 30) {
       return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
@@ -546,6 +709,23 @@ app.post('/api/auth/register', async (req, res) => {
 
     await db.collection('users').doc(uid).set(userData);
     delete userData.deviceFingerprint;
+
+    // ── Invalidate referrer's referral cache if a referral code was used ──
+    if (cleanReferredBy) {
+      try {
+        const referrerSnapshot = await db.collection('users')
+          .where('referralCode', '==', cleanReferredBy)
+          .limit(1)
+          .get();
+        if (!referrerSnapshot.empty) {
+          const referrerUid = referrerSnapshot.docs[0].id;
+          await invalidateKey(`referrals:${referrerUid}`);
+        }
+      } catch (err) {
+        console.warn('Failed to invalidate referrer cache:', err);
+      }
+    }
+
     res.status(201).json({ success: true, user: userData });
   } catch (error) {
     console.error('Register error:', error);
@@ -568,6 +748,10 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
 
     if (!cleanUsername || !cleanFullname || !cleanEmail) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    // ── Validate avatar URL ──
+    if (avatar && !validateImageUrl(avatar)) {
+      return res.status(400).json({ success: false, error: 'Invalid avatar URL' });
     }
     if (cleanUsername.length < 3 || cleanUsername.length > 30) {
       return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
@@ -669,7 +853,7 @@ app.get('/api/auth/check-ban', async (req, res) => {
 });
 
 // ── Record login ── (authenticated, low risk – could add rate limit, but optional)
-app.post('/api/auth/record-login', verifyToken, async (req, res) => {
+app.post('/api/auth/record-login', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     // ── Rate limit: 5 login recordings per minute ──
@@ -691,7 +875,6 @@ app.post('/api/auth/record-login', verifyToken, async (req, res) => {
 app.get('/api/auth/profile', async (req, res) => {
   try {
     const ip = getClientIp(req);
-    // ── Rate limit: 20 requests per minute per IP ──
     if (!(await checkRateLimit(ip, 'profile-check', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
@@ -699,16 +882,25 @@ app.get('/api/auth/profile', async (req, res) => {
     if (!uid) {
       return res.status(400).json({ success: false, error: 'Missing uid' });
     }
+    const cacheKey = `profile-status:${uid}`;
+    let cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
-      return res.json({ success: true, completed: false, username: null });
+      const response = { success: true, completed: false, username: null };
+      await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
+      return res.json(response);
     }
     const data = doc.data();
-    res.json({
+    const response = {
       success: true,
       completed: data.completed || false,
       username: data.username || null,
-    });
+    };
+    await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
+    res.json(response);
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -730,6 +922,10 @@ app.put('/api/auth/profile', verifyToken, checkBanned, async (req, res) => {
 
     if (!cleanUsername || !cleanFullname || !cleanEmail) {
       return res.status(400).json({ success: false, error: 'All fields are required' });
+    }
+    // ── Validate avatar URL ──
+    if (avatar && !validateImageUrl(avatar)) {
+      return res.status(400).json({ success: false, error: 'Invalid avatar URL' });
     }
     if (cleanUsername.length < 3 || cleanUsername.length > 30) {
       return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
@@ -807,6 +1003,11 @@ app.get('/api/auth/referrals', verifyToken, checkBanned, async (req, res) => {
     if (!(await checkRateLimit(uid, 'referrals-get', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
+    const cacheKey = `referrals:${uid}`;
+    let cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -815,7 +1016,9 @@ app.get('/api/auth/referrals', verifyToken, checkBanned, async (req, res) => {
     const referralCode = userData.referralCode;
 
     if (!referralCode) {
-      return res.json({ success: true, referrals: [], referrer: null });
+      const response = { success: true, referrals: [], referrer: null };
+      await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
+      return res.json(response);
     }
 
     const snapshot = await db.collection('users')
@@ -854,13 +1057,15 @@ app.get('/api/auth/referrals', verifyToken, checkBanned, async (req, res) => {
       }
     }
 
-    res.json({
+    const response = {
       success: true,
       referralCode,
       totalReferrals: referredUsers.length,
       referredUsers,
       referrer,
-    });
+    };
+    await redis.set(cacheKey, JSON.stringify(response), 'EX', 60);
+    res.json(response);
   } catch (error) {
     console.error('Get referrals error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch referrals' });
@@ -1034,6 +1239,10 @@ app.post('/api/templates', verifyToken, checkBanned, async (req, res) => {
     if (!title || !slug) {
       return res.status(400).json({ success: false, error: 'Title and slug are required' });
     }
+    // ── Validate image URL ──
+    if (image && !validateImageUrl(image)) {
+      return res.status(400).json({ success: false, error: 'Invalid image URL' });
+    }
     const validPlans = ['free', 'pro'];
     if (plan && !validPlans.includes(plan)) {
       return res.status(400).json({ success: false, error: 'Invalid plan. Must be: free, pro' });
@@ -1085,6 +1294,11 @@ app.put('/api/templates/:id', verifyToken, checkBanned, async (req, res) => {
     delete updates.createdAt;
     delete updates.usageCount;
     delete updates.id;
+
+    // ── Validate image URL if provided ──
+    if (updates.image && !validateImageUrl(updates.image)) {
+      return res.status(400).json({ success: false, error: 'Invalid image URL' });
+    }
 
     if (updates.plan) {
       const validPlans = ['free', 'pro'];
@@ -1154,24 +1368,7 @@ app.delete('/api/templates/:id/permanent', verifyToken, checkBanned, async (req,
   }
 });
 
-// ── Increment template usage ── (public, low risk, IP rate limit optional)
-app.post('/api/templates/:id/usage', async (req, res) => {
-  try {
-    const { id } = req.params;
-    // optional IP rate limit
-    const ip = getClientIp(req);
-    if (!(await checkRateLimit(ip, 'template-usage', 10, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
-    }
-    await db.collection('templates').doc(id).update({
-      usageCount: admin.firestore.FieldValue.increment(1),
-    });
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Increment usage error:', error);
-    res.status(500).json({ success: false, error: 'Failed to increment usage' });
-  }
-});
+// ── Removed: template usage is now incremented internally via POST /api/campaigns ──
 
 // ============================================================
 // 13. CAMPAIGN ENDPOINTS
@@ -1301,7 +1498,7 @@ app.get('/api/campaigns/:id', async (req, res) => {
       result = { success: true, campaign: { id: doc.id, ...campaignData } };
       // Store in cache with 60 second TTL
       try {
-        await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
         console.log(`💾 Campaign cached (60s TTL): ${id}`);
       } catch (err) { /* ignore */ }
     }
@@ -1326,7 +1523,8 @@ app.get('/api/campaigns/:id', async (req, res) => {
         }
         const deviceId = req.headers['x-device-id'] || null;
 
-        // ── Use transaction to prevent race condition ──
+        // ── Use transaction to prevent race condition and get new view count ──
+        let newViews = 0;
         await db.runTransaction(async (transaction) => {
           const docRef = db.collection('campaigns').doc(id);
           const doc = await transaction.get(docRef);
@@ -1348,15 +1546,34 @@ app.get('/api/campaigns/:id', async (req, res) => {
             ip: ip || 'unknown',
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
           });
+          // Get the updated view count
+          const updatedDoc = await transaction.get(docRef);
+          newViews = updatedDoc.data().views || 0;
         });
 
-              // ── Invalidate single campaign cache and update list cache ──
-        await invalidateKey(`campaigns:id:${id}`);
+        // ── Update the campaign cache with the new view count ──
+        const cacheKey = `campaigns:id:${id}`;
+        let cached = null;
+        try {
+          const cachedStr = await redis.get(cacheKey);
+          if (cachedStr) {
+            cached = JSON.parse(cachedStr);
+          }
+        } catch (e) { /* ignore */ }
+
+        if (cached && cached.campaign) {
+          cached.campaign.views = newViews;
+          const ttl = await redis.ttl(cacheKey);
+          const ttlToUse = ttl > 0 ? ttl : 300;
+          await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
+          console.log(`🔄 Updated campaign cache for ${id} (views: ${newViews})`);
+        }
+
+        // ── Also update the user's list cache with new views ──
         const campaignDoc = await db.collection('campaigns').doc(id).get();
         const data = campaignDoc.data();
         if (data && data.userId) {
-          // Update the specific campaign in the user's list cache with new views
-          await updateCampaignInUserListCache(data.userId, id, { views: (data.views || 0) });
+          await updateCampaignInUserListCache(data.userId, id, { views: newViews });
           await invalidateKey(`stats:user:${data.userId}`);
         }
       } catch (err) {
@@ -1391,6 +1608,10 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
     const templateData = templateDoc.data();
+    // ── Ensure template is active ──
+    if (templateData.isActive !== true) {
+      return res.status(400).json({ success: false, error: 'Template is not available' });
+    }
 
     const { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled } = features || {};
     if (typeof scEnabled !== 'boolean' || typeof tasksEnabled !== 'boolean' || typeof fuEnabled !== 'boolean') {
@@ -1476,9 +1697,21 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
     const docRef = await db.collection('campaigns').add(campaignData);
     await templateRef.update({ usageCount: admin.firestore.FieldValue.increment(1) });
 
-    // ── Invalidate user campaigns and stats ──
-    await invalidatePattern(`campaigns:user:${uid}:*`);
+    // ── Add the new campaign to the user's list cache ──
+    const newCampaign = {
+      id: docRef.id,
+      ...campaignData,
+    };
+    await addCampaignToUserListCache(uid, newCampaign);
     await invalidateKey(`stats:user:${uid}`);
+
+    // ── Update template cache with new usageCount ──
+    // We already incremented usageCount in Firestore above.
+    // Now we update the cache for that template.
+    // We need to know the new usageCount. We can read it from the updated templateDoc
+    const updatedTemplateDoc = await templateRef.get();
+    const newUsageCount = updatedTemplateDoc.data().usageCount || 0;
+    await updateTemplateInAllCaches(templateId, { usageCount: newUsageCount });
 
     res.status(201).json({
       success: true,
@@ -1523,8 +1756,8 @@ app.put('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
     filteredUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await doc.ref.update(filteredUpdates);
 
-    // ── Invalidate caches ──
-    await invalidatePattern(`campaigns:user:${uid}:*`);
+    // ── Update the specific campaign in the list cache ──
+    await updateCampaignInUserListCache(uid, id, filteredUpdates);
     await invalidateKey(`campaigns:id:${id}`);
     await invalidateKey(`stats:user:${uid}`);
 
@@ -1557,8 +1790,8 @@ app.delete('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // ── Invalidate caches ──
-    await invalidatePattern(`campaigns:user:${uid}:*`);
+    // ── Remove the campaign from the user's list cache ──
+    await removeCampaignFromUserListCache(uid, id);
     await invalidateKey(`campaigns:id:${id}`);
     await invalidateKey(`stats:user:${uid}`);
 
@@ -1643,11 +1876,27 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       });
     }
 
-    // ── Invalidate caches and update list cache ──
+    // ── Update campaign cache with new shares ──
+    const cacheKey = `campaigns:id:${id}`;
+    let cached = null;
+    try {
+      const cachedStr = await redis.get(cacheKey);
+      if (cachedStr) {
+        cached = JSON.parse(cachedStr);
+      }
+    } catch (e) { /* ignore */ }
+
+    if (cached && cached.campaign) {
+      cached.campaign.shares = result.shares;
+      const ttl = await redis.ttl(cacheKey);
+      const ttlToUse = ttl > 0 ? ttl : 86400; // keep existing TTL, default 24h
+      await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
+      console.log(`🔄 Updated campaign cache for ${id} (shares: ${result.shares})`);
+    }
+
+    // ── Invalidate sharecount cache and update list cache ──
     await invalidateKey(`campaigns:sharecount:${id}`);
-    await invalidateKey(`campaigns:id:${id}`);
     if (campaignData.userId) {
-      // Update the specific campaign in the user's list cache with new shares
       await updateCampaignInUserListCache(campaignData.userId, id, { shares: result.shares });
       await invalidateKey(`stats:user:${campaignData.userId}`);
     }
@@ -1754,10 +2003,26 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
       });
     });
 
-        await invalidateKey(`campaigns:id:${id}`);
+        // ── Update campaign cache with new completions ──
+    const newCompletions = (campaignData.completions || 0) + 1;
+    const cacheKey = `campaigns:id:${id}`;
+    let cached = null;
+    try {
+      const cachedStr = await redis.get(cacheKey);
+      if (cachedStr) {
+        cached = JSON.parse(cachedStr);
+      }
+    } catch (e) { /* ignore */ }
+
+    if (cached && cached.campaign) {
+      cached.campaign.completions = newCompletions;
+      const ttl = await redis.ttl(cacheKey);
+      const ttlToUse = ttl > 0 ? ttl : 86400;
+      await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
+      console.log(`🔄 Updated campaign cache for ${id} (completions: ${newCompletions})`);
+    }
+
     if (campaignData.userId) {
-      // Compute new completions (increment by 1)
-      const newCompletions = (campaignData.completions || 0) + 1;
       await updateCampaignInUserListCache(campaignData.userId, id, { completions: newCompletions });
       await invalidateKey(`stats:user:${campaignData.userId}`);
     }
@@ -1828,10 +2093,26 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
       });
     });
 
-        await invalidateKey(`campaigns:id:${id}`);
+        // ── Update campaign cache with new unlocks ──
+    const newUnlocks = (campaignData.unlockCount || 0) + 1;
+    const cacheKey = `campaigns:id:${id}`;
+    let cached = null;
+    try {
+      const cachedStr = await redis.get(cacheKey);
+      if (cachedStr) {
+        cached = JSON.parse(cachedStr);
+      }
+    } catch (e) { /* ignore */ }
+
+    if (cached && cached.campaign) {
+      cached.campaign.unlockCount = newUnlocks;
+      const ttl = await redis.ttl(cacheKey);
+      const ttlToUse = ttl > 0 ? ttl : 86400;
+      await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
+      console.log(`🔄 Updated campaign cache for ${id} (unlocks: ${newUnlocks})`);
+    }
+
     if (campaignData.userId) {
-      // Compute new unlocks (increment by 1)
-      const newUnlocks = (campaignData.unlockCount || 0) + 1;
       await updateCampaignInUserListCache(campaignData.userId, id, { unlockCount: newUnlocks });
       await invalidateKey(`stats:user:${campaignData.userId}`);
     }
@@ -1957,6 +2238,10 @@ app.post('/api/support', verifyToken, checkBanned, async (req, res) => {
     if (!description || !description.trim()) {
       return res.status(400).json({ success: false, error: 'Description is required' });
     }
+    // ── Validate image URL ──
+    if (image && !validateImageUrl(image)) {
+      return res.status(400).json({ success: false, error: 'Invalid image URL' });
+    }
 
     const ticketData = {
       userId: uid,
@@ -2070,11 +2355,17 @@ app.post('/api/upload', verifyToken, checkBanned, upload.single('image'), async 
       return res.status(400).json({ success: false, error: 'Invalid image file' });
     }
 
+    // ── Determine folder from query param (default: avatars) ──
+    const folder = req.query.folder || 'avatars';
+    const transformation = folder === 'templates' 
+      ? [{ width: 800, height: 600, crop: 'limit' }]
+      : [{ width: 400, height: 400, crop: 'limit' }];
+
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'maketrend/avatars',
-          transformation: [{ width: 400, height: 400, crop: 'limit' }],
+          folder: `maketrend/${folder}`,
+          transformation: transformation,
         },
         (error, result) => {
           if (error) reject(error);
