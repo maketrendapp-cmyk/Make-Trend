@@ -23,10 +23,11 @@ const sharp = require('sharp');
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   connectTimeout: 1000,
   maxRetriesPerRequest: 1,
-  lazyConnect: true,
 });
 redis.on('error', (err) => console.error('❌ Redis error:', err));
 redis.on('connect', () => console.log('✅ Redis connected'));
+
+redis.connect().catch(err => console.error('❌ Redis initial connection failed:', err));
 redis.on('error', (err) => console.error('❌ Redis error:', err));
 
 // ── Redis get with 500ms timeout ──
@@ -366,6 +367,18 @@ app.use('/api/auth/check-email', strictLimiter);
 app.use('/api/auth/check-username', strictLimiter);
 
 // ── Body Parsers & Sanitization ──
+// ── Response-time logging ──
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      console.warn(`⚠️ Slow API: ${req.method} ${req.originalUrl} took ${duration}ms`);
+    }
+  });
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -887,10 +900,6 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
 app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    // ── Rate limit: 20 requests per minute ──
-    if (!(await checkRateLimit(uid, 'profile-get', 20, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
-    }
     const cacheKey = `user:profile:${uid}`;
     let result;
     try {
@@ -2243,14 +2252,12 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
 app.get('/api/stats', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    if (!(await checkRateLimit(uid, 'stats-get', 30, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
-    }
     const cacheKey = `stats:user:${uid}`;
     const result = await getOrSetCache(cacheKey, async () => {
       console.log(`📡 Fetching stats for user ${uid} from Firestore...`);
       const snapshot = await db.collection('campaigns')
         .where('userId', '==', uid)
+        .select('views', 'unlockCount', 'shares', 'completions', 'shareCount', 'status')
         .get();
 
       let totalCampaigns = 0;
