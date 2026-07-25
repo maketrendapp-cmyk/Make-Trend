@@ -385,7 +385,7 @@ export default function Home({ initialFeaturedTemplates }) {
   return (
     <>
       <Meta
-        title="Make Trend – Viral Campaign Platform for Creators"
+        title="Viral Campaign Maker Platform for Creators"
         description="Create share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates."
         url="/"
         image="https://maketrend.app/og-image.png"
