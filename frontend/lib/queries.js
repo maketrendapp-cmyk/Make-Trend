@@ -32,21 +32,11 @@ async function apiRequest(endpoint, options = {}, token = null) {
 }
 
 // ── Get user token ──
-let cachedToken = null;
-let tokenPromise = null;
-
 async function getToken() {
-  if (cachedToken) return cachedToken;
-  if (tokenPromise) return tokenPromise;
-
-  tokenPromise = (async () => {
-    await auth.authStateReady();
-    const user = auth.currentUser;
-    cachedToken = user ? await user.getIdToken() : null;
-    return cachedToken;
-  })();
-
-  return tokenPromise;
+  await auth.authStateReady();
+  const user = auth.currentUser;
+  if (!user) return null;
+  return await user.getIdToken(false); // false = use cached token if still valid
 }
 
 // ── Queries ──
