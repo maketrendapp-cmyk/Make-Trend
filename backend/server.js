@@ -887,6 +887,8 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
       }
     }
 
+    // Invalidate profile cache so the next request gets fresh data
+    await invalidateKey(`user:profile:${uid}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Complete social profile error:', error);
@@ -936,7 +938,7 @@ app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
     result = { success: true, user: { uid, ...userData } };
 
     try {
-      await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+      await redis.set(cacheKey, JSON.stringify(result));
       console.log(`💾 User profile cached: ${uid}`);
     } catch (err) { /* ignore */ }
     res.json(result);
@@ -1232,48 +1234,6 @@ app.post('/api/auth/set-admin', async (req, res) => {
   }
 });
 
-// ── Set session cookie ──
-app.post('/api/auth/set-session', async (req, res) => {
-  try {
-    const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ success: false, error: 'Token required' });
-    }
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (!decoded) {
-      return res.status(401).json({ success: false, error: 'Invalid token' });
-    }
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
-    res.json({ success: true });
-    try {
-      await db.collection('users').doc(decoded.uid).update({
-        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    } catch (err) {
-      console.warn('Background lastLogin update failed:', err);
-    }
-  } catch (error) {
-    console.error('Set session error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ── Clear session cookie ──
-app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-  });
-  res.json({ success: true });
-});
 
 // ============================================================
 // 12. TEMPLATE ENDPOINTS
@@ -1568,7 +1528,7 @@ app.get('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
 
     // Cache with 24 hour TTL – invalidation on change ensures freshness
 try {
-  await redis.set(cacheKey, JSON.stringify(response), 'EX', 86400);
+  await redis.set(cacheKey, JSON.stringify(response)); // indefinite TTL – invalidated on changes
   console.log(`💾 Campaigns cached (24 hour TTL): ${cacheKey}`);
 } catch (err) {
   // ignore
@@ -1616,7 +1576,7 @@ app.get('/api/campaigns/:id', async (req, res) => {
       result = { success: true, campaign: { id: doc.id, ...campaignData } };
       // Store in cache with 60 second TTL
       try {
-        await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+        await redis.set(cacheKey, JSON.stringify(result));
         console.log(`💾 Campaign cached (60s TTL): ${id}`);
       } catch (err) { /* ignore */ }
     }
@@ -1683,7 +1643,7 @@ app.get('/api/campaigns/:id', async (req, res) => {
           cached.campaign.views = newViews;
           const ttl = await redis.ttl(cacheKey);
           const ttlToUse = ttl > 0 ? ttl : 300;
-          await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
+          await redis.set(cacheKey, JSON.stringify(cached));
           console.log(`🔄 Updated campaign cache for ${id} (views: ${newViews})`);
         }
 
