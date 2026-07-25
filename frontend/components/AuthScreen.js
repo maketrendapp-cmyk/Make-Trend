@@ -496,7 +496,7 @@ export function useAuth() {
 // ============================================================
 // AUTH SCREEN UI – CENTERED FORM (NO HERO)
 // ============================================================
-export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
+export default function AuthScreen({ onSuccess, redirectTo = '/', initialReferralCode = '' }) {
   const router = useRouter();
   const {
     login,
@@ -520,7 +520,7 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullname, setFullname] = useState('');
   const [username, setUsername] = useState('');
-  const [referralCode, setReferralCode] = useState('');
+  const [referralCode, setReferralCode] = useState(initialReferralCode);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [socialUser, setSocialUser] = useState(null);
