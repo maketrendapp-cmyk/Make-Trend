@@ -10,14 +10,14 @@ export default function Signup() {
 
   const redirectTo = router.query.redirect || '/profile';
 
-  // ── Redirect if already authenticated and profile is complete ──
+  // ── Only redirect if authenticated AND profile is complete ──
   useEffect(() => {
     if (isAuthenticated && !loading && !needsCompletion) {
       router.replace(redirectTo);
     }
   }, [isAuthenticated, loading, needsCompletion, router, redirectTo]);
 
-  // ── Show loading spinner while auth state is being resolved ──
+  // ── Show a loading spinner while auth state is being resolved ──
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -29,7 +29,7 @@ export default function Signup() {
   // ── If authenticated and profile is complete, return null (will redirect) ──
   if (isAuthenticated && !needsCompletion) return null;
 
-  // ── Render AuthScreen – it will show the signup form (and completion form if needed) ──
+  // ── Render AuthScreen – it will show the signup form (or completion form if needed) ──
   return (
     <>
       <Meta
