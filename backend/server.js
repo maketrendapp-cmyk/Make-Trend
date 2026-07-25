@@ -20,7 +20,12 @@ const sharp = require('sharp');
 // ============================================================
 // 0. REDIS CLIENT (with timeout guard)
 // ============================================================
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  connectTimeout: 1000,
+  maxRetriesPerRequest: 1,
+  lazyConnect: true,
+});
+redis.on('error', (err) => console.error('❌ Redis error:', err));
 redis.on('connect', () => console.log('✅ Redis connected'));
 redis.on('error', (err) => console.error('❌ Redis error:', err));
 
@@ -28,7 +33,7 @@ redis.on('error', (err) => console.error('❌ Redis error:', err));
 async function redisGet(key) {
   return Promise.race([
     redis.get(key),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 500))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 150))
   ]);
 }
 
@@ -42,7 +47,7 @@ async function getOrSetCache(key, fetchFn) {
     }
     console.log(`📡 Cache MISS: ${key}`);
     const data = await fetchFn();
-    await redis.set(key, JSON.stringify(data)); // indefinite TTL
+    await redis.set(key, JSON.stringify(data), 'EX', 86400); // 24h TTL
     return data;
   } catch (error) {
     console.warn(`⚠️ Cache fallback for ${key}:`, error.message);
@@ -540,17 +545,24 @@ async function isUserBanned(uid) {
 }
 
 // ── Middleware to check if user is banned (with caching) ──
+const banCache = new Map();
+
 async function checkBanned(req, res, next) {
   try {
     const uid = req.user.uid;
-    const banned = await isUserBanned(uid);
+    let banned = banCache.get(uid);
+    if (banned === undefined) {
+      banned = await isUserBanned(uid);
+      banCache.set(uid, banned);
+      setTimeout(() => banCache.delete(uid), 60000); // clear after 30s
+    }
     if (banned) {
       return res.status(403).json({ success: false, error: 'Your account has been suspended.' });
     }
     next();
   } catch (error) {
     console.error('Ban check error:', error);
-    next(); // allow on error to avoid blocking
+    next();
   }
 }
 
