@@ -1,19 +1,25 @@
 # ── Robots.txt for Make Trend ──
+# Allow all crawlers to index the site
+
 User-agent: *
 Allow: /
-Allow: /favicon.ico
-Allow: /favicon.svg
-Allow: /icons/*
-
-# ── Disallow sensitive/private paths ──
-Disallow: /api/
-Disallow: /stats
-Disallow: /support
-Disallow: /change-password
-Disallow: /createcampaign
-Disallow: /campaign-created
-Disallow: /tasks
-Disallow: /share
 
 # ── Sitemap location ──
-Sitemap: https://maketrend.vercel.app/sitemap.xml
+Sitemap: https://maketrend.app/sitemap.xml
+
+# ── Disallow sensitive / private paths (already handled by auth) ──
+# These are still blocked if not authenticated, but we exclude them from crawl anyway.
+Disallow: /profile
+Disallow: /stats
+Disallow: /support
+Disallow: /edit-profile
+Disallow: /change-password
+Disallow: /refer-earn
+Disallow: /campaign-created
+Disallow: /createcampaign
+Disallow: /api/
+Disallow: /_next/
+Disallow: /icons/
+
+# ── Crawl delay to be gentle on the server ──
+Crawl-delay: 1
