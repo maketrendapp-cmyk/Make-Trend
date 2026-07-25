@@ -33,16 +33,24 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
   }, [initialTemplates, initialFeaturedTemplates, queryClient]);
 
-  // ── React Query data ──
-  const { data: templates = [], isLoading: templatesLoading } = useTemplates();
-  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates();
+// ── State ──
+const [searchQuery, setSearchQuery] = useState(initialSearch || '');
+const [selectedCategory, setSelectedCategory] = useState('');
+const [selectedPlatform, setSelectedPlatform] = useState('');
+const [showFilters, setShowFilters] = useState(false);
+const [highlightedId, setHighlightedId] = useState(null);
+const [carouselIndex, setCarouselIndex] = useState(0);
 
-  const [searchQuery, setSearchQuery] = useState(initialSearch || '');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [highlightedId, setHighlightedId] = useState(null);
-  const [carouselIndex, setCarouselIndex] = useState(0);
+// ── React Query data ──
+const { data: templates = [], isLoading: templatesLoading } = useTemplates({
+  category: selectedCategory || undefined,
+  platform: selectedPlatform || undefined,
+});
+const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates({
+  category: selectedCategory || undefined,
+  platform: selectedPlatform || undefined,
+});
+  
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
