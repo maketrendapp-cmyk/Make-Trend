@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AuthScreen, { useAuth } from '../components/AuthScreen';
+import Meta from '../components/Meta'; // ✅ Import Meta
 
 export default function Login() {
   const router = useRouter();
@@ -29,5 +30,15 @@ export default function Login() {
   if (isAuthenticated && !needsCompletion) return null;
 
   // ── Render AuthScreen – it will show the completion form if needed ──
-  return <AuthScreen redirectTo={redirectTo} />;
+  return (
+    <>
+      <Meta
+        title="Login | Make Trend"
+        description="Sign in to your Make Trend account to create and manage campaigns."
+        image="https://maketrend.app/og-image.png"
+        url="https://maketrend.app/login"
+      />
+      <AuthScreen redirectTo={redirectTo} />
+    </>
+  );
 }
