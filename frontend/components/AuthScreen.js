@@ -496,8 +496,9 @@ export function useAuth() {
 // ============================================================
 // AUTH SCREEN UI – CENTERED FORM (NO HERO)
 // ============================================================
-export default function AuthScreen({ onSuccess, redirectTo = '/', initialReferralCode = '' }) {
+export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   const router = useRouter();
+  const { ref } = router.query;
   const {
     login,
     register,
@@ -520,7 +521,14 @@ export default function AuthScreen({ onSuccess, redirectTo = '/', initialReferra
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullname, setFullname] = useState('');
   const [username, setUsername] = useState('');
-  const [referralCode, setReferralCode] = useState(initialReferralCode);
+  const [referralCode, setReferralCode] = useState(ref ? ref.toUpperCase() : '');
+
+// ── Sync referral code from URL when it changes ──
+useEffect(() => {
+  if (ref && typeof ref === 'string') {
+    setReferralCode(ref.toUpperCase());
+  }
+}, [ref]);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [socialUser, setSocialUser] = useState(null);
