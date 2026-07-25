@@ -46,7 +46,7 @@ async function getOrSetCache(key, fetchFn) {
     }
     console.log(`📡 Cache MISS: ${key}`);
     const data = await fetchFn();
-    await redis.set(key, JSON.stringify(data), 'EX', 86400); // 24h TTL
+    await redis.set(key, JSON.stringify(data)); // indefinite TTL – invalidated on changes
     return data;
   } catch (error) {
     console.warn(`⚠️ Cache fallback for ${key}:`, error.message);
