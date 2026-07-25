@@ -48,6 +48,7 @@ const TOP_NAV_ONLY_PAGES = [
   '/download',
   '/contact',
   '/login',
+'/signup',
 ];
 
 function MyApp({ Component, pageProps }) {
