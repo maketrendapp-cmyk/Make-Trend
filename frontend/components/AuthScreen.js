@@ -196,18 +196,9 @@ export function AuthProvider({ children }) {
             setNeedsCompletion(false);
             cacheAuth(profileData);
           } else {
-            const status = await checkProfileStatus(firebaseUser.uid);
-            if (status.completed) {
-              const fallback = await fetchUserProfile(firebaseUser);
-              if (fallback) {
-                setUser(fallback);
-                setIsAuthenticated(true);
-                setNeedsCompletion(false);
-                cacheAuth(fallback);
-              }
-            } else {
-              setNeedsCompletion(true);
-            }
+            // If no profile data, user needs to complete their profile
+            setNeedsCompletion(true);
+            setUser({ ...basicUser, completed: false });
           }
         } catch {}
       } else {
