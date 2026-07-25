@@ -26,8 +26,6 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
 });
 redis.on('error', (err) => console.error('❌ Redis error:', err));
 redis.on('connect', () => console.log('✅ Redis connected'));
-
-redis.connect().catch(err => console.error('❌ Redis initial connection failed:', err));
 redis.on('error', (err) => console.error('❌ Redis error:', err));
 
 // ── Redis get with 500ms timeout ──
