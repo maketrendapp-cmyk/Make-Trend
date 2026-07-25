@@ -32,7 +32,7 @@ redis.on('error', (err) => console.error('❌ Redis error:', err));
 async function redisGet(key) {
   return Promise.race([
     redis.get(key),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 150))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 500))
   ]);
 }
 
