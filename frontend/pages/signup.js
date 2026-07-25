@@ -2,7 +2,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AuthScreen, { useAuth } from '../components/AuthScreen';
-import Meta from '../components/Meta';
 
 export default function Signup() {
   const router = useRouter();
@@ -10,14 +9,14 @@ export default function Signup() {
 
   const redirectTo = router.query.redirect || '/profile';
 
-  // ── Only redirect if authenticated AND profile is complete ──
+  // ── Redirect if already authenticated with a complete profile ──
   useEffect(() => {
     if (isAuthenticated && !loading && !needsCompletion) {
       router.replace(redirectTo);
     }
   }, [isAuthenticated, loading, needsCompletion, router, redirectTo]);
 
-  // ── Show a loading spinner while auth state is being resolved ──
+  // ── Show loading spinner while auth state is being resolved ──
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -29,14 +28,7 @@ export default function Signup() {
   // ── If authenticated and profile is complete, return null (will redirect) ──
   if (isAuthenticated && !needsCompletion) return null;
 
-  // ── Render AuthScreen – it will show the signup form (or completion form if needed) ──
-  return (
-    <>
-      <Meta
-        title="Sign Up | Make Trend"
-        description="Create your Make Trend account and start launching viral campaigns."
-      />
-      <AuthScreen redirectTo={redirectTo} />
-    </>
-  );
+  // ── Render AuthScreen – it will handle signup (and completion if needed) ──
+  // The referral code (?ref=CODE) is read directly inside AuthScreen
+  return <AuthScreen redirectTo={redirectTo} />;
 }
