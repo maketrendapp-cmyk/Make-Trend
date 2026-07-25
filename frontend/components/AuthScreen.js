@@ -980,13 +980,24 @@ useEffect(() => {
   // ─── CENTERED FORM LAYOUT (NO HERO) ───
   return (
     <>
-      <Meta
-        title={emailExists === true ? "Login | Make Trend" : "Sign Up | Make Trend"}
-        description={emailExists === true 
-          ? "Sign in to your Make Trend account to create and manage campaigns."
-          : "Create your Make Trend account and start launching viral campaigns."
-        }
-      />
+      // ── Dynamic meta for signup with referral code ──
+const isSignupPage = router.pathname === '/signup';
+const referralCode = ref ? ref.toUpperCase() : '';
+
+let metaTitle = emailExists === true ? "Login | Make Trend" : "Sign Up | Make Trend";
+let metaDescription = emailExists === true 
+  ? "Sign in to your Make Trend account to create and manage campaigns."
+  : "Create your Make Trend account and start launching viral campaigns.";
+
+if (isSignupPage && referralCode) {
+  metaTitle = `Join Make Trend with referral code ${referralCode} | Make Trend`;
+  metaDescription = `Create your Make Trend account using referral code ${referralCode} and start launching viral campaigns!`;
+}
+
+<Meta
+  title={metaTitle}
+  description={metaDescription}
+/>
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-purple-50/30 px-4 py-8">
 
         <motion.div
