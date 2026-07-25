@@ -7,9 +7,6 @@ Allow: /icons/*
 
 # ── Disallow sensitive/private paths ──
 Disallow: /api/
-Disallow: /login
-Disallow: /register
-Disallow: /profile
 Disallow: /stats
 Disallow: /support
 Disallow: /change-password
