@@ -15,7 +15,7 @@ apiClient.interceptors.request.use(
   async (config) => {
     const user = auth.currentUser;
     if (user) {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(false); // false = use cached token
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
