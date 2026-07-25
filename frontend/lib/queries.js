@@ -6,7 +6,15 @@ import toast from 'react-hot-toast';
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 
+const requestCache = new Map();
+
 async function apiRequest(endpoint, options = {}, token = null) {
+  const cacheKey = `${endpoint}-${JSON.stringify(options)}-${token || 'no-token'}`;
+  
+  if (requestCache.has(cacheKey)) {
+    return requestCache.get(cacheKey);
+  }
+
   const url = `${BACKEND_URL}/api${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -16,14 +24,29 @@ async function apiRequest(endpoint, options = {}, token = null) {
   const res = await fetch(url, { ...options, headers });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'API error');
+  
+  requestCache.set(cacheKey, data);
+  setTimeout(() => requestCache.delete(cacheKey), 1000); // 5s TTL
+
   return data;
 }
 
 // ── Get user token ──
+let cachedToken = null;
+let tokenPromise = null;
+
 async function getToken() {
-  await auth.authStateReady();
-  const user = auth.currentUser;
-  return user ? await user.getIdToken() : null;
+  if (cachedToken) return cachedToken;
+  if (tokenPromise) return tokenPromise;
+
+  tokenPromise = (async () => {
+    await auth.authStateReady();
+    const user = auth.currentUser;
+    cachedToken = user ? await user.getIdToken() : null;
+    return cachedToken;
+  })();
+
+  return tokenPromise;
 }
 
 // ── Queries ──
@@ -37,7 +60,7 @@ export function useProfile(enabled = false) {
       return data.user ? { ...data.user, completed: true } : null;
     },
     enabled,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -51,29 +74,34 @@ export function useStats(enabled = false) {
       return data.stats || {};
     },
     enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useTemplates(filters = {}) {
+  const queryString = new URLSearchParams(filters).toString();
+  const queryKey = ['templates', filters];
+  return useQuery({
+    queryKey,
+    queryFn: async () => {
+      const url = queryString ? `/templates?${queryString}` : '/templates';
+      const data = await apiRequest(url);
+      return data.templates || [];
+    },
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useTemplates() {
+export function useFeaturedTemplates(filters = {}) {
+  const queryString = new URLSearchParams({ highlight: true, ...filters }).toString();
+  const queryKey = ['featuredTemplates', filters];
   return useQuery({
-    queryKey: ['templates'],
+    queryKey,
     queryFn: async () => {
-      const data = await apiRequest('/templates');
-      return data.templates || [];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
-}
-
-export function useFeaturedTemplates() {
-  return useQuery({
-    queryKey: ['featuredTemplates'],
-    queryFn: async () => {
-      const data = await apiRequest('/templates?highlight=true');
+      const data = await apiRequest(`/templates?${queryString}`);
       return (data.templates || []).filter(t => t.isHighlight === true);
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
