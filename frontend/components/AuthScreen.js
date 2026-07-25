@@ -560,10 +560,10 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
   }, [redirectTo, router, user, needsCompletion]);
 
   const handleSuccess = (msg = 'Welcome to Make Trend! 🎉') => {
-    setSuccessMessage(msg);
-    setShowSuccess(true);
-    setTimeout(() => performRedirect(), 800);
-  };
+  setSuccessMessage(msg);
+  setShowSuccess(true);
+  setTimeout(() => performRedirect(), 200);
+};
 
   // ── Effects ──
   useEffect(() => {
