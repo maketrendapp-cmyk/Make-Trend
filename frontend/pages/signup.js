@@ -2,12 +2,14 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AuthScreen, { useAuth } from '../components/AuthScreen';
+import Meta from '../components/Meta'; // ✅ Import Meta
 
 export default function Signup() {
   const router = useRouter();
   const { isAuthenticated, loading, needsCompletion } = useAuth();
+  const { ref, redirect } = router.query;
 
-  const redirectTo = router.query.redirect || '/profile';
+  const redirectTo = redirect || '/profile';
 
   // ── Redirect if already authenticated with a complete profile ──
   useEffect(() => {
@@ -28,7 +30,25 @@ export default function Signup() {
   // ── If authenticated and profile is complete, return null (will redirect) ──
   if (isAuthenticated && !needsCompletion) return null;
 
-  // ── Render AuthScreen – it will handle signup (and completion if needed) ──
-  // The referral code (?ref=CODE) is read directly inside AuthScreen
-  return <AuthScreen redirectTo={redirectTo} />;
+  // ── Build dynamic meta tags with referral code ──
+  const referralCode = ref ? ref.toUpperCase() : '';
+  const metaTitle = referralCode 
+    ? `Join Make Trend with referral code ${referralCode} | Make Trend`
+    : 'Join Make Trend – Sign Up & Start Creating';
+  const metaDescription = referralCode 
+    ? `Create your Make Trend account using referral code ${referralCode} and start launching viral campaigns!`
+    : 'Create your Make Trend account and start launching viral campaigns.';
+  const metaUrl = `https://maketrend.app/signup${referralCode ? `?ref=${referralCode}` : ''}`;
+
+  return (
+    <>
+      <Meta
+        title={metaTitle}
+        description={metaDescription}
+        image="https://maketrend.app/og-image.png"  // Use your default OG image
+        url={metaUrl}
+      />
+      <AuthScreen redirectTo={redirectTo} />
+    </>
+  );
 }
