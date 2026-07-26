@@ -23,9 +23,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// ============================================================
-// PAGES WITH NO LAYOUT AT ALL (standalone pages)
-// ============================================================
 const NO_LAYOUT_PAGES = [
   '/templates/ncell-reward-v1',
   '/templates/student-scholarship-nepal-v1',
@@ -38,9 +35,6 @@ const NO_LAYOUT_PAGES = [
   '/share',
 ];
 
-// ============================================================
-// PAGES WITH ONLY TOP NAVBAR (no bottom nav, no menu, no sidebar)
-// ============================================================
 const TOP_NAV_ONLY_PAGES = [
   '/about',
   '/rules',
@@ -61,7 +55,6 @@ function MyApp({ Component, pageProps }) {
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
-  // ── No layout (templates, tasks, share) ──
   if (isNoLayout) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -74,7 +67,6 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
-  // ── Top navbar only (about, rules, terms, privacy, login, signup) ──
   if (isTopNavOnly) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -95,30 +87,38 @@ function MyApp({ Component, pageProps }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-        <div className="min-h-screen bg-bg flex flex-col">
-          <Navbar />
+        
+        {/* CRITICAL FIX: The entire app wrapper is now strictly h-screen, no overflow allowed on the body */}
+        <div className="h-screen bg-bg flex flex-col overflow-hidden">
+          
+          {/* Header stays locked at the top */}
+          <div className="flex-shrink-0 z-40 relative">
+            <Navbar />
+          </div>
 
-          <div className="flex flex-1">
-            {/* ── Sidebar Wrapper ── */}
-            {/* Removed conflicting width (w-64), sticky, and h-screen classes. 
-                Sidebar.js now dictates its own 260px width and fixed layout. */}
-            <div className="hidden md:block flex-shrink-0 z-30">
+          {/* This wrapper holds the Sidebar and Main Content and splits the remaining height */}
+          <div className="flex flex-1 overflow-hidden relative">
+            
+            {/* ── Sidebar (Fixed in place, matches remaining height exactly) ── */}
+            <div className="hidden md:block flex-shrink-0 h-full z-30">
               <Sidebar />
             </div>
 
-            {/* ── Main Content ── */}
-            {/* Added min-w-0 to prevent child elements from forcing horizontal scroll */}
-            <div className="flex-1 min-w-0 overflow-y-auto pb-20 md:pb-0">
+            {/* ── Main Content (This is the ONLY part that scrolls!) ── */}
+            <div className="flex-1 min-w-0 h-full overflow-y-auto pb-20 md:pb-0">
               <Component {...pageProps} />
             </div>
+            
           </div>
 
           {/* ── Bottom Navigation (mobile) ── */}
-          <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+          <div className="md:hidden flex-shrink-0 relative z-40">
+            <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+          </div>
 
-          {/* ── Mobile Menu Drawer ── */}
           <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
         </div>
+        
         <ReactQueryDevtools initialIsOpen={false} />
       </AuthProvider>
     </QueryClientProvider>
