@@ -89,31 +89,23 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="flex flex-col w-[280px] h-screen flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_8px_-4px_rgba(0,0,0,0.05)]">
-      {/* ── Brand / Logo Header ── */}
-      <div className="flex items-center h-20 px-8 border-b border-gray-100 flex-shrink-0">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-lg leading-none">A</span>
-          </div>
-          <span className="text-xl font-bold text-gray-900 tracking-tight">AppLogo</span>
-        </Link>
-      </div>
-
+    <aside className="flex flex-col w-[260px] h-full flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_8px_-4px_rgba(0,0,0,0.05)]">
+      
       {/* ── Scrollable Navigation ── */}
-      {/* Added styles to hide the ugly default scrollbar while keeping functionality */}
+      {/* Reduced padding (py-3) and gap space (space-y-4) to make it fit easily below a header */}
       <nav 
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-8"
+        className="flex-1 overflow-y-auto px-3 py-3 space-y-4"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         <style>{`nav::-webkit-scrollbar { display: none; }`}</style>
         
         {menuGroups.map((group, idx) => (
-          <div key={idx} className="space-y-2">
-            <h3 className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+          <div key={idx} className="space-y-1">
+            {/* Added a tiny top margin except for the very first group */}
+            <h3 className={`px-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider ${idx > 0 ? 'mt-2' : ''}`}>
               {group.title}
             </h3>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
@@ -122,7 +114,7 @@ export default function Sidebar() {
                     key={item.href}
                     href={item.href}
                     className={`
-                      group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200
+                      group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200
                       ${active
                         ? 'bg-purple-50 text-purple-700'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -130,7 +122,7 @@ export default function Sidebar() {
                     `}
                   >
                     <Icon 
-                      className={`w-5 h-5 transition-colors ${
+                      className={`w-[18px] h-[18px] transition-colors ${
                         active ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-600'
                       }`} 
                     />
@@ -149,11 +141,12 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Fixed Footer: User Info + Logout ── */}
-      <div className="flex-shrink-0 border-t border-gray-200 p-5 bg-white">
+      {/* Reduced padding here as well to pull it up slightly */}
+      <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-white">
         {isAuthenticated ? (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-              <div className="relative w-11 h-11 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-sm overflow-hidden flex-shrink-0 border-2 border-white ring-1 ring-gray-100">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3 p-1.5 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
+              <div className="relative w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm overflow-hidden flex-shrink-0 border-2 border-white ring-1 ring-gray-100">
                 {profileLoading ? (
                   <div className="w-full h-full animate-pulse bg-gray-300" />
                 ) : displayAvatar ? (
@@ -163,8 +156,8 @@ export default function Sidebar() {
                 )}
                 {isPro && (
                   <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5">
-                    <div className="bg-yellow-400 text-white rounded-full p-0.5">
-                      <FaCrown className="w-2.5 h-2.5" />
+                    <div className="bg-yellow-400 text-white rounded-full p-[1px]">
+                      <FaCrown className="w-2 h-2" />
                     </div>
                   </div>
                 )}
@@ -177,7 +170,7 @@ export default function Sidebar() {
                     displayName
                   )}
                 </p>
-                <p className="text-xs text-gray-500 truncate mt-0.5">
+                <p className="text-[11px] text-gray-500 truncate mt-0.5">
                   {profileLoading ? (
                     <span className="inline-block w-24 h-3 animate-pulse bg-gray-200 rounded" />
                   ) : (
@@ -189,7 +182,7 @@ export default function Sidebar() {
             
             <button
               onClick={handleLogout}
-              className="group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all duration-200 border border-gray-200 hover:border-red-100"
+              className="group flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all duration-200 border border-gray-200 hover:border-red-100"
             >
               <FiLogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors" />
               Sign Out
@@ -198,9 +191,9 @@ export default function Sidebar() {
         ) : (
           <Link
             href="/login"
-            className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 bg-purple-600 text-white font-medium text-sm hover:bg-purple-700 hover:shadow-md hover:shadow-purple-200 transition-all duration-200"
+            className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 bg-purple-600 text-white font-medium text-sm hover:bg-purple-700 hover:shadow-md hover:shadow-purple-200 transition-all duration-200"
           >
-            <FiUser className="w-4 h-4" />
+            <FiUser className="w-[18px] h-[18px]" />
             Sign In to Account
           </Link>
         )}
