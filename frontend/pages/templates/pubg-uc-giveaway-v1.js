@@ -6,9 +6,8 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 
 // ── Default Meta ──
 const defaultMeta = {
-  title: 'PUBG Mobile UC Giveaway – Official Event',
-  description:
-    'Claim free UC for PUBG Mobile! Complete tasks and earn up to 10,000 UC. Limited time official event.',
+  title: 'PUBG UC Giveaway – Official Event',
+  description: 'Claim free UC for PUBG Mobile. Complete tasks and win up to 10,000 UC. Limited time official event.',
   image: 'https://maketrend.vercel.app/og-pubg-uc.jpg', // replace
   url: 'https://maketrend.vercel.app/pubg-uc-giveaway-v1?id={id}',
 };
@@ -41,22 +40,19 @@ function PubgUcGiveawayV1({ campaign }) {
   // ── Submit and redirect ──
   const handleSubmit = () => {
     if (!isValidUid(uid)) {
-      setError('Please enter a valid 8‑12 digit UID.');
+      setError('Enter a valid 8‑12 digit UID.');
       return;
     }
     if (!acceptedTerms) {
-      setError('You must accept the terms to continue.');
+      setError('You must accept the terms.');
       return;
     }
     setError('');
     setLoading(true);
 
-    // Redirect to tasks or create page
     if (!id) {
       router.push('/create');
     } else {
-      // Optionally send data to backend
-      // await apiClient.post(`/campaigns/${id}/register`, { uid, server });
       router.push(`/tasks?id=${id}`);
     }
   };
@@ -70,35 +66,10 @@ function PubgUcGiveawayV1({ campaign }) {
           <h2>Open in Browser</h2>
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
-            <button
-              className="modal-btn"
-              onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
-                setShowWebViewModal(false);
-              }}
-            >
-              📋 Copy Link
-            </button>
-            <button
-              className="modal-btn primary"
-              onClick={() => {
-                const url = window.location.href;
-                if (navigator.userAgent.includes('Android')) {
-                  window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
-                } else {
-                  window.open(url, '_system');
-                }
-              }}
-            >
-              🚀 Open in Browser
-            </button>
+            <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
+            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_system'); } }}>🚀 Open in Browser</button>
           </div>
-          <button
-            className="modal-btn ghost"
-            onClick={() => setShowWebViewModal(false)}
-          >
-            Continue Anyway
-          </button>
+          <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
         </div>
       </div>
     );
@@ -112,16 +83,16 @@ function PubgUcGiveawayV1({ campaign }) {
       <header className="site-header">
         <div className="header-container">
           <div className="logo">
-            <span className="logo-icon">🎯</span>
-            <span className="logo-text">PUBG<span>Giveaway</span></span>
+            <span className="logo-icon">⚔️</span>
+            <span className="logo-text">PUBG<span>GIVEAWAY</span></span>
           </div>
           <div className="header-right">
             <div className="live-badge">
-              <span className="pulse"></span> Live
+              <span className="pulse"></span> LIVE
             </div>
-            <div className="user-badge">
-              <span>👤</span>
-              <span className="uid-placeholder">{uid ? uid : 'Not Connected'}</span>
+            <div className="uid-badge">
+              <span className="uid-label">UID</span>
+              <span className="uid-value">{uid || '—'}</span>
             </div>
           </div>
         </div>
@@ -131,19 +102,17 @@ function PubgUcGiveawayV1({ campaign }) {
       <section className="hero-section">
         <div className="hero-overlay"></div>
         <div className="hero-content">
-          <div className="hero-badge">🔥 Limited Time Event</div>
-          <h1>PUBG Mobile UC Giveaway</h1>
+          <div className="hero-badge">🔥 OFFICIAL EVENT</div>
+          <h1>PUBG Mobile UC<br />Giveaway</h1>
           <p className="hero-sub">
-            Complete simple tasks and win up to <span className="highlight">10,000 UC</span> + exclusive skins!
+            Complete tasks &amp; win up to <span className="highlight">10,000 UC</span> + exclusive skins
           </p>
           <div className="hero-stats">
-            <div><span>🎮</span> 500+ Winners</div>
-            <div><span>⏳</span> 24h Left</div>
             <div><span>🏆</span> 50,000 UC Pool</div>
+            <div><span>👥</span> 500+ Winners</div>
+            <div><span>⏳</span> <span id="countdown">24h</span> Left</div>
           </div>
-          <a href="#claim-section" className="hero-cta">
-            Claim Your Reward →
-          </a>
+          <a href="#claim" className="hero-cta">Claim Your Reward →</a>
         </div>
       </section>
 
@@ -158,13 +127,13 @@ function PubgUcGiveawayV1({ campaign }) {
           </div>
           <div className="reward-card">
             <div className="reward-icon">🔫</div>
-            <h3>Legendary Skin</h3>
-            <p>M416 – Glory</p>
+            <h3>M416 Glory</h3>
+            <p>Legendary Skin</p>
           </div>
           <div className="reward-card">
             <div className="reward-icon">🎒</div>
-            <h3>Exclusive Set</h3>
-            <p>Full Outfit</p>
+            <h3>Full Outfit</h3>
+            <p>Exclusive Set</p>
           </div>
           <div className="reward-card">
             <div className="reward-icon">🎫</div>
@@ -202,7 +171,7 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </section>
 
-      {/* ─── TERMS & CONDITIONS ─── */}
+      {/* ─── TERMS ─── */}
       <section className="terms-section">
         <h2 className="section-title">📜 Official Rules</h2>
         <div className="terms-content">
@@ -217,7 +186,7 @@ function PubgUcGiveawayV1({ campaign }) {
       </section>
 
       {/* ─── CLAIM FORM ─── */}
-      <section id="claim-section" className="claim-section">
+      <section id="claim" className="claim-section">
         <div className="claim-card">
           <h2>🎮 Enter Your Details</h2>
           <p>Fill in the fields below to start the process.</p>
@@ -262,7 +231,7 @@ function PubgUcGiveawayV1({ campaign }) {
               onChange={(e) => setAcceptedTerms(e.target.checked)}
             />
             <label htmlFor="terms">
-              I agree to the <a href="#terms">Terms &amp; Conditions</a> and confirm I am a real player.
+              I agree to the <a href="#terms">Terms &amp; Conditions</a>.
             </label>
           </div>
 
@@ -283,7 +252,7 @@ function PubgUcGiveawayV1({ campaign }) {
           </button>
 
           <p className="form-footnote">
-            ⚡ By continuing, you agree to complete the required tasks. Rewards are limited.
+            ⚡ By continuing, you agree to complete the required tasks.
           </p>
         </div>
       </section>
@@ -301,13 +270,13 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── ALL STYLES (inlined) ─── */}
+      {/* ─── ALL STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
-        /* ───── RESET & BASE ───── */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ───── RESET ───── */
+        * { margin:0; padding:0; box-sizing:border-box; }
         body {
-          font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-          background: #0a0c0f;
+          font-family: 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+          background: #0b0d10;
           color: #f0f0f0;
           line-height: 1.6;
           scroll-behavior: smooth;
@@ -316,529 +285,481 @@ function PubgUcGiveawayV1({ campaign }) {
 
         /* ───── HEADER ───── */
         .site-header {
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          background: rgba(10, 12, 15, 0.9);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 140, 0, 0.2);
+          position: sticky; top:0; z-index:100;
+          background: rgba(10,12,15,0.92);
+          backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(255,140,0,0.25);
           padding: 0.7rem 1.5rem;
         }
         .header-container {
-          max-width: 1100px;
-          margin: 0 auto;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+          max-width: 1200px; margin:0 auto;
+          display:flex; justify-content:space-between; align-items:center;
         }
         .logo {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-weight: 800;
-          font-size: 1.2rem;
+          display:flex; align-items:center; gap:10px;
+          font-weight:800; font-size:1.2rem;
         }
-        .logo-icon { font-size: 1.6rem; }
-        .logo-text { color: #fff; }
-        .logo-text span { color: #ff8c00; }
-        .header-right {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-        }
+        .logo-icon { font-size:1.6rem; }
+        .logo-text { color:#fff; letter-spacing:1px; }
+        .logo-text span { color:#ff8c00; margin-left:2px; }
+        .header-right { display:flex; align-items:center; gap:20px; }
         .live-badge {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background: rgba(255, 50, 50, 0.15);
-          border: 1px solid #ff3333;
-          padding: 0.2rem 0.8rem;
-          border-radius: 40px;
-          font-size: 0.7rem;
-          font-weight: 700;
-          color: #ff6666;
-          text-transform: uppercase;
+          display:flex; align-items:center; gap:6px;
+          background:rgba(255,50,50,0.15);
+          border:1px solid #ff3333;
+          padding:0.2rem 0.8rem;
+          border-radius:40px;
+          font-size:0.7rem;
+          font-weight:700;
+          color:#ff6666;
+          text-transform:uppercase;
         }
         .pulse {
-          display: inline-block;
-          width: 8px;
-          height: 8px;
-          background: #ff3333;
-          border-radius: 50%;
-          animation: pulse 1.5s infinite;
+          display:inline-block; width:8px; height:8px;
+          background:#ff3333; border-radius:50%;
+          animation:pulse 1.5s infinite;
         }
         @keyframes pulse {
-          0% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.2); }
-          100% { opacity: 1; transform: scale(1); }
+          0% { opacity:1; transform:scale(1); }
+          50% { opacity:0.5; transform:scale(1.2); }
+          100% { opacity:1; transform:scale(1); }
         }
-        .user-badge {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background: rgba(255,255,255,0.05);
-          padding: 0.2rem 1rem 0.2rem 0.6rem;
-          border-radius: 40px;
-          border: 1px solid rgba(255,255,255,0.1);
-          font-size: 0.8rem;
+        .uid-badge {
+          display:flex; align-items:center; gap:6px;
+          background:rgba(255,255,255,0.05);
+          padding:0.2rem 0.8rem 0.2rem 0.6rem;
+          border-radius:40px;
+          border:1px solid rgba(255,255,255,0.08);
+          font-size:0.8rem;
         }
-        .uid-placeholder {
-          color: #aaa;
-          font-weight: 500;
-          max-width: 100px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
+        .uid-label { color:#888; font-weight:600; }
+        .uid-value { color:#fff; font-weight:700; min-width:50px; }
 
         /* ───── HERO ───── */
         .hero-section {
-          position: relative;
-          min-height: 70vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          padding: 2rem 1.5rem;
+          position:relative;
+          min-height:85vh;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          text-align:center;
+          padding:2rem 1.5rem;
           background: url('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop') center/cover no-repeat;
+          background-attachment:fixed;
         }
         .hero-overlay {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%);
+          position:absolute; inset:0;
+          background:linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 100%);
         }
         .hero-content {
-          position: relative;
-          z-index: 2;
-          max-width: 800px;
+          position:relative; z-index:2;
+          max-width:900px;
         }
         .hero-badge {
-          display: inline-block;
-          background: rgba(255, 140, 0, 0.2);
-          border: 1px solid #ff8c00;
-          padding: 0.3rem 1.2rem;
-          border-radius: 40px;
-          font-size: 0.7rem;
-          text-transform: uppercase;
-          font-weight: 700;
-          color: #ff8c00;
-          margin-bottom: 1rem;
+          display:inline-block;
+          background:rgba(255,140,0,0.2);
+          border:1px solid #ff8c00;
+          padding:0.3rem 1.5rem;
+          border-radius:40px;
+          font-size:0.7rem;
+          text-transform:uppercase;
+          font-weight:700;
+          color:#ff8c00;
+          margin-bottom:1rem;
         }
         .hero-section h1 {
-          font-size: clamp(2.2rem, 8vw, 4.2rem);
-          font-weight: 900;
-          line-height: 1.1;
-          background: linear-gradient(135deg, #fff 30%, #ff8c00 100%);
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          margin-bottom: 0.5rem;
+          font-size:clamp(2.8rem, 10vw, 5.2rem);
+          font-weight:900;
+          line-height:1.1;
+          background:linear-gradient(135deg, #fff 30%, #ff8c00 100%);
+          -webkit-background-clip:text;
+          background-clip:text;
+          color:transparent;
+          margin-bottom:0.5rem;
+          text-shadow:0 0 40px rgba(255,140,0,0.2);
         }
         .hero-sub {
-          font-size: 1.2rem;
-          color: #ccc;
-          margin-bottom: 1.5rem;
+          font-size:1.3rem;
+          color:#ccc;
+          margin-bottom:1.8rem;
         }
-        .highlight {
-          color: #ff8c00;
-          font-weight: 800;
-        }
+        .highlight { color:#ff8c00; font-weight:800; }
         .hero-stats {
-          display: flex;
-          justify-content: center;
-          gap: 2rem;
-          flex-wrap: wrap;
-          margin-bottom: 2rem;
+          display:flex;
+          justify-content:center;
+          gap:2.5rem;
+          flex-wrap:wrap;
+          margin-bottom:2.5rem;
         }
         .hero-stats div {
-          background: rgba(0,0,0,0.5);
-          backdrop-filter: blur(4px);
-          padding: 0.5rem 1.5rem;
-          border-radius: 40px;
-          border: 1px solid rgba(255,255,255,0.1);
-          font-weight: 600;
-          font-size: 0.9rem;
+          background:rgba(0,0,0,0.5);
+          backdrop-filter:blur(8px);
+          padding:0.6rem 1.8rem;
+          border-radius:60px;
+          border:1px solid rgba(255,255,255,0.08);
+          font-weight:600;
+          font-size:1rem;
         }
-        .hero-stats span { margin-right: 6px; }
+        .hero-stats span { margin-right:8px; }
         .hero-cta {
-          display: inline-block;
-          background: linear-gradient(135deg, #ff8c00, #e67600);
-          color: #fff;
-          padding: 0.9rem 2.5rem;
-          border-radius: 60px;
-          font-weight: 800;
-          font-size: 1.1rem;
-          text-decoration: none;
-          box-shadow: 0 4px 20px rgba(255, 140, 0, 0.4);
-          transition: transform 0.2s, box-shadow 0.2s;
+          display:inline-block;
+          background:linear-gradient(135deg, #ff8c00, #e67600);
+          color:#0b0d10;
+          padding:1rem 3rem;
+          border-radius:60px;
+          font-weight:800;
+          font-size:1.2rem;
+          text-decoration:none;
+          box-shadow:0 4px 30px rgba(255,140,0,0.4);
+          transition:transform 0.2s, box-shadow 0.2s;
         }
         .hero-cta:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 30px rgba(255, 140, 0, 0.6);
+          transform:translateY(-4px);
+          box-shadow:0 8px 40px rgba(255,140,0,0.6);
         }
 
         /* ───── SECTIONS ───── */
         section {
-          padding: 3rem 1.5rem;
-          max-width: 1100px;
-          margin: 0 auto;
+          padding:4rem 1.5rem;
+          max-width:1100px;
+          margin:0 auto;
         }
         .section-title {
-          font-size: 2rem;
-          font-weight: 800;
-          text-align: center;
-          margin-bottom: 2rem;
-          position: relative;
+          font-size:2.2rem;
+          font-weight:800;
+          text-align:center;
+          margin-bottom:2.5rem;
+          position:relative;
         }
         .section-title::after {
-          content: '';
-          display: block;
-          width: 60px;
-          height: 4px;
-          background: #ff8c00;
-          margin: 0.5rem auto 0;
-          border-radius: 4px;
+          content:'';
+          display:block;
+          width:70px;
+          height:4px;
+          background:#ff8c00;
+          margin:0.5rem auto 0;
+          border-radius:4px;
         }
 
-        /* ───── REWARDS GRID ───── */
+        /* ───── REWARDS ───── */
         .rewards-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 1.5rem;
+          display:grid;
+          grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+          gap:2rem;
         }
         .reward-card {
-          background: rgba(255,255,255,0.04);
-          backdrop-filter: blur(6px);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 24px;
-          padding: 2rem 1rem;
-          text-align: center;
-          transition: transform 0.2s, border-color 0.2s;
+          background:rgba(255,255,255,0.04);
+          backdrop-filter:blur(6px);
+          border:1px solid rgba(255,255,255,0.06);
+          border-radius:28px;
+          padding:2rem 1.2rem;
+          text-align:center;
+          transition:transform 0.25s, border-color 0.25s;
         }
         .reward-card:hover {
-          transform: translateY(-6px);
-          border-color: #ff8c00;
+          transform:translateY(-8px);
+          border-color:#ff8c00;
         }
-        .reward-icon {
-          font-size: 2.8rem;
-          margin-bottom: 0.5rem;
-        }
-        .reward-card h3 {
-          font-size: 1.3rem;
-          font-weight: 800;
-          color: #fff;
-        }
-        .reward-card p {
-          color: #aaa;
-          font-size: 0.9rem;
-        }
+        .reward-icon { font-size:3rem; margin-bottom:0.5rem; }
+        .reward-card h3 { font-size:1.4rem; font-weight:800; }
+        .reward-card p { color:#aaa; font-size:0.9rem; }
 
         /* ───── HOW IT WORKS ───── */
         .steps {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-          max-width: 600px;
-          margin: 0 auto;
+          display:flex;
+          flex-direction:column;
+          gap:1.8rem;
+          max-width:700px;
+          margin:0 auto;
         }
         .step {
-          display: flex;
-          align-items: flex-start;
-          gap: 1.2rem;
-          background: rgba(255,255,255,0.03);
-          border-left: 3px solid #ff8c00;
-          padding: 1.2rem 1.5rem;
-          border-radius: 12px;
+          display:flex;
+          align-items:flex-start;
+          gap:1.5rem;
+          background:rgba(255,255,255,0.03);
+          border-left:4px solid #ff8c00;
+          padding:1.5rem 2rem;
+          border-radius:16px;
         }
         .step-number {
-          width: 40px;
-          height: 40px;
-          background: #ff8c00;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-          font-size: 1.2rem;
-          color: #0a0c0f;
-          flex-shrink: 0;
+          width:48px; height:48px;
+          background:#ff8c00;
+          border-radius:50%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-weight:900;
+          font-size:1.4rem;
+          color:#0b0d10;
+          flex-shrink:0;
         }
         .step-content h3 {
-          font-size: 1.1rem;
-          font-weight: 700;
-          margin-bottom: 0.2rem;
+          font-size:1.2rem;
+          font-weight:700;
+          margin-bottom:0.2rem;
         }
         .step-content p {
-          color: #bbb;
-          font-size: 0.95rem;
+          color:#bbb;
+          font-size:0.95rem;
         }
 
         /* ───── TERMS ───── */
         .terms-content {
-          background: rgba(255,255,255,0.04);
-          padding: 1.8rem;
-          border-radius: 20px;
-          border: 1px solid rgba(255,255,255,0.06);
+          background:rgba(255,255,255,0.04);
+          padding:2rem;
+          border-radius:24px;
+          border:1px solid rgba(255,255,255,0.06);
         }
         .terms-content ul {
-          list-style: none;
-          padding: 0;
+          list-style:none;
+          padding:0;
         }
         .terms-content ul li {
-          padding: 0.5rem 0 0.5rem 1.8rem;
-          position: relative;
-          color: #ccc;
-          border-bottom: 1px solid rgba(255,255,255,0.04);
+          padding:0.6rem 0 0.6rem 2rem;
+          position:relative;
+          color:#ccc;
+          border-bottom:1px solid rgba(255,255,255,0.04);
         }
         .terms-content ul li::before {
-          content: '▸';
-          position: absolute;
-          left: 0;
-          color: #ff8c00;
-          font-weight: 700;
+          content:'▸';
+          position:absolute;
+          left:0;
+          color:#ff8c00;
+          font-weight:700;
         }
-        .terms-content ul li:last-child { border-bottom: none; }
+        .terms-content ul li:last-child { border-bottom:none; }
 
         /* ───── CLAIM FORM ───── */
-        .claim-section {
-          padding-bottom: 4rem;
-        }
+        .claim-section { padding-bottom:5rem; }
         .claim-card {
-          background: rgba(255,255,255,0.05);
-          backdrop-filter: blur(8px);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 32px;
-          padding: 2.5rem 2rem;
-          max-width: 520px;
-          margin: 0 auto;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+          background:rgba(255,255,255,0.05);
+          backdrop-filter:blur(12px);
+          border:1px solid rgba(255,255,255,0.08);
+          border-radius:36px;
+          padding:2.8rem 2.2rem;
+          max-width:560px;
+          margin:0 auto;
+          box-shadow:0 20px 60px rgba(0,0,0,0.5);
         }
         .claim-card h2 {
-          font-size: 1.8rem;
-          font-weight: 800;
-          text-align: center;
-          margin-bottom: 0.2rem;
+          font-size:2rem;
+          font-weight:800;
+          text-align:center;
+          margin-bottom:0.2rem;
         }
         .claim-card > p {
-          text-align: center;
-          color: #aaa;
-          margin-bottom: 2rem;
+          text-align:center;
+          color:#aaa;
+          margin-bottom:2rem;
         }
-        .form-group {
-          margin-bottom: 1.2rem;
-        }
+        .form-group { margin-bottom:1.4rem; }
         .form-group label {
-          display: block;
-          font-weight: 600;
-          font-size: 0.9rem;
-          margin-bottom: 0.3rem;
+          display:block;
+          font-weight:600;
+          font-size:0.9rem;
+          margin-bottom:0.3rem;
         }
-        .form-group .required {
-          color: #ff4444;
-        }
+        .form-group .required { color:#ff4444; }
         .form-group input,
         .form-group select {
-          width: 100%;
-          padding: 0.9rem 1rem;
-          background: rgba(0,0,0,0.5);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 12px;
-          color: #fff;
-          font-size: 1rem;
-          outline: none;
-          transition: border-color 0.2s;
+          width:100%;
+          padding:0.9rem 1rem;
+          background:rgba(0,0,0,0.5);
+          border:1px solid rgba(255,255,255,0.1);
+          border-radius:14px;
+          color:#fff;
+          font-size:1rem;
+          outline:none;
+          transition:border-color 0.2s;
         }
         .form-group input:focus,
         .form-group select:focus {
-          border-color: #ff8c00;
+          border-color:#ff8c00;
         }
         .form-group input.error {
-          border-color: #ff4444;
+          border-color:#ff4444;
         }
         .checkbox-group {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
+          display:flex;
+          align-items:flex-start;
+          gap:12px;
         }
         .checkbox-group input {
-          width: 18px;
-          height: 18px;
-          margin-top: 2px;
-          accent-color: #ff8c00;
-          flex-shrink: 0;
+          width:20px; height:20px;
+          margin-top:2px;
+          accent-color:#ff8c00;
+          flex-shrink:0;
         }
         .checkbox-group label {
-          font-size: 0.85rem;
-          color: #ccc;
+          font-size:0.85rem;
+          color:#ccc;
         }
         .checkbox-group label a {
-          color: #ff8c00;
-          text-decoration: none;
+          color:#ff8c00;
+          text-decoration:none;
         }
         .form-error {
-          color: #ff4444;
-          font-size: 0.85rem;
-          margin: 0.5rem 0;
+          color:#ff4444;
+          font-size:0.85rem;
+          margin:0.5rem 0;
         }
         .claim-btn {
-          width: 100%;
-          padding: 1rem;
-          background: linear-gradient(135deg, #ff8c00, #e67600);
-          border: none;
-          border-radius: 60px;
-          font-weight: 800;
-          font-size: 1.1rem;
-          color: #0a0c0f;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 20px rgba(255, 140, 0, 0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
+          width:100%;
+          padding:1rem;
+          background:linear-gradient(135deg, #ff8c00, #e67600);
+          border:none;
+          border-radius:60px;
+          font-weight:800;
+          font-size:1.1rem;
+          color:#0b0d10;
+          cursor:pointer;
+          transition:transform 0.2s, box-shadow 0.2s;
+          box-shadow:0 4px 20px rgba(255,140,0,0.3);
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:10px;
         }
         .claim-btn:hover:not(:disabled) {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 30px rgba(255, 140, 0, 0.5);
+          transform:translateY(-3px);
+          box-shadow:0 8px 30px rgba(255,140,0,0.5);
         }
         .claim-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-          transform: none;
+          opacity:0.6;
+          cursor:not-allowed;
+          transform:none;
         }
         .spinner {
-          display: inline-block;
-          width: 20px;
-          height: 20px;
-          border: 3px solid rgba(0,0,0,0.2);
-          border-top-color: #0a0c0f;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
+          display:inline-block;
+          width:20px; height:20px;
+          border:3px solid rgba(0,0,0,0.2);
+          border-top-color:#0b0d10;
+          border-radius:50%;
+          animation:spin 0.8s linear infinite;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin { to { transform:rotate(360deg); } }
         .form-footnote {
-          font-size: 0.75rem;
-          color: #888;
-          text-align: center;
-          margin-top: 1rem;
+          font-size:0.75rem;
+          color:#888;
+          text-align:center;
+          margin-top:1rem;
         }
 
         /* ───── FOOTER ───── */
         .site-footer {
-          background: rgba(0,0,0,0.4);
-          border-top: 1px solid rgba(255,255,255,0.05);
-          padding: 2rem 1.5rem;
-          text-align: center;
+          background:rgba(0,0,0,0.5);
+          border-top:1px solid rgba(255,255,255,0.05);
+          padding:2.5rem 1.5rem;
+          text-align:center;
         }
         .footer-container {
-          max-width: 1100px;
-          margin: 0 auto;
+          max-width:1100px;
+          margin:0 auto;
         }
         .footer-container p {
-          font-size: 0.8rem;
-          color: #777;
-          margin-bottom: 0.3rem;
+          font-size:0.8rem;
+          color:#777;
+          margin-bottom:0.3rem;
         }
-        .footer-contact {
-          font-weight: 600;
-        }
+        .footer-contact { font-weight:600; }
         .footer-socials {
-          margin-top: 0.8rem;
-          display: flex;
-          justify-content: center;
-          gap: 1.5rem;
-          font-size: 1.4rem;
+          margin-top:0.8rem;
+          display:flex;
+          justify-content:center;
+          gap:1.8rem;
+          font-size:1.6rem;
         }
 
         /* ───── WEBVIEW MODAL ───── */
         .modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.9);
-          backdrop-filter: blur(12px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
+          position:fixed;
+          inset:0;
+          background:rgba(0,0,0,0.92);
+          backdrop-filter:blur(16px);
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          z-index:9999;
         }
         .modal-card {
-          background: #1a1c22;
-          border-radius: 32px;
-          padding: 2.5rem 2rem;
-          max-width: 400px;
-          width: 90%;
-          text-align: center;
-          border: 1px solid rgba(255,140,0,0.2);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          background:#1a1c22;
+          border-radius:36px;
+          padding:2.8rem 2rem;
+          max-width:420px;
+          width:90%;
+          text-align:center;
+          border:1px solid rgba(255,140,0,0.2);
+          box-shadow:0 20px 50px rgba(0,0,0,0.6);
         }
-        .modal-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+        .modal-icon { font-size:3.2rem; margin-bottom:0.5rem; }
         .modal-card h2 {
-          font-size: 1.6rem;
-          font-weight: 800;
-          margin-bottom: 0.5rem;
+          font-size:1.6rem;
+          font-weight:800;
+          margin-bottom:0.5rem;
         }
         .modal-card p {
-          color: #aaa;
-          margin-bottom: 1.8rem;
+          color:#aaa;
+          margin-bottom:1.8rem;
         }
         .modal-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: center;
+          display:flex;
+          gap:12px;
+          flex-wrap:wrap;
+          justify-content:center;
         }
         .modal-btn {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.1);
-          padding: 0.7rem 1.5rem;
-          border-radius: 60px;
-          font-weight: 600;
-          color: #fff;
-          cursor: pointer;
-          transition: 0.2s;
-          flex: 1;
-          min-width: 120px;
+          background:rgba(255,255,255,0.08);
+          border:1px solid rgba(255,255,255,0.1);
+          padding:0.7rem 1.5rem;
+          border-radius:60px;
+          font-weight:600;
+          color:#fff;
+          cursor:pointer;
+          transition:0.2s;
+          flex:1;
+          min-width:120px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn:hover { background:rgba(255,255,255,0.15); }
         .modal-btn.primary {
-          background: #ff8c00;
-          border: none;
-          color: #0a0c0f;
+          background:#ff8c00;
+          border:none;
+          color:#0b0d10;
         }
-        .modal-btn.primary:hover { background: #e67600; }
+        .modal-btn.primary:hover { background:#e67600; }
         .modal-btn.ghost {
-          background: transparent;
-          border: none;
-          color: #888;
-          margin-top: 0.5rem;
-          font-size: 0.8rem;
+          background:transparent;
+          border:none;
+          color:#888;
+          margin-top:0.5rem;
+          font-size:0.8rem;
         }
-        .modal-btn.ghost:hover { color: #fff; }
+        .modal-btn.ghost:hover { color:#fff; }
 
         /* ───── RESPONSIVE ───── */
-        @media (max-width: 768px) {
-          .hero-section { min-height: 60vh; }
-          .hero-stats { gap: 1rem; }
-          .hero-stats div { font-size: 0.8rem; padding: 0.3rem 1rem; }
-          .claim-card { padding: 1.8rem 1.2rem; }
-          .rewards-grid { grid-template-columns: 1fr 1fr; }
+        @media (max-width:768px) {
+          .hero-section { min-height:70vh; background-attachment:scroll; }
+          .hero-stats { gap:1rem; }
+          .hero-stats div { font-size:0.85rem; padding:0.4rem 1.2rem; }
+          .claim-card { padding:2rem 1.2rem; }
+          .rewards-grid { grid-template-columns:1fr 1fr; }
         }
-        @media (max-width: 480px) {
-          .header-container { flex-wrap: wrap; gap: 0.5rem; }
-          .user-badge { display: none; }
-          .site-header { padding: 0.5rem 1rem; }
-          .hero-cta { font-size: 0.95rem; padding: 0.7rem 1.8rem; }
-          .claim-card h2 { font-size: 1.4rem; }
-          .steps { gap: 1rem; }
-          .step { padding: 1rem; }
-          .rewards-grid { grid-template-columns: 1fr; }
+        @media (max-width:480px) {
+          .header-container { flex-wrap:wrap; gap:0.5rem; }
+          .uid-badge { display:none; }
+          .site-header { padding:0.5rem 1rem; }
+          .hero-cta { font-size:1rem; padding:0.8rem 2rem; }
+          .claim-card h2 { font-size:1.5rem; }
+          .steps { gap:1rem; }
+          .step { padding:1rem; }
+          .rewards-grid { grid-template-columns:1fr; }
+          .section-title { font-size:1.6rem; }
         }
       `}} />
     </div>
   );
 }
 
-// ── Server‑side data fetching ──
+// ── Server‑side props ──
 export async function getServerSideProps({ query }) {
   const campaignId = query.id || query.campaign || null;
   const campaign = campaignId ? await fetchCampaign(campaignId) : null;
