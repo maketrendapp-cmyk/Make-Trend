@@ -29,7 +29,6 @@ export default function Navbar() {
     setIsMobileMenuOpen(false);
   };
 
-  // ── User details ──
   const displayName = profile?.fullname ||
     profile?.name ||
     user?.fullName ||
@@ -79,17 +78,19 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* ── Desktop Nav (hidden on mobile) ── */}
-            <DesktopNav
-              isAuthenticated={isAuthenticated}
-              isProfileLoading={isProfileLoading}
-              displayName={displayName}
-              displayUsername={displayUsername}
-              avatarUrl={avatarUrl}
-              firstLetter={firstLetter}
-              isPro={isPro}
-              handleLogout={handleLogout}
-            />
+            {/* ── Desktop Nav ── */}
+            <div className="hidden md:block">
+              <DesktopNav
+                isAuthenticated={isAuthenticated}
+                isProfileLoading={isProfileLoading}
+                displayName={displayName}
+                displayUsername={displayUsername}
+                avatarUrl={avatarUrl}
+                firstLetter={firstLetter}
+                isPro={isPro}
+                handleLogout={handleLogout}
+              />
+            </div>
 
             {/* ── Mobile Menu Button ── */}
             <button
@@ -104,7 +105,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* ── Mobile Nav (drawer) ── */}
+      {/* ── Mobile Nav ── */}
       <MobileNav
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
