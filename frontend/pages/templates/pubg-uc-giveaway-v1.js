@@ -7,7 +7,7 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 const defaultMeta = {
   title: 'PUBG UC Giveaway – Official Event',
   description: 'Claim free UC for PUBG Mobile. Complete tasks and win up to 10,000 UC. Limited time official event.',
-  image: 'https://maketrend.app/og-image.jpg',
+  image: 'https://maketrend.app/og-image.png',
   url: 'https://maketrend.app/pubg-uc-giveaway-v1?id={id}',
 };
 
@@ -22,6 +22,7 @@ function PubgUcGiveawayV1({ campaign }) {
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
 
+  // Detect WebView
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
     const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
@@ -51,7 +52,9 @@ function PubgUcGiveawayV1({ campaign }) {
     }
   };
 
-  if (showWebViewModal) {
+  // ─── MODAL OVERLAY (always rendered conditionally) ───
+  const WebViewModal = () => {
+    if (!showWebViewModal) return null;
     return (
       <div className="modal-overlay">
         <div className="modal-card">
@@ -66,10 +69,13 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="page-wrapper">
+      {/* ─── MODAL OVERLAY (on top) ─── */}
+      <WebViewModal />
+
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="header-container">
@@ -101,7 +107,7 @@ function PubgUcGiveawayV1({ campaign }) {
           <div className="hero-stats">
             <div><span>🏆</span> 50,000 UC Pool</div>
             <div><span>👥</span> 500+ Winners</div>
-            <div><span>⏳</span> <span id="countdown">24h</span> Left</div>
+            <div><span>⏳</span> 24h Left</div>
           </div>
           <a href="#claim" className="hero-cta">Claim Your Reward →</a>
         </div>
@@ -234,7 +240,7 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── FULL CSS ─── */}
+      {/* ─── CSS ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
@@ -618,71 +624,71 @@ function PubgUcGiveawayV1({ campaign }) {
           font-size:1.6rem;
         }
 
-        /* ─── WEBVIEW MODAL ─── */
+        /* ─── MODAL OVERLAY (appears on top of page) ─── */
         .modal-overlay {
-          position:fixed;
-          inset:0;
-          background:rgba(0,0,0,0.92);
-          backdrop-filter:blur(16px);
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          z-index:9999;
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(12px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
         }
         .modal-card {
-          background:#1a1c22;
-          border-radius:36px;
-          padding:2.8rem 2rem;
-          max-width:420px;
-          width:90%;
-          text-align:center;
-          border:1px solid rgba(255,140,0,0.2);
-          box-shadow:0 20px 50px rgba(0,0,0,0.6);
+          background: #1a1c22;
+          border-radius: 36px;
+          padding: 2.8rem 2rem;
+          max-width: 420px;
+          width: 90%;
+          text-align: center;
+          border: 1px solid rgba(255,140,0,0.2);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
         }
-        .modal-icon { font-size:3.2rem; margin-bottom:0.5rem; }
+        .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
         .modal-card h2 {
-          font-size:1.6rem;
-          font-weight:800;
-          color:#fff;
-          margin-bottom:0.5rem;
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #fff;
+          margin-bottom: 0.5rem;
         }
         .modal-card p {
-          color:#aaa;
-          margin-bottom:1.8rem;
+          color: #aaa;
+          margin-bottom: 1.8rem;
         }
         .modal-actions {
-          display:flex;
-          gap:12px;
-          flex-wrap:wrap;
-          justify-content:center;
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
         }
         .modal-btn {
-          background:rgba(255,255,255,0.08);
-          border:1px solid rgba(255,255,255,0.1);
-          padding:0.7rem 1.5rem;
-          border-radius:60px;
-          font-weight:600;
-          color:#fff;
-          cursor:pointer;
-          transition:0.2s;
-          flex:1;
-          min-width:120px;
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 0.7rem 1.5rem;
+          border-radius: 60px;
+          font-weight: 600;
+          color: #fff;
+          cursor: pointer;
+          transition: 0.2s;
+          flex: 1;
+          min-width: 120px;
         }
-        .modal-btn:hover { background:rgba(255,255,255,0.15); }
+        .modal-btn:hover { background: rgba(255,255,255,0.15); }
         .modal-btn.primary {
-          background:#ff8c00;
-          border:none;
-          color:#0b0d10;
+          background: #ff8c00;
+          border: none;
+          color: #0b0d10;
         }
-        .modal-btn.primary:hover { background:#e67600; }
+        .modal-btn.primary:hover { background: #e67600; }
         .modal-btn.ghost {
-          background:transparent;
-          border:none;
-          color:#888;
-          margin-top:0.5rem;
-          font-size:0.8rem;
+          background: transparent;
+          border: none;
+          color: #888;
+          margin-top: 0.5rem;
+          font-size: 0.8rem;
         }
-        .modal-btn.ghost:hover { color:#fff; }
+        .modal-btn.ghost:hover { color: #fff; }
 
         /* ─── RESPONSIVE ─── */
         @media (max-width:768px) {
