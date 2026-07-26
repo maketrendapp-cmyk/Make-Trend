@@ -1,122 +1,124 @@
-// components/Navbar/index.js
-import Link from 'next/link';
+// pages/_app.js
+import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../AuthScreen';
-import { useProfile } from '../../lib/queries';
-import { useState, useEffect } from 'react';
-import MobileNav from './MobileNav';
-import DesktopNav from './DesktopNav';
-import { FiMenu } from 'react-icons/fi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from '../components/AuthScreen';
+import Navbar from '../components/Navbar';
+import BottomNav from '../components/BottomNav';
+import Menu from '../components/Menu';
+import Sidebar from '../components/Sidebar';
+import '../styles/globals.css';
 
-export default function Navbar() {
+// ── React Query client ──
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+// ============================================================
+// PAGES WITH NO LAYOUT AT ALL (standalone pages)
+// ============================================================
+const NO_LAYOUT_PAGES = [
+  '/templates/ncell-reward-v1',
+  '/templates/student-scholarship-nepal-v1',
+  '/templates/freefire-free-diamond-shop-v1',
+  '/templates/freefire-exclusive-rewards-v1',
+  '/templates/tonde-gamer-lucky-spin-v1',
+  '/templates/youtube-booster-v1',
+  '/ncell-reward-v1',
+  '/tasks',
+  '/share',
+];
+
+// ============================================================
+// PAGES WITH ONLY TOP NAVBAR (no bottom nav, no menu, no sidebar)
+// ============================================================
+const TOP_NAV_ONLY_PAGES = [
+  '/about',
+  '/rules',
+  '/terms',
+  '/privacy',
+  '/follow',
+  '/download',
+  '/contact',
+  '/login',
+  '/signup',
+];
+
+function MyApp({ Component, pageProps }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
+  const pathname = router.pathname;
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
+  const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/');
-    setIsMobileMenuOpen(false);
-  };
+  // ── No layout (templates, tasks, share) ──
+  if (isNoLayout) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+          <Component {...pageProps} />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+  }
 
-  // ── User details ──
-  const displayName = profile?.fullname ||
-    profile?.name ||
-    user?.fullName ||
-    user?.fullname ||
-    user?.displayName ||
-    'User';
+  // ── Top navbar only (about, rules, terms, privacy, login, signup) ──
+  if (isTopNavOnly) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+          <div className="min-h-screen bg-bg">
+            <Navbar />
+            <Component {...pageProps} />
+          </div>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+  }
 
-  const displayUsername = profile?.username ||
-    user?.username ||
-    user?.email?.split('@')[0] ||
-    'user';
-
-  const avatarUrl = profile?.avatar ||
-    profile?.profilePic ||
-    user?.photoURL ||
-    user?.avatar ||
-    null;
-
-  const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
-  const isPro = profile?.plan === 'pro' || false;
-  const isProfileLoading = profileLoading || (user && !profile);
-
+  // ── Full layout (default) ──
   return (
-    <>
-      <nav
-        className={`
-          sticky top-0 z-50 transition-all duration-300
-          ${isScrolled
-            ? 'bg-white/95 backdrop-blur-lg shadow-lg border-b border-gray-100'
-            : 'bg-white/80 backdrop-blur-sm border-b border-gray-200/50'
-          }
-        `}
-      >
-        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-          <div className="flex h-14 sm:h-16 items-center justify-between">
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+        <div className="min-h-screen bg-bg flex flex-col">
+          <Navbar />
 
-            {/* ── Logo (left) ── */}
-            <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
-              <img
-                src="/favicon.ico"
-                alt="Make Trend"
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg shadow-md group-hover:shadow-lg transition-all group-hover:scale-105"
-              />
-              <span className="text-base sm:text-xl font-extrabold tracking-tight whitespace-nowrap">
-                <span className="text-primary">Make</span>
-                <span className="text-gray-900 group-hover:text-primary/80 transition">Trend</span>
-              </span>
-            </Link>
-
-            {/* ── Desktop Nav (right) ── */}
-            <div className="hidden md:block">
-              <DesktopNav
-                isAuthenticated={isAuthenticated}
-                isProfileLoading={isProfileLoading}
-                displayName={displayName}
-                displayUsername={displayUsername}
-                avatarUrl={avatarUrl}
-                firstLetter={firstLetter}
-                isPro={isPro}
-                handleLogout={handleLogout}
-              />
+          <div className="flex flex-1">
+            {/* ── Sidebar (fixed, sticky) ── */}
+            <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0 sticky top-0 self-start h-screen overflow-hidden">
+              <Sidebar />
             </div>
 
-            {/* ── Mobile Menu Button ── */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 sm:p-2.5 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0 -mr-1"
-              aria-label="Toggle menu"
-            >
-              <FiMenu className="w-6 h-6 sm:w-7 sm:h-7" />
-            </button>
-
+            {/* ── Main Content ── */}
+            <div className="flex-1 overflow-y-auto pb-20 md:pb-0">
+              <Component {...pageProps} />
+            </div>
           </div>
-        </div>
-      </nav>
 
-      {/* ── Mobile Nav ── */}
-      <MobileNav
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-        isAuthenticated={isAuthenticated}
-        isProfileLoading={isProfileLoading}
-        displayUsername={displayUsername}
-        avatarUrl={avatarUrl}
-        firstLetter={firstLetter}
-        handleLogout={handleLogout}
-      />
-    </>
+          {/* ── Bottom Navigation (mobile) ── */}
+          <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+
+          {/* ── Mobile Menu Drawer ── */}
+          <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+        </div>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
+
+export default MyApp;
