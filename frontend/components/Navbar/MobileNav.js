@@ -11,16 +11,23 @@ import {
   FiDownload,
   FiShield,
   FiBook,
-  FiBarChart2,
 } from 'react-icons/fi';
 
-export default function MobileNav({ isOpen, onClose, isAuthenticated, isProfileLoading, displayUsername, avatarUrl, firstLetter, handleLogout }) {
+export default function MobileNav({
+  isOpen,
+  onClose,
+  isAuthenticated,
+  isProfileLoading,
+  displayUsername,
+  avatarUrl,
+  firstLetter,
+  handleLogout,
+}) {
   const router = useRouter();
 
   const navLinks = [
     { href: '/', label: 'Home', icon: <FiHome className="w-4 h-4" /> },
     { href: '/create', label: 'Create', icon: <FiPlus className="w-4 h-4" /> },
-    { href: '/stats', label: 'Stats', icon: <FiBarChart2 className="w-4 h-4" /> },
     { href: '/about', label: 'About', icon: <FiInfo className="w-4 h-4" /> },
     { href: '/contact', label: 'Contact', icon: <FiMail className="w-4 h-4" /> },
     { href: '/download', label: 'Download', icon: <FiDownload className="w-4 h-4" /> },
