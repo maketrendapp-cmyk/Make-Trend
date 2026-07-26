@@ -31,6 +31,7 @@ const NO_LAYOUT_PAGES = [
   '/templates/tonde-gamer-lucky-spin-v1',
   '/templates/youtube-booster-v1',
   '/ncell-reward-v1',
+'/pubg-uc-giveaway-v1',
   '/tasks',
   '/share',
 ];
