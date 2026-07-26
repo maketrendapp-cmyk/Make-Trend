@@ -169,48 +169,54 @@ export function AuthProvider({ children }) {
   // ============================================================
   // FIREBASE LISTENER
   // ============================================================
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        if (uidRef.current === firebaseUser.uid) return;
+  // ── Keep a stable reference to invalidateAll ──
+const invalidateAllRef = useRef(invalidateAll);
+useEffect(() => {
+  invalidateAllRef.current = invalidateAll;
+}, [invalidateAll]);
 
-        const basicUser = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName || '',
-          photoURL: firebaseUser.photoURL || '',
-        };
-        setUser(basicUser);
-        setIsAuthenticated(true);
-        setNeedsCompletion(false);
-        uidRef.current = firebaseUser.uid;
-        cacheAuth(basicUser);
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      if (uidRef.current === firebaseUser.uid) return;
 
-        invalidateAll();
+      const basicUser = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || '',
+        photoURL: firebaseUser.photoURL || '',
+      };
+      setUser(basicUser);
+      setIsAuthenticated(true);
+      setNeedsCompletion(false);
+      uidRef.current = firebaseUser.uid;
+      cacheAuth(basicUser);
 
-        try {
-          const profileData = await fetchUserProfile(firebaseUser);
-          if (profileData) {
-            setUser(profileData);
-            setIsAuthenticated(true);
-            setNeedsCompletion(false);
-            cacheAuth(profileData);
-          } else {
-            // If no profile data, user needs to complete their profile
-            setNeedsCompletion(true);
-            setUser({ ...basicUser, completed: false });
-          }
-        } catch {}
-      } else {
-        localStorage.removeItem(AUTH_CACHE_KEY);
-        setUser(null);
-        setIsAuthenticated(false);
-        setNeedsCompletion(false);
-        uidRef.current = null;
-      }
-    });
-    return () => unsubscribe();
-  }, [fetchUserProfile, checkProfileStatus, invalidateAll]);
+      invalidateAllRef.current(); // ✅ use ref instead
+
+      try {
+        const profileData = await fetchUserProfile(firebaseUser);
+        if (profileData) {
+          setUser(profileData);
+          setIsAuthenticated(true);
+          setNeedsCompletion(false);
+          cacheAuth(profileData);
+        } else {
+          // If no profile data, user needs to complete their profile
+          setNeedsCompletion(true);
+          setUser({ ...basicUser, completed: false });
+        }
+      } catch {}
+    } else {
+      localStorage.removeItem(AUTH_CACHE_KEY);
+      setUser(null);
+      setIsAuthenticated(false);
+      setNeedsCompletion(false);
+      uidRef.current = null;
+    }
+  });
+  return () => unsubscribe();
+}, [fetchUserProfile, checkProfileStatus]); // ✅ removed invalidateAll from deps
 
   // ============================================================
   // AUTH METHODS
