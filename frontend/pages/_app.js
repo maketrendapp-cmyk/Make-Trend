@@ -11,16 +11,20 @@ import Menu from '../components/Menu';
 import Sidebar from '../components/Sidebar';
 import '../styles/globals.css';
 
+// ── React Query client ──
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: false,
       retry: 1,
     },
   },
 });
 
+// ============================================================
+// PAGES WITH NO LAYOUT AT ALL (standalone pages)
+// ============================================================
 const NO_LAYOUT_PAGES = [
   '/templates/ncell-reward-v1',
   '/templates/student-scholarship-nepal-v1',
@@ -33,6 +37,9 @@ const NO_LAYOUT_PAGES = [
   '/share',
 ];
 
+// ============================================================
+// PAGES WITH ONLY TOP NAVBAR (no bottom nav, no menu, no sidebar)
+// ============================================================
 const TOP_NAV_ONLY_PAGES = [
   '/about',
   '/rules',
@@ -53,6 +60,7 @@ function MyApp({ Component, pageProps }) {
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
+  // ── No layout (templates, tasks, share) ──
   if (isNoLayout) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -65,6 +73,7 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
+  // ── Top navbar only (about, rules, terms, privacy, login, signup) ──
   if (isTopNavOnly) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -80,15 +89,17 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
+  // ── Full layout (default) ──
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
         <div className="min-h-screen bg-bg flex flex-col">
           <Navbar />
-          <div className="flex flex-1 overflow-hidden">
-            {/* ── Sidebar (fixed on desktop) ── */}
-            <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0">
+
+          <div className="flex flex-1">
+            {/* ── Sidebar (fixed) ── */}
+            <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0 sticky top-0 self-start max-h-screen">
               <Sidebar />
             </div>
 
@@ -98,7 +109,10 @@ function MyApp({ Component, pageProps }) {
             </div>
           </div>
 
+          {/* ── Bottom Navigation (mobile) ── */}
           <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+
+          {/* ── Mobile Menu Drawer ── */}
           <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
         </div>
         <ReactQueryDevtools initialIsOpen={false} />
