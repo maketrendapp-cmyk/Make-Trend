@@ -988,6 +988,8 @@ useEffect(() => {
       <Meta
         title={metaTitle}
         description={metaDescription}
+        image="https://maketrend.app/og-image.png"
+        url={isSignupPage ? `https://maketrend.app/signup${referralCode ? `?ref=${referralCode}` : ''}` : 'https://maketrend.app/'}
       />
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-purple-50/30 px-4 py-8">
 
