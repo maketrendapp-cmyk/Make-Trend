@@ -1,3 +1,4 @@
+
 // pages/_app.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
@@ -26,11 +27,11 @@ const queryClient = new QueryClient({
 // ============================================================
 const NO_LAYOUT_PAGES = [
   '/templates/ncell-reward-v1',
-'/templates/student-scholarship-nepal-v1',
-'/templates/freefire-free-diamond-shop-v1',
-'/templates/freefire-exclusive-rewards-v1',
-'/templates/tonde-gamer-lucky-spin-v1',
-'/templates/youtube-booster-v1',
+  '/templates/student-scholarship-nepal-v1',
+  '/templates/freefire-free-diamond-shop-v1',
+  '/templates/freefire-exclusive-rewards-v1',
+  '/templates/tonde-gamer-lucky-spin-v1',
+  '/templates/youtube-booster-v1',
   '/ncell-reward-v1',
   '/tasks',
   '/share',
@@ -48,7 +49,7 @@ const TOP_NAV_ONLY_PAGES = [
   '/download',
   '/contact',
   '/login',
-'/signup',
+  '/signup',
 ];
 
 function MyApp({ Component, pageProps }) {
