@@ -21,7 +21,7 @@ import {
 export default function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -39,6 +39,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
     setIsMobileMenuOpen(false);
   };
 
+  // ── Navigation links (desktop & mobile) ──
   const navLinks = [
     { href: '/', label: 'Home', icon: <FiHome className="w-4 h-4" /> },
     { href: '/create', label: 'Create', icon: <FiPlus className="w-4 h-4" /> },
@@ -52,31 +53,26 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
 
   const isActive = (path) => router.pathname === path;
 
-  // ── Get display name from profile OR user ──
-  const displayName = profile?.fullname || 
-                      profile?.name || 
-                      user?.fullName || 
-                      user?.fullname || 
-                      user?.displayName || 
-                      'User';
+  // ── User details ──
+  const displayName = profile?.fullname ||
+    profile?.name ||
+    user?.fullName ||
+    user?.fullname ||
+    user?.displayName ||
+    'User';
 
-  // ── Get username from profile OR user ──
-  const displayUsername = profile?.username || 
-                          user?.username || 
-                          user?.email?.split('@')[0] || 
-                          'user';
+  const displayUsername = profile?.username ||
+    user?.username ||
+    user?.email?.split('@')[0] ||
+    'user';
 
-  // ── Get avatar from profile OR user ──
-  const avatarUrl = profile?.avatar || 
-                    profile?.profilePic || 
-                    user?.photoURL || 
-                    user?.avatar || 
-                    null;
+  const avatarUrl = profile?.avatar ||
+    profile?.profilePic ||
+    user?.photoURL ||
+    user?.avatar ||
+    null;
 
-  // ── First letter for fallback ──
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
-
-  // ── Determine if profile is loading ──
   const isProfileLoading = profileLoading || (user && !profile);
 
   return (
@@ -84,8 +80,8 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
       <nav
         className={`
           sticky top-0 z-50 transition-all duration-300
-          ${isScrolled 
-            ? 'bg-white/95 backdrop-blur-lg shadow-lg border-b border-gray-100' 
+          ${isScrolled
+            ? 'bg-white/95 backdrop-blur-lg shadow-lg border-b border-gray-100'
             : 'bg-white/80 backdrop-blur-sm border-b border-gray-200/50'
           }
         `}
@@ -95,9 +91,9 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
             
             {/* ── Logo ── */}
             <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
-              <img 
-                src="/favicon.ico" 
-                alt="Make Trend" 
+              <img
+                src="/favicon.ico"
+                alt="Make Trend"
                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg shadow-md group-hover:shadow-lg transition-all group-hover:scale-105"
               />
               <span className="text-base sm:text-xl font-extrabold tracking-tight whitespace-nowrap">
@@ -106,9 +102,31 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
               </span>
             </Link>
 
+            {/* ── Desktop Navigation Links (hidden on mobile) ── */}
+            <div className="hidden md:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`
+                    flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                    ${isActive(link.href)
+                      ? 'bg-purple-100 text-purple-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }
+                  `}
+                >
+                  <span className={isActive(link.href) ? 'text-purple-600' : 'text-gray-400'}>
+                    {link.icon}
+                  </span>
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+
             {/* ── Home + Auth Buttons ── */}
             <div className="flex items-center">
-              {/* Home Button */}
+              {/* Home Button (mobile & desktop) – we keep it as a separate button */}
               <Link
                 href="/"
                 className={`
@@ -133,9 +151,9 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                     href="/profile"
                     className="
                       flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5
-                      bg-gradient-to-r from-purple-50 to-indigo-50 
-                      border border-purple-200/50 rounded-lg sm:rounded-xl 
-                      hover:from-purple-100 hover:to-indigo-100 
+                      bg-gradient-to-r from-purple-50 to-indigo-50
+                      border border-purple-200/50 rounded-lg sm:rounded-xl
+                      hover:from-purple-100 hover:to-indigo-100
                       transition-all duration-200 group
                       shadow-sm hover:shadow-md
                       flex-shrink-0
@@ -151,8 +169,8 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                       <>
                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex-shrink-0 shadow-sm border-2 border-white">
                           {avatarUrl ? (
-                            <img 
-                              src={avatarUrl} 
+                            <img
+                              src={avatarUrl}
                               alt={displayName}
                               className="w-full h-full object-cover"
                               onError={(e) => {
@@ -177,9 +195,9 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                   <button
                     onClick={handleLogout}
                     className="
-                      hidden sm:flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 
-                      text-sm sm:text-base font-medium text-gray-600 
-                      hover:text-red-600 hover:bg-red-50 
+                      hidden sm:flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5
+                      text-sm sm:text-base font-medium text-gray-600
+                      hover:text-red-600 hover:bg-red-50
                       rounded-lg sm:rounded-xl transition-all duration-200
                       border border-transparent hover:border-red-200
                       flex-shrink-0
@@ -194,11 +212,11 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 <Link
                   href="/login"
                   className="
-                    flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 
-                    bg-gradient-to-r from-purple-600 to-indigo-600 
-                    text-white font-semibold rounded-lg sm:rounded-xl 
-                    hover:from-purple-700 hover:to-indigo-700 
-                    transition-all duration-200 shadow-md hover:shadow-lg 
+                    flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5
+                    bg-gradient-to-r from-purple-600 to-indigo-600
+                    text-white font-semibold rounded-lg sm:rounded-xl
+                    hover:from-purple-700 hover:to-indigo-700
+                    transition-all duration-200 shadow-md hover:shadow-lg
                     hover:-translate-y-0.5 active:scale-95
                     text-sm sm:text-base whitespace-nowrap
                     flex-shrink-0
@@ -211,7 +229,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
               )}
             </div>
 
-            {/* ── Menu Button ── */}
+            {/* ── Menu Button (mobile only) ── */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="md:hidden p-2 sm:p-2.5 rounded-lg sm:rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex-shrink-0 -mr-1"
@@ -228,14 +246,14 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
         </div>
       </nav>
 
-      {/* ── Mobile Menu ── */}
+      {/* ── Mobile Menu (drawer) ── */}
       <div
         className={`
-          md:hidden fixed inset-x-0 top-14 sm:top-16 z-40 
+          md:hidden fixed inset-x-0 top-14 sm:top-16 z-40
           bg-white/95 backdrop-blur-lg border-b border-gray-200
           shadow-xl transition-all duration-300 ease-in-out
-          ${isMobileMenuOpen 
-            ? 'max-h-[calc(100vh-3.5rem)] opacity-100 translate-y-0' 
+          ${isMobileMenuOpen
+            ? 'max-h-[calc(100vh-3.5rem)] opacity-100 translate-y-0'
             : 'max-h-0 opacity-0 -translate-y-4 overflow-hidden'
           }
         `}
