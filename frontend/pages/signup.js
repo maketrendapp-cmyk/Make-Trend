@@ -2,11 +2,11 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AuthScreen, { useAuth } from '../components/AuthScreen';
-import Meta from '../components/Meta'; // ✅ Import Meta
+import Meta from '../components/Meta';
 
 export default function Signup() {
   const router = useRouter();
-  const { isAuthenticated, loading, needsCompletion } = useAuth();
+  const { isAuthenticated, loading, needsCompletion, logout } = useAuth();
   const { ref, redirect } = router.query;
 
   const redirectTo = redirect || '/profile';
@@ -17,6 +17,31 @@ export default function Signup() {
       router.replace(redirectTo);
     }
   }, [isAuthenticated, loading, needsCompletion, router, redirectTo]);
+
+  // ── Log out if user leaves the page while profile is incomplete ──
+  useEffect(() => {
+    // ── Handle internal navigation (Next.js routing) ──
+    const handleRouteChange = () => {
+      if (isAuthenticated && needsCompletion) {
+        logout();
+      }
+    };
+
+    // ── Handle external navigation / tab close ──
+    const handleBeforeUnload = () => {
+      if (isAuthenticated && needsCompletion) {
+        logout();
+      }
+    };
+
+    router.events.on('routeChangeStart', handleRouteChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      router.events.off('routeChangeStart', handleRouteChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isAuthenticated, needsCompletion, logout, router.events]);
 
   // ── Show loading spinner while auth state is being resolved ──
   if (loading) {
@@ -45,7 +70,7 @@ export default function Signup() {
       <Meta
         title={metaTitle}
         description={metaDescription}
-        image="https://maketrend.app/og-image.png"  // Use your default OG image
+        image="https://maketrend.app/og-image.png"
         url={metaUrl}
       />
       <AuthScreen redirectTo={redirectTo} />
