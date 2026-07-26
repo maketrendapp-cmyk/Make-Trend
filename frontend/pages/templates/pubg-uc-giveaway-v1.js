@@ -7,7 +7,7 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 const defaultMeta = {
   title: 'PUBG UC Giveaway – Official Event',
   description: 'Claim free UC for PUBG Mobile. Complete tasks and win up to 10,000 UC. Limited time official event.',
-  image: 'https://maketrend.app/og-image.png',
+  image: 'https://maketrend.app/og-image.jpg',
   url: 'https://maketrend.app/pubg-uc-giveaway-v1?id={id}',
 };
 
@@ -107,36 +107,9 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </section>
 
-      {/* ─── REWARDS ─── */}
-      <section className="rewards-section">
-        <h2 className="section-title">🎁 What You Can Win</h2>
-        <div className="rewards-grid">
-          <div className="reward-card">
-            <div className="reward-icon">💎</div>
-            <h3>10,000 UC</h3>
-            <p>Grand Prize</p>
-          </div>
-          <div className="reward-card">
-            <div className="reward-icon">🔫</div>
-            <h3>M416 Glory</h3>
-            <p>Legendary Skin</p>
-          </div>
-          <div className="reward-card">
-            <div className="reward-icon">🎒</div>
-            <h3>Full Outfit</h3>
-            <p>Exclusive Set</p>
-          </div>
-          <div className="reward-card">
-            <div className="reward-icon">🎫</div>
-            <h3>5,000 UC</h3>
-            <p>Runner‑up</p>
-          </div>
-        </div>
-      </section>
-
       {/* ─── HOW IT WORKS ─── */}
       <section className="how-section">
-        <h2 className="section-title">📋 How to Claim</h2>
+        <h2 className="section-title">How to Claim</h2>
         <div className="steps">
           <div className="step">
             <div className="step-number">1</div>
@@ -164,7 +137,7 @@ function PubgUcGiveawayV1({ campaign }) {
 
       {/* ─── TERMS ─── */}
       <section className="terms-section">
-        <h2 className="section-title">📜 Official Rules</h2>
+        <h2 className="section-title">Official Rules</h2>
         <div className="terms-content">
           <ul>
             <li>Only one entry per PUBG Mobile UID.</li>
@@ -179,7 +152,7 @@ function PubgUcGiveawayV1({ campaign }) {
       {/* ─── CLAIM FORM ─── */}
       <section id="claim" className="claim-section">
         <div className="claim-card">
-          <h2>🎮 Enter Your Details</h2>
+          <h2>Enter Your Details</h2>
           <p>Fill in the fields below to start the process.</p>
 
           <div className="form-group">
@@ -238,12 +211,12 @@ function PubgUcGiveawayV1({ campaign }) {
                 <span className="spinner"></span> Processing...
               </>
             ) : (
-              'Claim UC Now 🚀'
+              'Claim UC Now →'
             )}
           </button>
 
           <p className="form-footnote">
-            ⚡ By continuing, you agree to complete the required tasks.
+            By continuing, you agree to complete the required tasks.
           </p>
         </div>
       </section>
@@ -261,9 +234,8 @@ function PubgUcGiveawayV1({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── FULL CSS (now with !important fallback for safety) ─── */}
+      {/* ─── FULL CSS ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
-        /* ───── RESET ───── */
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
           font-family: 'Segoe UI', system-ui, sans-serif;
@@ -278,7 +250,7 @@ function PubgUcGiveawayV1({ campaign }) {
           background: #0b0d10;
         }
 
-        /* ───── HEADER ───── */
+        /* ─── HEADER ─── */
         .site-header {
           position: sticky; top:0; z-index:100;
           background: rgba(10,12,15,0.92);
@@ -330,7 +302,7 @@ function PubgUcGiveawayV1({ campaign }) {
         .uid-label { color:#888; font-weight:600; }
         .uid-value { color:#fff; font-weight:700; min-width:50px; }
 
-        /* ───── HERO ───── */
+        /* ─── HERO ─── */
         .hero-section {
           position:relative;
           min-height:85vh;
@@ -413,7 +385,7 @@ function PubgUcGiveawayV1({ campaign }) {
           box-shadow:0 8px 40px rgba(255,140,0,0.6);
         }
 
-        /* ───── SECTIONS ───── */
+        /* ─── SECTIONS ─── */
         section {
           padding:4rem 1.5rem;
           max-width:1100px;
@@ -437,30 +409,7 @@ function PubgUcGiveawayV1({ campaign }) {
           border-radius:4px;
         }
 
-        /* ───── REWARDS ───── */
-        .rewards-grid {
-          display:grid;
-          grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
-          gap:2rem;
-        }
-        .reward-card {
-          background:rgba(255,255,255,0.04);
-          backdrop-filter:blur(6px);
-          border:1px solid rgba(255,255,255,0.06);
-          border-radius:28px;
-          padding:2rem 1.2rem;
-          text-align:center;
-          transition:transform 0.25s, border-color 0.25s;
-        }
-        .reward-card:hover {
-          transform:translateY(-8px);
-          border-color:#ff8c00;
-        }
-        .reward-icon { font-size:3rem; margin-bottom:0.5rem; }
-        .reward-card h3 { font-size:1.4rem; font-weight:800; color:#fff; }
-        .reward-card p { color:#aaa; font-size:0.9rem; }
-
-        /* ───── HOW IT WORKS ───── */
+        /* ─── HOW IT WORKS ─── */
         .steps {
           display:flex;
           flex-direction:column;
@@ -500,7 +449,7 @@ function PubgUcGiveawayV1({ campaign }) {
           font-size:0.95rem;
         }
 
-        /* ───── TERMS ───── */
+        /* ─── TERMS ─── */
         .terms-content {
           background:rgba(255,255,255,0.04);
           padding:2rem;
@@ -526,7 +475,7 @@ function PubgUcGiveawayV1({ campaign }) {
         }
         .terms-content ul li:last-child { border-bottom:none; }
 
-        /* ───── CLAIM FORM ───── */
+        /* ─── CLAIM FORM ─── */
         .claim-section { padding-bottom:5rem; }
         .claim-card {
           background:rgba(255,255,255,0.05);
@@ -644,7 +593,7 @@ function PubgUcGiveawayV1({ campaign }) {
           margin-top:1rem;
         }
 
-        /* ───── FOOTER ───── */
+        /* ─── FOOTER ─── */
         .site-footer {
           background:rgba(0,0,0,0.5);
           border-top:1px solid rgba(255,255,255,0.05);
@@ -669,7 +618,7 @@ function PubgUcGiveawayV1({ campaign }) {
           font-size:1.6rem;
         }
 
-        /* ───── WEBVIEW MODAL ───── */
+        /* ─── WEBVIEW MODAL ─── */
         .modal-overlay {
           position:fixed;
           inset:0;
@@ -735,13 +684,12 @@ function PubgUcGiveawayV1({ campaign }) {
         }
         .modal-btn.ghost:hover { color:#fff; }
 
-        /* ───── RESPONSIVE ───── */
+        /* ─── RESPONSIVE ─── */
         @media (max-width:768px) {
           .hero-section { min-height:70vh; background-attachment:scroll; }
           .hero-stats { gap:1rem; }
           .hero-stats div { font-size:0.85rem; padding:0.4rem 1.2rem; }
           .claim-card { padding:2rem 1.2rem; }
-          .rewards-grid { grid-template-columns:1fr 1fr; }
         }
         @media (max-width:480px) {
           .header-container { flex-wrap:wrap; gap:0.5rem; }
@@ -751,7 +699,6 @@ function PubgUcGiveawayV1({ campaign }) {
           .claim-card h2 { font-size:1.5rem; }
           .steps { gap:1rem; }
           .step { padding:1rem; }
-          .rewards-grid { grid-template-columns:1fr; }
           .section-title { font-size:1.6rem; }
         }
       `}} />
