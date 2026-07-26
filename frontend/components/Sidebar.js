@@ -59,26 +59,8 @@ export default function Sidebar() {
   const isActive = (path) => router.pathname === path;
 
   return (
-    <div className="flex flex-col h-full bg-white/95 backdrop-blur-sm border-r border-gray-200">
-      {/* ── Logo / Brand (optional) ── */}
-      <div className="flex-shrink-0 px-4 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <img
-            src="/favicon.ico"
-            alt="Make Trend"
-            className="w-8 h-8 rounded-lg shadow-md"
-          />
-          <span className="text-xl font-extrabold tracking-tight">
-            <span className="text-purple-600">Make</span>
-            <span className="text-gray-900">Trend</span>
-          </span>
-        </div>
-        <p className="text-[10px] text-gray-400 font-medium tracking-wide pl-10">
-          Viral campaign builder
-        </p>
-      </div>
-
-      {/* ── Navigation Links (scrollable if needed) ── */}
+    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+      {/* ── Navigation Links (no logo) ── */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {navItems.map((item) => (
           <Link
@@ -103,11 +85,10 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* ── User Info + Logout (always at bottom) ── */}
+      {/* ── User Info + Logout (fixed at bottom) ── */}
       <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50/50">
         {isAuthenticated ? (
           <div className="space-y-3">
-            {/* User card */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md overflow-hidden flex-shrink-0">
                 {profileLoading ? (
@@ -140,8 +121,6 @@ export default function Sidebar() {
                 </span>
               )}
             </div>
-
-            {/* Logout button */}
             <button
               onClick={handleLogout}
               className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-100 hover:border-red-200"
