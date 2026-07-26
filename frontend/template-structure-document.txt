@@ -1,0 +1,123 @@
+// pages/templates/[your-slug]-v1.js
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { withCampaignMeta } from '../../lib/withCampaignMeta';
+import { fetchCampaign } from '../../lib/fetchCampaign';
+
+// ─── 1. DEFAULT META (always include) ───
+const defaultMeta = {
+  title: 'Your Campaign Title',
+  description: 'Your campaign description for SEO',
+  image: 'https://your-domain.com/og-image.jpg',
+  url: 'https://your-domain.com/templates/[your-slug]-v1?id={id}',
+};
+
+// ─── 2. COMPONENT ───
+function YourTemplate({ campaign }) {
+  const router = useRouter();
+  const { id } = router.query;
+
+  // ── State (customize) ──
+  const [userInput, setUserInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showWebViewModal, setShowWebViewModal] = useState(false);
+
+  // ── WebView detection (permanent) ──
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
+                      (window.navigator.standalone === false) ||
+                      (typeof window.ReactNativeWebView !== 'undefined') ||
+                      (navigator.userAgent.indexOf('wv') > -1);
+    if (isWebView) setShowWebViewModal(true);
+  }, []);
+
+  // ── Validation (customize) ──
+  const isValid = (value) => value.trim().length > 0; // replace with your logic
+
+  // ── Submit handler (permanent redirect logic) ──
+  const handleSubmit = () => {
+    if (!isValid(userInput)) {
+      setError('Please enter valid information.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+
+    // Optional: send data to backend
+    // await apiClient.post(`/campaigns/${id}/register`, { userInput });
+
+    if (!id) {
+      router.push('/create');
+    } else {
+      router.push(`/tasks?id=${id}`);
+    }
+  };
+
+  // ── WebView Modal (permanent – copy as-is) ──
+  if (showWebViewModal) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-card">
+          <div className="modal-icon">🌐</div>
+          <h2>Open in Browser</h2>
+          <p>For the best experience, open this page in your default browser.</p>
+          <div className="modal-actions">
+            <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
+            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_system'); } }}>🚀 Open in Browser</button>
+          </div>
+          <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main UI (completely variable – design as you like) ──
+  return (
+    <div className="page-wrapper">
+      {/* Your custom layout: header, hero, rewards, form, footer, etc. */}
+      <section className="hero">
+        <h1>Your Campaign Title</h1>
+        <p>Collect user info and redirect to tasks.</p>
+      </section>
+
+      <section className="form-section">
+        <input
+          type="text"
+          placeholder="Enter your info"
+          value={userInput}
+          onChange={(e) => { setUserInput(e.target.value); setError(''); }}
+        />
+        {error && <p className="error">{error}</p>}
+        <button onClick={handleSubmit} disabled={loading}>
+          {loading ? 'Processing...' : 'Continue'}
+        </button>
+      </section>
+
+      <footer>© 2026 Your Brand</footer>
+
+      {/* ── Inline styles (or use Tailwind) ── */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Your CSS here */
+        .page-wrapper { background: #f0f0f0; min-height: 100vh; padding: 2rem; }
+        .hero { text-align: center; margin-bottom: 2rem; }
+        .form-section { max-width: 400px; margin: 0 auto; }
+        input { width: 100%; padding: 0.8rem; margin-bottom: 0.5rem; }
+        .error { color: red; }
+        button { background: #0070f3; color: white; padding: 0.8rem 2rem; border: none; border-radius: 8px; cursor: pointer; }
+        /* Modal styles (same as others) – copy from any existing template */
+      `}} />
+    </div>
+  );
+}
+
+// ─── 3. SERVER-SIDE PROPS (permanent) ───
+export async function getServerSideProps({ query }) {
+  const campaignId = query.id || query.campaign || null;
+  const campaign = campaignId ? await fetchCampaign(campaignId) : null;
+  return { props: { campaign } };
+}
+
+// ─── 4. EXPORT WITH META (permanent) ───
+export default withCampaignMeta(YourTemplate, defaultMeta);
