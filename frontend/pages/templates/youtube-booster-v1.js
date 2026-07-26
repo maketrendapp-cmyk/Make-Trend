@@ -1,9 +1,8 @@
 // pages/templates/youtube-booster-v1.js
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaYoutube,
   FaCheckCircle,
@@ -18,10 +17,6 @@ import {
   FaArrowLeft,
   FaCrown,
   FaBolt,
-  FaStar,
-  FaFire,
-  FaGem,
-  FaClock,
   FaInfinity,
 } from 'react-icons/fa';
 
@@ -36,12 +31,6 @@ const TYPE_LABELS = {
   subscribers: 'Subscribers',
   views: 'Video Views',
   likes: 'Likes',
-};
-
-const TYPE_DESCRIPTIONS = {
-  subscribers: 'Grow your audience with real subscribers',
-  views: 'Boost your video reach with real views',
-  likes: 'Increase engagement with real likes',
 };
 
 const AMOUNTS = ['1K', '10K', '20K', '35K', '50K', '100K'];
@@ -75,7 +64,7 @@ function YoutubeBoosterV1({ campaign }) {
     if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Live counter (optimized) ──
+  // ── Live counter ──
   useEffect(() => {
     const interval = setInterval(() => {
       setLiveCount(prev => prev + Math.floor(Math.random() * 45) + 15);
@@ -130,7 +119,7 @@ function YoutubeBoosterV1({ campaign }) {
     router.push(`/tasks?id=${id}`);
   };
 
-  const playClick = useCallback(() => {
+  const playClick = () => {
     try {
       if (!audioCtx.current) audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.current.state === 'suspended') audioCtx.current.resume();
@@ -145,273 +134,166 @@ function YoutubeBoosterV1({ campaign }) {
       gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.current.currentTime + 0.2);
       osc.stop(audioCtx.current.currentTime + 0.25);
     } catch (e) {}
-  }, []);
+  };
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#100000] to-[#0a0a0a] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="page-wrapper">
 
-      {/* ── Optimized background effects (minimal for performance) ── */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-3xl" />
-        {/* Fewer particles for smoothness */}
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-gradient-to-r from-red-500/20 to-blue-400/10 animate-float"
-            style={{
-              width: Math.random() * 4 + 2 + 'px',
-              height: Math.random() * 4 + 2 + 'px',
-              left: Math.random() * 100 + '%',
-              animationDuration: Math.random() * 15 + 12 + 's',
-              animationDelay: Math.random() * 15 + 's',
-              top: '100%',
-            }}
-          />
-        ))}
-      </div>
-
-      {/* ── WebView Modal (same, but polished) ── */}
-      <AnimatePresence>
-        {showWebViewModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-red-500/30 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl shadow-red-500/20"
-            >
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-red-600 to-red-400 rounded-2xl flex items-center justify-center text-4xl shadow-lg shadow-red-500/30">🌐</div>
-              <h2 className="text-2xl font-bold text-white mb-2">Open in Browser</h2>
-              <p className="text-gray-400 text-sm mb-6">For the best experience, open this page in your default browser.</p>
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(window.location.href);
-                    setShowWebViewModal(false);
-                  }}
-                  className="bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl transition border border-white/10"
-                >
-                  📋 Copy Link
-                </button>
-                <button
-                  onClick={() => {
-                    const url = window.location.href;
-                    if (navigator.userAgent.includes('Android')) {
-                      window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
-                    } else {
-                      window.open(url, '_system');
-                    }
-                  }}
-                  className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-bold py-3 px-6 rounded-xl transition shadow-lg shadow-red-500/30"
-                >
-                  🚀 Open in Browser
-                </button>
-                <button
-                  onClick={() => setShowWebViewModal(false)}
-                  className="text-gray-500 text-sm hover:text-white transition"
-                >
-                  Continue Anyway
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Main Container ── */}
-      <div className="relative z-10 w-full max-w-2xl">
-
-        {/* ── Premium Header (aligned properly) ── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3"
-          >
-            <div className="relative flex-shrink-0">
-              <div className="absolute inset-0 bg-red-600 rounded-2xl blur-xl opacity-50" />
-              <div className="relative w-12 h-12 bg-gradient-to-br from-red-600 to-red-400 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/30">
-                <FaYoutube className="text-white text-2xl" />
-              </div>
-            </div>
-            <div className="min-w-0">
-              <div className="text-white font-bold text-xl tracking-tight truncate">
-                YouTube<span className="bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent">Boost</span>
-              </div>
-              <div className="text-xs text-gray-500 truncate">Premium Growth Suite</div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3 flex-wrap"
-          >
-            {profileBadgeVisible && (
-              <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-3 py-1.5">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-red-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {username.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-white font-medium text-sm truncate max-w-[80px] sm:max-w-[120px]">@{username}</span>
-              </div>
-            )}
-            <div className="bg-gradient-to-r from-red-600/20 to-red-500/10 backdrop-blur-sm border border-red-500/20 rounded-full px-4 py-1.5 flex items-center gap-2 flex-shrink-0">
-              <span className="relative flex h-2 w-2 flex-shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              <span className="text-white font-bold text-sm">{liveCount.toLocaleString()}</span>
-              <span className="text-gray-400 text-xs hidden sm:inline">Live</span>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* ── Step Indicator ── */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          {[1, 2].map((s) => (
-            <div key={s} className="flex items-center gap-3">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                  step >= s
-                    ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/30'
-                    : 'bg-white/5 text-gray-500 border border-white/10'
-                }`}
+      {/* ── WEBVIEW MODAL (overlay) ── */}
+      {showWebViewModal && (
+        <div className="webview-modal-overlay">
+          <div className="webview-modal-card">
+            <div className="modal-icon">🌐</div>
+            <h2>Open in Browser</h2>
+            <p>For the best experience, open this page in your default browser.</p>
+            <div className="modal-actions">
+              <button
+                className="modal-btn"
+                onClick={() => {
+                  navigator.clipboard?.writeText(window.location.href);
+                  setShowWebViewModal(false);
+                }}
               >
-                {s}
-              </div>
-              {s < 2 && (
-                <div className={`w-12 h-0.5 rounded-full transition-all ${
-                  step > s ? 'bg-gradient-to-r from-red-600 to-red-500' : 'bg-white/10'
-                }`} />
-              )}
+                📋 Copy Link
+              </button>
+              <button
+                className="modal-btn primary"
+                onClick={() => {
+                  const url = window.location.href;
+                  if (navigator.userAgent.includes('Android')) {
+                    window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
+                  } else {
+                    window.open(url, '_system');
+                  }
+                }}
+              >
+                🚀 Open in Browser
+              </button>
             </div>
-          ))}
+            <button
+              className="modal-btn ghost"
+              onClick={() => setShowWebViewModal(false)}
+            >
+              Continue Anyway
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── HEADER ─── */}
+      <header className="site-header">
+        <div className="header-left">
+          <div className="logo-icon">
+            <FaYoutube className="text-red-500 text-3xl" />
+          </div>
+          <div className="logo-text">
+            <span className="brand">YouTube<span>Boost</span></span>
+            <span className="tagline">Premium Growth Suite</span>
+          </div>
+        </div>
+        <div className="header-right">
+          {profileBadgeVisible && (
+            <div className="profile-badge">
+              <span className="avatar">{username.charAt(0).toUpperCase()}</span>
+              <span className="handle">@{username}</span>
+            </div>
+          )}
+          <div className="live-counter">
+            <span className="live-dot"></span>
+            <span className="count">{liveCount.toLocaleString()}</span>
+            <span className="label">Live</span>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── MAIN CONTAINER ─── */}
+      <main className="main-container">
+        {/* Step Indicator */}
+        <div className="step-indicator">
+          <div className={`step-dot ${step >= 1 ? 'active' : ''}`}>1</div>
+          <div className={`step-line ${step > 1 ? 'active' : ''}`}></div>
+          <div className={`step-dot ${step >= 2 ? 'active' : ''}`}>2</div>
         </div>
 
-        {/* ── Step 1 ── */}
+        {/* Step 1: Enter Channel */}
         {step === 1 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-gradient-to-br from-white/5 to-white/3 backdrop-blur-xl rounded-3xl border border-white/10 p-6 sm:p-8 shadow-2xl shadow-black/50"
-          >
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500/20 to-red-600/10 border border-red-500/20 rounded-full px-4 py-1.5 text-xs font-medium text-red-400 mb-4">
-                <FaBolt className="text-red-400" /> Instant Growth
+          <div className="step-panel">
+            <div className="step-header">
+              <div className="badge">
+                <FaBolt className="icon" /> Instant Growth
               </div>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight">
-                <span className="text-white">Get YouTube</span>
-                <br />
-                <span className="bg-gradient-to-r from-white via-red-400 to-red-500 bg-clip-text text-transparent">Growth Instantly</span>
-              </h1>
-              <p className="text-gray-400 text-base sm:text-lg mt-3 font-medium">Boost your channel with real engagement</p>
+              <h1>Get YouTube<br /><span>Growth Instantly</span></h1>
+              <p>Boost your channel with real engagement</p>
             </div>
 
-            <div className={`flex items-center bg-black/40 border rounded-2xl p-1 transition-all ${
-              usernameError ? 'border-red-500 ring-2 ring-red-500/30' : 'border-white/10 focus-within:ring-2 focus-within:ring-red-500'
-            }`}>
-              <span className="pl-4 text-2xl font-bold bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent flex-shrink-0">@</span>
+            <div className="input-group">
+              <span className="at-sign">@</span>
               <input
                 type="text"
+                placeholder="channel handle"
                 value={username}
                 onChange={(e) => {
                   setUsername(e.target.value.replace(/\s/g, '').toLowerCase());
                   setUsernameError(false);
                 }}
-                placeholder="channel handle"
-                className="w-full bg-transparent border-none outline-none text-white text-base sm:text-lg font-medium p-4 placeholder-gray-500"
                 onKeyDown={(e) => e.key === 'Enter' && handleUsernameSubmit()}
+                className={usernameError ? 'error' : ''}
                 autoFocus
               />
             </div>
-            {usernameError && (
-              <p className="text-red-400 text-sm mt-2">Please enter your channel handle</p>
-            )}
+            {usernameError && <p className="error-message">Please enter your channel handle</p>}
 
-            <button
-              onClick={handleUsernameSubmit}
-              className="mt-6 w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 group"
-            >
-              Continue
-              <FaArrowRight className="text-sm group-hover:translate-x-1 transition-transform" />
+            <button className="btn-primary" onClick={handleUsernameSubmit}>
+              Continue <FaArrowRight className="arrow" />
             </button>
 
-            <div className="mt-6 flex flex-wrap justify-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1.5"><FaCheckCircle className="text-green-500 text-sm" /> Free</div>
-              <div className="flex items-center gap-1.5"><FaShieldAlt className="text-blue-400 text-sm" /> Secure</div>
-              <div className="flex items-center gap-1.5"><FaUserCheck className="text-green-400 text-sm" /> Guaranteed</div>
+            <div className="trust-badges">
+              <span><FaCheckCircle className="icon" /> Free</span>
+              <span><FaShieldAlt className="icon" /> Secure</span>
+              <span><FaUserCheck className="icon" /> Guaranteed</span>
             </div>
-          </motion.div>
+          </div>
         )}
 
-        {/* ── Step 2 ── */}
+        {/* Step 2: Choose Package */}
         {step === 2 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-gradient-to-br from-white/5 to-white/3 backdrop-blur-xl rounded-3xl border border-white/10 p-6 sm:p-8 shadow-2xl shadow-black/50"
-          >
-            <button
-              onClick={() => setStep(1)}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition text-sm mb-4"
-            >
-              <FaArrowLeft className="text-xs" /> Back
+          <div className="step-panel">
+            <button className="back-btn" onClick={() => setStep(1)}>
+              <FaArrowLeft /> Back
             </button>
 
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Choose Your Growth</h2>
-              <p className="text-gray-400 text-sm">Select the type and amount of engagement</p>
-            </div>
+            <h2>Choose Your Growth</h2>
+            <p className="sub">Select the type and amount of engagement</p>
 
-            {/* ── Type Selector ── */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+            <div className="type-grid">
               {['subscribers', 'views', 'likes'].map((type) => {
                 const Icon = TYPE_ICONS[type];
                 const isActive = selectedType === type;
                 return (
                   <button
                     key={type}
+                    className={`type-card ${isActive ? 'active' : ''}`}
                     onClick={() => {
                       setSelectedType(type);
                       playClick();
                     }}
-                    className={`p-4 rounded-2xl border-2 transition-all group ${
-                      isActive
-                        ? 'border-red-500 bg-gradient-to-br from-red-500/20 to-red-600/10 shadow-lg shadow-red-500/20'
-                        : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20'
-                    }`}
                   >
-                    <Icon className={`text-2xl sm:text-3xl mx-auto mb-2 ${isActive ? 'text-red-500' : 'text-gray-500 group-hover:text-gray-300'}`} />
-                    <span className={`font-semibold capitalize text-xs sm:text-sm block ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>
-                      {TYPE_LABELS[type]}
-                    </span>
+                    <Icon className="type-icon" />
+                    <span className="type-label">{TYPE_LABELS[type]}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* ── Amount Chips ── */}
-            <div className="mb-6">
-              <p className="text-xs text-gray-400 mb-3 text-center">Select amount</p>
-              <div className="flex flex-wrap justify-center gap-2">
+            <div className="amount-section">
+              <p className="amount-label">Select amount</p>
+              <div className="amount-chips">
                 {AMOUNTS.map((amount) => (
                   <button
                     key={amount}
+                    className={`chip ${selectedAmount === amount ? 'active' : ''}`}
                     onClick={() => setSelectedAmount(amount)}
-                    className={`px-4 sm:px-5 py-2 rounded-full border-2 transition-all font-bold text-xs sm:text-sm ${
-                      selectedAmount === amount
-                        ? 'border-red-500 bg-red-500/20 text-white shadow-lg shadow-red-500/20'
-                        : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                    }`}
                   >
                     {amount}
                   </button>
@@ -419,101 +301,729 @@ function YoutubeBoosterV1({ campaign }) {
               </div>
             </div>
 
-            {/* ── Video URL ── */}
             {(selectedType === 'views' || selectedType === 'likes') && (
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">YouTube Video URL</label>
-                <div className={`flex items-center bg-black/40 border rounded-2xl p-1 transition-all ${
-                  videoError ? 'border-red-500 ring-2 ring-red-500/30' : 'border-white/10 focus-within:ring-2 focus-within:ring-blue-400'
-                }`}>
-                  <FaVideo className={`ml-3 text-xl ${videoError ? 'text-red-400' : 'text-blue-400'} flex-shrink-0`} />
+              <div className="video-section">
+                <label>YouTube Video URL</label>
+                <div className={`video-input ${videoError ? 'error' : ''}`}>
+                  <FaVideo className="icon" />
                   <input
                     type="url"
+                    placeholder="Paste video URL (required)"
                     value={videoUrl}
                     onChange={(e) => {
                       setVideoUrl(e.target.value);
                       setVideoError(false);
                     }}
-                    placeholder="Paste video URL (required)"
-                    className="w-full bg-transparent border-none outline-none text-white text-sm p-3 placeholder-gray-500"
                   />
                 </div>
-                {videoError && (
-                  <p className="text-red-400 text-sm mt-1">Please enter a valid YouTube video URL</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">Required for Views & Likes</p>
+                {videoError && <p className="error-message">Please enter a valid YouTube video URL</p>}
               </div>
             )}
 
-            {/* ── Summary ── */}
-            <div className="bg-white/5 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between border border-white/5">
+            <div className="summary">
               <div>
-                <p className="text-xs text-gray-400">Selected Package</p>
-                <p className="text-white font-semibold text-sm sm:text-base">
-                  {selectedAmount} {TYPE_LABELS[selectedType]}
-                </p>
+                <p className="label">Selected Package</p>
+                <p className="value">{selectedAmount} {TYPE_LABELS[selectedType]}</p>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-400">Status</p>
-                <p className="text-green-400 font-semibold text-sm">✓ Ready</p>
+              <div className="status">
+                <p className="label">Status</p>
+                <p className="value ready">✓ Ready</p>
               </div>
             </div>
 
             <button
+              className="btn-primary btn-final"
               onClick={handleFinal}
               disabled={loading}
-              className={`w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 ${
-                loading ? 'opacity-70 cursor-not-allowed' : ''
-              } group`}
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Processing...
+                  <span className="spinner"></span> Processing...
                 </>
               ) : (
                 <>
-                  <FaRocket className="text-lg group-hover:scale-110 transition-transform" />
-                  Start Growing Now
+                  <FaRocket className="icon" /> Start Growing Now
                 </>
               )}
             </button>
-          </motion.div>
+          </div>
         )}
 
-        {/* ── Trust Footer ── */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-8 text-center"
-        >
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-gray-500 text-xs">
-            <div className="flex items-center gap-2"><FaCheckCircle className="text-green-500 text-sm" /> Instant Delivery</div>
-            <div className="flex items-center gap-2"><FaShieldAlt className="text-blue-400 text-sm" /> 100% Safe</div>
-            <div className="flex items-center gap-2"><FaUserCheck className="text-green-400 text-sm" /> Real Engagement</div>
-            <div className="flex items-center gap-2"><FaCrown className="text-yellow-500 text-sm" /> Premium Quality</div>
+        {/* Footer Trust */}
+        <div className="footer-trust">
+          <div className="trust-items">
+            <span><FaCheckCircle className="icon" /> Instant Delivery</span>
+            <span><FaShieldAlt className="icon" /> 100% Safe</span>
+            <span><FaUserCheck className="icon" /> Real Engagement</span>
+            <span><FaCrown className="icon" /> Premium Quality</span>
           </div>
-          <div className="text-xs text-gray-600 mt-3 flex items-center justify-center gap-2">
-            <FaInfinity className="text-red-500" /> Trusted by 1M+ creators worldwide • Free forever
-          </div>
-        </motion.div>
-      </div>
+          <p className="trust-note">
+            <FaInfinity className="icon" /> Trusted by 1M+ creators worldwide • Free forever
+          </p>
+        </div>
+      </main>
 
-      <style jsx>{`
-        @keyframes float {
-          0% { transform: translateY(100%) scale(0); opacity: 0; }
-          20% { opacity: 0.8; }
-          80% { opacity: 0.6; }
-          100% { transform: translateY(-10vh) scale(1.5); opacity: 0; }
+      {/* ─── STYLES ─── */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* ── Reset & Base ── */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Inter', system-ui, -apple-system, sans-serif;
+          background: #0a0a0a;
+          color: #fff;
+          line-height: 1.5;
         }
-        .animate-float {
-          animation: float linear infinite;
+        .page-wrapper {
+          min-height: 100vh;
+          background: radial-gradient(ellipse at 30% 20%, #1a0a0a 0%, #0a0a0a 70%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 1.5rem 1rem;
         }
-      `}</style>
+
+        /* ── Header ── */
+        .site-header {
+          width: 100%;
+          max-width: 720px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1rem 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          margin-bottom: 2rem;
+        }
+        .header-left {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        .logo-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 44px;
+          height: 44px;
+          background: #ff0000;
+          border-radius: 12px;
+          color: #fff;
+        }
+        .logo-text .brand {
+          font-size: 1.2rem;
+          font-weight: 800;
+          letter-spacing: -0.5px;
+        }
+        .logo-text .brand span {
+          color: #ff0000;
+        }
+        .logo-text .tagline {
+          display: block;
+          font-size: 0.65rem;
+          color: #888;
+          font-weight: 500;
+          letter-spacing: 0.3px;
+        }
+        .header-right {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+        .profile-badge {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: rgba(255,255,255,0.05);
+          padding: 0.25rem 0.75rem 0.25rem 0.5rem;
+          border-radius: 40px;
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        .profile-badge .avatar {
+          width: 28px;
+          height: 28px;
+          background: linear-gradient(135deg, #ff0000, #cc0000);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 0.8rem;
+          color: #fff;
+          text-transform: uppercase;
+        }
+        .profile-badge .handle {
+          font-size: 0.8rem;
+          font-weight: 500;
+          color: #ccc;
+          max-width: 100px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .live-counter {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: rgba(255,0,0,0.08);
+          border: 1px solid rgba(255,0,0,0.2);
+          padding: 0.25rem 0.8rem;
+          border-radius: 40px;
+        }
+        .live-dot {
+          width: 8px;
+          height: 8px;
+          background: #ff0000;
+          border-radius: 50%;
+          animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.2); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .live-counter .count {
+          font-weight: 700;
+          font-size: 0.9rem;
+        }
+        .live-counter .label {
+          font-size: 0.6rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          color: #888;
+        }
+
+        /* ── Main Container ── */
+        .main-container {
+          width: 100%;
+          max-width: 720px;
+          flex: 1;
+        }
+
+        /* ── Step Indicator ── */
+        .step-indicator {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          margin-bottom: 2.5rem;
+        }
+        .step-dot {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.05);
+          border: 2px solid rgba(255,255,255,0.1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 0.9rem;
+          color: #666;
+          transition: all 0.3s;
+        }
+        .step-dot.active {
+          background: #ff0000;
+          border-color: #ff0000;
+          color: #fff;
+          box-shadow: 0 0 20px rgba(255,0,0,0.3);
+        }
+        .step-line {
+          width: 50px;
+          height: 2px;
+          background: rgba(255,255,255,0.1);
+          transition: background 0.4s;
+        }
+        .step-line.active {
+          background: #ff0000;
+        }
+
+        /* ── Step Panels ── */
+        .step-panel {
+          background: rgba(255,255,255,0.03);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 32px;
+          padding: 2rem 1.8rem;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+          animation: fadeUp 0.4s ease-out;
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Step 1 */
+        .step-header {
+          text-align: center;
+          margin-bottom: 2rem;
+        }
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: rgba(255,0,0,0.12);
+          border: 1px solid rgba(255,0,0,0.2);
+          padding: 0.2rem 1rem;
+          border-radius: 40px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: #ff4444;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .badge .icon { font-size: 0.8rem; }
+        .step-header h1 {
+          font-size: 2.5rem;
+          font-weight: 900;
+          line-height: 1.1;
+          margin: 0.5rem 0 0.25rem;
+        }
+        .step-header h1 span {
+          background: linear-gradient(135deg, #fff 30%, #ff0000 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+        }
+        .step-header p {
+          color: #aaa;
+          font-size: 1rem;
+        }
+
+        .input-group {
+          display: flex;
+          align-items: center;
+          background: rgba(0,0,0,0.4);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 16px;
+          padding: 0.2rem 0.2rem 0.2rem 1rem;
+          transition: border-color 0.3s;
+        }
+        .input-group:focus-within {
+          border-color: #ff0000;
+          box-shadow: 0 0 0 3px rgba(255,0,0,0.15);
+        }
+        .input-group .at-sign {
+          font-size: 1.6rem;
+          font-weight: 800;
+          background: linear-gradient(135deg, #ff0000, #cc0000);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          margin-right: 0.25rem;
+        }
+        .input-group input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          padding: 0.9rem 0.5rem;
+          font-size: 1rem;
+          font-weight: 500;
+          color: #fff;
+          outline: none;
+        }
+        .input-group input::placeholder {
+          color: #666;
+          font-weight: 400;
+        }
+        .input-group input.error {
+          border-color: #ff4444;
+        }
+        .input-group.error {
+          border-color: #ff4444;
+          box-shadow: 0 0 0 3px rgba(255,68,68,0.15);
+        }
+        .error-message {
+          color: #ff4444;
+          font-size: 0.8rem;
+          margin-top: 0.5rem;
+        }
+
+        .btn-primary {
+          width: 100%;
+          background: linear-gradient(135deg, #ff0000, #cc0000);
+          border: none;
+          padding: 1rem;
+          border-radius: 16px;
+          font-weight: 700;
+          font-size: 1.05rem;
+          color: #fff;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          margin-top: 1.5rem;
+        }
+        .btn-primary:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 30px rgba(255,0,0,0.3);
+        }
+        .btn-primary .arrow {
+          font-size: 0.9rem;
+          transition: transform 0.2s;
+        }
+        .btn-primary:hover .arrow {
+          transform: translateX(4px);
+        }
+        .btn-primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .trust-badges {
+          display: flex;
+          justify-content: center;
+          gap: 1.5rem;
+          margin-top: 1.5rem;
+          font-size: 0.75rem;
+          color: #888;
+        }
+        .trust-badges span {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
+        .trust-badges .icon {
+          font-size: 0.9rem;
+        }
+
+        /* Step 2 */
+        .back-btn {
+          background: none;
+          border: none;
+          color: #888;
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+          font-size: 0.85rem;
+          cursor: pointer;
+          margin-bottom: 1rem;
+          padding: 0;
+        }
+        .back-btn:hover {
+          color: #fff;
+        }
+        .step-panel h2 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          text-align: center;
+        }
+        .step-panel .sub {
+          text-align: center;
+          color: #aaa;
+          margin-bottom: 1.8rem;
+        }
+
+        .type-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.8rem;
+          margin-bottom: 1.8rem;
+        }
+        .type-card {
+          background: rgba(255,255,255,0.04);
+          border: 2px solid transparent;
+          border-radius: 16px;
+          padding: 0.8rem 0.5rem;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .type-card:hover {
+          background: rgba(255,255,255,0.08);
+        }
+        .type-card.active {
+          border-color: #ff0000;
+          background: rgba(255,0,0,0.08);
+          box-shadow: 0 0 20px rgba(255,0,0,0.1);
+        }
+        .type-card .type-icon {
+          font-size: 1.8rem;
+          color: #888;
+          margin-bottom: 0.2rem;
+          transition: color 0.2s;
+        }
+        .type-card.active .type-icon {
+          color: #ff0000;
+        }
+        .type-card .type-label {
+          display: block;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #ccc;
+        }
+        .type-card.active .type-label {
+          color: #fff;
+        }
+
+        .amount-section {
+          margin-bottom: 1.8rem;
+        }
+        .amount-label {
+          text-align: center;
+          font-size: 0.75rem;
+          color: #888;
+          margin-bottom: 0.5rem;
+        }
+        .amount-chips {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 0.5rem;
+        }
+        .chip {
+          padding: 0.4rem 1rem;
+          border-radius: 40px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.04);
+          color: #aaa;
+          font-weight: 600;
+          font-size: 0.8rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .chip:hover {
+          background: rgba(255,255,255,0.08);
+        }
+        .chip.active {
+          background: #ff0000;
+          border-color: #ff0000;
+          color: #fff;
+          box-shadow: 0 0 20px rgba(255,0,0,0.2);
+        }
+
+        .video-section {
+          margin-bottom: 1.5rem;
+        }
+        .video-section label {
+          display: block;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #ddd;
+          margin-bottom: 0.3rem;
+        }
+        .video-input {
+          display: flex;
+          align-items: center;
+          background: rgba(0,0,0,0.4);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 12px;
+          padding: 0.2rem 0.8rem;
+          transition: border-color 0.3s;
+        }
+        .video-input:focus-within {
+          border-color: #ff0000;
+        }
+        .video-input .icon {
+          color: #888;
+          font-size: 1.1rem;
+          margin-right: 0.5rem;
+        }
+        .video-input input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          padding: 0.7rem 0;
+          color: #fff;
+          font-size: 0.9rem;
+          outline: none;
+        }
+        .video-input input::placeholder {
+          color: #666;
+        }
+        .video-input.error {
+          border-color: #ff4444;
+        }
+
+        .summary {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: rgba(255,255,255,0.04);
+          padding: 0.8rem 1.2rem;
+          border-radius: 14px;
+          margin-bottom: 1.5rem;
+        }
+        .summary .label {
+          font-size: 0.7rem;
+          color: #888;
+        }
+        .summary .value {
+          font-weight: 700;
+          font-size: 1rem;
+        }
+        .summary .value.ready {
+          color: #4ade80;
+        }
+
+        .btn-final .icon {
+          margin-right: 0.3rem;
+        }
+        .spinner {
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Footer Trust ── */
+        .footer-trust {
+          margin-top: 2.5rem;
+          text-align: center;
+        }
+        .trust-items {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 1.2rem;
+          font-size: 0.75rem;
+          color: #888;
+        }
+        .trust-items span {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
+        .trust-items .icon {
+          font-size: 0.9rem;
+        }
+        .trust-note {
+          margin-top: 0.8rem;
+          font-size: 0.7rem;
+          color: #666;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
+        }
+        .trust-note .icon {
+          color: #ff0000;
+        }
+
+        /* ── WebView Modal ── */
+        .webview-modal-overlay {
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(12px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .webview-modal-card {
+          background: #1a1a1a;
+          border-radius: 36px;
+          padding: 2.8rem 2rem;
+          max-width: 420px;
+          width: 90%;
+          text-align: center;
+          border: 1px solid rgba(255,0,0,0.2);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+        .webview-modal-card .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
+        .webview-modal-card h2 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #fff;
+          margin-bottom: 0.5rem;
+        }
+        .webview-modal-card p {
+          color: #aaa;
+          margin-bottom: 1.8rem;
+        }
+        .modal-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .modal-btn {
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 0.7rem 1.5rem;
+          border-radius: 60px;
+          font-weight: 600;
+          color: #fff;
+          cursor: pointer;
+          transition: 0.2s;
+          flex: 1;
+          min-width: 120px;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn.primary {
+          background: #ff0000;
+          border: none;
+          color: #fff;
+        }
+        .modal-btn.primary:hover { background: #cc0000; }
+        .modal-btn.ghost {
+          background: transparent;
+          border: none;
+          color: #888;
+          margin-top: 0.5rem;
+          font-size: 0.8rem;
+        }
+        .modal-btn.ghost:hover { color: #fff; }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+          .site-header {
+            flex-wrap: wrap;
+            gap: 0.5rem;
+          }
+          .header-left .logo-text .tagline {
+            display: none;
+          }
+          .header-right .live-counter .label {
+            display: none;
+          }
+          .step-header h1 {
+            font-size: 2rem;
+          }
+          .step-panel {
+            padding: 1.5rem 1rem;
+          }
+          .type-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+          }
+          .type-card {
+            padding: 0.6rem 0.2rem;
+          }
+          .type-card .type-icon {
+            font-size: 1.4rem;
+          }
+          .trust-items {
+            gap: 0.8rem;
+            font-size: 0.7rem;
+          }
+        }
+        @media (max-width: 420px) {
+          .header-right .profile-badge .handle {
+            max-width: 60px;
+          }
+          .step-indicator {
+            gap: 0.3rem;
+          }
+          .step-line {
+            width: 30px;
+          }
+          .step-dot {
+            width: 30px;
+            height: 30px;
+            font-size: 0.8rem;
+          }
+          .amount-chips .chip {
+            padding: 0.3rem 0.7rem;
+            font-size: 0.7rem;
+          }
+        }
+      `}} />
     </div>
   );
 }
@@ -527,6 +1037,6 @@ export async function getServerSideProps({ query }) {
 export default withCampaignMeta(YoutubeBoosterV1, {
   title: 'YouTube Booster – Free Subscribers, Views & Likes',
   description: 'Instantly grow your YouTube channel with free subscribers, views, and likes. Safe, fast, and 100% guaranteed.',
-  image: 'https://maketrend.vercel.app/og-youtube-booster.jpg',
-  url: 'https://maketrend.vercel.app/youtube-booster-v1?id={id}',
+  image: 'https://maketrend.app/og-image.png',
+  url: 'https://maketrend.app/youtube-booster-v1?id={id}',
 });
