@@ -1,4 +1,3 @@
-
 // pages/_app.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
@@ -9,6 +8,7 @@ import { AuthProvider } from '../components/AuthScreen';
 import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
+import Sidebar from '../components/Sidebar'; // ✅ new component
 import '../styles/globals.css';
 
 // ── React Query client ──
@@ -38,7 +38,7 @@ const NO_LAYOUT_PAGES = [
 ];
 
 // ============================================================
-// PAGES WITH ONLY TOP NAVBAR (no bottom nav, no menu)
+// PAGES WITH ONLY TOP NAVBAR (no bottom nav, no menu, no sidebar)
 // ============================================================
 const TOP_NAV_ONLY_PAGES = [
   '/about',
@@ -73,7 +73,7 @@ function MyApp({ Component, pageProps }) {
     );
   }
 
-  // ── Top navbar only (about, rules, terms, privacy) ──
+  // ── Top navbar only (about, rules, terms, privacy, login, signup) ──
   if (isTopNavOnly) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -94,10 +94,25 @@ function MyApp({ Component, pageProps }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-        <div className="min-h-screen bg-bg pb-20 md:pb-0">
+        <div className="min-h-screen bg-bg flex flex-col">
           <Navbar />
-          <Component {...pageProps} />
+
+          <div className="flex flex-1 overflow-hidden">
+            {/* ── Sidebar (desktop) ── */}
+            <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0 border-r border-gray-200 bg-white/50 backdrop-blur-sm overflow-y-auto">
+              <Sidebar />
+            </div>
+
+            {/* ── Main Content ── */}
+            <div className="flex-1 overflow-y-auto pb-20 md:pb-0">
+              <Component {...pageProps} />
+            </div>
+          </div>
+
+          {/* ── Bottom Navigation (mobile) ── */}
           <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+
+          {/* ── Mobile Menu Drawer ── */}
           <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
         </div>
         <ReactQueryDevtools initialIsOpen={false} />
