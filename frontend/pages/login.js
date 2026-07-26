@@ -19,24 +19,14 @@ export default function Login() {
 
   // ── Log out if user leaves the page while profile is incomplete ──
   useEffect(() => {
-    // ── Handle internal navigation (Next.js routing) ──
     const handleRouteChange = () => {
       if (isAuthenticated && needsCompletion) {
         logout();
       }
     };
 
-    // ── Handle external navigation / tab close ──
     const handleBeforeUnload = () => {
       if (isAuthenticated && needsCompletion) {
-        // We can't call logout synchronously in beforeunload, but we can use navigator.sendBeacon
-        // However, logout is an async Firebase call; we can use a simple fetch to a logout endpoint.
-        // Since we want to log out instantly, we'll just use the logout function – it will work if the page is still open.
-        // For beforeunload, the browser may not complete async operations, so we'll use a beacon.
-        // But simpler: we use the logout function and hope it completes quickly.
-        // We'll use a synchronous approach: clear local storage and redirect.
-        // Actually, logout() is async, but we can call it and the browser will try to finish.
-        // For reliability, we can also set a flag in localStorage.
         logout();
       }
     };
