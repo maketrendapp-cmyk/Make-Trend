@@ -6,9 +6,9 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 
 function FreefireFreeDiamondShopV1({ campaign }) {
   const router = useRouter();
-  const { id } = router.query; // campaign ID from URL (e.g. ?id=abc123)
+  const { id } = router.query;
 
-  // ── State (same as original HTML) ──
+  // ── State ──
   const [uid, setUid] = useState('');
   const [loggedUid, setLoggedUid] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -19,18 +19,19 @@ function FreefireFreeDiamondShopV1({ campaign }) {
   const [successMessage, setSuccessMessage] = useState('');
   const [redeemCode, setRedeemCode] = useState('');
   const [toast, setToast] = useState('');
-  const [isWebView, setIsWebView] = useState(false);
+  const [showWebViewModal, setShowWebViewModal] = useState(false);
 
-  // ── Detect WebView (same logic as original HTML) ──
+  // ── Detect WebView (same comprehensive check as PUBG) ──
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
     const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
                       (window.navigator.standalone === false) ||
-                      (typeof window.ReactNativeWebView !== 'undefined');
-    setIsWebView(isWebView);
+                      (typeof window.ReactNativeWebView !== 'undefined') ||
+                      (navigator.userAgent.indexOf('wv') > -1);
+    if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Generate a random redeem code (same as original) ──
+  // ── Generate a random redeem code ──
   const generateRedeemCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -81,28 +82,26 @@ function FreefireFreeDiamondShopV1({ campaign }) {
 
   const closeModal = () => setModalOpen(false);
 
-  // ── CONTINUE BUTTON: redirect to tasks (if id exists) or /create (if no id) ──
+  // ── CONTINUE BUTTON: redirect to tasks (if id exists) or /create ──
   const handleContinue = () => {
     if (!isValidUID(modalUid)) {
       showToast('Enter Valid UID');
       return;
     }
     if (!id) {
-      // Show message and redirect to /create (SPA)
       setSuccessMessage('⚠️ Campaign ID missing. Redirecting…');
       setTimeout(() => {
         router.push('/create');
       }, 1500);
       return;
     }
-    // Redirect to tasks page with the campaign ID
     setSuccessMessage('Redirecting to tasks…');
     setTimeout(() => {
       router.push(`/tasks?id=${id}`);
     }, 1500);
   };
 
-  // ── Diamond packs & deals (identical to original) ──
+  // ── Diamond packs & deals ──
   const diamondPacks = [25, 100, 310, 520, 1060, 2180, 5600, 11500];
   const specialDeals = [
     { name: 'Weekly Membership', img: 'https://i.postimg.cc/B6h3f7k6/quality-restoration-20260510084158653.jpg?text=Weekly+Pass', id: 'weekly' },
@@ -113,19 +112,56 @@ function FreefireFreeDiamondShopV1({ campaign }) {
     { name: 'Evo Access 30D', img: 'https://i.postimg.cc/0ys9m4gx/quality-restoration-20260510094204645.jpg?text=Evo+30D', id: 'evo30' }
   ];
 
+  // ─── WEBVIEW MODAL (overlay) ───
+  const WebViewModal = () => {
+    if (!showWebViewModal) return null;
+    return (
+      <div className="webview-modal-overlay">
+        <div className="webview-modal-card">
+          <div className="modal-icon">🌐</div>
+          <h2>Open in Browser</h2>
+          <p>For the best experience, open this page in your default browser.</p>
+          <div className="modal-actions">
+            <button 
+              className="modal-btn" 
+              onClick={() => { 
+                navigator.clipboard?.writeText(window.location.href); 
+                setShowWebViewModal(false); 
+              }}
+            >
+              📋 Copy Link
+            </button>
+            <button 
+              className="modal-btn primary" 
+              onClick={() => { 
+                const url = window.location.href; 
+                if (navigator.userAgent.includes('Android')) { 
+                  window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; 
+                } else { 
+                  window.open(url, '_system'); 
+                } 
+              }}
+            >
+              🚀 Open in Browser
+            </button>
+          </div>
+          <button 
+            className="modal-btn ghost" 
+            onClick={() => setShowWebViewModal(false)}
+          >
+            Continue Anyway
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // ── Render ──
   return (
     <div className="page-container">
 
-      {/* ── WebView banner (exactly as original HTML) ── */}
-      {isWebView && (
-        <div className="webview-banner">
-          📱 For a better experience, open this page in your browser.
-          <button onClick={() => window.location.href = window.location.href}>
-            Open in Browser
-          </button>
-        </div>
-      )}
+      {/* ─── WEBVIEW MODAL (overlay) ─── */}
+      <WebViewModal />
 
       {/* ── Header ── */}
       <header className="app-header">
@@ -264,7 +300,7 @@ function FreefireFreeDiamondShopV1({ campaign }) {
         )}
       </main>
 
-      {/* ── Modal ── */}
+      {/* ── UID Modal (existing) ── */}
       <div className={`modal-overlay ${modalOpen ? 'open' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
         <div className="modal-box">
           <h3>Enter your Game UID</h3>
@@ -288,7 +324,7 @@ function FreefireFreeDiamondShopV1({ campaign }) {
       {/* ── Toast ── */}
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
 
-      {/* ── Styles (IDENTICAL to original) ── */}
+      {/* ── Styles (original + new modal styles) ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
             --white: #ffffff;
@@ -542,15 +578,73 @@ function FreefireFreeDiamondShopV1({ campaign }) {
             opacity: 0; transition: opacity 0.3s; pointer-events: none;
         }
         .toast.show { opacity: 1; }
-        .webview-banner {
-            position: fixed; top:0; left:0; width:100%; background:#1a1a1a; color:#fff;
-            text-align:center; padding:12px; z-index:9999; font-family:Inter,sans-serif;
-            font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.3);
+
+        /* ─── NEW WEBVIEW MODAL STYLES (overlay) ─── */
+        .webview-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
         }
-        .webview-banner button {
-            background:#ff6b35; color:#fff; border:none; padding:6px 18px; margin-left:8px;
-            border-radius:20px; font-weight:700; cursor:pointer;
+        .webview-modal-card {
+            background: #1a1c22;
+            border-radius: 36px;
+            padding: 2.8rem 2rem;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+            border: 1px solid rgba(255,140,0,0.2);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
         }
+        .webview-modal-card .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
+        .webview-modal-card h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+        .webview-modal-card p {
+            color: #aaa;
+            margin-bottom: 1.8rem;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .modal-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 0.7rem 1.5rem;
+            border-radius: 60px;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.2s;
+            flex: 1;
+            min-width: 120px;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn.primary {
+            background: #ff8c00;
+            border: none;
+            color: #0b0d10;
+        }
+        .modal-btn.primary:hover { background: #e67600; }
+        .modal-btn.ghost {
+            background: transparent;
+            border: none;
+            color: #888;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+        }
+        .modal-btn.ghost:hover { color: #fff; }
+
         @media (max-width: 480px) {
             .diamond-grid { grid-template-columns: repeat(2, 1fr); }
             .deals-grid { grid-template-columns: 1fr; }
@@ -571,6 +665,6 @@ export async function getServerSideProps({ query }) {
 export default withCampaignMeta(FreefireFreeDiamondShopV1, {
   title: 'Free Fire Free Diamond Shop',
   description: 'Get free diamonds and exclusive deals for Garena Free Fire.',
-  image: 'https://maketrend.vercel.app/og-freefire.jpg',
-  url: 'https://maketrend.vercel.app/freefire-free-diamond-shop-v1?id={id}',
+  image: 'https://maketrend.app/og-image.png',
+  url: 'https://maketrend.app/freefire-free-diamond-shop-v1?id={id}',
 });
