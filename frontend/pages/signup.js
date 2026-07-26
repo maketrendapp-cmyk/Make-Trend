@@ -20,14 +20,12 @@ export default function Signup() {
 
   // ── Log out if user leaves the page while profile is incomplete ──
   useEffect(() => {
-    // ── Handle internal navigation (Next.js routing) ──
     const handleRouteChange = () => {
       if (isAuthenticated && needsCompletion) {
         logout();
       }
     };
 
-    // ── Handle external navigation / tab close ──
     const handleBeforeUnload = () => {
       if (isAuthenticated && needsCompletion) {
         logout();
@@ -57,10 +55,10 @@ export default function Signup() {
 
   // ── Build dynamic meta tags with referral code ──
   const referralCode = ref ? ref.toUpperCase() : '';
-  const metaTitle = referralCode 
+  const metaTitle = referralCode
     ? `Join Make Trend with referral code ${referralCode} | Make Trend`
     : 'Join Make Trend – Sign Up & Start Creating';
-  const metaDescription = referralCode 
+  const metaDescription = referralCode
     ? `Create your Make Trend account using referral code ${referralCode} and start launching viral campaigns!`
     : 'Create your Make Trend account and start launching viral campaigns.';
   const metaUrl = `https://maketrend.app/signup${referralCode ? `?ref=${referralCode}` : ''}`;
