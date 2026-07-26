@@ -1,3 +1,4 @@
+
 // pages/_app.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
@@ -98,13 +99,16 @@ function MyApp({ Component, pageProps }) {
           <Navbar />
 
           <div className="flex flex-1">
-            {/* ── Sidebar (fixed, sticky) ── */}
-            <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0 sticky top-0 self-start h-screen overflow-hidden">
+            {/* ── Sidebar Wrapper ── */}
+            {/* Removed conflicting width (w-64), sticky, and h-screen classes. 
+                Sidebar.js now dictates its own 260px width and fixed layout. */}
+            <div className="hidden md:block flex-shrink-0 z-30">
               <Sidebar />
             </div>
 
             {/* ── Main Content ── */}
-            <div className="flex-1 overflow-y-auto pb-20 md:pb-0">
+            {/* Added min-w-0 to prevent child elements from forcing horizontal scroll */}
+            <div className="flex-1 min-w-0 overflow-y-auto pb-20 md:pb-0">
               <Component {...pageProps} />
             </div>
           </div>
