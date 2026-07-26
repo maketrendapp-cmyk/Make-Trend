@@ -24,7 +24,6 @@ import { FaCrown } from 'react-icons/fa';
 
 export default function Sidebar() {
   const router = useRouter();
-  // Safe fallbacks for hooks in case they are undefined during render
   const auth = useAuth() || {};
   const { user, isAuthenticated, logout } = auth;
   
@@ -88,15 +87,10 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside 
-      className="sticky top-0 self-start flex flex-col w-[260px] h-screen flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_8px_-4px_rgba(0,0,0,0.05)] z-40"
-      /* NOTE: If your header is fixed at the top (e.g. 64px height), change the classes above to:
-         sticky top-[64px] h-[calc(100vh-64px)] 
-         so it sits perfectly underneath your header. */
-    >
+    // Changed to simply `h-full` so it perfectly fills the space it's given
+    <aside className="flex flex-col w-[260px] h-full bg-white border-r border-gray-200 shadow-[2px_0_8px_-4px_rgba(0,0,0,0.05)]">
       
       {/* ── Scrollable Navigation ── */}
-      {/* flex-1 allows it to take remaining space, overflow-y-auto lets it scroll internally */}
       <nav 
         className="flex-1 overflow-y-auto px-3 py-3 space-y-4"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -143,7 +137,6 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Fixed Footer: User Info + Logout ── */}
-      {/* flex-shrink-0 ensures this bottom block never gets squished or hidden by the scroll */}
       <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-white">
         {isAuthenticated ? (
           <div className="flex flex-col gap-3">
