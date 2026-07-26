@@ -17,6 +17,7 @@ import {
   FiDownload,
   FiGrid,
   FiLogOut,
+  FiSettings,
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
@@ -42,6 +43,7 @@ export default function Sidebar() {
     ...(isAuthenticated ? [
       { href: '/stats', label: 'Dashboard', icon: <FiBarChart2 className="w-4 h-4" /> },
       { href: '/profile', label: 'Profile', icon: <FiUser className="w-4 h-4" /> },
+      { href: '/edit-profile', label: 'Edit Profile', icon: <FiSettings className="w-4 h-4" /> },
     ] : []),
     { href: '/follow', label: 'Follow Us', icon: <FiHeart className="w-4 h-4" /> },
     { href: '/refer-earn', label: 'Refer & Earn', icon: <FiAward className="w-4 h-4" /> },
@@ -57,60 +59,27 @@ export default function Sidebar() {
   const isActive = (path) => router.pathname === path;
 
   return (
-    <div className="flex flex-col h-screen sticky top-0 overflow-hidden bg-white/80 backdrop-blur-sm border-r border-gray-200">
-      {/* ── User Profile (Top) ── */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200">
-        {isAuthenticated ? (
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md overflow-hidden flex-shrink-0">
-              {profileLoading ? (
-                <div className="w-full h-full animate-pulse bg-gray-300" />
-              ) : displayAvatar ? (
-                <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
-              ) : (
-                firstLetter
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 text-sm truncate">
-                {profileLoading ? (
-                  <span className="animate-pulse bg-gray-200 px-3 py-0.5 rounded">Loading...</span>
-                ) : (
-                  displayName
-                )}
-              </p>
-              <p className="text-xs text-gray-500 truncate">
-                {profileLoading ? (
-                  <span className="animate-pulse bg-gray-200 px-2 py-0.5 rounded">Loading...</span>
-                ) : (
-                  displayEmail
-                )}
-              </p>
-              {isPro && (
-                <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">
-                  <FaCrown className="w-3 h-3" /> PRO
-                </span>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center">
-            <p className="text-sm font-medium text-gray-700">Welcome to</p>
-            <p className="text-lg font-extrabold text-gray-900">
-              Make<span className="text-purple-600">Trend</span>
-            </p>
-            <Link
-              href="/login"
-              className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition"
-            >
-              Sign In
-            </Link>
-          </div>
-        )}
+    <div className="flex flex-col h-full bg-white/95 backdrop-blur-sm border-r border-gray-200">
+      {/* ── Logo / Brand (optional) ── */}
+      <div className="flex-shrink-0 px-4 py-4 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <img
+            src="/favicon.ico"
+            alt="Make Trend"
+            className="w-8 h-8 rounded-lg shadow-md"
+          />
+          <span className="text-xl font-extrabold tracking-tight">
+            <span className="text-purple-600">Make</span>
+            <span className="text-gray-900">Trend</span>
+          </span>
+        </div>
+        <p className="text-[10px] text-gray-400 font-medium tracking-wide pl-10">
+          Viral campaign builder
+        </p>
       </div>
 
-      {/* ── Navigation (Middle) ── */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
+      {/* ── Navigation Links (scrollable if needed) ── */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {navItems.map((item) => (
           <Link
             key={item.href}
@@ -134,24 +103,63 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* ── Bottom Section (Logout / Version) ── */}
-      <div className="flex-shrink-0 border-t border-gray-200 p-3">
+      {/* ── User Info + Logout (always at bottom) ── */}
+      <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50/50">
         {isAuthenticated ? (
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 group"
-          >
-            <FiLogOut className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            <span>Logout</span>
-          </button>
-        ) : (
-          <div className="text-center">
-            <p className="text-[10px] text-gray-400">v2.0.0</p>
+          <div className="space-y-3">
+            {/* User card */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md overflow-hidden flex-shrink-0">
+                {profileLoading ? (
+                  <div className="w-full h-full animate-pulse bg-gray-300" />
+                ) : displayAvatar ? (
+                  <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
+                ) : (
+                  firstLetter
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm truncate">
+                  {profileLoading ? (
+                    <span className="animate-pulse bg-gray-200 px-4 py-0.5 rounded">Loading...</span>
+                  ) : (
+                    displayName
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {profileLoading ? (
+                    <span className="animate-pulse bg-gray-200 px-3 py-0.5 rounded">Loading...</span>
+                  ) : (
+                    displayEmail
+                  )}
+                </p>
+              </div>
+              {isPro && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                  <FaCrown className="w-3 h-3" /> PRO
+                </span>
+              )}
+            </div>
+
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-100 hover:border-red-200"
+            >
+              <FiLogOut className="w-4 h-4" />
+              Logout
+            </button>
           </div>
+        ) : (
+          <Link
+            href="/login"
+            className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-sm hover:shadow-lg transition-all duration-200"
+          >
+            <FiUser className="w-4 h-4" />
+            Sign In
+          </Link>
         )}
-        {isAuthenticated && (
-          <p className="text-center text-[10px] text-gray-400 mt-2">v2.0.0</p>
-        )}
+        <p className="text-[10px] text-gray-400 text-center mt-3">v2.0.0</p>
       </div>
     </div>
   );
