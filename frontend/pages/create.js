@@ -42,14 +42,13 @@ const [highlightedId, setHighlightedId] = useState(null);
 const [carouselIndex, setCarouselIndex] = useState(0);
 
 // ── React Query data ──
-const { data: templates = [], isLoading: templatesLoading } = useTemplates({
-  category: selectedCategory || undefined,
-  platform: selectedPlatform || undefined,
-});
-const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates({
-  category: selectedCategory || undefined,
-  platform: selectedPlatform || undefined,
-});
+// Only include filter keys that actually have values
+const activeFilters = {};
+if (selectedCategory) activeFilters.category = selectedCategory;
+if (selectedPlatform) activeFilters.platform = selectedPlatform;
+
+const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters);
+const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters);
   
 
   const highlightTimeoutRef = useRef(null);
