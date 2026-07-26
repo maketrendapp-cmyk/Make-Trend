@@ -1,3 +1,4 @@
+
 // pages/create.js
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
@@ -33,23 +34,21 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
   }, [initialTemplates, initialFeaturedTemplates, queryClient]);
 
-// ── State ──
-const [searchQuery, setSearchQuery] = useState(initialSearch || '');
-const [selectedCategory, setSelectedCategory] = useState('');
-const [selectedPlatform, setSelectedPlatform] = useState('');
-const [showFilters, setShowFilters] = useState(false);
-const [highlightedId, setHighlightedId] = useState(null);
-const [carouselIndex, setCarouselIndex] = useState(0);
+  // ── State ──
+  const [searchQuery, setSearchQuery] = useState(initialSearch || '');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [highlightedId, setHighlightedId] = useState(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
 
-// ── React Query data ──
-// Only include filter keys that actually have values
-const activeFilters = {};
-if (selectedCategory) activeFilters.category = selectedCategory;
-if (selectedPlatform) activeFilters.platform = selectedPlatform;
+  // ── React Query data ──
+  const activeFilters = {};
+  if (selectedCategory) activeFilters.category = selectedCategory;
+  if (selectedPlatform) activeFilters.platform = selectedPlatform;
 
-const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters);
-const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters);
-  
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters);
+  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters);
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
@@ -127,7 +126,7 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
     if (showCarousel) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
-      }, 2000);
+      }, 3500); // Increased slightly for better reading experience on PC
     } else {
       setCarouselIndex(0);
     }
@@ -143,7 +142,7 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
       if (showCarousel) {
         carouselIntervalRef.current = setInterval(() => {
           setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
-        }, 2000);
+        }, 3500);
       }
     }
   }, [featuredFiltered.length, showCarousel]);
@@ -179,8 +178,6 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
     const found = templates.find(t => t.slug === highlightSlug);
     if (!found) return;
 
-    // If the slug is featured, we want to show grid, so we set highlightedId but also we need to scroll to it.
-    // The grid will be displayed because showCarousel will be false.
     setHighlightedId(found.id);
     highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
 
@@ -189,7 +186,6 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
     };
   }, [highlightSlug, templates]);
 
-  // ── Auto‑scroll to highlighted element ──
   useEffect(() => {
     if (highlightedId) {
       const el = document.getElementById(`template-${highlightedId}`);
@@ -258,33 +254,20 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
 
   // ── SEO ──
   const pageTitle = useMemo(() => {
-    if (selectedCategory && selectedCategory !== 'All') {
-      return `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Templates – Make Trend`;
-    }
-    if (selectedPlatform && selectedPlatform !== 'All') {
-      return `${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} Templates – Make Trend`;
-    }
-    if (searchQuery) {
-      return `"${searchQuery}" Templates – Make Trend`;
-    }
+    if (selectedCategory && selectedCategory !== 'All') return `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Templates – Make Trend`;
+    if (selectedPlatform && selectedPlatform !== 'All') return `${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} Templates – Make Trend`;
+    if (searchQuery) return `"${searchQuery}" Templates – Make Trend`;
     return 'Browse Campaign Templates – Make Trend';
   }, [selectedCategory, selectedPlatform, searchQuery]);
 
   const pageDescription = useMemo(() => {
-    if (selectedCategory && selectedCategory !== 'All') {
-      return `Explore the best ${selectedCategory} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
-    }
-    if (selectedPlatform && selectedPlatform !== 'All') {
-      return `Explore ${selectedPlatform} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
-    }
-    if (searchQuery) {
-      return `Search results for "${searchQuery}". Find the perfect template to launch your campaign.`;
-    }
+    if (selectedCategory && selectedCategory !== 'All') return `Explore the best ${selectedCategory} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
+    if (selectedPlatform && selectedPlatform !== 'All') return `Explore ${selectedPlatform} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
+    if (searchQuery) return `Search results for "${searchQuery}". Find the perfect template to launch your campaign.`;
     return 'Explore a curated collection of viral campaign templates. Customize, launch, and start growing your audience in minutes.';
   }, [selectedCategory, selectedPlatform, searchQuery]);
 
   const templateNames = templates.map(t => t.title).slice(0, 10);
-
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.app';
   const structuredData = {
     "@context": "https://schema.org",
@@ -417,21 +400,25 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
             </div>
 
             {showCarousel ? (
-              // ── Carousel ──
+              // ── Carousel (Responsive Layout Fix Applied Here) ──
               <div id="featured-carousel" className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div
-                  className="flex transition-transform duration-700 ease-in-out"
+                  className="flex transition-transform duration-700 ease-in-out h-full"
                   style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
                 >
                   {featuredFiltered.map((template) => (
                     <div key={template.id} className="w-full flex-shrink-0">
-                      <div className="flex flex-col">
-                        <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
+                      
+                      {/* PC FIX: 'md:flex-row' makes it sit side-by-side on desktop to save height! */}
+                      <div className="flex flex-col md:flex-row h-full">
+                        
+                        {/* Image Container */}
+                        <div className="w-full md:w-1/2 lg:w-[55%] aspect-video md:aspect-auto md:min-h-[280px] bg-slate-100 overflow-hidden relative shrink-0">
                           {template.image ? (
                             <img
                               src={template.image}
                               alt={template.title}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover md:absolute md:inset-0"
                               loading="lazy"
                             />
                           ) : (
@@ -439,46 +426,47 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
                               <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
                             </div>
                           )}
-                          <div className="absolute top-2.5 left-2.5 flex gap-1 z-10">
-                            <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                          <div className="absolute top-3 left-3 flex gap-1 z-10">
+                            <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
                               ⭐ Featured
                             </span>
                           </div>
                         </div>
 
-                        <div className="p-3 bg-white">
-                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                        {/* Content Container */}
+                        <div className="p-4 md:p-6 lg:p-8 bg-white flex flex-col justify-center flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-3">
                             {template.platform && (
-                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                              <span className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
                                 {template.platform}
                               </span>
                             )}
-                            <span className="bg-slate-50 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center">
+                            <span className="bg-slate-50 text-slate-500 text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded flex items-center border border-slate-100">
                               👥 {template.usageCount || 0} Uses
                             </span>
                           </div>
 
-                          <h3 className="text-sm font-black leading-tight text-slate-950 mb-0.5">
+                          <h3 className="text-base md:text-xl lg:text-2xl font-black leading-tight text-slate-950 mb-1.5 md:mb-2">
                             {template.title}
                           </h3>
-                          <p className="text-slate-500 text-[11px] line-clamp-1 mb-2 leading-snug">
+                          <p className="text-slate-500 text-[11px] md:text-sm line-clamp-2 md:line-clamp-3 mb-4 md:mb-6 leading-relaxed">
                             {template.description || 'Launch your campaign with this template.'}
                           </p>
 
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-2 gap-3 mt-auto">
                             <button
                               onClick={() => handlePreview(template.slug)}
-                              className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
+                              className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2.5 md:py-3 transition active:scale-95"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                              <svg className="w-4 h-4 md:w-4.5 md:h-4.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                               Preview
                             </button>
                             <button
                               onClick={() => handleUseTemplate(template.slug)}
-                              className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
+                              className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-black text-white bg-primary hover:bg-primary-600 rounded-xl py-2.5 md:py-3 transition shadow-sm active:scale-95"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                              Use
+                              <svg className="w-4 h-4 md:w-4.5 md:h-4.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                              Use Template
                             </button>
                           </div>
                         </div>
@@ -491,28 +479,29 @@ const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeatured
                   <>
                     <button
                       onClick={() => goToSlide((carouselIndex - 1 + featuredFiltered.length) % featuredFiltered.length)}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
+                      className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-white/90 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
                       aria-label="Previous slide"
                     >
-                      <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 md:w-5 md:h-5 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
                     <button
                       onClick={() => goToSlide((carouselIndex + 1) % featuredFiltered.length)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-full bg-white/80 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
+                      className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-white/90 hover:bg-white shadow-md backdrop-blur-sm border border-slate-200 transition-all"
                       aria-label="Next slide"
                     >
-                      <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 md:w-5 md:h-5 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
-                    <div className="absolute bottom-24 right-3 flex gap-1 z-20">
+                    {/* Centered navigation dots at the bottom */}
+                    <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-white/50 backdrop-blur-md px-2 py-1 rounded-full">
                       {featuredFiltered.map((_, idx) => (
                         <button
                           key={idx}
                           onClick={() => goToSlide(idx)}
-                          className={`h-1 rounded-full transition-all ${idx === carouselIndex ? 'bg-primary w-3' : 'bg-slate-300 w-1'}`}
+                          className={`h-1.5 rounded-full transition-all ${idx === carouselIndex ? 'bg-primary w-4' : 'bg-slate-400/70 w-1.5'}`}
                           aria-label={`Go to slide ${idx + 1}`}
                         />
                       ))}
@@ -715,7 +704,6 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platf
   );
 }
 
-// ── Pre‑fetch templates at build time ──
 export async function getStaticProps() {
   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
   if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
