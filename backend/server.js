@@ -287,14 +287,6 @@ const upload = multer({
 const app = express();
 app.set('trust proxy', 1);
 
-// ── Enforce HTTPS in production ──
-app.use((req, res, next) => {
-  if (req.headers['x-forwarded-proto'] !== 'https' && process.env.NODE_ENV === 'production') {
-    return res.redirect(301, 'https://' + req.headers.host + req.url);
-  }
-  next();
-});
-
 // ── Helmet (Security Headers) ──
 app.use(helmet({
   contentSecurityPolicy: {
@@ -517,10 +509,25 @@ function validateImageUrl(url) {
     const parsed = new URL(url);
     // Only allow HTTPS URLs (no data:, javascript:, etc.)
     if (parsed.protocol !== 'https:') return false;
-    // Must be a Cloudinary URL OR have a valid image extension
-    const isCloudinary = parsed.hostname.includes('cloudinary.com') || parsed.hostname.includes('res.cloudinary.com');
+
+    // ── Allowed social media and CDN hosts ──
+    const allowedHosts = [
+      'cloudinary.com',
+      'res.cloudinary.com',
+      'lh3.googleusercontent.com',
+      'lh4.googleusercontent.com',
+      'lh5.googleusercontent.com',
+      'lh6.googleusercontent.com',
+      'pbs.twimg.com',
+      'abs.twimg.com',
+    ];
+    const hostname = parsed.hostname.toLowerCase();
+    const isAllowedHost = allowedHosts.some(host => hostname.includes(host));
+
+    // ── Or it must have a valid image extension ──
     const isImage = /\.(jpg|jpeg|png|webp|gif|svg|bmp|ico)(\?.*)?$/i.test(parsed.pathname);
-    return isCloudinary || isImage;
+
+    return isAllowedHost || isImage;
   } catch {
     return false;
   }
@@ -895,8 +902,6 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
       }
     }
 
-    // Invalidate profile cache so the next request gets fresh data
-    await invalidateKey(`user:profile:${uid}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Complete social profile error:', error);
@@ -946,7 +951,7 @@ app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
     result = { success: true, user: { uid, ...userData } };
 
     try {
-      await redis.set(cacheKey, JSON.stringify(result));
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
       console.log(`💾 User profile cached: ${uid}`);
     } catch (err) { /* ignore */ }
     res.json(result);
@@ -1242,6 +1247,48 @@ app.post('/api/auth/set-admin', async (req, res) => {
   }
 });
 
+// ── Set session cookie ──
+app.post('/api/auth/set-session', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Token required' });
+    }
+    const decoded = await admin.auth().verifyIdToken(token);
+    if (!decoded) {
+      return res.status(401).json({ success: false, error: 'Invalid token' });
+    }
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+    res.json({ success: true });
+    try {
+      await db.collection('users').doc(decoded.uid).update({
+        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Background lastLogin update failed:', err);
+    }
+  } catch (error) {
+    console.error('Set session error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Clear session cookie ──
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  });
+  res.json({ success: true });
+});
 
 // ============================================================
 // 12. TEMPLATE ENDPOINTS
