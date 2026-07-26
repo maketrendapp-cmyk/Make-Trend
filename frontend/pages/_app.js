@@ -99,7 +99,7 @@ function MyApp({ Component, pageProps }) {
 
           <div className="flex flex-1">
             {/* ── Sidebar (fixed) ── */}
-            <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0 sticky top-0 self-start max-h-screen">
+            <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0 sticky top-0 self-start max-h-screen overflow-hidden">
               <Sidebar />
             </div>
 
