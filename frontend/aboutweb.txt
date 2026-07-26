@@ -1,0 +1,172 @@
+Based on a deep read of the frontend codebase, here’s a comprehensive breakdown of how the **template pages** are structured, how they interact with the **task page**, and the role of the `lib` folder in rendering metadata and handling data.
+
+## 1. Project Structure Overview
+
+The frontend is a Next.js application with the following key directories:
+
+*   **`pages/`**: Contains all route pages, including `create.js`, `createcampaign.js`, `tasks.js`, `share.js`, and the `templates/` subdirectory.
+*   **`pages/templates/`**: Houses individual template files (e.g., `freefire-exclusive-rewards-v1.js`). These are the "landing pages" for each campaign type.
+*   **`lib/`**: Contains core utilities for API communication (`api.js`, `queries.js`), data fetching for campaigns (`fetchCampaign.js`), and a higher-order component for metadata (`withCampaignMeta.js`).
+*   **`components/`**: Includes reusable UI components like `Meta.js` (for SEO) and layout components.
+
+---
+
+## 2. Template Pages: Creation and Pattern
+
+Template pages are located in `pages/templates/` and follow a consistent pattern.
+
+### A. Structure and Data Fetching
+
+Each template file is a React component that:
+*   **Receives a `campaign` prop**: This prop is populated by the `withCampaignMeta` HOC (see Section 4).
+*   **Uses `useRouter`**: To extract the `id` from the query string (e.g., `?id=abc123`). This `id` is the campaign ID.
+*   **Fetches campaign data**: The `fetchCampaign` function from `lib/fetchCampaign.js` is used to retrieve campaign details from the backend.
+
+**Example (`freefire-exclusive-rewards-v1.js`)**:
+```javascript
+import { withCampaignMeta } from '../../lib/withCampaignMeta';
+import { fetchCampaign } from '../../lib/fetchCampaign';
+
+function FreefireExclusiveRewardsV1({ campaign }) {
+  const router = useRouter();
+  const { id } = router.query; // campaign ID from URL
+  // ... component logic
+}
+```
+
+
+### B. Core Functionality
+
+*   **WebView Detection**: Templates detect if they are running inside an in-app browser (WebView) and adjust the UI accordingly (e.g., showing a modal to open in an external browser).
+*   **User Input**: They typically collect user-specific information, such as a UID (User ID) or phone number.
+*   **Redirection Logic**: Once the user completes the initial action (e.g., enters a UID), the template redirects to the task page: `router.push(`/tasks?id=${id}`)`.
+
+**Example (`ncell-reward-v1.js`)**:
+```javascript
+const handleContinueToReward = () => {
+  if (id) {
+    router.push(`/tasks?id=${id}`);
+  } else {
+    router.push('/create');
+  }
+};
+```
+
+
+---
+
+## 3. The Task Page (`pages/tasks.js`)
+
+The task page is the next step after a user interacts with a template. It displays a list of tasks the user must complete to unlock the reward.
+
+### A. Data Fetching
+
+*   It extracts the `id` from the URL query.
+*   Fetches the campaign data from the backend using the device ID for identification.
+
+### B. Task Completion Flow
+
+*   **Display Tasks**: The page renders a list of tasks from the campaign data (`campaign.tasks`).
+*   **Open Task**: When a user clicks a task, it opens in a new tab (`window.open(url, '_blank')`) and starts a countdown.
+*   **Completion**: After the countdown, the task is marked as completed.
+*   **Unlock**: Once all tasks are completed, the user clicks "Continue to Share," which calls the `/api/campaigns/${id}/unlock` endpoint and redirects to the share page.
+
+---
+
+## 4. The `lib` Folder: Core Utilities
+
+The `lib` folder provides the backbone for data management and metadata rendering.
+
+### A. `api.js` - API Client
+
+*   Sets up an Axios instance (`apiClient`) with automatic Bearer token injection for authenticated requests.
+*   Provides a `serverFetch` function for server-side requests without tokens.
+
+### B. `queries.js` - React Query Hooks
+
+*   **`useTemplates`**: Fetches all available templates from the backend (`/api/templates`).
+*   **`useFeaturedTemplates`**: Fetches highlighted templates.
+*   **`useCampaigns`**: Uses `useInfiniteQuery` for paginated campaign lists.
+*   **`useProfile`** and **`useStats`**: Fetch user profile and statistics, requiring authentication.
+*   All hooks use a simple caching mechanism (`requestCache`) to prevent duplicate requests.
+
+### C. `withCampaignMeta.js` - Higher-Order Component (HOC)
+
+This HOC is crucial for injecting metadata into template pages.
+*   It wraps a template component and enhances it with a `campaign` prop.
+*   It uses the `Meta` component (from `components/Meta.js`) to set page-specific SEO tags (title, description, image, URL) based on the campaign data.
+
+```javascript
+export function withCampaignMeta(Component, defaultMeta) {
+  const WrappedComponent = ({ campaign, ...props }) => {
+    const meta = campaign ? {
+      title: campaign.title,
+      description: campaign.description,
+      image: campaign.image || defaultMeta.image,
+      url: defaultMeta.url.replace('{id}', campaign.id),
+    } : defaultMeta;
+    return (
+      <>
+        <Meta {...meta} />
+        <Component campaign={campaign} {...props} />
+      </>
+    );
+  };
+  return WrappedComponent;
+}
+```
+
+
+### D. `fetchCampaign.js` - Simple Campaign Fetcher
+
+A straightforward function to fetch a single campaign by ID from the backend.
+
+---
+
+## 5. The `Meta` Component (`components/Meta.js`)
+
+This component renders the `<head>` section of the page.
+*   It accepts `title`, `description`, `image`, and `url` as props.
+*   It constructs the `<title>` tag, Open Graph meta tags (`og:title`, `og:description`, etc.), and Twitter Card meta tags.
+*   This component is used by the `withCampaignMeta` HOC to ensure each template page has dynamic, campaign-specific SEO.
+
+---
+
+## 6. Application Layout (`_app.js` and `_document.js`)
+
+### A. `_app.js` - Global Providers and Layout
+
+*   Sets up **React Query** (`QueryClientProvider`) for data fetching.
+*   Wraps the app with an **`AuthProvider`** for authentication state.
+*   Defines **`NO_LAYOUT_PAGES`** and **`TOP_NAV_ONLY_PAGES`** arrays to conditionally render layouts (e.g., template pages and the task page have no layout, while some pages only have a top nav).
+*   Renders `Navbar`, `Sidebar`, `BottomNav`, and `Menu` components conditionally based on the route.
+
+### B. `_document.js` - HTML Document Structure
+
+*   Sets up the base HTML document with PWA manifest, favicons, and fonts.
+*   Notably, it **removes global social tags** and delegates them to the page-specific `Meta` component.
+
+---
+
+## 7. The Complete User Flow
+
+Here’s how all the pieces fit together:
+
+1.  **User discovers a campaign** via a shareable link, e.g., `https://maketrend.app/templates/freefire-exclusive-rewards-v1?id=abc123`.
+2.  **The template page loads**: `withCampaignMeta` fetches the campaign data using `fetchCampaign` and injects it into the template component. The `Meta` component sets the page title, description, and image based on the campaign data.
+3.  **User interacts with the template**: They enter their UID, phone number, or perform the required action.
+4.  **Redirection to tasks**: The template redirects to `/tasks?id=abc123`.
+5.  **Task page loads**: It fetches the campaign data again, displays the list of tasks, and manages the completion flow.
+6.  **Tasks completed**: The user completes all tasks and clicks "Continue."
+7.  **Unlock and share**: The task page calls the unlock API and redirects to `/share?id=abc123`.
+8.  **Share page**: The user shares the campaign to reach the required share count, after which they can claim the reward.
+
+---
+
+## Summary
+
+*   **Templates** are self-contained pages that collect user input and redirect to the task flow. They are wrapped with `withCampaignMeta` for dynamic SEO.
+*   **The task page** manages the completion of campaign tasks and handles the unlock logic.
+*   **The `lib` folder** provides the core utilities: an API client, React Query hooks for data fetching, a campaign fetcher, and a metadata HOC.
+*   **The `Meta` component** ensures each page has proper SEO tags.
+*   **`_app.js`** orchestrates the global layout and providers, while **`_document.js`** sets up the base HTML structure.
