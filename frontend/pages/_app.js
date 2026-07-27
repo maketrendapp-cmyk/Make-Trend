@@ -36,6 +36,7 @@ const NO_LAYOUT_PAGES = [
 '/templates/spin-win-daraz-discount-v1',
 '/templates/lucky-draw-premium-prizes-v1',
 '/templates/gaming-clip-contest',
+'/templates/photography-contest',
 
   '/tasks',
   '/share',
