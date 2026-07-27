@@ -74,7 +74,6 @@ function BgmiTournamentRegistration({ campaign }) {
   const [teamsRegistered, setTeamsRegistered] = useState(324);
   const [slotsLeft, setSlotsLeft] = useState(76);
   const [expandedFaq, setExpandedFaq] = useState(null);
-  const [isVisible, setIsVisible] = useState({});
 
   const formRef = useRef(null);
 
@@ -118,26 +117,6 @@ function BgmiTournamentRegistration({ campaign }) {
       });
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
-
-  // ── Intersection Observer for scroll animations ──
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            setIsVisible(prev => ({ ...prev, [entry.target.id]: true }));
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    document.querySelectorAll('.animate-on-scroll').forEach(el => {
-      observer.observe(el);
-    });
-
-    return () => observer.disconnect();
   }, []);
 
   // ── Validate ──
@@ -259,7 +238,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── TOURNAMENT INFORMATION ─── */}
-      <section className="info-section animate-on-scroll" id="info">
+      <section className="info-section" id="info">
         <h2 className="section-title">Tournament Information</h2>
         <div className="info-grid">
           <div className="info-card">
@@ -286,7 +265,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── PRIZE POOL ─── */}
-      <section className="prize-section animate-on-scroll" id="prizes">
+      <section className="prize-section" id="prizes">
         <h2 className="section-title">🏆 Prize Pool</h2>
         <div className="prize-grid">
           <div className="prize-card gold">
@@ -308,7 +287,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── TOURNAMENT TIMELINE ─── */}
-      <section className="timeline-section animate-on-scroll" id="timeline">
+      <section className="timeline-section" id="timeline">
         <h2 className="section-title">Tournament Timeline</h2>
         <div className="timeline">
           <div className="timeline-item">
@@ -354,7 +333,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── REGISTRATION FORM ─── */}
-      <section className="form-section animate-on-scroll" id="register" ref={formRef}>
+      <section className="form-section" id="register" ref={formRef}>
         <h2 className="section-title">📝 Team Registration</h2>
         <div className="form-card">
           <div className="form-header">
@@ -492,7 +471,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── LIVE STATISTICS ─── */}
-      <section className="stats-section animate-on-scroll" id="stats">
+      <section className="stats-section" id="stats">
         <h2 className="section-title">📊 Live Statistics</h2>
         <div className="stats-grid">
           <div className="stat-card">
@@ -514,7 +493,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── RULES ─── */}
-      <section className="rules-section animate-on-scroll" id="rules">
+      <section className="rules-section" id="rules">
         <h2 className="section-title">📜 Tournament Rules</h2>
         <div className="rules-grid">
           <div className="rule-card">
@@ -551,7 +530,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── FEATURED REWARDS ─── */}
-      <section className="rewards-section animate-on-scroll" id="rewards">
+      <section className="rewards-section" id="rewards">
         <h2 className="section-title">🎁 Featured Rewards</h2>
         <div className="rewards-grid">
           <div className="reward-card">
@@ -583,7 +562,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── PREVIOUS WINNERS ─── */}
-      <section className="winners-section animate-on-scroll" id="winners">
+      <section className="winners-section" id="winners">
         <h2 className="section-title">🏅 Previous Winners</h2>
         <div className="winners-grid">
           {PREVIOUS_WINNERS.map((winner, idx) => (
@@ -598,7 +577,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── SPONSORS ─── */}
-      <section className="sponsors-section animate-on-scroll" id="sponsors">
+      <section className="sponsors-section" id="sponsors">
         <h2 className="section-title">🤝 Our Sponsors</h2>
         <div className="sponsors-grid">
           {SPONSORS.map((sponsor, idx) => (
@@ -611,7 +590,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── FAQ ─── */}
-      <section className="faq-section animate-on-scroll" id="faq">
+      <section className="faq-section" id="faq">
         <h2 className="section-title">❓ Frequently Asked Questions</h2>
         <div className="faq-list">
           {FAQS.map((faq, idx) => (
@@ -676,17 +655,6 @@ function BgmiTournamentRegistration({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: #0A0F1E;
-        }
-
-        /* ── Scroll Animation ── */
-        .animate-on-scroll {
-          opacity: 0;
-          transform: translateY(40px);
-          transition: opacity 0.8s ease, transform 0.8s ease;
-        }
-        .animate-on-scroll.visible {
-          opacity: 1;
-          transform: translateY(0);
         }
 
         /* ── Header ── */
