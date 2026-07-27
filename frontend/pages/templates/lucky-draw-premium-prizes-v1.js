@@ -31,7 +31,7 @@ const PRIZES = [
   },
   {
     label: 'Gaming PC',
-    image: 'https://www.illegear.com/shop/illegear-desktop-pc/196-illegear-gaming-pc-set-murah-ddr4.html?srsltid=AfmBOopDWF6PXYhNp1554Rg2v9cQJryDuYa1761gUwRqiSfT9VozypRp',
+    image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSBla5n5awwuLJxW1OAAwN-RCoEDaHV8mvyMY2-DUr5VM4ddhw4msktMSjQ&s=10',
     color: '#0f3460',
   },
   {
