@@ -268,17 +268,17 @@ function BgmiTournamentRegistration({ campaign }) {
         <div className="prize-grid">
           <div className="prize-card gold">
             <span className="prize-rank">🥇</span>
-            <span className="prize-amount">₹50,000</span>
+            <span className="prize-amount">$50,000</span>
             <span className="prize-label">1st Place</span>
           </div>
           <div className="prize-card silver">
             <span className="prize-rank">🥈</span>
-            <span className="prize-amount">₹30,000</span>
+            <span className="prize-amount">$30,000</span>
             <span className="prize-label">2nd Place</span>
           </div>
           <div className="prize-card bronze">
             <span className="prize-rank">🥉</span>
-            <span className="prize-amount">₹20,000</span>
+            <span className="prize-amount">$20,000</span>
             <span className="prize-label">3rd Place</span>
           </div>
         </div>
