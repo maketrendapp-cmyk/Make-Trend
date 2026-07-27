@@ -12,55 +12,47 @@ const defaultMeta = {
   url: 'https://maketrend.app/lucky-draw-premium-prizes-v1?id={id}',
 };
 
-// ── Prize Segments ──
+// ── Prize Data (with working image URLs) ──
 const PRIZES = [
   {
     label: 'iPhone 15 Pro',
     image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=150&h=150&fit=crop&auto=format',
     color: '#1a1a2e',
-    icon: '📱',
   },
   {
     label: 'MacBook Air',
     image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=150&h=150&fit=crop&auto=format',
     color: '#2d4059',
-    icon: '💻',
   },
   {
     label: 'Samsung TV 55"',
     image: 'https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=150&h=150&fit=crop&auto=format',
     color: '#e94560',
-    icon: '📺',
   },
   {
     label: 'Gaming PC',
-    image: 'https://images.unsplash.com/photo-1587202372775-38e1f3e188e8?w=150&h=150&fit=crop&auto=format',
+    image: 'https://images.unsplash.com/photo-1587831990717-23a1b7b9a3b3?w=150&h=150&fit=crop&auto=format',
     color: '#0f3460',
-    icon: '🖥️',
   },
   {
     label: '$500 Cash',
-    image: 'https://images.unsplash.com/photo-1580518324672-31d444ab9ec7?w=150&h=150&fit=crop&auto=format',
+    image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=150&h=150&fit=crop&auto=format',
     color: '#f5a623',
-    icon: '💰',
   },
   {
     label: 'iPad Pro',
     image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=150&h=150&fit=crop&auto=format',
     color: '#16213e',
-    icon: '📱',
   },
   {
     label: 'Smart Watch',
     image: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=150&h=150&fit=crop&auto=format',
     color: '#533483',
-    icon: '⌚',
   },
   {
     label: '$200 Cash',
     image: 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=150&h=150&fit=crop&auto=format',
     color: '#e94560',
-    icon: '💰',
   },
 ];
 
@@ -69,7 +61,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=spin, 2=result+form, 3=redirecting
+  const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,9 +71,11 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 24, minutes: 0, seconds: 0 });
+  const [imagesLoaded, setImagesLoaded] = useState(false);
 
   const canvasRef = useRef(null);
   const audioCtx = useRef(null);
+  const imageCache = useRef([]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -109,11 +103,38 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
     return () => clearInterval(timer);
   }, []);
 
-  // ── Draw wheel ──
+  // ── Preload images for canvas ──
+  useEffect(() => {
+    let loaded = 0;
+    PRIZES.forEach((prize, index) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        imageCache.current[index] = img;
+        loaded++;
+        if (loaded === PRIZES.length) {
+          setImagesLoaded(true);
+          drawWheel();
+        }
+      };
+      img.onerror = () => {
+        // fallback: use a placeholder (we'll just draw text)
+        imageCache.current[index] = null;
+        loaded++;
+        if (loaded === PRIZES.length) {
+          setImagesLoaded(true);
+          drawWheel();
+        }
+      };
+      img.src = prize.image;
+    });
+  }, []);
+
+  // ── Draw wheel with images ──
   const drawWheel = useCallback(
     (rotationAngle = rotation) => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas || !imagesLoaded) return;
       const ctx = canvas.getContext('2d');
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
@@ -122,6 +143,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // ── Draw segments ──
       PRIZES.forEach((prize, i) => {
         const startAngle = i * segmentAngle + rotationAngle;
         const endAngle = startAngle + segmentAngle;
@@ -141,21 +163,45 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(startAngle + segmentAngle / 2);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 12px "Segoe UI", system-ui, sans-serif';
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.shadowBlur = 6;
+        // ── Draw image inside segment ──
+        const img = imageCache.current[i];
+        if (img) {
+          const imgSize = radius * 0.5;
+          const midAngle = startAngle + segmentAngle / 2;
+          const imgX = centerX + Math.cos(midAngle) * (radius * 0.6) - imgSize / 2;
+          const imgY = centerY + Math.sin(midAngle) * (radius * 0.6) - imgSize / 2;
 
-        const textRadius = radius * 0.65;
-        ctx.fillText(prize.icon, textRadius, -8);
-        ctx.font = 'bold 10px "Segoe UI", system-ui, sans-serif';
-        ctx.fillText(prize.label.split(' ').slice(0, 2).join(' '), textRadius, 16);
-        ctx.restore();
+          ctx.save();
+          ctx.beginPath();
+          // Clip to a circle
+          const clipX = centerX + Math.cos(midAngle) * (radius * 0.6);
+          const clipY = centerY + Math.sin(midAngle) * (radius * 0.6);
+          ctx.arc(clipX, clipY, imgSize / 2, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
+          ctx.restore();
+
+          // Small border
+          ctx.beginPath();
+          ctx.arc(clipX, clipY, imgSize / 2 + 1, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        } else {
+          // fallback text
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.rotate(startAngle + segmentAngle / 2);
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 12px "Segoe UI", sans-serif';
+          ctx.shadowColor = 'rgba(0,0,0,0.5)';
+          ctx.shadowBlur = 6;
+          ctx.fillText(prize.label.split(' ').slice(0, 2).join(' '), radius * 0.6, 0);
+          ctx.restore();
+        }
       });
 
       // ── Center circle ──
@@ -167,17 +213,17 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
       ctx.fillStyle = centerGradient;
       ctx.fill();
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 4;
       ctx.stroke();
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowBlur = 0;
       ctx.fillText('SPIN', centerX, centerY - 4);
-      ctx.font = '10px "Segoe UI", sans-serif';
-      ctx.fillText('NOW', centerX, centerY + 14);
+      ctx.font = '12px "Segoe UI", sans-serif';
+      ctx.fillText('NOW', centerX, centerY + 18);
 
       // ── Pointer ──
       const pointerAngle = -Math.PI / 2;
@@ -185,16 +231,16 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
       const pointerY = centerY + Math.sin(pointerAngle) * (radius + 8);
       ctx.beginPath();
       ctx.moveTo(pointerX - 15, pointerY - 8);
-      ctx.lineTo(pointerX, pointerY + 18);
+      ctx.lineTo(pointerX, pointerY + 20);
       ctx.lineTo(pointerX + 15, pointerY - 8);
       ctx.closePath();
       ctx.fillStyle = '#e74c3c';
       ctx.fill();
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.stroke();
     },
-    [rotation]
+    [rotation, imagesLoaded]
   );
 
   const lightenColor = (hex, percent) => {
@@ -207,8 +253,8 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
   };
 
   useEffect(() => {
-    drawWheel();
-  }, [drawWheel]);
+    if (imagesLoaded) drawWheel();
+  }, [drawWheel, imagesLoaded]);
 
   const playSound = (type) => {
     try {
@@ -231,7 +277,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
   // ── Spin ──
   const handleSpin = () => {
-    if (isSpinning) return;
+    if (isSpinning || !imagesLoaded) return;
     setIsSpinning(true);
     playSound('click');
 
@@ -283,7 +329,6 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
     setError('');
     setLoading(true);
 
-    // Save data to localStorage or send to backend
     localStorage.setItem('lucky_draw_name', name);
     localStorage.setItem('lucky_draw_email', email);
 
@@ -319,10 +364,10 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">🎰</span>
+          <span className="logo-icon">🏆</span>
           <span className="logo-text">Lucky<span>Draw</span></span>
         </div>
-        <div className="header-badge">🏆 Win Premium Prizes</div>
+        <div className="header-badge">✨ Win Premium Prizes</div>
       </header>
 
       {/* ─── HERO ─── */}
@@ -376,8 +421,8 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
             <div className="wheel-container">
               <canvas ref={canvasRef} width="400" height="400" className="wheel-canvas"></canvas>
-              <button className="spin-btn" onClick={handleSpin} disabled={isSpinning}>
-                {isSpinning ? 'Spinning...' : 'SPIN'}
+              <button className="spin-btn" onClick={handleSpin} disabled={isSpinning || !imagesLoaded}>
+                {isSpinning ? 'Spinning...' : !imagesLoaded ? 'Loading...' : 'SPIN'}
               </button>
             </div>
             <p className="spin-note">🎯 Click the SPIN button to try your luck!</p>
@@ -500,22 +545,22 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-          background: #f8f9fc;
+          background: #f0f2f5;
           color: #1a1a2e;
           line-height: 1.6;
         }
         .page-wrapper {
           max-width: 100%;
           overflow-x: hidden;
-          background: #f8f9fc;
+          background: linear-gradient(180deg, #f0f2f5 0%, #e8ecf1 100%);
         }
 
         /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
           background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(0,0,0,0.06);
+          backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(0,0,0,0.05);
           padding: 0.7rem 1.5rem;
           display: flex;
           justify-content: space-between;
@@ -523,37 +568,38 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         }
         .logo {
           display: flex; align-items: center; gap: 0.6rem;
-          font-weight: 800; font-size: 1.2rem;
+          font-weight: 800; font-size: 1.3rem;
         }
         .logo-icon { font-size: 1.6rem; }
         .logo-text { color: #1a1a2e; }
         .logo-text span { color: #f5a623; }
         .header-badge {
-          background: #f5a623;
+          background: linear-gradient(135deg, #f5a623, #e67e22);
           color: #fff;
           font-weight: 700;
           font-size: 0.7rem;
-          padding: 0.3rem 1rem;
+          padding: 0.3rem 1.2rem;
           border-radius: 40px;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.8px;
+          box-shadow: 0 2px 8px rgba(245, 166, 35, 0.3);
         }
 
         /* ── Hero ── */
         .hero {
           position: relative;
-          min-height: 50vh;
+          min-height: 55vh;
           display: flex;
           align-items: center;
           justify-content: center;
           text-align: center;
           padding: 3rem 1.5rem;
-          background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+          background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
           color: #fff;
         }
         .hero-overlay {
           position: absolute; inset: 0;
-          background: rgba(0,0,0,0.3);
+          background: radial-gradient(circle at 30% 40%, rgba(245,166,35,0.08) 0%, transparent 70%);
         }
         .hero-content {
           position: relative; z-index: 2;
@@ -561,9 +607,9 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         }
         .hero-badge {
           display: inline-block;
-          background: rgba(245, 166, 35, 0.2);
-          border: 1px solid #f5a623;
-          padding: 0.3rem 1.2rem;
+          background: rgba(245, 166, 35, 0.15);
+          border: 1px solid rgba(245, 166, 35, 0.4);
+          padding: 0.3rem 1.5rem;
           border-radius: 40px;
           font-size: 0.7rem;
           text-transform: uppercase;
@@ -572,13 +618,17 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           margin-bottom: 1rem;
         }
         .hero h1 {
-          font-size: clamp(2rem, 6vw, 3.2rem);
+          font-size: clamp(2.2rem, 7vw, 3.8rem);
           font-weight: 900;
           line-height: 1.1;
           margin-bottom: 0.5rem;
+          background: linear-gradient(135deg, #fff 40%, #f5a623 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
         }
         .hero p {
-          font-size: 1.1rem;
+          font-size: 1.15rem;
           color: #ccc;
           margin-bottom: 1.8rem;
         }
@@ -589,13 +639,13 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           flex-wrap: wrap;
         }
         .hero-stats div {
-          background: rgba(255,255,255,0.08);
-          backdrop-filter: blur(6px);
-          padding: 0.4rem 1rem;
+          background: rgba(255,255,255,0.06);
+          backdrop-filter: blur(8px);
+          padding: 0.4rem 1.2rem;
           border-radius: 40px;
-          border: 1px solid rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.08);
           font-weight: 600;
-          font-size: 0.85rem;
+          font-size: 0.9rem;
         }
         .hero-stats span { margin-right: 6px; }
 
@@ -603,30 +653,30 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 1rem;
-          margin-top: 1rem;
-          background: rgba(255,255,255,0.1);
-          padding: 0.8rem 1.5rem;
+          gap: 1.2rem;
+          margin-top: 1.2rem;
+          background: rgba(255,255,255,0.08);
+          padding: 0.8rem 2rem;
           border-radius: 60px;
-          border: 1px solid rgba(255,255,255,0.2);
+          border: 1px solid rgba(255,255,255,0.15);
         }
         .result-display .result-image {
-          width: 60px;
-          height: 60px;
+          width: 64px;
+          height: 64px;
           object-fit: cover;
-          border-radius: 12px;
+          border-radius: 16px;
           border: 2px solid #f5a623;
         }
         .result-display .result-label {
-          font-size: 1.4rem;
+          font-size: 1.5rem;
           font-weight: 800;
           color: #f5a623;
         }
 
         /* ── Main Content ── */
         .main-content {
-          max-width: 700px;
-          margin: -2rem auto 3rem;
+          max-width: 720px;
+          margin: -2.5rem auto 3rem;
           padding: 0 1.5rem;
           position: relative;
           z-index: 10;
@@ -635,20 +685,20 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         /* ── Spin Card ── */
         .spin-card {
           background: #fff;
-          border-radius: 32px;
-          padding: 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
-          border: 1px solid #eef0f4;
+          border-radius: 36px;
+          padding: 2rem 2rem 2.5rem;
+          box-shadow: 0 24px 64px rgba(0,0,0,0.06);
+          border: 1px solid rgba(0,0,0,0.04);
           text-align: center;
         }
 
         .rewards-preview {
           margin-bottom: 2rem;
           padding-bottom: 1.5rem;
-          border-bottom: 2px solid #f0f0f0;
+          border-bottom: 2px solid #f0f2f5;
         }
         .rewards-preview h3 {
-          font-size: 1.2rem;
+          font-size: 1.1rem;
           font-weight: 700;
           color: #1a1a2e;
           margin-bottom: 1rem;
@@ -662,27 +712,30 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 0.4rem 0.2rem;
-          background: #f8f9fc;
-          border-radius: 12px;
-          border: 1px solid #eef0f4;
-          transition: transform 0.2s;
+          padding: 0.6rem 0.2rem;
+          background: #f8fafc;
+          border-radius: 16px;
+          border: 1px solid #eef2f6;
+          transition: all 0.2s;
         }
         .reward-item:hover {
-          transform: translateY(-2px);
+          transform: translateY(-4px);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+          border-color: #f5a623;
         }
         .reward-item .reward-image {
-          width: 50px;
-          height: 50px;
+          width: 56px;
+          height: 56px;
           object-fit: cover;
-          border-radius: 8px;
-          margin-bottom: 0.2rem;
+          border-radius: 10px;
+          margin-bottom: 0.3rem;
         }
         .reward-item .reward-label {
-          font-size: 0.65rem;
+          font-size: 0.7rem;
           font-weight: 600;
           color: #4b5563;
           text-align: center;
+          line-height: 1.2;
         }
 
         .wheel-container {
@@ -695,32 +748,34 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           width: 100%;
           height: auto;
           border-radius: 50%;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+          box-shadow: 0 12px 48px rgba(0,0,0,0.12), 0 0 0 6px rgba(245,166,35,0.2);
         }
         .spin-btn {
           position: absolute;
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          width: 80px;
-          height: 80px;
+          width: 84px;
+          height: 84px;
           border-radius: 50%;
-          background: #f5a623;
+          background: linear-gradient(135deg, #f5a623, #e67e22);
           border: 4px solid #fff;
-          color: #1a1a2e;
+          color: #fff;
           font-size: 1.2rem;
           font-weight: 800;
           cursor: pointer;
-          box-shadow: 0 4px 20px rgba(245, 166, 35, 0.4);
-          transition: transform 0.2s;
+          box-shadow: 0 4px 24px rgba(245, 166, 35, 0.5);
+          transition: transform 0.2s, box-shadow 0.2s;
           text-transform: uppercase;
           letter-spacing: 1px;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.2);
         }
         .spin-btn:hover:not(:disabled) {
-          transform: translate(-50%, -50%) scale(1.05);
+          transform: translate(-50%, -50%) scale(1.06);
+          box-shadow: 0 6px 32px rgba(245, 166, 35, 0.6);
         }
         .spin-btn:disabled {
-          opacity: 0.6;
+          opacity: 0.7;
           cursor: not-allowed;
           transform: translate(-50%, -50%);
         }
@@ -733,10 +788,10 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         /* ── Claim Card ── */
         .claim-card {
           background: #fff;
-          border-radius: 32px;
+          border-radius: 36px;
           padding: 2.5rem 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
-          border: 1px solid #eef0f4;
+          box-shadow: 0 24px 64px rgba(0,0,0,0.06);
+          border: 1px solid rgba(0,0,0,0.04);
         }
         .claim-card h2 {
           font-size: 1.8rem;
@@ -764,16 +819,17 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         .form-group input {
           width: 100%;
           padding: 0.85rem 1rem;
-          border: 1.5px solid #e5e7eb;
-          border-radius: 12px;
+          border: 2px solid #e5e7eb;
+          border-radius: 14px;
           font-size: 0.95rem;
           background: #f9fafb;
-          transition: border-color 0.2s;
+          transition: border-color 0.2s, box-shadow 0.2s;
           outline: none;
         }
         .form-group input:focus {
           border-color: #f5a623;
           background: #fff;
+          box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.1);
         }
         .form-error {
           color: #ef4444;
@@ -783,7 +839,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         .claim-btn {
           width: 100%;
           padding: 1rem;
-          background: #10b981;
+          background: linear-gradient(135deg, #10b981, #059669);
           border: none;
           border-radius: 60px;
           font-weight: 800;
@@ -791,7 +847,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           color: #fff;
           cursor: pointer;
           transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+          box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -799,7 +855,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         }
         .claim-btn:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+          box-shadow: 0 8px 32px rgba(16, 185, 129, 0.35);
         }
         .claim-btn:disabled {
           opacity: 0.6;
@@ -837,9 +893,9 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         .section-title::after {
           content: '';
           display: block;
-          width: 60px;
+          width: 64px;
           height: 4px;
-          background: #f5a623;
+          background: linear-gradient(90deg, #f5a623, #e67e22);
           margin: 0.5rem auto 0;
           border-radius: 4px;
         }
@@ -852,30 +908,32 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         }
         .step {
           background: #fff;
-          padding: 1.5rem;
-          border-radius: 20px;
+          padding: 1.8rem 1.2rem;
+          border-radius: 24px;
           text-align: center;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-          border: 1px solid #eef0f4;
-          transition: transform 0.2s;
+          box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+          border: 1px solid #eef2f6;
+          transition: transform 0.2s, box-shadow 0.2s;
         }
         .step:hover {
-          transform: translateY(-4px);
+          transform: translateY(-6px);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.06);
         }
         .step-number {
-          width: 48px; height: 48px;
-          background: #f5a623;
+          width: 52px; height: 52px;
+          background: linear-gradient(135deg, #f5a623, #e67e22);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: 900;
-          font-size: 1.3rem;
+          font-size: 1.4rem;
           color: #fff;
           margin: 0 auto 0.8rem;
+          box-shadow: 0 4px 12px rgba(245, 166, 35, 0.3);
         }
         .step-content h3 {
-          font-size: 1rem;
+          font-size: 1.05rem;
           font-weight: 700;
           color: #1a1a2e;
           margin-bottom: 0.2rem;
@@ -893,10 +951,10 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         }
         .terms-content {
           background: #fff;
-          padding: 2rem;
-          border-radius: 24px;
-          border: 1px solid #eef0f4;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          padding: 2rem 2.5rem;
+          border-radius: 28px;
+          border: 1px solid #eef2f6;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.02);
           max-width: 900px;
           margin: 0 auto;
         }
@@ -905,7 +963,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           padding: 0;
         }
         .terms-content ul li {
-          padding: 0.6rem 0 0.6rem 1.8rem;
+          padding: 0.7rem 0 0.7rem 2rem;
           position: relative;
           color: #4b5563;
           border-bottom: 1px solid #f3f4f6;
@@ -929,7 +987,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           color: #9ca3af;
           padding: 2.5rem 1.5rem;
           text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.05);
+          border-top: 1px solid rgba(255,255,255,0.04);
           margin-top: 2rem;
         }
         .site-footer p {
@@ -946,7 +1004,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           position: fixed;
           top: 0; left: 0; width: 100%; height: 100%;
           background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(12px);
+          backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -954,13 +1012,13 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         }
         .modal-card {
           background: #1a1c22;
-          border-radius: 36px;
+          border-radius: 40px;
           padding: 2.8rem 2rem;
           max-width: 420px;
           width: 90%;
           text-align: center;
           border: 1px solid rgba(245, 166, 35, 0.2);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.6);
         }
         .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
         .modal-card h2 {
@@ -980,7 +1038,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           justify-content: center;
         }
         .modal-btn {
-          background: rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.06);
           border: 1px solid rgba(255,255,255,0.1);
           padding: 0.7rem 1.5rem;
           border-radius: 60px;
@@ -991,7 +1049,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           flex: 1;
           min-width: 120px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn:hover { background: rgba(255,255,255,0.12); }
         .modal-btn.primary {
           background: #f5a623;
           border: none;
@@ -1009,17 +1067,18 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
         /* ── Responsive ── */
         @media (max-width: 640px) {
-          .hero { min-height: 40vh; }
-          .hero h1 { font-size: 1.8rem; }
+          .hero { min-height: 45vh; }
+          .hero h1 { font-size: 2rem; }
           .hero p { font-size: 0.95rem; }
           .hero-stats { gap: 0.5rem; }
-          .hero-stats div { font-size: 0.7rem; padding: 0.2rem 0.6rem; }
+          .hero-stats div { font-size: 0.7rem; padding: 0.2rem 0.8rem; }
           .main-content { padding: 0 1rem; }
           .spin-card, .claim-card { padding: 1.8rem 1.2rem; }
           .steps { grid-template-columns: 1fr 1fr; }
           .rewards-grid { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
-          .reward-item .reward-image { width: 40px; height: 40px; }
-          .reward-item .reward-label { font-size: 0.55rem; }
+          .reward-item .reward-image { width: 44px; height: 44px; }
+          .reward-item .reward-label { font-size: 0.6rem; }
+          .spin-btn { width: 72px; height: 72px; font-size: 1rem; }
         }
         @media (max-width: 480px) {
           .header-badge { font-size: 0.6rem; padding: 0.2rem 0.8rem; }
@@ -1027,9 +1086,9 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           .claim-card h2 { font-size: 1.5rem; }
           .steps { grid-template-columns: 1fr; }
           .terms-content { padding: 1.2rem; }
-          .spin-btn { width: 60px; height: 60px; font-size: 0.9rem; }
           .rewards-grid { grid-template-columns: repeat(2, 1fr); }
           .result-display .result-image { width: 50px; height: 50px; }
+          .result-display .result-label { font-size: 1.2rem; }
         }
       `}} />
     </div>
