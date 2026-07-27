@@ -31,8 +31,11 @@ import {
   FiYoutube,
   FiFacebook,
   FiCalendar,
+  FiCheckCircle,
+  FiThumbsUp,
+  FiSmartphone,
 } from 'react-icons/fi';
-import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin } from 'react-icons/fa';
+import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin, FaGamepad, FaTrophy, FaGift } from 'react-icons/fa';
 import { useAuth } from '../components/AuthScreen';
 import { useComments, useInvalidateQueries } from '../lib/queries';
 
@@ -177,23 +180,26 @@ export default function About() {
 
   // ── Fade‑up hooks ──
   const heroFade = useFadeUp(0.1);
+  const whatIsFade = useFadeUp(0.1);
   const storyFade = useFadeUp(0.1);
   const missionFade = useFadeUp(0.1);
   const valuesFade = useFadeUp(0.1);
   const featuresFade = useFadeUp(0.1);
+  const howItWorksFade = useFadeUp(0.1);
   const milestonesFade = useFadeUp(0.1);
   const statsFade = useFadeUp(0.1);
   const partnersFade = useFadeUp(0.1);
+  const useCasesFade = useFadeUp(0.1);
   const testimonialsFade = useFadeUp(0.1);
   const faqFade = useFadeUp(0.1);
   const ctaFade = useFadeUp(0.1);
 
   // ── Stats counters ──
   const stats = [
-    { label: 'Campaigns Launched', target: 1200, suffix: '+' },
-    { label: 'Active Users', target: 500, suffix: '+' },
+    { label: 'Campaigns Launched', target: 1500, suffix: '+' },
+    { label: 'Active Users', target: 5000, suffix: '+' },
     { label: 'Templates Available', target: 50, suffix: '+' },
-    { label: 'Total Shares', target: 10000, suffix: '+' },
+    { label: 'Total Shares', target: 15000, suffix: '+' },
   ];
   const counters = stats.map(s => useCounter(s.target));
 
@@ -257,12 +263,19 @@ export default function About() {
   ];
 
   const features = [
-    { icon: <FaRocket className="w-5 h-5" />, title: 'Launch Campaigns Instantly', description: 'Choose from professionally designed templates and launch in under 60 seconds.' },
+    { icon: <FaRocket className="w-5 h-5" />, title: '50+ Ready-Made Templates', description: 'Choose from Gaming Contests, Quiz Challenges, Spin & Win, Lucky Draw, Telecom Rewards, Photography Contests, and more – all professionally designed.' },
     { icon: <FaChartLine className="w-5 h-5" />, title: 'Real‑Time Analytics', description: 'Track views, unlocks, shares, and completions – all in one dashboard.' },
     { icon: <FaUserFriends className="w-5 h-5" />, title: 'Referral & Affiliate System', description: 'Grow your network with built‑in referral tracking and rewards.' },
     { icon: <FaLock className="w-5 h-5" />, title: 'Secure & Private', description: 'Your data is encrypted and protected. We never share with third parties.' },
     { icon: <FaCrown className="w-5 h-5" />, title: 'Pro Features', description: 'Unlock advanced templates, priority support, and more.' },
     { icon: <FiTrendingUp className="w-5 h-5" />, title: 'Trending Insights', description: 'Discover what’s trending and optimise your campaigns.' },
+  ];
+
+  // ── How It Works Steps ──
+  const howItWorks = [
+    { step: '1', title: 'Choose a Template', description: 'Select from 50+ professionally designed templates – Gaming, Quizzes, Spin & Win, Lucky Draw, and more.' },
+    { step: '2', title: 'Customize & Launch', description: 'Add your reward, share target, tasks, and redirect link. Launch your campaign in under 60 seconds.' },
+    { step: '3', title: 'Share & Grow', description: 'Share your unique campaign link with your audience. Watch as people engage, share, and help you grow.' },
   ];
 
   const milestones = [
@@ -273,31 +286,64 @@ export default function About() {
   ];
 
   const faqs = [
-    { question: 'What is Make Trend?', answer: 'Make Trend is a platform that lets you create share‑to‑unlock campaigns for social media growth. You choose a template, customise it, share your unique link, and track metrics like views, shares, and unlocks – all in minutes.' },
-    { question: 'Do I need to pay to use Make Trend?', answer: 'No! Make Trend offers a free plan with access to many templates and features. Pro plans unlock advanced templates, priority support, and additional analytics for power users.' },
-    { question: 'How do I create a campaign?', answer: 'Simply browse our template library, select one, customise the title, description, reward, and features (share count, tasks, redirect URL), then click "Create Campaign". You’ll get a unique link to share with your audience.' },
-    { question: 'Is my data safe?', answer: 'Absolutely. We use Firebase Authentication and Firestore with strict security rules. Your personal information is never shared with third parties without your explicit consent.' },
-    { question: 'Can I track my campaign performance?', answer: 'Yes! Our dashboard shows real‑time stats: total campaigns, views, shares, unlocks, completions, and success rates. You can also copy share links directly from the dashboard.' },
-    { question: 'What platforms does Make Trend support?', answer: 'Our templates are optimised for TikTok, Instagram, YouTube, Facebook, and more. You can also customise campaigns for any platform by editing the tasks and redirect URLs.' },
+    { 
+      question: 'What is Make Trend?', 
+      answer: 'Make Trend is a campaign creation platform that lets you launch share‑to‑unlock campaigns in minutes. Choose from 50+ templates, customize your campaign, share your link, and track real‑time analytics – all without any coding skills.' 
+    },
+    { 
+      question: 'Is Make Trend really free?', 
+      answer: 'Yes! Make Trend offers a generous free plan that gives you access to many templates and core features. You can create campaigns, share them, and track basic metrics without paying anything. Pro plans are available for users who need advanced templates, analytics, and priority support – but the free plan is more than enough to get started.' 
+    },
+    { 
+      question: 'What kinds of campaigns can I create?', 
+      answer: 'You can create Gaming Contests (BGMI, Free Fire, PUBG), Quiz Challenges, Spin & Win, Lucky Draw, Telecom Rewards (Ncell, etc.), Photography Contests, YouTube Growth campaigns, and more. We add new templates regularly.' 
+    },
+    { 
+      question: 'How do I create a campaign?', 
+      answer: 'Simply browse our template library, select one, customise the title, description, reward, share count, tasks, and redirect URL. Click "Create Campaign" and you\'ll get a unique link to share with your audience. It takes less than 60 seconds.' 
+    },
+    { 
+      question: 'Is my data safe?', 
+      answer: 'Absolutely. We use Firebase Authentication and Firestore with strict security rules. Your personal information is never shared with third parties without your explicit consent.' 
+    },
+    { 
+      question: 'Can I track my campaign performance?', 
+      answer: 'Yes! Our dashboard shows real‑time stats: total campaigns, views, shares, unlocks, completions, and success rates. You can also copy share links directly from the dashboard.' 
+    },
+    { 
+      question: 'What platforms does Make Trend support?', 
+      answer: 'Our templates are optimised for TikTok, Instagram, YouTube, Facebook, Twitter, Discord, and more. You can customise campaigns for any platform by editing the tasks and redirect URLs.' 
+    },
   ];
 
-  // ── Partners (text only, no placeholder images) ──
+  // ── Partners ──
   const partners = [
     { name: 'TikTok' },
     { name: 'Instagram' },
     { name: 'YouTube' },
     { name: 'Facebook' },
     { name: 'Twitter' },
+    { name: 'Discord' },
   ];
 
   const usps = [
-    { title: 'Free to Start', description: 'Create campaigns without any upfront cost.' },
+    { title: 'Free to Start', description: 'Create campaigns without any upfront cost. No credit card required.' },
     { title: 'No Coding Needed', description: 'Drag, drop, and customise – no technical skills required.' },
     { title: 'Real‑Time Data', description: 'See your metrics update instantly as your campaign goes live.' },
-    { title: 'Global Reach', description: 'Share your campaigns with anyone, anywhere.' },
+    { title: 'Global Reach', description: 'Share your campaigns with anyone, anywhere in the world.' },
   ];
 
-  // ── Current year for "last updated" ──
+  // ── Use Cases ──
+  const useCases = [
+    { icon: <FaGamepad className="w-6 h-6" />, title: 'Gaming Creators', description: 'Launch BGMI, Free Fire, or PUBG tournaments and reward events.' },
+    { icon: <FiYoutube className="w-6 h-6" />, title: 'YouTubers', description: 'Grow your channel with share‑to‑unlock growth campaigns.' },
+    { icon: <FiSmartphone className="w-6 h-6" />, title: 'Businesses', description: 'Promote products, collect leads, and drive traffic to landing pages.' },
+    { icon: <FiUsers className="w-6 h-6" />, title: 'Community Owners', description: 'Increase engagement, attract new members, and build community.' },
+    { icon: <FiAward className="w-6 h-6" />, title: 'Photographers & Artists', description: 'Run photography contests and showcase your work.' },
+    { icon: <FiTrendingUp className="w-6 h-6" />, title: 'Marketers', description: 'Launch viral campaigns and track performance in real‑time.' },
+  ];
+
+  // ── Current year ──
   const currentYear = new Date().getFullYear();
 
   // ── Structured Data (JSON‑LD) ──
@@ -320,6 +366,7 @@ export default function About() {
       "url": "https://youtube.com/@rockyxsiyu"
     }
   };
+
   const webpageData = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -332,21 +379,36 @@ export default function About() {
     }
   };
 
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
+  };
+
   return (
     <>
       <Meta
-        title="About Make Trend – Viral Campaign Platform"
-        description="Make Trend helps creators launch viral share‑to‑unlock campaigns in minutes. Free templates, real‑time analytics, and built‑in referral tracking. Built by Rocky Axis."
+        title="About Make Trend – Launch Viral Campaigns Free"
+        description="Make Trend helps creators launch viral share‑to‑unlock campaigns in minutes. Free templates, real‑time analytics, and built‑in referral tracking. No coding needed."
         image="https://maketrend.app/og-image.png"
         url="https://maketrend.app/about"
+        extraKeywords={['campaign platform', 'viral campaigns', 'share to unlock', 'creator tools', 'growth platform', 'free templates']}
       />
       <Head>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageData) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       </Head>
 
       <div className="min-h-screen bg-white">
-        {/* ── Hero ── */}
+        {/* ── HERO ── */}
         <section
           ref={heroFade.ref}
           className={`relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-16 sm:py-20 transition-all duration-700 ${
@@ -378,30 +440,35 @@ export default function About() {
               </form>
             </div>
             <div className="text-center">
+              {/* ── Trust Badges ── */}
               <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
-                <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-white/10">
-                  <FiCalendar className="w-3.5 h-3.5" />
-                  Est. 2025
+                <span className="inline-flex items-center gap-1.5 bg-green-400/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-green-400/20 text-green-200">
+                  <FiCheckCircle className="w-3.5 h-3.5" />
+                  Free to Start
                 </span>
-                <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-white/10">
-                  <FiClock className="w-3.5 h-3.5" />
-                  Updated {currentYear}
+                <span className="inline-flex items-center gap-1.5 bg-purple-400/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-purple-400/20 text-purple-200">
+                  <FiZap className="w-3.5 h-3.5" />
+                  No Code Needed
+                </span>
+                <span className="inline-flex items-center gap-1.5 bg-amber-400/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-amber-400/20 text-amber-200">
+                  <FiUsers className="w-3.5 h-3.5" />
+                  5K+ Creators Trust
                 </span>
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight">
-                About{' '}
+                Launch Viral{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-300">
-                  Make Trend
+                  Campaigns in Minutes
                 </span>
               </h1>
               <p className="mt-4 text-lg sm:text-xl max-w-3xl mx-auto text-indigo-100">
-                We empower creators, marketers, and entrepreneurs to launch viral campaigns that drive real results.
+                Make Trend is the smart campaign platform that helps creators, gamers, and marketers grow their audience with share‑to‑unlock templates.
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <Link href="/create">
                   <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-purple-700 font-semibold rounded-full hover:bg-gray-100 transition shadow-lg cursor-pointer text-sm">
-                    Start Creating <FiArrowRight className="w-4 h-4" />
+                    Start Creating Free <FiArrowRight className="w-4 h-4" />
                   </span>
                 </Link>
                 <Link href="/">
@@ -409,137 +476,126 @@ export default function About() {
                     Home
                   </span>
                 </Link>
-                <Link href="/follow">
-                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
-                    Follow Us
-                  </span>
-                </Link>
-                <Link href="/support">
-                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
-                    Support
-                  </span>
-                </Link>
-                {!user && (
-                  <Link href="/login">
-                    <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
-                      Login
-                    </span>
-                  </Link>
-                )}
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── Our Story ── */}
+        {/* ─── WHAT IS MAKE TREND? ─── */}
         <section
-          ref={storyFade.ref}
+          ref={whatIsFade.ref}
           className={`py-12 bg-white transition-all duration-700 ${
-            storyFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            whatIsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <FiBookOpen className="w-10 h-10 text-purple-600 mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Story</h2>
-            <p className="text-gray-600 text-base leading-relaxed max-w-2xl mx-auto">
-              Make Trend was born from a simple idea: <strong>campaign creation should be easy, fast, and effective</strong>.
-              We saw creators struggling with complex tools and expensive agencies, so we built a platform that gives anyone the power to launch share‑to‑unlock campaigns in minutes.
-              Today, we’re proud to help thousands of users grow their audience and turn their ideas into movements.
-            </p>
-
-            <div className="mt-6 pt-6 border-t border-gray-200 max-w-md mx-auto">
-              <p className="text-sm text-gray-500">
-                Built with ❤️ by{' '}
-                <a
-                  href="https://youtube.com/@rockyxsiyu?si=lk_b1rkizInBvZu8"
-                  target="_blank"
-                  rel="noopener noreferrer me"
-                  className="text-purple-600 hover:underline font-medium"
-                >
-                  Rocky Axis
-                </a>
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">What is Make Trend?</span>
+            </div>
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
+              A Campaign Platform Built for{' '}
+              <span className="text-purple-600">Growth</span>
+            </h2>
+            <div className="max-w-3xl mx-auto space-y-4 text-gray-600 text-base leading-relaxed">
+              <p>
+                <strong>Make Trend</strong> is a smart campaign-building platform designed for <strong>creators, gamers, marketers, and online businesses</strong> who want to launch engaging, share-driven campaigns without starting from scratch.
               </p>
-              <div className="flex items-center justify-center gap-3 mt-2">
-                <a
-                  href="https://youtube.com/@rockyxsiyu?si=lk_b1rkizInBvZu8"
-                  target="_blank"
-                  rel="noopener noreferrer me"
-                  className="text-gray-400 hover:text-red-600 transition"
-                  aria-label="YouTube"
-                >
-                  <FiYoutube className="w-5 h-5" />
-                </a>
-                <span className="text-xs text-gray-300">|</span>
-                <a
-                  href="https://youtube.com/@rockyxsiyu?si=lk_b1rkizInBvZu8"
-                  target="_blank"
-                  rel="noopener noreferrer me"
-                  className="text-xs text-gray-400 hover:text-purple-600 transition"
-                >
-                  Subscribe on YouTube
-                </a>
+              <p>
+                Instead of spending hours building pages manually, users can select from <strong>50+ ready-made templates</strong>, customize campaign details, set share targets, add tasks, and define redirect links. What once took days now takes <strong>under 60 seconds</strong>.
+              </p>
+              <p>
+                The real power isn't just a beautiful page — it's a system that <strong>encourages people to engage, share, and help campaigns spread organically</strong>. That's what makes Make Trend powerful: it's <strong>built for growth through participation</strong>.
+              </p>
+            </div>
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto">
+              <div className="bg-purple-50 rounded-xl p-3 text-center">
+                <div className="text-2xl mb-0.5">🎮</div>
+                <p className="text-xs font-bold text-gray-700">Gaming</p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3 text-center">
+                <div className="text-2xl mb-0.5">❓</div>
+                <p className="text-xs font-bold text-gray-700">Quizzes</p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3 text-center">
+                <div className="text-2xl mb-0.5">🎡</div>
+                <p className="text-xs font-bold text-gray-700">Spin & Win</p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3 text-center">
+                <div className="text-2xl mb-0.5">🎁</div>
+                <p className="text-xs font-bold text-gray-700">Rewards</p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── Mission & Vision ── */}
+        {/* ─── HOW IT WORKS ─── */}
         <section
-          ref={missionFade.ref}
+          ref={howItWorksFade.ref}
           className={`py-12 bg-gray-50 transition-all duration-700 ${
-            missionFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            howItWorksFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <div>
-                <div className="flex items-center gap-3 mb-3">
-                  <FiTarget className="w-6 h-6 text-purple-600" />
-                  <h2 className="text-2xl font-bold text-gray-900">Our Mission</h2>
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Simple Process</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">How It Works</h2>
+              <p className="text-gray-500 max-w-2xl mx-auto mt-1">
+                Launch your campaign in three simple steps – no coding, no complexity.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {howItWorks.map((item, idx) => (
+                <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition text-center">
+                  <div className="w-14 h-14 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl font-extrabold">
+                    {item.step}
+                  </div>
+                  <h3 className="font-bold text-gray-800">{item.title}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{item.description}</p>
                 </div>
-                <p className="text-gray-600 text-base leading-relaxed">
-                  To democratise campaign creation – giving everyone, from individuals to enterprises,
-                  the tools they need to tell their story and grow their audience without technical complexity.
-                </p>
-              </div>
-              <div>
-                <div className="flex items-center gap-3 mb-3">
-                  <FiZap className="w-6 h-6 text-purple-600" />
-                  <h2 className="text-2xl font-bold text-gray-900">Our Vision</h2>
-                </div>
-                <p className="text-gray-600 text-base leading-relaxed">
-                  A world where every idea can become a trending movement. We envision a platform where creativity meets data – and everyone wins.
-                </p>
-              </div>
+              ))}
+            </div>
+            <div className="text-center mt-6">
+              <Link href="/create">
+                <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-full hover:bg-purple-700 transition shadow-sm text-sm">
+                  Start Your Campaign <FiArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
             </div>
           </div>
         </section>
 
-        {/* ── Core Values ── */}
+        {/* ─── USE CASES ─── */}
         <section
-          ref={valuesFade.ref}
+          ref={useCasesFade.ref}
           className={`py-12 bg-white transition-all duration-700 ${
-            valuesFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            useCasesFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Our Core Values</h2>
-            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">The principles that guide everything we do.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {coreValues.map((val, idx) => (
-                <div key={idx} className="text-center p-5 bg-gray-50 rounded-2xl border border-gray-100 hover:shadow-md transition hover:-translate-y-1">
-                  <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    {val.icon}
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Versatile</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">Who Uses Make Trend?</h2>
+              <p className="text-gray-500 max-w-2xl mx-auto mt-1">
+                Built for creators, gamers, businesses, and communities worldwide.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {useCases.map((useCase, idx) => (
+                <div key={idx} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 hover:shadow-md transition flex items-start gap-3">
+                  <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                    {useCase.icon}
                   </div>
-                  <h4 className="font-bold text-gray-800 text-sm">{val.title}</h4>
-                  <p className="text-gray-500 text-xs mt-1">{val.description}</p>
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-sm">{useCase.title}</h4>
+                    <p className="text-gray-500 text-xs mt-0.5">{useCase.description}</p>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ── What We Do (Features) ── */}
+        {/* ─── FEATURES ─── */}
         <section
           ref={featuresFade.ref}
           className={`py-12 bg-gray-50 transition-all duration-700 ${
@@ -547,8 +603,11 @@ export default function About() {
           }`}
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">What We Do</h2>
-            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">Everything you need to create, launch, and grow campaigns.</p>
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Features</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">Everything You Need to Grow</h2>
+              <p className="text-gray-500 max-w-2xl mx-auto mt-1">Powerful tools designed to help you succeed.</p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((feature, idx) => (
                 <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-0.5">
@@ -563,28 +622,10 @@ export default function About() {
           </div>
         </section>
 
-        {/* ── Milestones ── */}
-        <section
-          ref={milestonesFade.ref}
-          className={`py-12 bg-white transition-all duration-700 ${
-            milestonesFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
-        >
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Our Journey</h2>
-            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">Key milestones in our story.</p>
-            <div className="space-y-6 relative before:absolute before:left-6 before:top-0 before:h-full before:w-0.5 before:bg-purple-200 before:content-[''] pl-8">
-              {milestones.map((m, idx) => (
-                <Milestone key={idx} year={m.year} title={m.title} description={m.description} icon={m.icon} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Stats ── */}
+        {/* ─── STATS ─── */}
         <section
           ref={statsFade.ref}
-          className={`py-12 bg-gray-50 transition-all duration-700 ${
+          className={`py-12 bg-white transition-all duration-700 ${
             statsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
@@ -596,7 +637,7 @@ export default function About() {
                 const { count, ref } = counters[idx];
                 const displayValue = stat.label === 'Total Shares' ? (count / 1000).toFixed(1) + 'K' : count + stat.suffix;
                 return (
-                  <div key={idx} ref={ref} className="text-center p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
+                  <div key={idx} ref={ref} className="text-center p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
                     <p className="text-3xl font-extrabold text-purple-600">{displayValue}</p>
                     <p className="text-xs text-gray-500 mt-1 font-medium">{stat.label}</p>
                     <div className="w-12 h-0.5 mx-auto mt-2 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-full" />
@@ -607,25 +648,7 @@ export default function About() {
           </div>
         </section>
 
-        {/* ── Partners / Trusted By ── */}
-        <section
-          ref={partnersFade.ref}
-          className={`py-12 bg-white transition-all duration-700 ${
-            partnersFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
-        >
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">Trusted by Creators Worldwide</h2>
-            <p className="text-gray-500 text-sm mb-6">Used by marketers, influencers, and entrepreneurs everywhere.</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-              {partners.map((p, idx) => (
-                <div key={idx} className="text-gray-400 font-bold text-lg">{p.name}</div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Why Choose Us (USPs) ── */}
+        {/* ─── WHY CHOOSE US ─── */}
         <section className="py-12 bg-gradient-to-r from-purple-50 to-indigo-50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Why Choose Make Trend</h2>
@@ -644,7 +667,7 @@ export default function About() {
           </div>
         </section>
 
-        {/* ── Testimonials (Comments) ── */}
+        {/* ─── TESTIMONIALS ─── */}
         <section
           ref={testimonialsFade.ref}
           className={`py-12 bg-white transition-all duration-700 ${
@@ -747,7 +770,7 @@ export default function About() {
           </div>
         </section>
 
-        {/* ── FAQ ── */}
+        {/* ─── FAQ ─── */}
         <section
           ref={faqFade.ref}
           className={`py-12 bg-gray-50 transition-all duration-700 ${
@@ -755,8 +778,11 @@ export default function About() {
           }`}
         >
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Frequently Asked Questions</h2>
-            <p className="text-center text-gray-500 mb-8">Got questions? We’ve got answers.</p>
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Got Questions?</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">Frequently Asked Questions</h2>
+              <p className="text-gray-500 mt-1">We've got answers to the most common questions.</p>
+            </div>
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               {faqs.map((faq, idx) => (
                 <FaqItem
@@ -771,46 +797,35 @@ export default function About() {
           </div>
         </section>
 
-        {/* ── Careers / Join Us ── */}
-        <section className="py-12 bg-white border-t border-gray-100">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <FiUsers className="w-10 h-10 text-purple-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900">Join Our Team</h2>
-            <p className="text-gray-500 text-sm max-w-2xl mx-auto mt-2">
-              We’re always looking for passionate people to help us build the future of campaign creation.
-              If you’re a developer, designer, or creator, we’d love to hear from you.
-            </p>
-            <Link href="/contact">
-              <span className="inline-flex items-center gap-2 mt-4 px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-full hover:bg-purple-700 transition shadow-sm text-sm">
-                Join Us <FiArrowRight className="w-4 h-4" />
-              </span>
-            </Link>
-          </div>
-        </section>
-
-        {/* ── CTA ── */}
+        {/* ─── CTA ─── */}
         <section
           ref={ctaFade.ref}
-          className={`py-12 bg-gradient-to-r from-purple-600 to-indigo-600 transition-all duration-700 ${
+          className={`py-16 bg-gradient-to-r from-purple-600 to-indigo-600 transition-all duration-700 ${
             ctaFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
             <h2 className="text-3xl font-bold">Ready to Make Your Trend?</h2>
             <p className="mt-2 text-indigo-100 max-w-2xl mx-auto">
-              Join thousands of creators who are already launching successful campaigns with Make Trend.
+              Join 5,000+ creators who are already launching successful campaigns with Make Trend.
             </p>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Link href="/create">
                 <span className="inline-flex items-center gap-2 px-6 py-3 bg-white text-purple-700 font-semibold rounded-full hover:bg-gray-50 transition shadow-lg cursor-pointer text-sm">
                   Get Started Free <FiArrowRight className="w-4 h-4" />
                 </span>
               </Link>
+              <Link href="/templates">
+                <span className="inline-flex items-center gap-2 px-6 py-3 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
+                  Browse Templates
+                </span>
+              </Link>
             </div>
+            <p className="mt-4 text-xs text-indigo-200">🚀 No credit card required. Start for free.</p>
           </div>
         </section>
 
-        {/* ── Footer ── */}
+        {/* ─── FOOTER ─── */}
         <footer className="border-t border-slate-200/60 py-6 px-4 bg-white/50">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <span>© {new Date().getFullYear()} Make Trend. All rights reserved.</span>
