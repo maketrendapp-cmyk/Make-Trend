@@ -34,6 +34,7 @@ const NO_LAYOUT_PAGES = [
 '/templates/pubg-uc-giveaway-v1',
 '/templates/quiz-challenge-win-cash-v1',
 '/templates/spin-win-daraz-discount-v1',
+'/templates/lucky-draw-premium-prizes-v1',
 
   '/tasks',
   '/share',
