@@ -47,8 +47,14 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   if (selectedCategory) activeFilters.category = selectedCategory;
   if (selectedPlatform) activeFilters.platform = selectedPlatform;
 
-  const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters);
-  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters);
+  // Pass initial data from getStaticProps – no fetch on initial load
+const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters, initialTemplates);
+const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters, initialFeaturedTemplates);
+
+// Determine if we have initial data (for loading states)
+const hasInitialData = (initialTemplates && initialTemplates.length > 0) || 
+                       (initialFeaturedTemplates && initialFeaturedTemplates.length > 0);
+const isLoading = (templatesLoading || featuredLoading) && !hasInitialData;
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
@@ -235,9 +241,8 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
-  const isLoading = templatesLoading || featuredLoading;
-
-  if (!isLoading && templates.length === 0) {
+  // Use the new isLoading with initial data check
+if (!isLoading && templates.length === 0) {
     return (
       <>
         <Meta title="No Templates" />
@@ -541,22 +546,22 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
         {/* ── Regular Templates Grid ── */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
-                <div className="w-full aspect-video bg-slate-200" />
-                <div className="p-3 space-y-2">
-                  <div className="h-3 bg-slate-200 rounded w-2/3" />
-                  <div className="h-2.5 bg-slate-200 rounded w-1/2" />
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div className="h-6 bg-slate-200 rounded-lg" />
-                    <div className="h-6 bg-slate-200 rounded-lg" />
-                  </div>
-                </div>
-              </div>
-            ))}
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+    {[1, 2, 3].map((i) => (
+      <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
+        <div className="w-full aspect-video bg-slate-200" />
+        <div className="p-3 space-y-2">
+          <div className="h-3 bg-slate-200 rounded w-2/3" />
+          <div className="h-2.5 bg-slate-200 rounded w-1/2" />
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="h-6 bg-slate-200 rounded-lg" />
+            <div className="h-6 bg-slate-200 rounded-lg" />
           </div>
-        ) : regularTemplates.length === 0 ? (
+        </div>
+      </div>
+    ))}
+  </div>
+) : regularTemplates.length === 0 ? (
           <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm px-4">
             <span className="text-2xl mb-1.5 block">🔍</span>
             <h3 className="text-xs font-bold text-slate-900 mb-0.5">No templates match</h3>

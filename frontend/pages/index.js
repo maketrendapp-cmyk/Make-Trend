@@ -114,8 +114,12 @@ export default function Home({ initialFeaturedTemplates }) {
     queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
   }, [initialFeaturedTemplates, queryClient]);
 
-  // ── React Query data (now from cache, instantly available) ──
-  const { data: featuredTemplates, isLoading: featuredLoading } = useFeaturedTemplates();
+// ── React Query data (uses pre-fetched data from getStaticProps, instantly available) ──
+const { data: featuredTemplates, isLoading: featuredLoading } = useFeaturedTemplates({}, initialFeaturedTemplates);
+
+// Determine if we have initial data (for loading states)
+const hasInitialData = initialFeaturedTemplates && initialFeaturedTemplates.length > 0;
+const isLoading = featuredLoading && !hasInitialData;
 
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
@@ -200,25 +204,26 @@ export default function Home({ initialFeaturedTemplates }) {
   };
 
   // ── Render carousel ──
-  const renderCarousel = () => {
-    if (featuredLoading) {
-      return (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 sm:p-6 animate-pulse">
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-            <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-200 rounded-xl" />
-            <div className="flex-1 space-y-3">
-              <div className="h-6 bg-slate-200 rounded w-3/4" />
-              <div className="h-4 bg-slate-200 rounded w-1/2" />
-              <div className="h-4 bg-slate-200 rounded w-2/3" />
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <div className="h-9 bg-slate-200 rounded-xl" />
-                <div className="h-9 bg-slate-200 rounded-xl" />
-              </div>
+const renderCarousel = () => {
+  // Use isLoading with hasInitialData check – no loading flash!
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 sm:p-6 animate-pulse">
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+          <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-200 rounded-xl" />
+          <div className="flex-1 space-y-3">
+            <div className="h-6 bg-slate-200 rounded w-3/4" />
+            <div className="h-4 bg-slate-200 rounded w-1/2" />
+            <div className="h-4 bg-slate-200 rounded w-2/3" />
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <div className="h-9 bg-slate-200 rounded-xl" />
+              <div className="h-9 bg-slate-200 rounded-xl" />
             </div>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
     if (!featuredTemplates || featuredTemplates.length === 0) {
       return (
