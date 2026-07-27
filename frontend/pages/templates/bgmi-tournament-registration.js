@@ -4,10 +4,10 @@ import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
 
-// ── Default Meta ──
+// ── Default Meta (YOUR DOMAIN) ──
 const defaultMeta = {
   title: 'BGMI Tournament Registration – Join the Battle!',
-  description: 'Register your team for the biggest BGMI tournament. Win ₹100,000 prize pool. Limited slots available. Join now!',
+  description: 'Register your team for the biggest BGMI tournament. Win $100,000 prize pool. Limited slots available. Join now!',
   image: 'https://maketrend.app/og-image.png',
   url: 'https://maketrend.app/bgmi-tournament-registration?id={id}',
 };
@@ -36,27 +36,11 @@ const FAQS = [
   },
 ];
 
-// ── Previous Winners ──
-const PREVIOUS_WINNERS = [
-  { season: 'Season 1', team: 'TEAM ALPHA', prize: '₹50,000' },
-  { season: 'Season 2', team: 'TEAM LEGENDS', prize: '₹50,000' },
-  { season: 'Season 3', team: 'TEAM VENOM', prize: '₹50,000' },
-];
-
-// ── Sponsors ──
-const SPONSORS = [
-  { name: 'Sponsor A', logo: '🏢' },
-  { name: 'Sponsor B', logo: '🏢' },
-  { name: 'Sponsor C', logo: '🏢' },
-  { name: 'Sponsor D', logo: '🏢' },
-];
-
 function BgmiTournamentRegistration({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1);
   const [teamName, setTeamName] = useState('');
   const [captainName, setCaptainName] = useState('');
   const [email, setEmail] = useState('');
@@ -71,8 +55,6 @@ function BgmiTournamentRegistration({ campaign }) {
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState({ days: 2, hours: 14, minutes: 39, seconds: 0 });
-  const [teamsRegistered, setTeamsRegistered] = useState(324);
-  const [slotsLeft, setSlotsLeft] = useState(76);
   const [expandedFaq, setExpandedFaq] = useState(null);
 
   const formRef = useRef(null);
@@ -102,21 +84,6 @@ function BgmiTournamentRegistration({ campaign }) {
       if (remaining === 0) clearInterval(timer);
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  // ── Live stats counter ──
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTeamsRegistered(prev => {
-        const increase = Math.floor(Math.random() * 3) + 1;
-        return Math.min(prev + increase, 400);
-      });
-      setSlotsLeft(prev => {
-        const decrease = Math.floor(Math.random() * 2) + 1;
-        return Math.max(prev - decrease, 0);
-      });
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   // ── Validate ──
@@ -191,10 +158,10 @@ function BgmiTournamentRegistration({ campaign }) {
           <span className="logo-icon">🎯</span>
           <span className="logo-text">BGMI<span>Champions</span></span>
         </div>
-        <div className="header-badge">🔥 Registration Open</div>
+        <div className="header-badge">🔥 Open</div>
       </header>
 
-      {/* ─── HERO SECTION ─── */}
+      {/* ─── HERO ─── */}
       <section className="hero">
         <div className="hero-overlay"></div>
         <div className="hero-content">
@@ -202,8 +169,8 @@ function BgmiTournamentRegistration({ campaign }) {
           <h1>BGMI Champions Cup 2026</h1>
           <p>Register your squad and compete for the ultimate glory.</p>
           <div className="hero-stats">
-            <div><span>💰</span> ₹100,000</div>
-            <div><span>👥</span> Squad • Duo • Solo</div>
+            <div><span>💰</span> $100,000</div>
+            <div><span>👥</span> Squad (4v4)</div>
           </div>
           <button className="hero-cta" onClick={scrollToForm}>
             Register Now →
@@ -235,9 +202,9 @@ function BgmiTournamentRegistration({ campaign }) {
         </div>
       </section>
 
-      {/* ─── TOURNAMENT INFORMATION ─── */}
+      {/* ─── TOURNAMENT INFO ─── */}
       <section className="info-section">
-        <h2 className="section-title">Tournament Information</h2>
+        <h2 className="section-title">Tournament Info</h2>
         <div className="info-grid">
           <div className="info-card">
             <span className="info-icon">📅</span>
@@ -262,31 +229,31 @@ function BgmiTournamentRegistration({ campaign }) {
         </div>
       </section>
 
-      {/* ─── PRIZE POOL ─── */}
+      {/* ─── PRIZE POOL (DOLLAR) ─── */}
       <section className="prize-section">
         <h2 className="section-title">🏆 Prize Pool</h2>
         <div className="prize-grid">
           <div className="prize-card gold">
             <span className="prize-rank">🥇</span>
             <span className="prize-amount">$50,000</span>
-            <span className="prize-label">1st Place</span>
+            <span className="prize-label">1st</span>
           </div>
           <div className="prize-card silver">
             <span className="prize-rank">🥈</span>
             <span className="prize-amount">$30,000</span>
-            <span className="prize-label">2nd Place</span>
+            <span className="prize-label">2nd</span>
           </div>
           <div className="prize-card bronze">
             <span className="prize-rank">🥉</span>
             <span className="prize-amount">$20,000</span>
-            <span className="prize-label">3rd Place</span>
+            <span className="prize-label">3rd</span>
           </div>
         </div>
       </section>
 
-      {/* ─── TOURNAMENT TIMELINE ─── */}
+      {/* ─── TIMELINE ─── */}
       <section className="timeline-section">
-        <h2 className="section-title">Tournament Timeline</h2>
+        <h2 className="section-title">Timeline</h2>
         <div className="timeline">
           <div className="timeline-item">
             <div className="timeline-dot"></div>
@@ -367,7 +334,7 @@ function BgmiTournamentRegistration({ campaign }) {
             </div>
 
             <div className="form-group">
-              <label>Email Address <span className="required">*</span></label>
+              <label>Email <span className="required">*</span></label>
               <input
                 type="email"
                 placeholder="you@example.com"
@@ -377,10 +344,10 @@ function BgmiTournamentRegistration({ campaign }) {
             </div>
 
             <div className="form-group">
-              <label>Phone Number <span className="required">*</span></label>
+              <label>Phone <span className="required">*</span></label>
               <input
                 type="tel"
-                placeholder="e.g. 98XXXXXXXX"
+                placeholder="98XXXXXXXX"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
               />
@@ -464,116 +431,43 @@ function BgmiTournamentRegistration({ campaign }) {
         </div>
       </section>
 
-      {/* ─── LIVE STATISTICS ─── */}
-      <section className="stats-section">
-        <h2 className="section-title">📊 Live Statistics</h2>
-        <div className="stats-grid">
-          <div className="stat-card">
-            <span className="stat-icon">👥</span>
-            <span className="stat-value">{teamsRegistered.toLocaleString()}</span>
-            <span className="stat-label">Teams Registered</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-icon">🔥</span>
-            <span className="stat-value">{slotsLeft}</span>
-            <span className="stat-label">Slots Left</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-icon">🏆</span>
-            <span className="stat-value">₹100K</span>
-            <span className="stat-label">Prize Pool</span>
-          </div>
-        </div>
-      </section>
-
       {/* ─── RULES ─── */}
       <section className="rules-section">
-        <h2 className="section-title">📜 Tournament Rules</h2>
+        <h2 className="section-title">📜 Rules</h2>
         <div className="rules-grid">
-          <div className="rule-card">
-            <span className="rule-icon">❌</span>
-            <h3>No Emulator</h3>
-          </div>
-          <div className="rule-card">
-            <span className="rule-icon">🚫</span>
-            <h3>No Hacks</h3>
-          </div>
-          <div className="rule-card">
-            <span className="rule-icon">📱</span>
-            <h3>Mobile Only</h3>
-          </div>
-          <div className="rule-card">
-            <span className="rule-icon">🎮</span>
-            <h3>Official Rules</h3>
-          </div>
-          <div className="rule-card">
-            <span className="rule-icon">⏰</span>
-            <h3>Join 15 Min Early</h3>
-          </div>
-          <div className="rule-card">
-            <span className="rule-icon">📢</span>
-            <h3>Voice Chat Required</h3>
-          </div>
+          <div className="rule-card"><span className="rule-icon">❌</span><h3>No Emulator</h3></div>
+          <div className="rule-card"><span className="rule-icon">🚫</span><h3>No Hacks</h3></div>
+          <div className="rule-card"><span className="rule-icon">📱</span><h3>Mobile Only</h3></div>
+          <div className="rule-card"><span className="rule-icon">🎮</span><h3>Official Rules</h3></div>
+          <div className="rule-card"><span className="rule-icon">⏰</span><h3>Join 15 Min Early</h3></div>
+          <div className="rule-card"><span className="rule-icon">📢</span><h3>Voice Chat</h3></div>
         </div>
       </section>
 
-      {/* ─── FEATURED REWARDS (REAL IMAGES) ─── */}
+      {/* ─── FEATURED REWARDS (YOUR ORIGINAL IMAGES) ─── */}
       <section className="rewards-section">
-        <h2 className="section-title">🎁 Featured Rewards</h2>
+        <h2 className="section-title">🎁 Rewards</h2>
         <div className="rewards-grid">
           <div className="reward-card">
             <img src="https://mms.businesswire.com/media/20210111005169/en/851040/5/hx-press-image-all-products-1000x611.jpg?download=1" alt="Gaming Items" />
             <h3>Gaming Items</h3>
-            <p>For Teammates</p>
           </div>
           <div className="reward-card">
-            <img src="https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=150&h=150&fit=crop&auto=format" alt="Trophy" />
+            <img src="https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=150&h=150&fit=crop&auto=format" alt="Gaming Laptop" />
             <h3>Gaming Laptop</h3>
-            <p>Laptop</p>
           </div>
           <div className="reward-card">
-            <img src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100&h=100&fit=crop&auto=format" alt="Gaming Phone" />
+            <img src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100&h=100&fit=crop&auto=format" alt="iPhone 15 Pro" />
             <h3>iPhone 15 Pro</h3>
-            <p>For MVPs</p>
           </div>
           <div className="reward-card">
             <img src="https://i.ytimg.com/vi/BYWx-2t3jxc/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLCD0hr9ZuRvK2zfzN6KwR0tpizEAw" alt="Mix Pro" />
             <h3>Mix Pro</h3>
-            <p>Free</p>
           </div>
           <div className="reward-card">
             <img src="https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=100&h=100&fit=crop&auto=format" alt="Keyboard" />
             <h3>Gaming Keyboard</h3>
-            <p>Mechanical</p>
           </div>
-        </div>
-      </section>
-
-      {/* ─── PREVIOUS WINNERS ─── */}
-      <section className="winners-section">
-        <h2 className="section-title">🏅 Previous Winners</h2>
-        <div className="winners-grid">
-          {PREVIOUS_WINNERS.map((winner, idx) => (
-            <div key={idx} className="winner-card">
-              <span className="winner-icon">🏆</span>
-              <h3>{winner.season}</h3>
-              <p className="winner-team">{winner.team}</p>
-              <span className="winner-prize">{winner.prize}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── SPONSORS ─── */}
-      <section className="sponsors-section">
-        <h2 className="section-title">🤝 Our Sponsors</h2>
-        <div className="sponsors-grid">
-          {SPONSORS.map((sponsor, idx) => (
-            <div key={idx} className="sponsor-card">
-              <span className="sponsor-logo">{sponsor.logo}</span>
-              <span className="sponsor-name">{sponsor.name}</span>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -630,14 +524,14 @@ function BgmiTournamentRegistration({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── STYLES (COMPACT) ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', system-ui, sans-serif;
           background: #0A0F1E;
-          color: #FFFFFF;
-          line-height: 1.5;
+          color: #fff;
+          line-height: 1.4;
         }
         .page-wrapper {
           max-width: 100%;
@@ -645,46 +539,43 @@ function BgmiTournamentRegistration({ campaign }) {
           background: #0A0F1E;
         }
 
-        /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
           background: rgba(10, 15, 30, 0.95);
           backdrop-filter: blur(16px);
           border-bottom: 1px solid rgba(245, 158, 11, 0.15);
-          padding: 0.5rem 1.5rem;
+          padding: 0.4rem 1rem;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
         .logo {
-          display: flex; align-items: center; gap: 0.5rem;
-          font-weight: 800; font-size: 1.1rem;
+          display: flex; align-items: center; gap: 0.4rem;
+          font-weight: 800; font-size: 1rem;
         }
-        .logo-icon { font-size: 1.4rem; }
+        .logo-icon { font-size: 1.2rem; }
         .logo-text { color: #fff; }
         .logo-text span { color: #F59E0B; }
         .header-badge {
           background: linear-gradient(135deg, #F59E0B, #D97706);
           color: #0A0F1E;
           font-weight: 700;
-          font-size: 0.6rem;
-          padding: 0.2rem 1rem;
+          font-size: 0.55rem;
+          padding: 0.15rem 0.7rem;
           border-radius: 40px;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.3px;
         }
 
-        /* ── Hero ── */
         .hero {
           position: relative;
-          min-height: 60vh;
+          min-height: 55vh;
           display: flex;
           align-items: center;
           justify-content: center;
           text-align: center;
-          padding: 2rem 1.5rem;
-          background: radial-gradient(ellipse at 50% 30%, rgba(245,158,11,0.08) 0%, transparent 70%),
-                      #0A0F1E;
+          padding: 1.5rem 1rem;
+          background: radial-gradient(ellipse at 50% 30%, rgba(245,158,11,0.08) 0%, transparent 70%), #0A0F1E;
           overflow: hidden;
         }
         .hero-overlay {
@@ -699,44 +590,44 @@ function BgmiTournamentRegistration({ campaign }) {
           display: inline-block;
           background: rgba(245, 158, 11, 0.12);
           border: 1px solid rgba(245, 158, 11, 0.25);
-          padding: 0.2rem 1.2rem;
+          padding: 0.15rem 1rem;
           border-radius: 40px;
-          font-size: 0.6rem;
+          font-size: 0.55rem;
           text-transform: uppercase;
           font-weight: 700;
           color: #F59E0B;
-          margin-bottom: 0.5rem;
-          letter-spacing: 1px;
+          margin-bottom: 0.3rem;
+          letter-spacing: 0.5px;
         }
         .hero h1 {
-          font-size: clamp(2rem, 6vw, 3.2rem);
+          font-size: clamp(1.8rem, 5vw, 2.8rem);
           font-weight: 900;
           line-height: 1.1;
-          margin-bottom: 0.3rem;
+          margin-bottom: 0.2rem;
           background: linear-gradient(135deg, #fff 30%, #F59E0B 70%, #D97706 100%);
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
         }
         .hero p {
-          font-size: 0.95rem;
+          font-size: 0.85rem;
           color: #aaa;
-          margin-bottom: 1.2rem;
+          margin-bottom: 0.8rem;
         }
         .hero-stats {
           display: flex;
           justify-content: center;
-          gap: 1.5rem;
+          gap: 1rem;
           flex-wrap: wrap;
-          margin-bottom: 1.2rem;
+          margin-bottom: 0.8rem;
         }
         .hero-stats div {
           background: rgba(255,255,255,0.04);
-          padding: 0.3rem 1rem;
+          padding: 0.2rem 0.8rem;
           border-radius: 40px;
           border: 1px solid rgba(255,255,255,0.05);
           font-weight: 600;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
         }
         .hero-stats span { margin-right: 4px; }
 
@@ -744,167 +635,155 @@ function BgmiTournamentRegistration({ campaign }) {
           display: inline-block;
           background: linear-gradient(135deg, #F59E0B, #D97706);
           border: none;
-          padding: 0.6rem 2rem;
+          padding: 0.5rem 1.6rem;
           border-radius: 60px;
           font-weight: 800;
-          font-size: 0.95rem;
+          font-size: 0.85rem;
           color: #0A0F1E;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25);
-          margin-bottom: 1.2rem;
+          transition: transform 0.2s;
+          box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2);
+          margin-bottom: 0.8rem;
         }
-        .hero-cta:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 28px rgba(245, 158, 11, 0.35);
-        }
+        .hero-cta:hover { transform: translateY(-2px); }
 
         .countdown {
           background: rgba(255,255,255,0.04);
-          border-radius: 16px;
-          padding: 0.8rem 1.2rem;
+          border-radius: 12px;
+          padding: 0.6rem 1rem;
           border: 1px solid rgba(255,255,255,0.06);
         }
         .countdown-label {
           display: block;
-          font-size: 0.65rem;
+          font-size: 0.6rem;
           color: #888;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          margin-bottom: 0.3rem;
+          margin-bottom: 0.2rem;
         }
         .countdown-numbers {
           display: flex;
           justify-content: center;
           align-items: center;
-          gap: 0.3rem;
+          gap: 0.2rem;
         }
         .countdown-item {
           display: flex;
           flex-direction: column;
           align-items: center;
-          min-width: 40px;
+          min-width: 35px;
         }
         .cd-value {
-          font-size: 1.6rem;
+          font-size: 1.4rem;
           font-weight: 900;
           color: #F59E0B;
           line-height: 1;
           font-family: 'Courier New', monospace;
         }
         .cd-label {
-          font-size: 0.5rem;
+          font-size: 0.45rem;
           color: #888;
           text-transform: uppercase;
-          margin-top: 0.05rem;
         }
         .cd-separator {
-          font-size: 1.4rem;
+          font-size: 1.2rem;
           font-weight: 900;
           color: #555;
-          padding: 0 0.1rem;
+          padding: 0 0.05rem;
         }
 
-        /* ── Sections ── */
         section {
-          padding: 2rem 1.5rem;
-          max-width: 1000px;
+          padding: 1.5rem 1rem;
+          max-width: 900px;
           margin: 0 auto;
         }
         .section-title {
-          font-size: 1.5rem;
+          font-size: 1.2rem;
           font-weight: 800;
           text-align: center;
-          margin-bottom: 1.5rem;
+          margin-bottom: 1rem;
           color: #fff;
         }
         .section-title::after {
           content: '';
           display: block;
-          width: 50px;
+          width: 40px;
           height: 3px;
           background: linear-gradient(90deg, #F59E0B, #D97706);
-          margin: 0.4rem auto 0;
+          margin: 0.3rem auto 0;
           border-radius: 4px;
         }
 
-        /* ── Tournament Info ── */
         .info-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 1rem;
+          gap: 0.6rem;
         }
         .info-card {
           background: rgba(255,255,255,0.04);
-          border-radius: 16px;
-          padding: 1rem;
+          border-radius: 12px;
+          padding: 0.6rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.06);
-          transition: transform 0.3s;
         }
-        .info-card:hover { transform: translateY(-3px); }
-        .info-icon { font-size: 1.8rem; display: block; margin-bottom: 0.2rem; }
+        .info-icon { font-size: 1.4rem; display: block; margin-bottom: 0.1rem; }
         .info-card h3 {
-          font-size: 0.65rem;
+          font-size: 0.55rem;
           font-weight: 600;
           color: #888;
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
         .info-value {
-          font-size: 0.9rem;
+          font-size: 0.8rem;
           font-weight: 700;
           color: #fff;
-          margin-top: 0.1rem;
         }
         .info-value.highlight { color: #F59E0B; }
 
-        /* ── Prize Pool ── */
         .prize-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
+          gap: 0.6rem;
         }
         .prize-card {
           background: rgba(255,255,255,0.04);
-          border-radius: 18px;
-          padding: 1.2rem 1rem;
+          border-radius: 14px;
+          padding: 0.8rem 0.5rem;
           text-align: center;
           border: 2px solid rgba(255,255,255,0.06);
-          transition: transform 0.3s;
+          transition: transform 0.2s;
         }
-        .prize-card:hover { transform: translateY(-4px); }
+        .prize-card:hover { transform: translateY(-3px); }
         .prize-card.gold { border-color: #F59E0B; }
         .prize-card.silver { border-color: #9CA3AF; }
         .prize-card.bronze { border-color: #CD7F32; }
-        .prize-rank { font-size: 2rem; display: block; }
+        .prize-rank { font-size: 1.6rem; display: block; }
         .prize-amount {
           display: block;
-          font-size: 1.3rem;
+          font-size: 1.1rem;
           font-weight: 900;
           color: #F59E0B;
         }
         .prize-label {
           display: block;
-          font-size: 0.7rem;
+          font-size: 0.6rem;
           color: #888;
-          margin-top: 0.1rem;
         }
 
-        /* ── Timeline ── */
         .timeline {
           display: flex;
           flex-direction: column;
           gap: 0;
-          max-width: 500px;
+          max-width: 450px;
           margin: 0 auto;
           position: relative;
-          padding-left: 1.5rem;
+          padding-left: 1.2rem;
         }
         .timeline::before {
           content: '';
           position: absolute;
-          left: 5px;
+          left: 4px;
           top: 0;
           bottom: 0;
           width: 2px;
@@ -912,79 +791,66 @@ function BgmiTournamentRegistration({ campaign }) {
         }
         .timeline-item {
           display: flex;
-          gap: 0.8rem;
-          position: relative;
-          padding: 0.5rem 0;
+          gap: 0.6rem;
+          padding: 0.3rem 0;
         }
         .timeline-dot {
-          width: 10px;
-          height: 10px;
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
           background: #F59E0B;
           border: 2px solid #0A0F1E;
-          box-shadow: 0 0 16px rgba(245,158,11,0.3);
+          box-shadow: 0 0 12px rgba(245,158,11,0.3);
           flex-shrink: 0;
           margin-top: 0.2rem;
         }
         .timeline-content h3 {
-          font-size: 0.9rem;
+          font-size: 0.8rem;
           font-weight: 700;
           color: #fff;
         }
         .timeline-content p {
-          font-size: 0.75rem;
+          font-size: 0.65rem;
           color: #888;
         }
 
-        /* ── Form ── */
         .form-card {
           background: rgba(255,255,255,0.04);
-          border-radius: 24px;
-          padding: 1.8rem 1.5rem;
+          border-radius: 20px;
+          padding: 1.2rem 1rem;
           border: 1px solid rgba(255,255,255,0.06);
-          max-width: 720px;
+          max-width: 650px;
           margin: 0 auto;
         }
-        .form-header {
-          text-align: center;
-          margin-bottom: 1.2rem;
-        }
-        .form-header h3 {
-          font-size: 1.3rem;
-          font-weight: 800;
-          color: #fff;
-        }
-        .form-header p {
-          color: #888;
-          font-size: 0.85rem;
-        }
+        .form-header { text-align: center; margin-bottom: 0.8rem; }
+        .form-header h3 { font-size: 1.1rem; font-weight: 800; color: #fff; }
+        .form-header p { color: #888; font-size: 0.75rem; }
 
         .form-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 0.8rem;
+          gap: 0.5rem;
         }
         .full-width { grid-column: span 2; }
         .form-group { margin-bottom: 0.1rem; }
         .form-group label {
           display: block;
           font-weight: 600;
-          font-size: 0.7rem;
+          font-size: 0.6rem;
           color: #ccc;
-          margin-bottom: 0.1rem;
+          margin-bottom: 0.05rem;
         }
         .form-group .required { color: #EF4444; }
-        .form-group .optional { color: #666; font-weight: 400; font-size: 0.65rem; }
+        .form-group .optional { color: #666; font-weight: 400; font-size: 0.55rem; }
         .form-group input {
           width: 100%;
-          padding: 0.5rem 0.8rem;
+          padding: 0.4rem 0.6rem;
           border: 2px solid rgba(255,255,255,0.06);
-          border-radius: 10px;
-          font-size: 0.8rem;
+          border-radius: 8px;
+          font-size: 0.75rem;
           background: rgba(255,255,255,0.03);
           color: #fff;
           outline: none;
-          font-family: inherit;
         }
         .form-group input::placeholder { color: #555; }
         .form-group input:focus {
@@ -993,71 +859,60 @@ function BgmiTournamentRegistration({ campaign }) {
         }
 
         .player-section {
-          margin: 1rem 0 0.5rem;
-          padding-top: 1rem;
+          margin: 0.6rem 0 0.3rem;
+          padding-top: 0.6rem;
           border-top: 1px solid rgba(255,255,255,0.06);
         }
-        .player-section h3 {
-          font-size: 0.95rem;
-          font-weight: 700;
-          color: #fff;
-        }
-        .player-sub {
-          font-size: 0.7rem;
-          color: #666;
-          margin-bottom: 0.5rem;
-        }
+        .player-section h3 { font-size: 0.85rem; font-weight: 700; color: #fff; }
+        .player-sub { font-size: 0.6rem; color: #666; margin-bottom: 0.3rem; }
         .player-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 0.8rem;
+          gap: 0.5rem;
         }
 
         .checkbox-group {
           display: flex;
           align-items: flex-start;
-          gap: 8px;
-          margin: 0.8rem 0;
+          gap: 6px;
+          margin: 0.6rem 0;
         }
         .checkbox-group input {
-          width: 16px; height: 16px;
+          width: 14px; height: 14px;
           margin-top: 2px;
           accent-color: #F59E0B;
           flex-shrink: 0;
         }
         .checkbox-group label {
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           color: #aaa;
         }
         .checkbox-group label a { color: #F59E0B; text-decoration: none; }
         .form-error {
           color: #EF4444;
-          font-size: 0.75rem;
-          margin: 0.3rem 0;
+          font-size: 0.7rem;
+          margin: 0.2rem 0;
         }
 
         .register-btn {
           width: 100%;
-          padding: 0.7rem;
+          padding: 0.6rem;
           background: linear-gradient(135deg, #F59E0B, #D97706);
           border: none;
           border-radius: 50px;
           font-weight: 800;
-          font-size: 0.95rem;
+          font-size: 0.85rem;
           color: #0A0F1E;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2);
+          transition: transform 0.2s;
+          box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
           letter-spacing: 0.5px;
         }
-        .register-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 24px rgba(245, 158, 11, 0.3);
-        }
+        .register-btn:hover:not(:disabled) { transform: translateY(-2px); }
         .register-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .spinner {
           display: inline-block;
-          width: 16px; height: 16px;
+          width: 14px; height: 14px;
           border: 2px solid rgba(10,15,30,0.2);
           border-top-color: #0A0F1E;
           border-radius: 50%;
@@ -1065,160 +920,74 @@ function BgmiTournamentRegistration({ campaign }) {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── Live Stats ── */
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-        }
-        .stat-card {
-          background: rgba(255,255,255,0.04);
-          border-radius: 16px;
-          padding: 1.2rem 1rem;
-          text-align: center;
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        .stat-icon { font-size: 1.8rem; display: block; margin-bottom: 0.2rem; }
-        .stat-value {
-          display: block;
-          font-size: 1.6rem;
-          font-weight: 900;
-          color: #F59E0B;
-        }
-        .stat-label {
-          display: block;
-          font-size: 0.7rem;
-          color: #888;
-        }
-
-        /* ── Rules ── */
         .rules-grid {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
-          gap: 0.8rem;
+          gap: 0.5rem;
         }
         .rule-card {
           background: rgba(255,255,255,0.04);
-          border-radius: 14px;
-          padding: 0.8rem 0.5rem;
+          border-radius: 10px;
+          padding: 0.5rem 0.3rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.06);
         }
-        .rule-icon { font-size: 1.6rem; display: block; margin-bottom: 0.2rem; }
+        .rule-icon { font-size: 1.2rem; display: block; margin-bottom: 0.1rem; }
         .rule-card h3 {
-          font-size: 0.6rem;
+          font-size: 0.5rem;
           font-weight: 700;
           color: #fff;
           line-height: 1.2;
         }
 
-        /* ── Rewards ── */
         .rewards-grid {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
-          gap: 0.8rem;
+          gap: 0.5rem;
         }
         .reward-card {
           background: rgba(255,255,255,0.04);
-          border-radius: 14px;
-          padding: 0.8rem 0.5rem;
+          border-radius: 10px;
+          padding: 0.5rem 0.3rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.06);
-          transition: transform 0.3s;
+          transition: transform 0.2s;
         }
-        .reward-card:hover { transform: translateY(-4px); }
+        .reward-card:hover { transform: translateY(-3px); }
         .reward-card img {
-          width: 50px;
-          height: 50px;
+          width: 40px;
+          height: 40px;
           object-fit: cover;
-          border-radius: 10px;
-          margin-bottom: 0.3rem;
+          border-radius: 8px;
+          margin-bottom: 0.2rem;
         }
         .reward-card h3 {
-          font-size: 0.7rem;
-          font-weight: 700;
-          color: #fff;
-        }
-        .reward-card p {
           font-size: 0.6rem;
-          color: #888;
-        }
-
-        /* ── Winners ── */
-        .winners-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-        }
-        .winner-card {
-          background: rgba(255,255,255,0.04);
-          border-radius: 16px;
-          padding: 1rem;
-          text-align: center;
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        .winner-icon { font-size: 2rem; display: block; margin-bottom: 0.2rem; }
-        .winner-card h3 {
-          font-size: 0.7rem;
-          font-weight: 600;
-          color: #888;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-        }
-        .winner-team {
-          font-size: 1rem;
-          font-weight: 800;
+          font-weight: 700;
           color: #fff;
         }
-        .winner-prize {
-          display: inline-block;
-          font-size: 0.7rem;
-          color: #F59E0B;
-          font-weight: 700;
-        }
 
-        /* ── Sponsors ── */
-        .sponsors-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 1rem;
-        }
-        .sponsor-card {
-          background: rgba(255,255,255,0.04);
-          border-radius: 14px;
-          padding: 1rem;
-          text-align: center;
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        .sponsor-logo { font-size: 2rem; display: block; margin-bottom: 0.2rem; }
-        .sponsor-name {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: #888;
-        }
-
-        /* ── FAQ ── */
         .faq-list {
-          max-width: 700px;
+          max-width: 650px;
           margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.4rem;
         }
         .faq-item {
           background: rgba(255,255,255,0.04);
-          border-radius: 12px;
+          border-radius: 10px;
           border: 1px solid rgba(255,255,255,0.06);
           overflow: hidden;
         }
         .faq-item.expanded { border-color: rgba(245, 158, 11, 0.3); }
         .faq-question {
           width: 100%;
-          padding: 0.7rem 1rem;
+          padding: 0.5rem 0.8rem;
           background: transparent;
           border: none;
           color: #fff;
-          font-size: 0.85rem;
+          font-size: 0.75rem;
           font-weight: 600;
           display: flex;
           justify-content: space-between;
@@ -1229,77 +998,75 @@ function BgmiTournamentRegistration({ campaign }) {
         }
         .faq-question:hover { color: #F59E0B; }
         .faq-icon {
-          font-size: 1.2rem;
+          font-size: 1rem;
           color: #F59E0B;
           font-weight: 300;
           flex-shrink: 0;
-          margin-left: 0.8rem;
+          margin-left: 0.6rem;
         }
         .faq-answer {
-          padding: 0 1rem 0.8rem;
+          padding: 0 0.8rem 0.6rem;
           color: #aaa;
-          font-size: 0.8rem;
+          font-size: 0.7rem;
           animation: fadeIn 0.3s ease;
         }
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-6px); }
+          from { opacity: 0; transform: translateY(-4px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Footer ── */
         .site-footer {
           background: rgba(0,0,0,0.3);
           color: #555;
-          padding: 1.5rem 1.5rem;
+          padding: 1.2rem 1rem;
           border-top: 1px solid rgba(255,255,255,0.03);
-          margin-top: 1rem;
+          margin-top: 0.5rem;
         }
         .footer-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 1.5rem;
-          max-width: 1000px;
+          gap: 1rem;
+          max-width: 900px;
           margin: 0 auto;
         }
         .footer-section h3 {
-          font-size: 0.8rem;
+          font-size: 0.7rem;
           font-weight: 700;
           color: #fff;
-          margin-bottom: 0.3rem;
+          margin-bottom: 0.2rem;
         }
         .footer-section p {
-          font-size: 0.75rem;
+          font-size: 0.65rem;
           color: #888;
         }
         .footer-section a {
           display: block;
           color: #888;
           text-decoration: none;
-          font-size: 0.75rem;
-          padding: 0.15rem 0;
+          font-size: 0.65rem;
+          padding: 0.1rem 0;
           transition: color 0.2s;
         }
         .footer-section a:hover { color: #F59E0B; }
         .social-links {
           display: flex;
-          gap: 0.8rem;
-          font-size: 1.4rem;
+          gap: 0.6rem;
+          font-size: 1.2rem;
         }
         .social-links a { color: #888; text-decoration: none; transition: color 0.2s; }
         .social-links a:hover { color: #F59E0B; }
         .footer-bottom {
           text-align: center;
-          padding-top: 1rem;
-          margin-top: 1rem;
+          padding-top: 0.8rem;
+          margin-top: 0.8rem;
           border-top: 1px solid rgba(255,255,255,0.04);
-          font-size: 0.7rem;
+          font-size: 0.6rem;
           color: #555;
-          max-width: 1000px;
+          max-width: 900px;
           margin-left: auto;
           margin-right: auto;
         }
 
-        /* ── WebView Modal ── */
         .modal-overlay {
           position: fixed;
           top: 0; left: 0; width: 100%; height: 100%;
@@ -1312,43 +1079,34 @@ function BgmiTournamentRegistration({ campaign }) {
         }
         .modal-card {
           background: #1a1c22;
-          border-radius: 32px;
-          padding: 2rem 1.5rem;
-          max-width: 380px;
+          border-radius: 28px;
+          padding: 1.8rem 1.5rem;
+          max-width: 350px;
           width: 90%;
           text-align: center;
           border: 1px solid rgba(245, 158, 11, 0.15);
         }
-        .modal-icon { font-size: 2.8rem; margin-bottom: 0.3rem; }
-        .modal-card h2 {
-          font-size: 1.3rem;
-          font-weight: 800;
-          color: #fff;
-          margin-bottom: 0.3rem;
-        }
-        .modal-card p {
-          color: #aaa;
-          font-size: 0.85rem;
-          margin-bottom: 1.2rem;
-        }
+        .modal-icon { font-size: 2.4rem; margin-bottom: 0.2rem; }
+        .modal-card h2 { font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 0.2rem; }
+        .modal-card p { color: #aaa; font-size: 0.8rem; margin-bottom: 1rem; }
         .modal-actions {
           display: flex;
-          gap: 10px;
+          gap: 8px;
           flex-wrap: wrap;
           justify-content: center;
         }
         .modal-btn {
           background: rgba(255,255,255,0.06);
           border: 1px solid rgba(255,255,255,0.08);
-          padding: 0.5rem 1.2rem;
+          padding: 0.4rem 1rem;
           border-radius: 40px;
           font-weight: 600;
-          font-size: 0.8rem;
+          font-size: 0.7rem;
           color: #fff;
           cursor: pointer;
           transition: 0.2s;
           flex: 1;
-          min-width: 100px;
+          min-width: 80px;
         }
         .modal-btn:hover { background: rgba(255,255,255,0.1); }
         .modal-btn.primary {
@@ -1361,41 +1119,34 @@ function BgmiTournamentRegistration({ campaign }) {
           background: transparent;
           border: none;
           color: #666;
-          font-size: 0.7rem;
-          margin-top: 0.3rem;
+          font-size: 0.65rem;
+          margin-top: 0.2rem;
         }
         .modal-btn.ghost:hover { color: #fff; }
 
-        /* ── Responsive ── */
         @media (max-width: 768px) {
           .info-grid { grid-template-columns: 1fr 1fr; }
           .prize-grid { grid-template-columns: 1fr; }
-          .stats-grid { grid-template-columns: 1fr 1fr; }
           .rules-grid { grid-template-columns: repeat(3, 1fr); }
           .rewards-grid { grid-template-columns: repeat(3, 1fr); }
-          .winners-grid { grid-template-columns: 1fr; }
-          .sponsors-grid { grid-template-columns: 1fr 1fr; }
           .footer-grid { grid-template-columns: 1fr 1fr; }
           .form-grid { grid-template-columns: 1fr; }
           .full-width { grid-column: span 1; }
           .player-grid { grid-template-columns: 1fr; }
           .hero h1 { font-size: 2rem; }
           .cd-value { font-size: 1.4rem; }
-          .countdown-item { min-width: 35px; }
         }
         @media (max-width: 480px) {
-          .header-badge { font-size: 0.5rem; padding: 0.15rem 0.6rem; }
+          .header-badge { font-size: 0.5rem; padding: 0.1rem 0.5rem; }
           .info-grid { grid-template-columns: 1fr 1fr; }
           .rules-grid { grid-template-columns: repeat(2, 1fr); }
           .rewards-grid { grid-template-columns: repeat(2, 1fr); }
-          .sponsors-grid { grid-template-columns: 1fr 1fr; }
           .footer-grid { grid-template-columns: 1fr; }
           .cd-value { font-size: 1.2rem; }
           .countdown-item { min-width: 30px; }
           .hero h1 { font-size: 1.6rem; }
-          .form-card { padding: 1.2rem; }
-          .section-title { font-size: 1.2rem; }
-          .stats-grid { grid-template-columns: 1fr; }
+          .form-card { padding: 1rem; }
+          .section-title { font-size: 1rem; }
         }
       `}} />
     </div>
