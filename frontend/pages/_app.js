@@ -33,6 +33,7 @@ const NO_LAYOUT_PAGES = [
   '/ncell-reward-v1',
 '/templates/pubg-uc-giveaway-v1',
 '/templates/quiz-challenge-win-cash-v1',
+'/templates/spin-win-daraz-discount-v1',
 
   '/tasks',
   '/share',
