@@ -1,0 +1,1542 @@
+// pages/templates/bgmi-tournament-registration.js
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
+import { withCampaignMeta } from '../../lib/withCampaignMeta';
+import { fetchCampaign } from '../../lib/fetchCampaign';
+
+// ── Default Meta ──
+const defaultMeta = {
+  title: 'BGMI Tournament Registration – Join the Battle!',
+  description: 'Register your team for the biggest BGMI tournament. Win ₹100,000 prize pool. Limited slots available. Join now!',
+  image: 'https://maketrend.app/og-image.png',
+  url: 'https://maketrend.app/bgmi-tournament-registration?id={id}',
+};
+
+// ── FAQ Data ──
+const FAQS = [
+  {
+    q: 'How do I join the tournament?',
+    a: 'Simply register your team using the form above. You will receive a confirmation email with further details.',
+  },
+  {
+    q: 'How are room IDs shared?',
+    a: 'Room IDs and passwords will be sent via email and Discord 30 minutes before the match starts.',
+  },
+  {
+    q: 'Can I change players after registration?',
+    a: 'Player changes are allowed up to 24 hours before the tournament starts. Contact support for changes.',
+  },
+  {
+    q: 'Is the entry fee refundable?',
+    a: 'Entry fees are non-refundable unless the tournament is cancelled by the organizers.',
+  },
+  {
+    q: 'What happens if I disconnect during a match?',
+    a: 'In case of disconnection, players can rejoin the room. No rematches will be provided for disconnections.',
+  },
+];
+
+// ── Previous Winners ──
+const PREVIOUS_WINNERS = [
+  { season: 'Season 1', team: 'TEAM ALPHA', prize: '₹50,000' },
+  { season: 'Season 2', team: 'TEAM LEGENDS', prize: '₹50,000' },
+  { season: 'Season 3', team: 'TEAM VENOM', prize: '₹50,000' },
+];
+
+// ── Sponsors ──
+const SPONSORS = [
+  { name: 'Sponsor A', logo: '🏢' },
+  { name: 'Sponsor B', logo: '🏢' },
+  { name: 'Sponsor C', logo: '🏢' },
+  { name: 'Sponsor D', logo: '🏢' },
+];
+
+function BgmiTournamentRegistration({ campaign }) {
+  const router = useRouter();
+  const { id } = router.query;
+
+  // ── State ──
+  const [step, setStep] = useState(1);
+  const [teamName, setTeamName] = useState('');
+  const [captainName, setCaptainName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [player1Id, setPlayer1Id] = useState('');
+  const [player2Id, setPlayer2Id] = useState('');
+  const [player3Id, setPlayer3Id] = useState('');
+  const [player4Id, setPlayer4Id] = useState('');
+  const [discord, setDiscord] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showWebViewModal, setShowWebViewModal] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState({ days: 2, hours: 14, minutes: 39, seconds: 0 });
+  const [teamsRegistered, setTeamsRegistered] = useState(324);
+  const [slotsLeft, setSlotsLeft] = useState(76);
+  const [expandedFaq, setExpandedFaq] = useState(null);
+  const [isVisible, setIsVisible] = useState({});
+
+  const formRef = useRef(null);
+
+  // ── WebView detection ──
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
+                      (window.navigator.standalone === false) ||
+                      (typeof window.ReactNativeWebView !== 'undefined') ||
+                      (navigator.userAgent.indexOf('wv') > -1);
+    if (isWebView) setShowWebViewModal(true);
+  }, []);
+
+  // ── Countdown timer ──
+  useEffect(() => {
+    const startTime = Date.now();
+    const duration = 2 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000 + 39 * 60 * 1000;
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, duration - elapsed);
+      const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+      setTimeRemaining({ days, hours, minutes, seconds });
+      if (remaining === 0) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ── Live stats counter ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTeamsRegistered(prev => {
+        const increase = Math.floor(Math.random() * 3) + 1;
+        return Math.min(prev + increase, 400);
+      });
+      setSlotsLeft(prev => {
+        const decrease = Math.floor(Math.random() * 2) + 1;
+        return Math.max(prev - decrease, 0);
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Intersection Observer for scroll animations ──
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            setIsVisible(prev => ({ ...prev, [entry.target.id]: true }));
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    document.querySelectorAll('.animate-on-scroll').forEach(el => {
+      observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // ── Validate ──
+  const validate = () => {
+    if (!teamName.trim()) return 'Please enter your team name.';
+    if (!captainName.trim()) return 'Please enter the captain\'s name.';
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) return 'Please enter a valid email address.';
+    if (!phone.trim() || !/^\d{10}$/.test(phone.replace(/\s/g, ''))) return 'Please enter a valid 10-digit phone number.';
+    if (!player1Id.trim() || !/^\d{9,12}$/.test(player1Id)) return 'Please enter a valid Player 1 UID (9-12 digits).';
+    if (!player2Id.trim() || !/^\d{9,12}$/.test(player2Id)) return 'Please enter a valid Player 2 UID (9-12 digits).';
+    if (!player3Id.trim() || !/^\d{9,12}$/.test(player3Id)) return 'Please enter a valid Player 3 UID (9-12 digits).';
+    if (!player4Id.trim() || !/^\d{9,12}$/.test(player4Id)) return 'Please enter a valid Player 4 UID (9-12 digits).';
+    if (!acceptedTerms) return 'You must accept the terms and conditions.';
+    return null;
+  };
+
+  // ── Submit ──
+  const handleSubmit = () => {
+    const err = validate();
+    if (err) {
+      setError(err);
+      return;
+    }
+    setError('');
+    setLoading(true);
+
+    setTimeout(() => {
+      setLoading(false);
+      if (!id) {
+        router.push('/create');
+      } else {
+        router.push(`/tasks?id=${id}`);
+      }
+    }, 2000);
+  };
+
+  // ── Toggle FAQ ──
+  const toggleFaq = (index) => {
+    setExpandedFaq(expandedFaq === index ? null : index);
+  };
+
+  // ── Scroll to form ──
+  const scrollToForm = () => {
+    formRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // ── WebView Modal ──
+  if (showWebViewModal) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-card">
+          <div className="modal-icon">🌐</div>
+          <h2>Open in Browser</h2>
+          <p>For the best experience, open this page in your default browser.</p>
+          <div className="modal-actions">
+            <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
+            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_system'); } }}>🚀 Open in Browser</button>
+          </div>
+          <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main UI ──
+  return (
+    <div className="page-wrapper">
+
+      {/* ─── HEADER ─── */}
+      <header className="site-header">
+        <div className="logo">
+          <span className="logo-icon">🎯</span>
+          <span className="logo-text">BGMI<span>Champions</span></span>
+        </div>
+        <div className="header-badge">🔥 Registration Open</div>
+      </header>
+
+      {/* ─── HERO SECTION ─── */}
+      <section className="hero">
+        <div className="hero-overlay"></div>
+        <div className="hero-sparks"></div>
+        <div className="hero-smoke"></div>
+        <div className="hero-content">
+          <div className="hero-badge">🏆 OFFICIAL BGMI TOURNAMENT</div>
+          <h1>BGMI Champions<br />Cup 2026</h1>
+          <p>Register your squad and compete for the ultimate glory.</p>
+          <div className="hero-stats">
+            <div><span>💰</span> ₹100,000 Prize Pool</div>
+            <div><span>👥</span> Squad • Duo • Solo</div>
+          </div>
+          <button className="hero-cta" onClick={scrollToForm}>
+            Register Now →
+          </button>
+          <div className="countdown">
+            <span className="countdown-label">⏳ Registration Ends In</span>
+            <div className="countdown-numbers">
+              <div className="countdown-item">
+                <span className="cd-value">{String(timeRemaining.days).padStart(2, '0')}</span>
+                <span className="cd-label">Days</span>
+              </div>
+              <span className="cd-separator">:</span>
+              <div className="countdown-item">
+                <span className="cd-value">{String(timeRemaining.hours).padStart(2, '0')}</span>
+                <span className="cd-label">Hours</span>
+              </div>
+              <span className="cd-separator">:</span>
+              <div className="countdown-item">
+                <span className="cd-value">{String(timeRemaining.minutes).padStart(2, '0')}</span>
+                <span className="cd-label">Mins</span>
+              </div>
+              <span className="cd-separator">:</span>
+              <div className="countdown-item">
+                <span className="cd-value">{String(timeRemaining.seconds).padStart(2, '0')}</span>
+                <span className="cd-label">Secs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── TOURNAMENT INFORMATION ─── */}
+      <section className="info-section animate-on-scroll" id="info">
+        <h2 className="section-title">Tournament Information</h2>
+        <div className="info-grid">
+          <div className="info-card">
+            <span className="info-icon">📅</span>
+            <h3>Date</h3>
+            <p className="info-value">December 15, 2026</p>
+          </div>
+          <div className="info-card">
+            <span className="info-icon">🕒</span>
+            <h3>Time</h3>
+            <p className="info-value">7:00 PM IST</p>
+          </div>
+          <div className="info-card">
+            <span className="info-icon">👥</span>
+            <h3>Team Size</h3>
+            <p className="info-value">Squad (4v4)</p>
+          </div>
+          <div className="info-card">
+            <span className="info-icon">💰</span>
+            <h3>Entry Fee</h3>
+            <p className="info-value highlight">Free</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── PRIZE POOL ─── */}
+      <section className="prize-section animate-on-scroll" id="prizes">
+        <h2 className="section-title">🏆 Prize Pool</h2>
+        <div className="prize-grid">
+          <div className="prize-card gold">
+            <span className="prize-rank">🥇</span>
+            <span className="prize-amount">₹50,000</span>
+            <span className="prize-label">1st Place</span>
+          </div>
+          <div className="prize-card silver">
+            <span className="prize-rank">🥈</span>
+            <span className="prize-amount">₹30,000</span>
+            <span className="prize-label">2nd Place</span>
+          </div>
+          <div className="prize-card bronze">
+            <span className="prize-rank">🥉</span>
+            <span className="prize-amount">₹20,000</span>
+            <span className="prize-label">3rd Place</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── TOURNAMENT TIMELINE ─── */}
+      <section className="timeline-section animate-on-scroll" id="timeline">
+        <h2 className="section-title">Tournament Timeline</h2>
+        <div className="timeline">
+          <div className="timeline-item">
+            <div className="timeline-dot"></div>
+            <div className="timeline-content">
+              <h3>Registration Open</h3>
+              <p>Team registration begins</p>
+            </div>
+          </div>
+          <div className="timeline-line"></div>
+          <div className="timeline-item">
+            <div className="timeline-dot"></div>
+            <div className="timeline-content">
+              <h3>Registration Close</h3>
+              <p>December 14, 2026 (11:59 PM)</p>
+            </div>
+          </div>
+          <div className="timeline-line"></div>
+          <div className="timeline-item">
+            <div className="timeline-dot"></div>
+            <div className="timeline-content">
+              <h3>Room Details Sent</h3>
+              <p>30 minutes before match start</p>
+            </div>
+          </div>
+          <div className="timeline-line"></div>
+          <div className="timeline-item">
+            <div className="timeline-dot"></div>
+            <div className="timeline-content">
+              <h3>Tournament Starts</h3>
+              <p>December 15, 2026 (7:00 PM)</p>
+            </div>
+          </div>
+          <div className="timeline-line"></div>
+          <div className="timeline-item">
+            <div className="timeline-dot"></div>
+            <div className="timeline-content">
+              <h3>Winner Announcement</h3>
+              <p>December 17, 2026 (10:00 PM)</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── REGISTRATION FORM ─── */}
+      <section className="form-section animate-on-scroll" id="register" ref={formRef}>
+        <h2 className="section-title">📝 Team Registration</h2>
+        <div className="form-card">
+          <div className="form-header">
+            <h3>Register Your Team</h3>
+            <p>Fill in your team details to secure your slot.</p>
+          </div>
+
+          <div className="form-grid">
+            <div className="form-group full-width">
+              <label>Team Name <span className="required">*</span></label>
+              <input
+                type="text"
+                placeholder="e.g. Team Invincible"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Captain Name <span className="required">*</span></label>
+              <input
+                type="text"
+                placeholder="Full name"
+                value={captainName}
+                onChange={(e) => setCaptainName(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>BGMI UID <span className="required">*</span></label>
+              <input
+                type="text"
+                placeholder="UID (9-12 digits)"
+                value={player1Id}
+                onChange={(e) => setPlayer1Id(e.target.value.replace(/\D/g, '').slice(0, 12))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Email Address <span className="required">*</span></label>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Phone Number <span className="required">*</span></label>
+              <input
+                type="tel"
+                placeholder="e.g. 98XXXXXXXX"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              />
+            </div>
+          </div>
+
+          <div className="player-section">
+            <h3>👥 Team Members</h3>
+            <p className="player-sub">Enter the in-game UID for each player (9-12 digits)</p>
+            <div className="player-grid">
+              <div className="form-group">
+                <label>Player 1 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  placeholder="UID"
+                  value={player1Id}
+                  onChange={(e) => setPlayer1Id(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Player 2 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  placeholder="UID"
+                  value={player2Id}
+                  onChange={(e) => setPlayer2Id(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Player 3 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  placeholder="UID"
+                  value={player3Id}
+                  onChange={(e) => setPlayer3Id(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Player 4 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  placeholder="UID"
+                  value={player4Id}
+                  onChange={(e) => setPlayer4Id(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Discord ID <span className="optional">(optional)</span></label>
+            <input
+              type="text"
+              placeholder="e.g. username#1234"
+              value={discord}
+              onChange={(e) => setDiscord(e.target.value)}
+            />
+          </div>
+
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="terms"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+            />
+            <label htmlFor="terms">I agree to the <a href="#rules">Terms &amp; Conditions</a> and confirm all player UIDs are correct.</label>
+          </div>
+
+          {error && <p className="form-error">{error}</p>}
+
+          <button className="register-btn" onClick={handleSubmit} disabled={loading}>
+            {loading ? (
+              <>
+                <span className="spinner"></span> Registering...
+              </>
+            ) : (
+              'REGISTER NOW →'
+            )}
+          </button>
+        </div>
+      </section>
+
+      {/* ─── LIVE STATISTICS ─── */}
+      <section className="stats-section animate-on-scroll" id="stats">
+        <h2 className="section-title">📊 Live Statistics</h2>
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-icon">👥</span>
+            <span className="stat-value">{teamsRegistered.toLocaleString()}</span>
+            <span className="stat-label">Teams Registered</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">🔥</span>
+            <span className="stat-value">{slotsLeft}</span>
+            <span className="stat-label">Slots Left</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">🏆</span>
+            <span className="stat-value">₹100,000</span>
+            <span className="stat-label">Prize Pool</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── RULES ─── */}
+      <section className="rules-section animate-on-scroll" id="rules">
+        <h2 className="section-title">📜 Tournament Rules</h2>
+        <div className="rules-grid">
+          <div className="rule-card">
+            <span className="rule-icon">❌</span>
+            <h3>No Emulator</h3>
+            <p>Emulator users are not allowed.</p>
+          </div>
+          <div className="rule-card">
+            <span className="rule-icon">🚫</span>
+            <h3>No Hacks</h3>
+            <p>Any hacking will result in immediate disqualification.</p>
+          </div>
+          <div className="rule-card">
+            <span className="rule-icon">📱</span>
+            <h3>Mobile Only</h3>
+            <p>All players must use mobile devices.</p>
+          </div>
+          <div className="rule-card">
+            <span className="rule-icon">🎮</span>
+            <h3>Official BGMI Rules</h3>
+            <p>All matches follow official BGMI rules.</p>
+          </div>
+          <div className="rule-card">
+            <span className="rule-icon">⏰</span>
+            <h3>Join 15 Min Early</h3>
+            <p>Join the room 15 minutes before start.</p>
+          </div>
+          <div className="rule-card">
+            <span className="rule-icon">📢</span>
+            <h3>Voice Chat Required</h3>
+            <p>All players must have voice chat enabled.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── FEATURED REWARDS ─── */}
+      <section className="rewards-section animate-on-scroll" id="rewards">
+        <h2 className="section-title">🎁 Featured Rewards</h2>
+        <div className="rewards-grid">
+          <div className="reward-card">
+            <span className="reward-icon">💰</span>
+            <h3>Cash Prize</h3>
+            <p>₹100,000 Pool</p>
+          </div>
+          <div className="reward-card">
+            <span className="reward-icon">🏆</span>
+            <h3>Trophy</h3>
+            <p>Champions Trophy</p>
+          </div>
+          <div className="reward-card">
+            <span className="reward-icon">📱</span>
+            <h3>Gaming Phone</h3>
+            <p>For MVPs</p>
+          </div>
+          <div className="reward-card">
+            <span className="reward-icon">🎧</span>
+            <h3>Gaming Headset</h3>
+            <p>Premium Gear</p>
+          </div>
+          <div className="reward-card">
+            <span className="reward-icon">⌨️</span>
+            <h3>Gaming Keyboard</h3>
+            <p>Mechanical</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── PREVIOUS WINNERS ─── */}
+      <section className="winners-section animate-on-scroll" id="winners">
+        <h2 className="section-title">🏅 Previous Winners</h2>
+        <div className="winners-grid">
+          {PREVIOUS_WINNERS.map((winner, idx) => (
+            <div key={idx} className="winner-card">
+              <span className="winner-icon">🏆</span>
+              <h3>{winner.season}</h3>
+              <p className="winner-team">{winner.team}</p>
+              <span className="winner-prize">{winner.prize}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── SPONSORS ─── */}
+      <section className="sponsors-section animate-on-scroll" id="sponsors">
+        <h2 className="section-title">🤝 Our Sponsors</h2>
+        <div className="sponsors-grid">
+          {SPONSORS.map((sponsor, idx) => (
+            <div key={idx} className="sponsor-card">
+              <span className="sponsor-logo">{sponsor.logo}</span>
+              <span className="sponsor-name">{sponsor.name}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── FAQ ─── */}
+      <section className="faq-section animate-on-scroll" id="faq">
+        <h2 className="section-title">❓ Frequently Asked Questions</h2>
+        <div className="faq-list">
+          {FAQS.map((faq, idx) => (
+            <div key={idx} className={`faq-item ${expandedFaq === idx ? 'expanded' : ''}`}>
+              <button className="faq-question" onClick={() => toggleFaq(idx)}>
+                <span>{faq.q}</span>
+                <span className="faq-icon">{expandedFaq === idx ? '−' : '+'}</span>
+              </button>
+              {expandedFaq === idx && (
+                <div className="faq-answer">
+                  <p>{faq.a}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── FOOTER ─── */}
+      <footer className="site-footer">
+        <div className="footer-grid">
+          <div className="footer-section">
+            <h3>BGMI Champions</h3>
+            <p>Official tournament platform for competitive BGMI players.</p>
+          </div>
+          <div className="footer-section">
+            <h3>Quick Links</h3>
+            <a href="#register">Register</a>
+            <a href="#rules">Rules</a>
+            <a href="#prizes">Prizes</a>
+            <a href="#faq">FAQ</a>
+          </div>
+          <div className="footer-section">
+            <h3>Follow Us</h3>
+            <div className="social-links">
+              <a href="#">📱</a>
+              <a href="#">💬</a>
+              <a href="#">📷</a>
+              <a href="#">🐦</a>
+            </div>
+          </div>
+          <div className="footer-section">
+            <h3>Contact</h3>
+            <p>support@bgmichampions.com</p>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <p>© 2026 BGMI Champions. All rights reserved. | Terms & Privacy</p>
+        </div>
+      </footer>
+
+      {/* ─── STYLES ─── */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Segoe UI', system-ui, sans-serif;
+          background: #0A0F1E;
+          color: #FFFFFF;
+          line-height: 1.6;
+        }
+        .page-wrapper {
+          max-width: 100%;
+          overflow-x: hidden;
+          background: #0A0F1E;
+        }
+
+        /* ── Scroll Animation ── */
+        .animate-on-scroll {
+          opacity: 0;
+          transform: translateY(40px);
+          transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        .animate-on-scroll.visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        /* ── Header ── */
+        .site-header {
+          position: sticky; top: 0; z-index: 100;
+          background: rgba(10, 15, 30, 0.95);
+          backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+          padding: 0.7rem 1.5rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .logo {
+          display: flex; align-items: center; gap: 0.6rem;
+          font-weight: 800; font-size: 1.2rem;
+        }
+        .logo-icon { font-size: 1.6rem; }
+        .logo-text { color: #fff; }
+        .logo-text span { color: #F59E0B; }
+        .header-badge {
+          background: linear-gradient(135deg, #F59E0B, #D97706);
+          color: #0A0F1E;
+          font-weight: 700;
+          font-size: 0.7rem;
+          padding: 0.3rem 1.2rem;
+          border-radius: 40px;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+          box-shadow: 0 2px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        /* ── Hero ── */
+        .hero {
+          position: relative;
+          min-height: 80vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 3rem 1.5rem;
+          background: radial-gradient(ellipse at 50% 30%, rgba(245,158,11,0.08) 0%, transparent 70%),
+                      radial-gradient(ellipse at 70% 60%, rgba(59,130,246,0.06) 0%, transparent 50%),
+                      #0A0F1E;
+          overflow: hidden;
+        }
+        .hero-overlay {
+          position: absolute; inset: 0;
+          background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23F59E0B' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .hero-sparks {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle at 20% 80%, rgba(245,158,11,0.05) 0%, transparent 50%),
+                      radial-gradient(circle at 80% 20%, rgba(59,130,246,0.04) 0%, transparent 50%);
+        }
+        .hero-smoke {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(ellipse at 40% 90%, rgba(245,158,11,0.03) 0%, transparent 60%);
+        }
+        .hero-content {
+          position: relative; z-index: 2;
+          max-width: 800px;
+        }
+        .hero-badge {
+          display: inline-block;
+          background: rgba(245, 158, 11, 0.12);
+          border: 1px solid rgba(245, 158, 11, 0.25);
+          padding: 0.3rem 1.5rem;
+          border-radius: 40px;
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: #F59E0B;
+          margin-bottom: 1rem;
+          letter-spacing: 1.5px;
+        }
+        .hero h1 {
+          font-size: clamp(2.8rem, 9vw, 4.8rem);
+          font-weight: 900;
+          line-height: 1.05;
+          margin-bottom: 0.5rem;
+          background: linear-gradient(135deg, #fff 30%, #F59E0B 70%, #D97706 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+        }
+        .hero p {
+          font-size: 1.15rem;
+          color: #aaa;
+          margin-bottom: 1.8rem;
+        }
+        .hero-stats {
+          display: flex;
+          justify-content: center;
+          gap: 2rem;
+          flex-wrap: wrap;
+          margin-bottom: 2rem;
+        }
+        .hero-stats div {
+          background: rgba(255,255,255,0.04);
+          backdrop-filter: blur(8px);
+          padding: 0.5rem 1.5rem;
+          border-radius: 40px;
+          border: 1px solid rgba(255,255,255,0.05);
+          font-weight: 600;
+          font-size: 0.95rem;
+        }
+        .hero-stats span { margin-right: 6px; }
+
+        .hero-cta {
+          display: inline-block;
+          background: linear-gradient(135deg, #F59E0B, #D97706);
+          border: none;
+          padding: 0.9rem 2.8rem;
+          border-radius: 60px;
+          font-weight: 800;
+          font-size: 1.1rem;
+          color: #0A0F1E;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+          box-shadow: 0 4px 24px rgba(245, 158, 11, 0.3);
+          margin-bottom: 2rem;
+        }
+        .hero-cta:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 32px rgba(245, 158, 11, 0.4);
+        }
+
+        .countdown {
+          background: rgba(255,255,255,0.04);
+          backdrop-filter: blur(8px);
+          border-radius: 24px;
+          padding: 1.2rem 1.5rem;
+          border: 1px solid rgba(255,255,255,0.06);
+        }
+        .countdown-label {
+          display: block;
+          font-size: 0.75rem;
+          color: #888;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 0.5rem;
+        }
+        .countdown-numbers {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .countdown-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          min-width: 55px;
+        }
+        .cd-value {
+          font-size: 2.2rem;
+          font-weight: 900;
+          color: #F59E0B;
+          line-height: 1;
+          font-family: 'Courier New', monospace;
+        }
+        .cd-label {
+          font-size: 0.55rem;
+          color: #888;
+          text-transform: uppercase;
+          margin-top: 0.1rem;
+        }
+        .cd-separator {
+          font-size: 1.8rem;
+          font-weight: 900;
+          color: #555;
+          padding: 0 0.2rem;
+        }
+
+        /* ── Sections ── */
+        section {
+          padding: 4rem 1.5rem;
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+        .section-title {
+          font-size: 2rem;
+          font-weight: 800;
+          text-align: center;
+          margin-bottom: 2.5rem;
+          color: #fff;
+        }
+        .section-title::after {
+          content: '';
+          display: block;
+          width: 64px;
+          height: 4px;
+          background: linear-gradient(90deg, #F59E0B, #D97706);
+          margin: 0.5rem auto 0;
+          border-radius: 4px;
+        }
+
+        /* ── Tournament Info ── */
+        .info-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1.5rem;
+        }
+        .info-card {
+          background: rgba(255,255,255,0.04);
+          backdrop-filter: blur(12px);
+          border-radius: 20px;
+          padding: 1.5rem;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.06);
+          transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .info-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+        }
+        .info-icon { font-size: 2.5rem; display: block; margin-bottom: 0.3rem; }
+        .info-card h3 {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #888;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .info-value {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: #fff;
+          margin-top: 0.2rem;
+        }
+        .info-value.highlight {
+          color: #F59E0B;
+        }
+
+        /* ── Prize Pool ── */
+        .prize-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 1.5rem;
+        }
+        .prize-card {
+          background: rgba(255,255,255,0.04);
+          border-radius: 24px;
+          padding: 2rem 1.5rem;
+          text-align: center;
+          border: 2px solid rgba(255,255,255,0.06);
+          transition: transform 0.3s, box-shadow 0.3s;
+          position: relative;
+          overflow: hidden;
+        }
+        .prize-card::before {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          border-radius: 24px;
+          padding: 2px;
+          background: linear-gradient(135deg, transparent, rgba(245,158,11,0.3));
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+        }
+        .prize-card:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 12px 40px rgba(245, 158, 11, 0.08);
+        }
+        .prize-card.gold { border-color: #F59E0B; }
+        .prize-card.silver { border-color: #9CA3AF; }
+        .prize-card.bronze { border-color: #CD7F32; }
+        .prize-rank { font-size: 2.8rem; display: block; margin-bottom: 0.3rem; }
+        .prize-amount {
+          display: block;
+          font-size: 1.8rem;
+          font-weight: 900;
+          color: #F59E0B;
+        }
+        .prize-label {
+          display: block;
+          font-size: 0.85rem;
+          color: #888;
+          margin-top: 0.2rem;
+        }
+
+        /* ── Timeline ── */
+        .timeline {
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          max-width: 600px;
+          margin: 0 auto;
+          position: relative;
+          padding-left: 2rem;
+        }
+        .timeline::before {
+          content: '';
+          position: absolute;
+          left: 6px;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: linear-gradient(180deg, #F59E0B, rgba(245,158,11,0.2));
+        }
+        .timeline-item {
+          display: flex;
+          gap: 1rem;
+          position: relative;
+          padding: 0.8rem 0;
+        }
+        .timeline-dot {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #F59E0B;
+          border: 2px solid #0A0F1E;
+          box-shadow: 0 0 20px rgba(245,158,11,0.3);
+          flex-shrink: 0;
+          margin-top: 0.3rem;
+        }
+        .timeline-content h3 {
+          font-size: 1rem;
+          font-weight: 700;
+          color: #fff;
+        }
+        .timeline-content p {
+          font-size: 0.85rem;
+          color: #888;
+        }
+        .timeline-line {
+          height: 8px;
+        }
+
+        /* ── Form ── */
+        .form-card {
+          background: rgba(255,255,255,0.04);
+          backdrop-filter: blur(12px);
+          border-radius: 36px;
+          padding: 2.5rem 2rem;
+          border: 1px solid rgba(255,255,255,0.06);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+          max-width: 820px;
+          margin: 0 auto;
+        }
+        .form-header {
+          text-align: center;
+          margin-bottom: 2rem;
+        }
+        .form-header h3 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #fff;
+        }
+        .form-header p {
+          color: #888;
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+        }
+        .full-width { grid-column: span 2; }
+        .form-group {
+          margin-bottom: 0.2rem;
+        }
+        .form-group label {
+          display: block;
+          font-weight: 600;
+          font-size: 0.8rem;
+          color: #ccc;
+          margin-bottom: 0.2rem;
+        }
+        .form-group .required { color: #EF4444; }
+        .form-group .optional { color: #666; font-weight: 400; font-size: 0.75rem; }
+        .form-group input {
+          width: 100%;
+          padding: 0.7rem 1rem;
+          border: 2px solid rgba(255,255,255,0.06);
+          border-radius: 14px;
+          font-size: 0.9rem;
+          background: rgba(255,255,255,0.03);
+          color: #fff;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          outline: none;
+          font-family: inherit;
+        }
+        .form-group input::placeholder {
+          color: #555;
+        }
+        .form-group input:focus {
+          border-color: #F59E0B;
+          box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.08);
+        }
+
+        .player-section {
+          margin: 1.5rem 0 1rem;
+          padding-top: 1.5rem;
+          border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .player-section h3 {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: #fff;
+          margin-bottom: 0.2rem;
+        }
+        .player-sub {
+          font-size: 0.8rem;
+          color: #666;
+          margin-bottom: 1rem;
+        }
+        .player-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+        }
+
+        .checkbox-group {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin: 1.2rem 0;
+        }
+        .checkbox-group input {
+          width: 18px; height: 18px;
+          margin-top: 2px;
+          accent-color: #F59E0B;
+          flex-shrink: 0;
+        }
+        .checkbox-group label {
+          font-size: 0.85rem;
+          color: #aaa;
+        }
+        .checkbox-group label a {
+          color: #F59E0B;
+          text-decoration: none;
+        }
+        .form-error {
+          color: #EF4444;
+          font-size: 0.85rem;
+          margin: 0.5rem 0;
+        }
+
+        .register-btn {
+          width: 100%;
+          padding: 1rem;
+          background: linear-gradient(135deg, #F59E0B, #D97706);
+          border: none;
+          border-radius: 60px;
+          font-weight: 800;
+          font-size: 1.1rem;
+          color: #0A0F1E;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+          box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          letter-spacing: 1px;
+        }
+        .register-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 32px rgba(245, 158, 11, 0.35);
+        }
+        .register-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .spinner {
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 2px solid rgba(10,15,30,0.2);
+          border-top-color: #0A0F1E;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Live Stats ── */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1.5rem;
+        }
+        .stat-card {
+          background: rgba(255,255,255,0.04);
+          border-radius: 24px;
+          padding: 2rem 1.5rem;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.06);
+          transition: transform 0.3s;
+        }
+        .stat-card:hover {
+          transform: translateY(-4px);
+        }
+        .stat-icon { font-size: 2.5rem; display: block; margin-bottom: 0.3rem; }
+        .stat-value {
+          display: block;
+          font-size: 2.2rem;
+          font-weight: 900;
+          color: #F59E0B;
+        }
+        .stat-label {
+          display: block;
+          font-size: 0.85rem;
+          color: #888;
+          margin-top: 0.2rem;
+        }
+
+        /* ── Rules ── */
+        .rules-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1.5rem;
+        }
+        .rule-card {
+          background: rgba(255,255,255,0.04);
+          border-radius: 20px;
+          padding: 1.5rem;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.06);
+          transition: transform 0.3s;
+        }
+        .rule-card:hover {
+          transform: translateY(-4px);
+        }
+        .rule-icon { font-size: 2.5rem; display: block; margin-bottom: 0.3rem; }
+        .rule-card h3 {
+          font-size: 1rem;
+          font-weight: 700;
+          color: #fff;
+        }
+        .rule-card p {
+          font-size: 0.8rem;
+          color: #888;
+        }
+
+        /* ── Rewards ── */
+        .rewards-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 1.5rem;
+        }
+        .reward-card {
+          background: rgba(255,255,255,0.04);
+          border-radius: 20px;
+          padding: 1.5rem;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.06);
+          transition: transform 0.3s;
+        }
+        .reward-card:hover {
+          transform: translateY(-4px);
+        }
+        .reward-icon { font-size: 2.5rem; display: block; margin-bottom: 0.3rem; }
+        .reward-card h3 {
+          font-size: 1rem;
+          font-weight: 700;
+          color: #fff;
+        }
+        .reward-card p {
+          font-size: 0.8rem;
+          color: #888;
+        }
+
+        /* ── Winners ── */
+        .winners-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 1.5rem;
+        }
+        .winner-card {
+          background: rgba(255,255,255,0.04);
+          border-radius: 20px;
+          padding: 1.5rem;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.06);
+          transition: transform 0.3s;
+        }
+        .winner-card:hover {
+          transform: translateY(-4px);
+        }
+        .winner-icon { font-size: 2.5rem; display: block; margin-bottom: 0.3rem; }
+        .winner-card h3 {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #888;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .winner-team {
+          font-size: 1.2rem;
+          font-weight: 800;
+          color: #fff;
+        }
+        .winner-prize {
+          display: inline-block;
+          font-size: 0.85rem;
+          color: #F59E0B;
+          font-weight: 700;
+          margin-top: 0.2rem;
+        }
+
+        /* ── Sponsors ── */
+        .sponsors-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 1.5rem;
+        }
+        .sponsor-card {
+          background: rgba(255,255,255,0.04);
+          border-radius: 16px;
+          padding: 1.5rem;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.06);
+          transition: transform 0.3s;
+        }
+        .sponsor-card:hover {
+          transform: translateY(-4px);
+        }
+        .sponsor-logo { font-size: 2.5rem; display: block; margin-bottom: 0.3rem; }
+        .sponsor-name {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #888;
+        }
+
+        /* ── FAQ ── */
+        .faq-list {
+          max-width: 800px;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 0.8rem;
+        }
+        .faq-item {
+          background: rgba(255,255,255,0.04);
+          border-radius: 16px;
+          border: 1px solid rgba(255,255,255,0.06);
+          overflow: hidden;
+          transition: border-color 0.3s;
+        }
+        .faq-item.expanded {
+          border-color: rgba(245, 158, 11, 0.3);
+        }
+        .faq-question {
+          width: 100%;
+          padding: 1rem 1.2rem;
+          background: transparent;
+          border: none;
+          color: #fff;
+          font-size: 1rem;
+          font-weight: 600;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          text-align: left;
+          font-family: inherit;
+        }
+        .faq-question:hover {
+          color: #F59E0B;
+        }
+        .faq-icon {
+          font-size: 1.4rem;
+          color: #F59E0B;
+          font-weight: 300;
+          flex-shrink: 0;
+          margin-left: 1rem;
+        }
+        .faq-answer {
+          padding: 0 1.2rem 1.2rem;
+          color: #aaa;
+          font-size: 0.95rem;
+          animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Footer ── */
+        .site-footer {
+          background: rgba(0,0,0,0.3);
+          color: #555;
+          padding: 2.5rem 1.5rem;
+          border-top: 1px solid rgba(255,255,255,0.03);
+          margin-top: 2rem;
+        }
+        .footer-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 2rem;
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+        .footer-section h3 {
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: #fff;
+          margin-bottom: 0.5rem;
+        }
+        .footer-section p {
+          font-size: 0.85rem;
+          color: #888;
+        }
+        .footer-section a {
+          display: block;
+          color: #888;
+          text-decoration: none;
+          font-size: 0.85rem;
+          padding: 0.2rem 0;
+          transition: color 0.2s;
+        }
+        .footer-section a:hover {
+          color: #F59E0B;
+        }
+        .social-links {
+          display: flex;
+          gap: 1rem;
+          font-size: 1.8rem;
+        }
+        .social-links a {
+          color: #888;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        .social-links a:hover {
+          color: #F59E0B;
+        }
+        .footer-bottom {
+          text-align: center;
+          padding-top: 1.5rem;
+          margin-top: 1.5rem;
+          border-top: 1px solid rgba(255,255,255,0.04);
+          font-size: 0.8rem;
+          color: #555;
+          max-width: 1100px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        /* ── WebView Modal ── */
+        .modal-overlay {
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.92);
+          backdrop-filter: blur(16px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .modal-card {
+          background: #1a1c22;
+          border-radius: 40px;
+          padding: 2.8rem 2rem;
+          max-width: 420px;
+          width: 90%;
+          text-align: center;
+          border: 1px solid rgba(245, 158, 11, 0.15);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+        }
+        .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
+        .modal-card h2 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #fff;
+          margin-bottom: 0.5rem;
+        }
+        .modal-card p {
+          color: #aaa;
+          margin-bottom: 1.8rem;
+        }
+        .modal-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .modal-btn {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.08);
+          padding: 0.7rem 1.5rem;
+          border-radius: 60px;
+          font-weight: 600;
+          color: #fff;
+          cursor: pointer;
+          transition: 0.2s;
+          flex: 1;
+          min-width: 120px;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.1); }
+        .modal-btn.primary {
+          background: #F59E0B;
+          border: none;
+          color: #0A0F1E;
+        }
+        .modal-btn.primary:hover { background: #D97706; }
+        .modal-btn.ghost {
+          background: transparent;
+          border: none;
+          color: #666;
+          margin-top: 0.5rem;
+          font-size: 0.8rem;
+        }
+        .modal-btn.ghost:hover { color: #fff; }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+          .form-grid { grid-template-columns: 1fr; }
+          .full-width { grid-column: span 1; }
+          .player-grid { grid-template-columns: 1fr; }
+          .hero h1 { font-size: 2.4rem; }
+          .hero-stats { gap: 0.8rem; }
+          .hero-stats div { font-size: 0.75rem; padding: 0.3rem 1rem; }
+          .cd-value { font-size: 1.6rem; }
+          .countdown-item { min-width: 40px; }
+          .prize-grid { grid-template-columns: 1fr; }
+          .rules-grid { grid-template-columns: 1fr 1fr; }
+          .rewards-grid { grid-template-columns: 1fr 1fr; }
+          .footer-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+          .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
+          .site-header { padding: 0.5rem 1rem; }
+          .form-card { padding: 1.8rem 1.2rem; }
+          .hero h1 { font-size: 2rem; }
+          .cd-value { font-size: 1.2rem; }
+          .countdown-item { min-width: 30px; }
+          .rules-grid { grid-template-columns: 1fr; }
+          .rewards-grid { grid-template-columns: 1fr; }
+          .stats-grid { grid-template-columns: 1fr; }
+          .winners-grid { grid-template-columns: 1fr; }
+        }
+      `}} />
+    </div>
+  );
+}
+
+// ── Server‑side props ──
+export async function getServerSideProps({ query }) {
+  const campaignId = query.id || query.campaign || null;
+  const campaign = campaignId ? await fetchCampaign(campaignId) : null;
+  return { props: { campaign } };
+}
+
+// ── Wrap with Meta ──
+export default withCampaignMeta(BgmiTournamentRegistration, defaultMeta);
