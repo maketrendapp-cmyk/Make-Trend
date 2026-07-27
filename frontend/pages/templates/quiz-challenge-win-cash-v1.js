@@ -169,7 +169,7 @@ function QuizChallengeWinCashV1({ campaign }) {
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
             <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
-            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_system'); } }}>🚀 Open in Browser</button>
+            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>🚀 Open in Browser</button>
           </div>
           <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
         </div>
@@ -929,9 +929,12 @@ function QuizChallengeWinCashV1({ campaign }) {
         /* ── WebView Modal ── */
         .modal-overlay {
           position: fixed;
-          top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(12px);
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.88);
+          backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -939,23 +942,27 @@ function QuizChallengeWinCashV1({ campaign }) {
         }
         .modal-card {
           background: #1a1c22;
-          border-radius: 36px;
+          border-radius: 40px;
           padding: 2.8rem 2rem;
           max-width: 420px;
           width: 90%;
           text-align: center;
-          border: 1px solid rgba(245, 166, 35, 0.2);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          border: 2px solid rgba(245, 166, 35, 0.25);
+          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
         }
-        .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
+        .modal-card .modal-icon {
+          font-size: 3.6rem;
+          margin-bottom: 0.5rem;
+        }
         .modal-card h2 {
           font-size: 1.6rem;
           font-weight: 800;
           color: #fff;
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.3rem;
         }
         .modal-card p {
           color: #aaa;
+          font-size: 0.95rem;
           margin-bottom: 1.8rem;
         }
         .modal-actions {
@@ -965,24 +972,29 @@ function QuizChallengeWinCashV1({ campaign }) {
           justify-content: center;
         }
         .modal-btn {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           padding: 0.7rem 1.5rem;
           border-radius: 60px;
           font-weight: 600;
+          font-size: 0.85rem;
           color: #fff;
           cursor: pointer;
           transition: 0.2s;
           flex: 1;
           min-width: 120px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
         .modal-btn.primary {
           background: #f5a623;
           border: none;
           color: #1a1a2e;
         }
-        .modal-btn.primary:hover { background: #e0991a; }
+        .modal-btn.primary:hover {
+          background: #e0991a;
+        }
         .modal-btn.ghost {
           background: transparent;
           border: none;
@@ -990,7 +1002,9 @@ function QuizChallengeWinCashV1({ campaign }) {
           margin-top: 0.5rem;
           font-size: 0.8rem;
         }
-        .modal-btn.ghost:hover { color: #fff; }
+        .modal-btn.ghost:hover {
+          color: #fff;
+        }
 
         /* ── Responsive ── */
         @media (max-width: 640px) {
