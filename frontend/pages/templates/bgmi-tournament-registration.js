@@ -537,9 +537,9 @@ function BgmiTournamentRegistration({ campaign }) {
             <p>For MVPs</p>
           </div>
           <div className="reward-card">
-            <img src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=150&h=150&fit=crop&auto=format" alt="Headset" />
-            <h3>Gaming Headset</h3>
-            <p>Premium Gear</p>
+            <img src="https://i.ytimg.com/vi/BYWx-2t3jxc/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLCD0hr9ZuRvK2zfzN6KwR0tpizEAw" alt="Mix Pro" />
+            <h3>Mix Pro</h3>
+            <p>Free</p>
           </div>
           <div className="reward-card">
             <img src="https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=100&h=100&fit=crop&auto=format" alt="Keyboard" />
