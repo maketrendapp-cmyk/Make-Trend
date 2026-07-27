@@ -31,12 +31,12 @@ const PRIZES = [
   },
   {
     label: 'Gaming PC',
-    image: 'https://images.unsplash.com/photo-1587831990717-23a1b7b9a3b3?w=150&h=150&fit=crop&auto=format',
+    image: 'https://www.illegear.com/shop/illegear-desktop-pc/196-illegear-gaming-pc-set-murah-ddr4.html?srsltid=AfmBOopDWF6PXYhNp1554Rg2v9cQJryDuYa1761gUwRqiSfT9VozypRp',
     color: '#0f3460',
   },
   {
     label: '$500 Cash',
-    image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=150&h=150&fit=crop&auto=format',
+    image: 'https://thumbs.dreamstime.com/b/united-states-currency-hundred-dollar-bills-isolated-white-multiple-scattered-background-83510093.jpg',
     color: '#f5a623',
   },
   {
@@ -51,7 +51,7 @@ const PRIZES = [
   },
   {
     label: '$200 Cash',
-    image: 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=150&h=150&fit=crop&auto=format',
+    image: 'https://thumbs.dreamstime.com/b/united-states-currency-hundred-dollar-bills-isolated-white-multiple-scattered-background-83510093.jpg',
     color: '#e94560',
   },
 ];
