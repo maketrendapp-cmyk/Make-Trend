@@ -26,7 +26,7 @@ async function apiRequest(endpoint, options = {}, token = null) {
   if (!res.ok) throw new Error(data.error || 'API error');
   
   requestCache.set(cacheKey, data);
-  setTimeout(() => requestCache.delete(cacheKey), 1000); // 5s TTL
+  setTimeout(() => requestCache.delete(cacheKey), 5000); // 5s TTL
 
   return data;
 }
@@ -68,9 +68,11 @@ export function useStats(enabled = false) {
   });
 }
 
-export function useTemplates(filters = {}) {
+export function useTemplates(filters = {}, initialData = null) {
   const queryString = new URLSearchParams(filters).toString();
   const queryKey = ['templates', filters];
+  const hasFilters = Object.keys(filters).length > 0;
+  
   return useQuery({
     queryKey,
     queryFn: async () => {
@@ -78,20 +80,28 @@ export function useTemplates(filters = {}) {
       const data = await apiRequest(url);
       return data.templates || [];
     },
+    initialData: initialData || undefined,
     staleTime: 5 * 60 * 1000,
+    // Only fetch if filters are applied OR no initial data
+    enabled: hasFilters || !initialData || (Array.isArray(initialData) && initialData.length === 0),
   });
 }
 
-export function useFeaturedTemplates(filters = {}) {
+export function useFeaturedTemplates(filters = {}, initialData = null) {
   const queryString = new URLSearchParams({ highlight: true, ...filters }).toString();
   const queryKey = ['featuredTemplates', filters];
+  const hasFilters = Object.keys(filters).length > 0;
+  
   return useQuery({
     queryKey,
     queryFn: async () => {
       const data = await apiRequest(`/templates?${queryString}`);
       return (data.templates || []).filter(t => t.isHighlight === true);
     },
+    initialData: initialData || undefined,
     staleTime: 5 * 60 * 1000,
+    // Only fetch if filters are applied OR no initial data
+    enabled: hasFilters || !initialData || (Array.isArray(initialData) && initialData.length === 0),
   });
 }
 
