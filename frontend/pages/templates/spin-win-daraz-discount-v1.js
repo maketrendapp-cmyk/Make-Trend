@@ -1,4 +1,4 @@
-
+// pages/templates/spin-win-daraz-discount-v1.js
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
@@ -13,7 +13,7 @@ const defaultMeta = {
   url: 'https://maketrend.app/spin-win-daraz-discount-v1?id={id}',
 };
 
-// ── Wheel Segments ──
+// ── Wheel Segments (also used as rewards list) ──
 const SEGMENTS = [
   { label: '10% OFF', color: '#FF6B35', icon: '🛍️' },
   { label: '20% OFF', color: '#F7931E', icon: '🎉' },
@@ -84,7 +84,6 @@ function SpinWinDarazDiscountV1({ campaign }) {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // ── Draw segments ──
       SEGMENTS.forEach((segment, i) => {
         const startAngle = i * segmentAngle + rotationAngle;
         const endAngle = startAngle + segmentAngle;
@@ -94,7 +93,6 @@ function SpinWinDarazDiscountV1({ campaign }) {
         ctx.arc(centerX, centerY, radius, startAngle, endAngle);
         ctx.closePath();
 
-        // Gradient fill
         const gradient = ctx.createRadialGradient(centerX, centerY, 20, centerX, centerY, radius);
         gradient.addColorStop(0, lightenColor(segment.color, 40));
         gradient.addColorStop(1, segment.color);
@@ -105,7 +103,6 @@ function SpinWinDarazDiscountV1({ campaign }) {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // ── Text ──
         ctx.save();
         ctx.translate(centerX, centerY);
         ctx.rotate(startAngle + segmentAngle / 2);
@@ -123,7 +120,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
         ctx.restore();
       });
 
-      // ── Center circle ──
+      // Center circle
       ctx.beginPath();
       ctx.arc(centerX, centerY, 40, 0, Math.PI * 2);
       const centerGradient = ctx.createRadialGradient(centerX - 10, centerY - 10, 5, centerX, centerY, 40);
@@ -144,7 +141,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
       ctx.font = '10px "Segoe UI", sans-serif';
       ctx.fillText('NOW', centerX, centerY + 14);
 
-      // ── Pointer ──
+      // Pointer
       const pointerAngle = -Math.PI / 2;
       const pointerLength = 30;
       const pointerX = centerX + Math.cos(pointerAngle) * (radius + 8);
@@ -163,7 +160,6 @@ function SpinWinDarazDiscountV1({ campaign }) {
     [rotation]
   );
 
-  // ── Helper: lighten color ──
   const lightenColor = (hex, percent) => {
     const num = parseInt(hex.replace('#', ''), 16);
     const amt = Math.round(2.55 * percent);
@@ -173,12 +169,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
     return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
   };
 
-  // ── Redraw on rotation change ──
   useEffect(() => {
     drawWheel();
   }, [drawWheel]);
 
-  // ── Play sound ──
   const playSound = (type) => {
     try {
       if (!audioCtx.current) {
@@ -198,11 +192,11 @@ function SpinWinDarazDiscountV1({ campaign }) {
     } catch (e) {}
   };
 
-  // ── Spin ──
+  // ── Spin logic ──
   const handleSpin = () => {
     if (isSpinning) return;
 
-    // Validate registration
+    // Safety validation (should already be validated, but keep it)
     if (!name.trim()) {
       setError('Please enter your full name.');
       return;
@@ -253,7 +247,6 @@ function SpinWinDarazDiscountV1({ campaign }) {
     requestAnimationFrame(animate);
   };
 
-  // ── Claim redirect ──
   const handleClaim = () => {
     setLoading(true);
     if (!id) {
@@ -261,6 +254,24 @@ function SpinWinDarazDiscountV1({ campaign }) {
     } else {
       router.push(`/tasks?id=${id}`);
     }
+  };
+
+  // ── Validation before going to spin ──
+  const goToSpin = () => {
+    if (!name.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
+    if (!phone.trim() || !/^\d{10}$/.test(phone.replace(/\s/g, ''))) {
+      setError('Please enter a valid 10-digit phone number.');
+      return;
+    }
+    if (!acceptedTerms) {
+      setError('You must accept the terms to continue.');
+      return;
+    }
+    setError('');
+    setStep(2);
   };
 
   // ── WebView Modal ──
@@ -314,7 +325,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
             <>
               <div className="hero-badge">🎯 Spin the Wheel</div>
               <h1>Try Your Luck!</h1>
-              <p>Click the button below to spin and win an exclusive discount.</p>
+              <p>Click the SPIN button below and win an exclusive discount.</p>
             </>
           )}
           {step === 3 && result && (
@@ -372,7 +383,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
 
             {error && <p className="form-error">{error}</p>}
 
-            <button className="join-btn" onClick={() => { setStep(2); }}>
+            <button className="join-btn" onClick={goToSpin}>
               Spin Now →
             </button>
 
@@ -380,9 +391,22 @@ function SpinWinDarazDiscountV1({ campaign }) {
           </div>
         )}
 
-        {/* Step 2: Spin Wheel */}
+        {/* Step 2: Spin Wheel with Rewards Preview */}
         {step === 2 && (
           <div className="spin-card">
+            {/* ─── NEW: What You Can Win (visible before spinning) ─── */}
+            <div className="rewards-preview">
+              <h3>🎁 What You Can Win</h3>
+              <div className="rewards-grid">
+                {SEGMENTS.map((item, idx) => (
+                  <div key={idx} className="reward-item">
+                    <span className="reward-icon">{item.icon}</span>
+                    <span className="reward-label">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="wheel-container">
               <canvas ref={canvasRef} width="400" height="400" className="wheel-canvas"></canvas>
               <button className="spin-btn" onClick={handleSpin} disabled={isSpinning}>
@@ -722,6 +746,48 @@ function SpinWinDarazDiscountV1({ campaign }) {
           border: 1px solid #eef0f4;
           text-align: center;
         }
+
+        /* ─── NEW: Rewards Preview Section ─── */
+        .rewards-preview {
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 2px solid #f0f0f0;
+        }
+        .rewards-preview h3 {
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: #1a1a2e;
+          margin-bottom: 1rem;
+        }
+        .rewards-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.8rem;
+        }
+        .reward-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 0.5rem 0.2rem;
+          background: #f8f9fc;
+          border-radius: 12px;
+          border: 1px solid #eef0f4;
+          transition: transform 0.2s;
+        }
+        .reward-item:hover {
+          transform: translateY(-2px);
+        }
+        .reward-item .reward-icon {
+          font-size: 1.6rem;
+          margin-bottom: 0.2rem;
+        }
+        .reward-item .reward-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: #4b5563;
+          text-align: center;
+        }
+
         .wheel-container {
           position: relative;
           width: 100%;
@@ -1057,6 +1123,9 @@ function SpinWinDarazDiscountV1({ campaign }) {
           .main-content { padding: 0 1rem; }
           .register-card, .spin-card, .result-card { padding: 1.8rem 1.2rem; }
           .steps { grid-template-columns: 1fr 1fr; }
+          .rewards-grid { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+          .reward-item .reward-icon { font-size: 1.2rem; }
+          .reward-item .reward-label { font-size: 0.6rem; }
         }
         @media (max-width: 480px) {
           .header-badge { font-size: 0.6rem; padding: 0.2rem 0.8rem; }
@@ -1067,6 +1136,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
           .steps { grid-template-columns: 1fr; }
           .terms-content { padding: 1.2rem; }
           .spin-btn { width: 60px; height: 60px; font-size: 0.9rem; }
+          .rewards-grid { grid-template-columns: repeat(2, 1fr); }
         }
       `}} />
     </div>
