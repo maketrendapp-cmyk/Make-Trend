@@ -3,7 +3,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import Head from 'next/head';
-import Image from 'next/image';
 import Meta from '../components/Meta';
 import { useFeaturedTemplates, useTemplates } from '../lib/queries';
 import {
@@ -250,20 +249,17 @@ const renderCarousel = () => {
             <div key={template.id} className="w-full flex-shrink-0">
               <div className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                  <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm relative">
-  {template.image ? (
-    <Image
-      src={template.image}
-      alt={template.title}
-      fill
-      className="object-cover"
-      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 224px"
-      loading="lazy"
-    />
-  ) : (
-    <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">🎨</div>
-  )}
-</div>
+                  <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                    {template.image ? (
+                      <img
+                        src={template.image}
+                        alt={template.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">🎨</div>
+                    )}
+                  </div>
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-1.5 mb-1">
