@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import Head from 'next/head';
+import Image from 'next/image';
 import Meta from '../components/Meta';
 import { useTemplates, useFeaturedTemplates } from '../lib/queries';
 
@@ -420,13 +421,15 @@ if (!isLoading && templates.length === 0) {
                         {/* Image Container */}
                         <div className="w-full md:w-1/2 lg:w-[55%] aspect-video md:aspect-auto md:min-h-[280px] bg-slate-100 overflow-hidden relative shrink-0">
                           {template.image ? (
-                            <img
-                              src={template.image}
-                              alt={template.title}
-                              className="w-full h-full object-cover md:absolute md:inset-0"
-                              loading="lazy"
-                            />
-                          ) : (
+  <Image
+    src={template.image}
+    alt={template.title}
+    fill
+    className="object-cover md:absolute md:inset-0"
+    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 50vw"
+    loading="lazy"
+  />
+) : (
                             <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
                               <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
                             </div>
@@ -610,13 +613,15 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platf
     >
       <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
         {template.image ? (
-          <img
-            src={template.image}
-            alt={template.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-            loading="lazy"
-          />
-        ) : (
+  <Image
+    src={template.image}
+    alt={template.title}
+    fill
+    className="object-cover group-hover:scale-105 transition duration-300"
+    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+    loading="lazy"
+  />
+) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
             <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
           </div>
