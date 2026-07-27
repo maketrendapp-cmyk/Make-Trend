@@ -32,6 +32,8 @@ const NO_LAYOUT_PAGES = [
   '/templates/youtube-booster-v1',
   '/ncell-reward-v1',
 '/templates/pubg-uc-giveaway-v1',
+'/templates/quiz-challenge-win-cash-v1',
+
   '/tasks',
   '/share',
 ];
