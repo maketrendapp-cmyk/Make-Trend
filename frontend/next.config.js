@@ -1,6 +1,6 @@
 // frontend/next.config.js
 const withPWA = require('next-pwa')({
-  dest: 'public',           // your static assets folder
+  dest: 'public',
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
@@ -11,7 +11,6 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   
-  // ── Image Optimization Configuration ──
   images: {
     remotePatterns: [
       {
@@ -50,6 +49,15 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'i.pinimg.com',
       },
+      // ── Cloudinary ──
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.cloudinary.com',
+      },
     ],
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
@@ -57,22 +65,18 @@ const nextConfig = {
 
   async rewrites() {
     return [
-      // Template preview: /ncell-reward-v1 → /templates/ncell-reward-v1
       {
         source: '/:slug',
         destination: '/templates/:slug',
       },
-      // Template campaign: /ncell-reward-v1/abc123 → /templates/ncell-reward-v1?id=abc123
       {
         source: '/:slug/:campaignId',
         destination: '/templates/:slug?id=:campaignId',
       },
-      // Task: /task/abc123 → /tasks?id=abc123
       {
         source: '/task/:id',
         destination: '/tasks?id=:id',
       },
-      // Share: /share/abc123 → /share?id=abc123
       {
         source: '/share/:id',
         destination: '/share?id=:id',
