@@ -18,34 +18,29 @@ const PRIZES = [
     label: 'iPhone 15 Pro',
     image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=150&h=150&fit=crop&auto=format',
     color: '#7C3AED',
+    glowColor: 'rgba(124, 58, 237, 0.3)',
   },
   {
     label: 'Gaming Laptop',
     image: 'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=150&h=150&fit=crop&auto=format',
     color: '#06B6D4',
+    glowColor: 'rgba(6, 182, 212, 0.3)',
   },
   {
     label: '$2,000 Cash',
     image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=150&h=150&fit=crop&auto=format',
     color: '#22C55E',
+    glowColor: 'rgba(34, 197, 94, 0.3)',
   },
   {
     label: 'Gaming Gear',
-    image: 'https://images.unsplash.com/photo-1618384887929-16ec33d0ef2d?w=150&h=150&fit=crop&auto=format',
+    image: 'https://mms.businesswire.com/media/20210111005169/en/851040/5/hx-press-image-all-products-1000x611.jpg?download=1',
     color: '#F59E0B',
+    glowColor: 'rgba(245, 158, 11, 0.3)',
   },
 ];
 
 const GAMES = ['Free Fire', 'PUBG Mobile', 'Call of Duty', 'Mobile Legends', 'Apex Legends', 'Other'];
-
-// ── Mock Leaderboard Data ──
-const LEADERBOARD = [
-  { name: 'ShadowX', votes: 12420, avatar: 'S' },
-  { name: 'SniperPro', votes: 11980, avatar: 'S' },
-  { name: 'RavenKing', votes: 11420, avatar: 'R' },
-  { name: 'PhantomZ', votes: 10800, avatar: 'P' },
-  { name: 'ViperX', votes: 10200, avatar: 'V' },
-];
 
 // ── Mock Live Activity ──
 const LIVE_UPDATES = [
@@ -61,7 +56,7 @@ function GamingClipContestV1({ campaign }) {
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=upload, 2=waiting, 3=results
+  const [step, setStep] = useState(1); // 1=upload, 2=processing, 3=appeal, 4=redirecting
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [game, setGame] = useState('Free Fire');
@@ -73,8 +68,8 @@ function GamingClipContestV1({ campaign }) {
   const [timeRemaining, setTimeRemaining] = useState({ hours: 24, minutes: 0, seconds: 0 });
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [liveUpdateIndex, setLiveUpdateIndex] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [liveUpdateIndex, setLiveUpdateIndex] = useState(0);
 
   const fileInputRef = useRef(null);
 
@@ -129,7 +124,6 @@ function GamingClipContestV1({ campaign }) {
     setFile(selectedFile);
     setError('');
 
-    // Create preview
     if (selectedFile.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => setFilePreview(e.target.result);
@@ -184,19 +178,21 @@ function GamingClipContestV1({ campaign }) {
         progress = 100;
         clearInterval(interval);
         setIsUploading(false);
+        // Move to processing state
         setStep(2);
-        // Simulate waiting and then show results
+        // After 3 seconds, move to appeal step
         setTimeout(() => {
           setStep(3);
-        }, 5000);
+        }, 3000);
       }
       setUploadProgress(Math.min(100, progress));
     }, 200);
   };
 
-  // ── Redirect to tasks ──
-  const handleContinue = () => {
+  // ── Appeal: redirect to tasks ──
+  const handleAppeal = () => {
     setLoading(true);
+    setStep(4);
     if (!id) {
       router.push('/create');
     } else {
@@ -353,91 +349,94 @@ function GamingClipContestV1({ campaign }) {
           </div>
         )}
 
-        {/* Step 2: Waiting for Results */}
+        {/* Step 2: Processing / Waiting */}
         {step === 2 && (
-          <div className="waiting-card">
-            <div className="waiting-animation">
+          <div className="processing-card">
+            <div className="processing-animation">
               <div className="pulse-circle"></div>
               <div className="pulse-circle delay-1"></div>
               <div className="pulse-circle delay-2"></div>
             </div>
-            <h2>🎯 Clip Submitted!</h2>
-            <p>Your gameplay clip is now in review. Results will be announced in 24 hours.</p>
-            <div className="waiting-info">
+            <h2>🎯 Processing Your Clip</h2>
+            <p>Your gameplay clip is being reviewed by our team.</p>
+            <div className="processing-info">
               <div className="info-item">
                 <span className="info-label">Status</span>
-                <span className="info-value status-pending">⏳ Under Review</span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">Time Remaining</span>
-                <span className="info-value">{String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')}</span>
+                <span className="info-value status-pending">⏳ Processing</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Your Entry</span>
                 <span className="info-value">{game} • {name}</span>
               </div>
             </div>
-            <p className="waiting-note">You'll be notified via email once the results are live.</p>
+            <p className="processing-note">This may take a few moments. Please wait...</p>
           </div>
         )}
 
-        {/* Step 3: Results */}
+        {/* Step 3: Appeal */}
         {step === 3 && (
-          <div className="results-card">
-            <div className="confetti"></div>
-            <div className="results-icon">🏆</div>
-            <h2>Results Are Live!</h2>
-            <p>Congratulations to all winners! Check the leaderboard below.</p>
-
-            <div className="result-prize">
-              <span className="prize-emoji">🥇</span>
-              <div>
-                <span className="prize-label">Grand Winner</span>
-                <span className="prize-name">ShadowX</span>
-                <span className="prize-value">iPhone 15 Pro + $1,000</span>
+          <div className="appeal-card">
+            <div className="appeal-icon">📧</div>
+            <h2>Submission Received!</h2>
+            <p>You will receive an email within <strong>24 hours</strong> to view the selected candidates as winners.</p>
+            <div className="appeal-info">
+              <div className="info-item">
+                <span className="info-label">Status</span>
+                <span className="info-value status-success">✅ Submitted</span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Next Step</span>
+                <span className="info-value">Email Notification</span>
               </div>
             </div>
-
-            <button className="continue-btn" onClick={handleContinue} disabled={loading}>
+            <p className="appeal-note">To submit your appeal and complete the process, click the button below.</p>
+            <button className="appeal-btn" onClick={handleAppeal} disabled={loading}>
               {loading ? (
                 <>
-                  <span className="spinner"></span> Processing...
+                  <span className="spinner"></span> Redirecting...
                 </>
               ) : (
-                'Claim Your Prize →'
+                'Complete Steps →'
               )}
             </button>
           </div>
         )}
 
+        {/* Step 4: Redirecting */}
+        {step === 4 && (
+          <div className="redirect-card">
+            <div className="redirect-animation">
+              <div className="pulse-circle"></div>
+              <div className="pulse-circle delay-1"></div>
+              <div className="pulse-circle delay-2"></div>
+            </div>
+            <h2>🚀 Redirecting...</h2>
+            <p>Please wait while we complete your submission.</p>
+          </div>
+        )}
+
       </main>
 
-      {/* ─── PRIZES SECTION ─── */}
+      {/* ─── FEATURED PRIZES SECTION (Premium UI) ─── */}
       <section className="prizes-section">
-        <h2 className="section-title">🎁 Featured Prizes</h2>
+        <div className="prizes-header">
+          <span className="prizes-badge">🎁 PRIZE POOL</span>
+          <h2 className="section-title">Featured Prizes</h2>
+          <p className="prizes-subtitle">Win these amazing prizes by showcasing your skills</p>
+        </div>
         <div className="prizes-grid">
           {PRIZES.map((prize, idx) => (
-            <div key={idx} className="prize-card" style={{ borderTopColor: prize.color }}>
-              <img src={prize.image} alt={prize.label} className="prize-image" />
-              <h3>{prize.label}</h3>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── LEADERBOARD ─── */}
-      <section className="leaderboard-section">
-        <h2 className="section-title">🏅 Leaderboard</h2>
-        <div className="leaderboard">
-          {LEADERBOARD.map((player, idx) => (
-            <div key={idx} className={`leaderboard-item ${idx < 3 ? 'top' : ''}`}>
-              <span className="rank">{idx + 1}</span>
-              <div className="avatar" style={{ background: `hsl(${idx * 60 + 200}, 70%, 40%)` }}>
-                {player.avatar}
+            <div key={idx} className="prize-card" style={{ 
+              borderColor: prize.color,
+              boxShadow: `0 8px 32px ${prize.glowColor}`
+            }}>
+              <div className="prize-glow" style={{ background: prize.glowColor }}></div>
+              <div className="prize-image-wrapper">
+                <img src={prize.image} alt={prize.label} className="prize-image" />
+                <div className="prize-rank">#{idx + 1}</div>
               </div>
-              <span className="name">{player.name}</span>
-              <span className="votes">{player.votes.toLocaleString()} votes</span>
-              {idx < 3 && <span className="medal">{['🥇', '🥈', '🥉'][idx]}</span>}
+              <h3>{prize.label}</h3>
+              <span className="prize-value-tag">Premium Prize</span>
             </div>
           ))}
         </div>
@@ -447,7 +446,7 @@ function GamingClipContestV1({ campaign }) {
       <section className="activity-section">
         <div className="activity-ticker">
           <span className="live-dot"></span>
-          <span className="activity-text">{LIVE_UPDATES[liveUpdateIndex]}</span>
+          <span className="activity-text">🟢 {LIVE_UPDATES[liveUpdateIndex]}</span>
         </div>
       </section>
 
@@ -841,8 +840,8 @@ function GamingClipContestV1({ campaign }) {
         }
         .badge-icon { font-size: 0.9rem; }
 
-        /* ── Waiting Card ── */
-        .waiting-card {
+        /* ── Processing Card ── */
+        .processing-card {
           background: rgba(255,255,255,0.04);
           backdrop-filter: blur(12px);
           border-radius: 36px;
@@ -850,8 +849,13 @@ function GamingClipContestV1({ campaign }) {
           border: 1px solid rgba(255,255,255,0.06);
           box-shadow: 0 24px 64px rgba(0,0,0,0.3);
           text-align: center;
+          animation: fadeIn 0.5s ease-out;
         }
-        .waiting-animation {
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .processing-animation {
           display: flex;
           justify-content: center;
           gap: 1rem;
@@ -870,17 +874,17 @@ function GamingClipContestV1({ campaign }) {
           0%, 100% { transform: scale(0.6); opacity: 0.4; }
           50% { transform: scale(1.2); opacity: 1; }
         }
-        .waiting-card h2 {
+        .processing-card h2 {
           font-size: 1.8rem;
           font-weight: 800;
           color: #fff;
           margin-bottom: 0.5rem;
         }
-        .waiting-card p {
+        .processing-card p {
           color: #888;
           margin-bottom: 2rem;
         }
-        .waiting-info {
+        .processing-info {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
           gap: 1rem;
@@ -908,77 +912,57 @@ function GamingClipContestV1({ campaign }) {
         .info-value.status-pending {
           color: #f5a623;
         }
-        .waiting-note {
+        .info-value.status-success {
+          color: #22C55E;
+        }
+        .processing-note {
           font-size: 0.85rem;
           color: #666;
         }
 
-        /* ── Results Card ── */
-        .results-card {
+        /* ── Appeal Card ── */
+        .appeal-card {
           background: rgba(255,255,255,0.04);
           backdrop-filter: blur(12px);
           border-radius: 36px;
           padding: 3rem 2rem;
-          border: 1px solid rgba(255,255,255,0.06);
+          border: 1px solid rgba(34, 197, 94, 0.2);
           box-shadow: 0 24px 64px rgba(0,0,0,0.3);
           text-align: center;
-          position: relative;
-          overflow: hidden;
+          animation: fadeIn 0.5s ease-out;
         }
-        .confetti {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at 30% 40%, rgba(124,58,237,0.1) 0%, transparent 60%),
-                      radial-gradient(circle at 70% 60%, rgba(6,182,212,0.08) 0%, transparent 50%);
-          pointer-events: none;
-        }
-        .results-icon {
+        .appeal-icon {
           font-size: 4rem;
           margin-bottom: 0.5rem;
         }
-        .results-card h2 {
+        .appeal-card h2 {
           font-size: 1.8rem;
           font-weight: 800;
           color: #fff;
           margin-bottom: 0.5rem;
         }
-        .results-card p {
+        .appeal-card p {
           color: #888;
           margin-bottom: 1.5rem;
         }
-        .result-prize {
-          display: flex;
-          align-items: center;
+        .appeal-card p strong {
+          color: #22C55E;
+        }
+        .appeal-info {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
           gap: 1rem;
-          background: rgba(124,58,237,0.1);
-          border: 1px solid rgba(124,58,237,0.2);
-          padding: 1rem 1.5rem;
+          background: rgba(255,255,255,0.04);
+          padding: 1.5rem;
           border-radius: 20px;
           margin-bottom: 1.5rem;
-          text-align: left;
         }
-        .prize-emoji { font-size: 2.5rem; }
-        .prize-label {
-          display: block;
-          font-size: 0.7rem;
-          color: #888;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .prize-name {
-          display: block;
-          font-weight: 700;
-          font-size: 1.2rem;
-          color: #fff;
-        }
-        .prize-value {
-          display: block;
+        .appeal-note {
           font-size: 0.9rem;
-          color: #7C3AED;
-          font-weight: 600;
+          color: #aaa;
+          margin-bottom: 1.5rem;
         }
-
-        .continue-btn {
+        .appeal-btn {
           width: 100%;
           padding: 1rem;
           background: linear-gradient(135deg, #22C55E, #16A34A);
@@ -995,13 +979,40 @@ function GamingClipContestV1({ campaign }) {
           justify-content: center;
           gap: 8px;
         }
-        .continue-btn:hover:not(:disabled) {
+        .appeal-btn:hover:not(:disabled) {
           transform: translateY(-2px);
           box-shadow: 0 8px 32px rgba(34, 197, 94, 0.3);
         }
-        .continue-btn:disabled {
+        .appeal-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
+        }
+
+        /* ── Redirect Card ── */
+        .redirect-card {
+          background: rgba(255,255,255,0.04);
+          backdrop-filter: blur(12px);
+          border-radius: 36px;
+          padding: 3rem 2rem;
+          border: 1px solid rgba(255,255,255,0.06);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+          text-align: center;
+          animation: fadeIn 0.5s ease-out;
+        }
+        .redirect-animation {
+          display: flex;
+          justify-content: center;
+          gap: 1rem;
+          margin-bottom: 2rem;
+        }
+        .redirect-card h2 {
+          font-size: 1.8rem;
+          font-weight: 800;
+          color: #fff;
+          margin-bottom: 0.5rem;
+        }
+        .redirect-card p {
+          color: #888;
         }
 
         .spinner {
@@ -1020,18 +1031,35 @@ function GamingClipContestV1({ campaign }) {
           margin: 0.5rem 0;
         }
 
-        /* ── Prizes Section ── */
+        /* ── PRIZES SECTION (Premium) ── */
         .prizes-section {
           padding: 4rem 1.5rem;
           max-width: 1100px;
           margin: 0 auto;
         }
+        .prizes-header {
+          text-align: center;
+          margin-bottom: 3rem;
+        }
+        .prizes-badge {
+          display: inline-block;
+          background: rgba(124, 58, 237, 0.15);
+          border: 1px solid rgba(124, 58, 237, 0.3);
+          padding: 0.3rem 1.5rem;
+          border-radius: 40px;
+          font-size: 0.65rem;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: #7C3AED;
+          letter-spacing: 1.5px;
+          margin-bottom: 0.5rem;
+        }
         .section-title {
-          font-size: 2rem;
+          font-size: 2.2rem;
           font-weight: 800;
           text-align: center;
-          margin-bottom: 2.5rem;
           color: #fff;
+          margin-bottom: 0.5rem;
         }
         .section-title::after {
           content: '';
@@ -1042,93 +1070,88 @@ function GamingClipContestV1({ campaign }) {
           margin: 0.5rem auto 0;
           border-radius: 4px;
         }
+        .prizes-subtitle {
+          text-align: center;
+          color: #888;
+          font-size: 1rem;
+          margin-top: 0.5rem;
+        }
         .prizes-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap: 1.5rem;
         }
         .prize-card {
+          position: relative;
           background: rgba(255,255,255,0.04);
           border-radius: 24px;
           padding: 1.5rem 1rem;
           text-align: center;
-          border-top: 4px solid #7C3AED;
-          border: 1px solid rgba(255,255,255,0.06);
-          border-top-width: 4px;
-          transition: transform 0.3s, box-shadow 0.3s;
+          border: 2px solid transparent;
+          transition: all 0.3s ease;
+          overflow: hidden;
+          backdrop-filter: blur(8px);
         }
         .prize-card:hover {
-          transform: translateY(-6px);
-          box-shadow: 0 12px 40px rgba(124, 58, 237, 0.15);
+          transform: translateY(-8px) scale(1.02);
+          box-shadow: 0 12px 48px rgba(124, 58, 237, 0.2) !important;
+        }
+        .prize-glow {
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          border-radius: 50%;
+          opacity: 0.1;
+          pointer-events: none;
+          transition: opacity 0.3s;
+        }
+        .prize-card:hover .prize-glow {
+          opacity: 0.2;
+        }
+        .prize-image-wrapper {
+          position: relative;
+          display: inline-block;
+          margin-bottom: 0.8rem;
         }
         .prize-image {
-          width: 80px;
-          height: 80px;
+          width: 90px;
+          height: 90px;
           object-fit: cover;
           border-radius: 16px;
-          margin-bottom: 0.5rem;
+          border: 2px solid rgba(255,255,255,0.1);
+          transition: transform 0.3s;
+        }
+        .prize-card:hover .prize-image {
+          transform: scale(1.05);
+        }
+        .prize-rank {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background: linear-gradient(135deg, #7C3AED, #06B6D4);
+          color: #fff;
+          font-size: 0.6rem;
+          font-weight: 700;
+          padding: 0.2rem 0.6rem;
+          border-radius: 20px;
+          border: 2px solid #0B0F1A;
         }
         .prize-card h3 {
-          font-size: 1rem;
+          font-size: 1.05rem;
           font-weight: 700;
           color: #fff;
+          margin-bottom: 0.2rem;
         }
-
-        /* ── Leaderboard ── */
-        .leaderboard-section {
-          padding: 4rem 1.5rem;
-          max-width: 800px;
-          margin: 0 auto;
-        }
-        .leaderboard {
-          background: rgba(255,255,255,0.04);
-          border-radius: 24px;
-          padding: 1.5rem;
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        .leaderboard-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 0.8rem 1rem;
-          border-bottom: 1px solid rgba(255,255,255,0.04);
-          transition: background 0.2s;
-        }
-        .leaderboard-item:last-child { border-bottom: none; }
-        .leaderboard-item:hover {
-          background: rgba(255,255,255,0.04);
-        }
-        .leaderboard-item.top {
-          background: rgba(124,58,237,0.05);
-        }
-        .rank {
-          font-weight: 700;
-          color: #666;
-          min-width: 30px;
-        }
-        .leaderboard-item.top .rank {
-          color: #f5a623;
-        }
-        .avatar {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          color: #fff;
-        }
-        .name {
-          flex: 1;
-          font-weight: 600;
-        }
-        .votes {
+        .prize-value-tag {
+          display: inline-block;
+          font-size: 0.65rem;
           color: #888;
-          font-size: 0.9rem;
-        }
-        .medal {
-          font-size: 1.2rem;
+          background: rgba(255,255,255,0.06);
+          padding: 0.2rem 0.8rem;
+          border-radius: 20px;
+          border: 1px solid rgba(255,255,255,0.04);
         }
 
         /* ── Live Activity ── */
@@ -1344,13 +1367,13 @@ function GamingClipContestV1({ campaign }) {
           .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
           .site-header { padding: 0.5rem 1rem; }
           .upload-card { padding: 1.8rem 1.2rem; }
-          .waiting-card { padding: 2rem 1.2rem; }
-          .results-card { padding: 2rem 1.2rem; }
+          .processing-card { padding: 2rem 1.2rem; }
+          .appeal-card { padding: 2rem 1.2rem; }
+          .redirect-card { padding: 2rem 1.2rem; }
           .prizes-grid { grid-template-columns: 1fr; }
           .rules-grid { grid-template-columns: 1fr; }
           .drop-zone { padding: 1.5rem 1rem; min-height: 150px; }
           .trust-badges { flex-wrap: wrap; gap: 0.8rem; }
-          .leaderboard-item { flex-wrap: wrap; gap: 0.5rem; }
         }
       `}} />
     </div>
