@@ -28,13 +28,13 @@ const PRIZES = [
   },
   {
     label: '$3,000 Cash',
-    image: 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=150&h=150&fit=crop&auto=format',
+    image: 'https://thumbs.dreamstime.com/b/united-states-currency-hundred-dollar-bills-isolated-white-multiple-scattered-background-83510093.jpg',
     color: '#22C55E',
     glowColor: 'rgba(34, 197, 94, 0.3)',
   },
   {
     label: 'Tripod + Accessories',
-    image: 'https://images.unsplash.com/photo-1589739900243-4b52cd9dd8df?w=150&h=150&fit=crop&auto=format',
+    image: 'https://www.lenscoat.com/cdn/shop/articles/best-tripod-support-accessories_jpg.webp?v=1724392699',
     color: '#F59E0B',
     glowColor: 'rgba(245, 158, 11, 0.3)',
   },
