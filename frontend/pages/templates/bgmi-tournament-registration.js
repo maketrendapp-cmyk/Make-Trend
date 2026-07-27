@@ -522,22 +522,22 @@ function BgmiTournamentRegistration({ campaign }) {
         <h2 className="section-title">🎁 Featured Rewards</h2>
         <div className="rewards-grid">
           <div className="reward-card">
-            <img src="https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=100&h=100&fit=crop&auto=format" alt="Cash" />
-            <h3>Cash Prize</h3>
-            <p>₹100,000 Pool</p>
+            <img src="https://mms.businesswire.com/media/20210111005169/en/851040/5/hx-press-image-all-products-1000x611.jpg?download=1" alt="Gaming Items" />
+            <h3>Gaming Items</h3>
+            <p>For Teammates</p>
           </div>
           <div className="reward-card">
-            <img src="https://images.unsplash.com/photo-1618384887929-16ec33d0ef2d?w=100&h=100&fit=crop&auto=format" alt="Trophy" />
-            <h3>Trophy</h3>
-            <p>Champions Trophy</p>
+            <img src="https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=150&h=150&fit=crop&auto=format" alt="Trophy" />
+            <h3>Gaming Laptop</h3>
+            <p>Laptop</p>
           </div>
           <div className="reward-card">
             <img src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100&h=100&fit=crop&auto=format" alt="Gaming Phone" />
-            <h3>Gaming Phone</h3>
+            <h3>iPhone 15 Pro</h3>
             <p>For MVPs</p>
           </div>
           <div className="reward-card">
-            <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100&h=100&fit=crop&auto=format" alt="Headset" />
+            <img src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=150&h=150&fit=crop&auto=format" alt="Headset" />
             <h3>Gaming Headset</h3>
             <p>Premium Gear</p>
           </div>
