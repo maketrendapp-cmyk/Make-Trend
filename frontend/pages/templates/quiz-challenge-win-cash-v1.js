@@ -6,8 +6,8 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 
 // ── Default Meta ──
 const defaultMeta = {
-  title: 'Quiz Challenge – Win Real Cash 2026',
-  description: 'Join the ultimate quiz competition and win real cash prizes. Answer 8 questions and claim your reward!',
+  title: 'Quiz Challenge – Win Real Cash 2026 | Free Quiz Competition',
+  description: 'Join the ultimate quiz competition and win real cash prizes. Answer 8 questions, complete tasks, and claim your $100 reward. Free to enter!',
   image: 'https://maketrend.app/og-image.png',
   url: 'https://maketrend.app/quiz-challenge-win-cash-v1?id={id}',
 };
@@ -18,7 +18,7 @@ const QUESTIONS = [
     id: 1,
     question: 'What is the capital of France?',
     options: ['London', 'Paris', 'Berlin', 'Madrid'],
-    correct: 1, // index of correct answer (0‑based)
+    correct: 1,
   },
   {
     id: 2,
@@ -69,13 +69,9 @@ function QuizChallengeWinCashV1({ campaign }) {
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=register, 2=quiz, 3=results
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    category: 'general',
-  });
+  const [step, setStep] = useState(1);
+  const [fullName, setFullName] = useState('');
+  const [category, setCategory] = useState('general');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -113,9 +109,7 @@ function QuizChallengeWinCashV1({ campaign }) {
 
   // ── Validation ──
   const validateRegistration = () => {
-    if (!formData.fullName.trim()) return 'Please enter your full name.';
-    if (!formData.email.trim() || !/^\S+@\S+\.\S+$/.test(formData.email)) return 'Enter a valid email address.';
-    if (!formData.phone.trim() || !/^\d{10,12}$/.test(formData.phone.replace(/\s/g, ''))) return 'Enter a valid 10‑12 digit phone number.';
+    if (!fullName.trim()) return 'Please enter your full name.';
     if (!acceptedTerms) return 'You must accept the terms to continue.';
     return null;
   };
@@ -150,7 +144,6 @@ function QuizChallengeWinCashV1({ campaign }) {
     if (currentQuestion < QUESTIONS.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      // Quiz completed
       setQuizCompleted(true);
       setStep(3);
     }
@@ -197,7 +190,7 @@ function QuizChallengeWinCashV1({ campaign }) {
         <div className="header-badge">💰 Win Real Cash</div>
       </header>
 
-      {/* ─── HERO / STEP INDICATOR ─── */}
+      {/* ─── HERO ─── */}
       <section className="hero">
         <div className="hero-overlay"></div>
         <div className="hero-content">
@@ -249,42 +242,24 @@ function QuizChallengeWinCashV1({ campaign }) {
               <input
                 type="text"
                 placeholder="e.g. John Doe"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Email Address <span className="required">*</span></label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Phone Number <span className="required">*</span></label>
-              <input
-                type="tel"
-                placeholder="e.g. 98XXXXXXXX"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
               />
             </div>
 
             <div className="form-group">
               <label>Category <span className="required">*</span></label>
               <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
               >
                 <option value="general">General Knowledge</option>
                 <option value="sports">Sports</option>
                 <option value="technology">Technology</option>
                 <option value="science">Science</option>
                 <option value="history">History</option>
+                <option value="entertainment">Entertainment</option>
+                <option value="geography">Geography</option>
               </select>
             </div>
 
@@ -343,7 +318,7 @@ function QuizChallengeWinCashV1({ campaign }) {
         {step === 3 && (
           <div className="result-card">
             <div className="result-icon">🎉</div>
-            <h2>Congratulations, {formData.fullName}!</h2>
+            <h2>Congratulations, {fullName}!</h2>
             <p>You have successfully completed the quiz. You are now eligible to claim your reward.</p>
             <div className="prize-badge">
               <span>🏆</span>
@@ -366,6 +341,59 @@ function QuizChallengeWinCashV1({ campaign }) {
         )}
 
       </main>
+
+      {/* ─── HOW TO PLAY ─── */}
+      <section className="how-to-play">
+        <h2 className="section-title">📋 How to Play</h2>
+        <div className="steps">
+          <div className="step">
+            <div className="step-number">1</div>
+            <div className="step-content">
+              <h3>Register</h3>
+              <p>Enter your full name and select your preferred category.</p>
+            </div>
+          </div>
+          <div className="step">
+            <div className="step-number">2</div>
+            <div className="step-content">
+              <h3>Answer Questions</h3>
+              <p>Answer 8 quiz questions. Select the correct option for each.</p>
+            </div>
+          </div>
+          <div className="step">
+            <div className="step-number">3</div>
+            <div className="step-content">
+              <h3>Complete Tasks</h3>
+              <p>Finish 3 simple tasks to verify your entry and eligibility.</p>
+            </div>
+          </div>
+          <div className="step">
+            <div className="step-number">4</div>
+            <div className="step-content">
+              <h3>Claim Your Prize</h3>
+              <p>Receive your $100 cash prize directly to your wallet.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── TERMS & CONDITIONS ─── */}
+      <section id="terms" className="terms-section">
+        <h2 className="section-title">📜 Terms & Conditions</h2>
+        <div className="terms-content">
+          <ul>
+            <li><strong>Eligibility:</strong> Open to all participants aged 18 years and above.</li>
+            <li><strong>Entry:</strong> One entry per person. Duplicate entries will be disqualified.</li>
+            <li><strong>Quiz Rules:</strong> Participants must answer all 8 questions to qualify.</li>
+            <li><strong>Tasks:</strong> Winners must complete the required tasks within 24 hours of quiz completion.</li>
+            <li><strong>Prize Distribution:</strong> Prizes are paid via PayPal or bank transfer within 48 hours of task completion.</li>
+            <li><strong>Fraud Prevention:</strong> Any fraudulent activity, including fake accounts or automated entries, will result in immediate disqualification.</li>
+            <li><strong>Data Privacy:</strong> Your information is secure and will only be used for prize distribution.</li>
+            <li><strong>Changes:</strong> The organizers reserve the right to modify or terminate this competition at any time.</li>
+            <li><strong>Affiliation:</strong> This competition is not affiliated with any third‑party platform.</li>
+          </ul>
+        </div>
+      </section>
 
       {/* ─── FOOTER ─── */}
       <footer className="site-footer">
@@ -778,6 +806,108 @@ function QuizChallengeWinCashV1({ campaign }) {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ── How to Play ── */
+        .how-to-play {
+          padding: 4rem 1.5rem;
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+        .section-title {
+          font-size: 2rem;
+          font-weight: 800;
+          text-align: center;
+          margin-bottom: 2.5rem;
+          color: #1a1a2e;
+        }
+        .section-title::after {
+          content: '';
+          display: block;
+          width: 60px;
+          height: 4px;
+          background: #f5a623;
+          margin: 0.5rem auto 0;
+          border-radius: 4px;
+        }
+        .steps {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1.5rem;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+        .step {
+          background: #fff;
+          padding: 1.5rem;
+          border-radius: 20px;
+          text-align: center;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+          border: 1px solid #eef0f4;
+          transition: transform 0.2s;
+        }
+        .step:hover {
+          transform: translateY(-4px);
+        }
+        .step-number {
+          width: 48px; height: 48px;
+          background: #f5a623;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 900;
+          font-size: 1.3rem;
+          color: #fff;
+          margin: 0 auto 0.8rem;
+        }
+        .step-content h3 {
+          font-size: 1rem;
+          font-weight: 700;
+          color: #1a1a2e;
+          margin-bottom: 0.2rem;
+        }
+        .step-content p {
+          color: #6b7280;
+          font-size: 0.85rem;
+        }
+
+        /* ── Terms Section ── */
+        .terms-section {
+          padding: 4rem 1.5rem;
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+        .terms-content {
+          background: #fff;
+          padding: 2rem;
+          border-radius: 24px;
+          border: 1px solid #eef0f4;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          max-width: 900px;
+          margin: 0 auto;
+        }
+        .terms-content ul {
+          list-style: none;
+          padding: 0;
+        }
+        .terms-content ul li {
+          padding: 0.6rem 0 0.6rem 1.8rem;
+          position: relative;
+          color: #4b5563;
+          border-bottom: 1px solid #f3f4f6;
+          font-size: 0.9rem;
+        }
+        .terms-content ul li::before {
+          content: '▸';
+          position: absolute;
+          left: 0;
+          color: #f5a623;
+          font-weight: 700;
+        }
+        .terms-content ul li:last-child { border-bottom: none; }
+        .terms-content ul li strong {
+          color: #1a1a2e;
+        }
+
         /* ── Footer ── */
         .site-footer {
           background: #1a1a2e;
@@ -873,6 +1003,7 @@ function QuizChallengeWinCashV1({ campaign }) {
           .register-card, .quiz-card, .result-card { padding: 1.8rem 1.2rem; }
           .question-text { font-size: 1.2rem; }
           .option-btn { padding: 0.7rem 1rem; font-size: 0.9rem; }
+          .steps { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 480px) {
           .header-badge { font-size: 0.6rem; padding: 0.2rem 0.8rem; }
@@ -880,6 +1011,8 @@ function QuizChallengeWinCashV1({ campaign }) {
           .register-card h2 { font-size: 1.5rem; }
           .prize-badge { padding: 0.4rem 1rem; }
           .prize-amount { font-size: 1.3rem; }
+          .steps { grid-template-columns: 1fr; }
+          .terms-content { padding: 1.2rem; }
         }
       `}} />
     </div>
