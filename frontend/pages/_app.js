@@ -37,6 +37,7 @@ const NO_LAYOUT_PAGES = [
 '/templates/lucky-draw-premium-prizes-v1',
 '/templates/gaming-clip-contest',
 '/templates/photography-contest',
+'/templates/bgmi-tournament-registration',
 
   '/tasks',
   '/share',
