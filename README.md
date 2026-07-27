@@ -1,7 +1,7 @@
 <!-- frontend/README.md -->
 
 <div align="center">
-  <img src="public/favicon.ico" alt="Make Trend Logo" width="80" />
+  <img src="frontend/public/favicon.ico" alt="Make Trend Logo" width="80" />
   <h1>🚀 Make Trend – Frontend</h1>
   <p><strong>Create, share, and track viral campaigns in minutes.</strong></p>
 
