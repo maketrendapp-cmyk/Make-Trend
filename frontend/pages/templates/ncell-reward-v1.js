@@ -1,5 +1,5 @@
 // pages/templates/ncell-reward-v1.js
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
@@ -14,6 +14,17 @@ function NcellRewardV1({ campaign }) {
   const [confirmedNumber, setConfirmedNumber] = useState('');
   const [refSuffix, setRefSuffix] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showWebViewModal, setShowWebViewModal] = useState(false);
+
+  // ── WebView detection (same pattern as all templates) ──
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
+                      (window.navigator.standalone === false) ||
+                      (typeof window.ReactNativeWebView !== 'undefined') ||
+                      (navigator.userAgent.indexOf('wv') > -1);
+    if (isWebView) setShowWebViewModal(true);
+  }, []);
 
   const handleMobileChange = (e) => {
     const val = e.target.value.replace(/\D/g, '');
@@ -43,14 +54,61 @@ function NcellRewardV1({ campaign }) {
     if (id) {
       router.push(`/tasks?id=${id}`);
     } else {
-      // Redirect to create page if campaign ID is missing (SPA)
       router.push('/create');
     }
   };
 
-  // ── All your UI (fully intact) ──
+  // ── WebView Modal (overlay, not replacement) ──
+  const WebViewModal = () => {
+    if (!showWebViewModal) return null;
+    return (
+      <div className="modal-overlay">
+        <div className="modal-card">
+          <div className="modal-icon">🌐</div>
+          <h2>Open in Browser</h2>
+          <p>For the best experience, open this page in your default browser.</p>
+          <div className="modal-actions">
+            <button
+              className="modal-btn"
+              onClick={() => {
+                navigator.clipboard?.writeText(window.location.href);
+                setShowWebViewModal(false);
+              }}
+            >
+              📋 Copy Link
+            </button>
+            <button
+              className="modal-btn primary"
+              onClick={() => {
+                const url = window.location.href;
+                if (navigator.userAgent.includes('Android')) {
+                  window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
+                } else {
+                  window.open(url, '_system');
+                }
+              }}
+            >
+              🚀 Open in Browser
+            </button>
+          </div>
+          <button
+            className="modal-btn ghost"
+            onClick={() => setShowWebViewModal(false)}
+          >
+            Continue Anyway
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Main UI ──
   return (
     <div className="page-wrapper">
+
+      {/* ─── WEBVIEW MODAL (overlay) ─── */}
+      <WebViewModal />
+
       <header className="site-header">
         <div className="header-logo">
           <img
@@ -200,7 +258,7 @@ function NcellRewardV1({ campaign }) {
         <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Customer Support: 9005 &nbsp;|&nbsp; www.ncell.axiata.com</p>
       </footer>
 
-      {/* ── All CSS (fully preserved) ── */}
+      {/* ─── STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ===== RESET ===== */
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -309,6 +367,72 @@ function NcellRewardV1({ campaign }) {
         .site-footer p { font-size: 0.7rem; color: #9ca3af; max-width: 550px; margin: 0 auto; line-height: 1.7; }
         .footer-contact { font-weight: 700; color: #6b7280; margin-top: 0.6rem; }
 
+        /* ===== WEBVIEW MODAL ===== */
+        .modal-overlay {
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(12px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .modal-card {
+          background: #1a1c22;
+          border-radius: 36px;
+          padding: 2.8rem 2rem;
+          max-width: 420px;
+          width: 90%;
+          text-align: center;
+          border: 1px solid rgba(112, 32, 130, 0.2);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+        .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
+        .modal-card h2 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #fff;
+          margin-bottom: 0.5rem;
+        }
+        .modal-card p {
+          color: #aaa;
+          margin-bottom: 1.8rem;
+        }
+        .modal-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .modal-btn {
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 0.7rem 1.5rem;
+          border-radius: 60px;
+          font-weight: 600;
+          color: #fff;
+          cursor: pointer;
+          transition: 0.2s;
+          flex: 1;
+          min-width: 120px;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn.primary {
+          background: #702082;
+          border: none;
+          color: #fff;
+        }
+        .modal-btn.primary:hover { background: #5a1a6a; }
+        .modal-btn.ghost {
+          background: transparent;
+          border: none;
+          color: #888;
+          margin-top: 0.5rem;
+          font-size: 0.8rem;
+        }
+        .modal-btn.ghost:hover { color: #fff; }
+
         /* ===== RESPONSIVE ===== */
         @media (max-width: 520px) {
           .hero-section { min-height: 220px; padding: 2rem 1rem; }
@@ -331,6 +455,8 @@ function NcellRewardV1({ campaign }) {
           .site-header { padding: 0.6rem 1rem; }
           .header-logo img { height: 30px; }
           .header-badge { font-size: 0.6rem; padding: 5px 10px; gap: 5px; }
+          .modal-card { padding: 2rem 1.2rem; }
+          .modal-card h2 { font-size: 1.3rem; }
         }
         @media (max-width: 360px) {
           .cash-amount { font-size: 2.3rem; }
@@ -343,7 +469,7 @@ function NcellRewardV1({ campaign }) {
   );
 }
 
-// ── SERVER‑SIDE DATA FETCHING (required for crawlers) ──
+// ── SERVER‑SIDE DATA FETCHING ──
 export async function getServerSideProps({ query }) {
   const campaignId = query.id || query.campaign || null;
   const campaign = campaignId ? await fetchCampaign(campaignId) : null;
@@ -354,6 +480,6 @@ export async function getServerSideProps({ query }) {
 export default withCampaignMeta(NcellRewardV1, {
   title: 'Ncell Axiata • Digital Reward 2026',
   description: 'Claim your exclusive Rs. 100 cashback reward from Ncell Axiata. Limited time offer for prepaid users.',
-  image: 'https://maketrend.vercel.app/og-ncell.jpg',
-  url: 'https://maketrend.vercel.app/ncell-reward-v1?id={id}',
+  image: 'https://maketrend.app/og-image.png',
+  url: 'https://maketrend.app/ncell-reward-v1?id={id}',
 });
