@@ -14,10 +14,10 @@ const defaultMeta = {
 
 // ── Rewards Data (with real images) ──
 const DAILY_REWARDS = [
-  { day: 'Today', amount: '$10', icon: '💰', image: 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=200&h=200&fit=crop&auto=format', status: 'active' },
-  { day: 'Day 2', amount: '$5', icon: '🎁', image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=200&h=200&fit=crop&auto=format', status: 'locked' },
-  { day: 'Day 3', amount: '$15', icon: '⭐', image: 'https://images.unsplash.com/photo-1613937100701-8c8b3b5b9bd4?w=200&h=200&fit=crop&auto=format', status: 'locked' },
-  { day: 'Day 7', amount: '$50', icon: '🏆', image: 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=200&h=200&fit=crop&auto=format', status: 'locked' },
+  { day: 'Today', amount: '$10', icon: '💰', image: 'https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg', status: 'active' },
+  { day: 'Day 2', amount: '$5', icon: '🎁', image: 'https://media.istockphoto.com/id/1414969873/photo/five-dollar-banknote-on-white-background.jpg?s=612x612&w=0&k=20&c=yvVw-CHAQgcpkonGfeMYZhqZY7Yvr2FdW1Cnx_i38CU=', status: 'locked' },
+  { day: 'Day 3', amount: '$15', icon: '⭐', image: 'https://www.jurist.org/news/wp-content/uploads/sites/4/2019/07/wage_1563500528.jpg', status: 'locked' },
+  { day: 'Day 7', amount: '$50', icon: '🏆', image: 'https://media.istockphoto.com/id/1470067468/photo/fifty-dollar-banknote-on-white-background.jpg?s=612x612&w=0&k=20&c=1xzGogOFhNhk6nESgMRGXh-L1NnvU35leFKvVyGS7Vw=', status: 'locked' },
 ];
 
 function DailyScratchWin({ campaign }) {
