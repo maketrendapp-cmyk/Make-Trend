@@ -69,7 +69,7 @@ function DailyScratchWin({ campaign }) {
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
-    img.src = 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=600&h=400&fit=crop&auto=format';
+    img.src = 'https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg';
     img.onload = () => setMoneyImage(img);
   }, []);
 
@@ -423,7 +423,7 @@ function DailyScratchWin({ campaign }) {
             <p>Your $10 reward has been confirmed.</p>
             <div className="claimed-reward">
               <img
-                src="https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=100&h=100&fit=crop&auto=format"
+                src="https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg"
                 alt="$10"
                 className="claimed-image"
               />
