@@ -118,38 +118,34 @@ function DownloadYourFiles({ campaign }) {
         </div>
       </section>
 
-      {/* ─── MAIN CARD ─── */}
-      <section className="main-section">
-        <div className="main-card">
-          {/* File Preview */}
-          <div className="file-preview">
-            <div className="file-icon-wrapper">
-              <span className="file-icon">📄</span>
-            </div>
-            <div className="file-info">
-              <h3>{campaign?.file_name || 'Your File'}</h3>
-              <p className="file-meta">
-                {campaign?.file_size || '2.4 MB'} • {campaign?.file_type || 'PDF'}
-              </p>
-              {campaign?.file_description && (
-                <p className="file-desc">{campaign.file_description}</p>
-              )}
-            </div>
+      {/* ─── DOWNLOAD CARD ─── */}
+      <section className="download-section">
+        <div className="download-card">
+
+          {/* File Icon */}
+          <div className="file-icon-wrapper">
+            <span className="file-icon">📄</span>
           </div>
 
-          {/* Unlock Steps */}
-          <div className="unlock-steps">
-            <div className="step-item completed">
-              <span className="step-icon">✅</span>
-              <span className="step-text">File ready to download</span>
+          {/* File Name */}
+          <h2 className="file-name">{campaign?.file_name || 'Your File'}</h2>
+
+          {/* Progress Steps */}
+          <div className="progress-steps">
+            <div className="progress-step completed">
+              <div className="step-circle">✓</div>
+              <div className="step-line"></div>
+              <span className="step-label">File Ready</span>
             </div>
-            <div className="step-item active">
-              <span className="step-icon">🔓</span>
-              <span className="step-text">Complete tasks to unlock</span>
+            <div className="progress-step active">
+              <div className="step-circle">🔓</div>
+              <div className="step-line"></div>
+              <span className="step-label">Complete Tasks</span>
             </div>
-            <div className="step-item">
-              <span className="step-icon">⬇️</span>
-              <span className="step-text">Download instantly</span>
+            <div className="progress-step">
+              <div className="step-circle">⬇️</div>
+              <div className="step-line"></div>
+              <span className="step-label">Download</span>
             </div>
           </div>
 
@@ -180,21 +176,21 @@ function DownloadYourFiles({ campaign }) {
             <div className="step-number">1</div>
             <div className="step-content">
               <h3>Complete Tasks</h3>
-              <p>Finish the required tasks to verify.</p>
+              <p>Finish the required tasks to verify your identity.</p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">2</div>
             <div className="step-content">
-              <h3>Unlock Download</h3>
-              <p>Your file is unlocked instantly.</p>
+              <h3>Unlock File</h3>
+              <p>Your file is unlocked instantly after task completion.</p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">3</div>
             <div className="step-content">
-              <h3>Get Your File</h3>
-              <p>Download your file safely.</p>
+              <h3>Download</h3>
+              <p>Download your file safely and securely.</p>
             </div>
           </div>
         </div>
@@ -280,7 +276,7 @@ function DownloadYourFiles({ campaign }) {
         /* ── Hero ── */
         .hero {
           position: relative;
-          min-height: 35vh;
+          min-height: 40vh;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -312,7 +308,7 @@ function DownloadYourFiles({ campaign }) {
           letter-spacing: 1px;
         }
         .hero h1 {
-          font-size: clamp(2rem, 6vw, 3rem);
+          font-size: clamp(2.2rem, 6vw, 3.2rem);
           font-weight: 900;
           line-height: 1.1;
           margin-bottom: 0.3rem;
@@ -340,121 +336,140 @@ function DownloadYourFiles({ campaign }) {
         }
         .hero-stats span { margin-right: 6px; }
 
-        /* ── Main Section ── */
-        .main-section {
+        /* ── Download Section ── */
+        .download-section {
           padding: 2rem 1.5rem;
           max-width: 640px;
           margin: -2rem auto 2rem;
           position: relative;
           z-index: 10;
         }
-        .main-card {
+        .download-card {
           background: #fff;
           border-radius: 32px;
-          padding: 2rem;
+          padding: 2.5rem 2rem;
           box-shadow: 0 20px 60px rgba(0,0,0,0.08);
           border: 1px solid #eef2f6;
           text-align: center;
         }
 
-        /* File Preview */
-        .file-preview {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 1.5rem 0;
-          border-bottom: 1px solid #eef2f6;
-          margin-bottom: 1.5rem;
-        }
         .file-icon-wrapper {
-          width: 80px;
-          height: 80px;
+          width: 100px;
+          height: 100px;
           background: #eff6ff;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 0.8rem;
-          box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
+          margin: 0 auto 0.5rem;
+          box-shadow: 0 8px 32px rgba(37, 99, 235, 0.12);
         }
         .file-icon {
-          font-size: 2.8rem;
+          font-size: 3.5rem;
           color: #2563EB;
         }
-        .file-info h3 {
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #1a1a2e;
-          margin-bottom: 0.1rem;
-        }
-        .file-meta {
-          font-size: 0.85rem;
-          color: #6b7280;
-        }
-        .file-desc {
-          font-size: 0.9rem;
-          color: #4b5563;
-          margin-top: 0.3rem;
-        }
 
-        /* Unlock Steps */
-        .unlock-steps {
-          display: flex;
-          flex-direction: column;
-          gap: 0.6rem;
+        .file-name {
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #1a1a2e;
           margin-bottom: 1.5rem;
         }
-        .step-item {
+
+        /* Progress Steps */
+        .progress-steps {
           display: flex;
           align-items: center;
-          gap: 0.8rem;
-          padding: 0.6rem 1rem;
-          background: #f9fafb;
-          border-radius: 12px;
-          border: 1px solid #eef2f6;
-          font-size: 0.9rem;
-          color: #1a1a2e;
-          transition: all 0.2s;
+          justify-content: center;
+          gap: 0;
+          margin-bottom: 2rem;
+          padding: 0 0.5rem;
         }
-        .step-item.completed {
-          background: #f0fdf4;
-          border-color: #22C55E;
+        .progress-step {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          flex: 1;
+          position: relative;
         }
-        .step-item.active {
-          background: #eff6ff;
-          border-color: #2563EB;
-          box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
-        }
-        .step-icon {
+        .step-circle {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-size: 1.2rem;
-          width: 24px;
-          text-align: center;
+          font-weight: 700;
+          background: #e5e7eb;
+          color: #9ca3af;
+          transition: all 0.3s;
+          z-index: 2;
+          position: relative;
         }
-        .step-text {
-          font-weight: 500;
+        .step-line {
+          position: absolute;
+          top: 24px;
+          left: 50%;
+          right: -50%;
+          height: 3px;
+          background: #e5e7eb;
+          z-index: 1;
+        }
+        .progress-step:last-child .step-line {
+          display: none;
+        }
+        .progress-step.completed .step-circle {
+          background: #22C55E;
+          color: #fff;
+        }
+        .progress-step.completed .step-line {
+          background: #22C55E;
+        }
+        .progress-step.active .step-circle {
+          background: #2563EB;
+          color: #fff;
+          box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.15);
+        }
+        .progress-step.active .step-line {
+          background: #2563EB;
+        }
+        .step-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: #6b7280;
+          margin-top: 0.4rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .progress-step.completed .step-label {
+          color: #22C55E;
+        }
+        .progress-step.active .step-label {
+          color: #2563EB;
         }
 
         /* Download Button */
         .download-btn {
           width: 100%;
-          padding: 0.9rem;
+          padding: 1rem;
           background: linear-gradient(135deg, #2563EB, #1D4ED8);
           border: none;
           border-radius: 60px;
           font-weight: 800;
-          font-size: 1rem;
+          font-size: 1.1rem;
           color: #fff;
           cursor: pointer;
           transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 20px rgba(37, 99, 235, 0.2);
+          box-shadow: 0 4px 24px rgba(37, 99, 235, 0.25);
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
         }
         .download-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(37, 99, 235, 0.3);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 36px rgba(37, 99, 235, 0.35);
         }
         .download-btn:disabled {
           opacity: 0.6;
@@ -463,8 +478,8 @@ function DownloadYourFiles({ campaign }) {
 
         .spinner {
           display: inline-block;
-          width: 18px;
-          height: 18px;
+          width: 20px;
+          height: 20px;
           border: 2px solid rgba(255,255,255,0.3);
           border-top-color: #fff;
           border-radius: 50%;
@@ -475,7 +490,7 @@ function DownloadYourFiles({ campaign }) {
         }
 
         .secure-note {
-          font-size: 0.75rem;
+          font-size: 0.8rem;
           color: #6b7280;
           margin-top: 1rem;
         }
@@ -520,8 +535,8 @@ function DownloadYourFiles({ campaign }) {
           transform: translateY(-4px);
         }
         .step-number {
-          width: 44px;
-          height: 44px;
+          width: 48px;
+          height: 48px;
           background: linear-gradient(135deg, #2563EB, #1D4ED8);
           border-radius: 50%;
           display: flex;
@@ -533,12 +548,12 @@ function DownloadYourFiles({ campaign }) {
           margin: 0 auto 0.6rem;
         }
         .step-content h3 {
-          font-size: 0.95rem;
+          font-size: 1rem;
           font-weight: 700;
           color: #1a1a2e;
         }
         .step-content p {
-          font-size: 0.8rem;
+          font-size: 0.85rem;
           color: #888;
         }
 
@@ -685,11 +700,29 @@ function DownloadYourFiles({ campaign }) {
             font-size: 0.75rem;
             padding: 0.3rem 1rem;
           }
-          .file-preview {
-            flex-direction: column;
+          .download-card {
+            padding: 1.8rem 1.2rem;
           }
-          .main-card {
-            padding: 1.5rem;
+          .file-icon-wrapper {
+            width: 80px;
+            height: 80px;
+          }
+          .file-icon {
+            font-size: 2.8rem;
+          }
+          .file-name {
+            font-size: 1.3rem;
+          }
+          .step-circle {
+            width: 40px;
+            height: 40px;
+            font-size: 1rem;
+          }
+          .step-line {
+            top: 20px;
+          }
+          .step-label {
+            font-size: 0.6rem;
           }
         }
         @media (max-width: 480px) {
@@ -703,12 +736,27 @@ function DownloadYourFiles({ campaign }) {
           .site-header {
             padding: 0.5rem 1rem;
           }
-          .main-section {
+          .download-section {
             padding: 1rem 1rem;
           }
-          .unlock-steps .step-item {
-            font-size: 0.8rem;
-            padding: 0.5rem 0.8rem;
+          .progress-steps {
+            flex-direction: column;
+            gap: 0.3rem;
+          }
+          .step-line {
+            display: none !important;
+          }
+          .progress-step {
+            flex-direction: row;
+            gap: 0.8rem;
+            width: 100%;
+          }
+          .step-label {
+            margin-top: 0;
+          }
+          .download-btn {
+            font-size: 1rem;
+            padding: 0.8rem;
           }
         }
       `}} />
