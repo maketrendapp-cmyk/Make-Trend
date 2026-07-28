@@ -1,4 +1,4 @@
-// pages/templates/download-file-unlock.js
+// pages/templates/download-your-files.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
@@ -6,13 +6,13 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 
 // ── Default Meta ──
 const defaultMeta = {
-  title: 'Download File – Complete Tasks to Unlock',
-  description: 'Get your file by completing a few simple tasks. Safe, secure, and free. Start now!',
+  title: 'Download Your Files – Complete Tasks to Unlock',
+  description: 'Get your files by completing a few simple tasks. Safe, secure, and free. Start now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/download-file-unlock',
+  url: 'https://maketrend.app/download-your-files',
 };
 
-function DownloadFileUnlock({ campaign }) {
+function DownloadYourFiles({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
@@ -95,7 +95,7 @@ function DownloadFileUnlock({ campaign }) {
       <header className="site-header">
         <div className="logo">
           <span className="logo-icon">📥</span>
-          <span className="logo-text">File<span>Unlock</span></span>
+          <span className="logo-text">File<span>Hub</span></span>
         </div>
         <div className="header-badge">🔒 Secure</div>
       </header>
@@ -105,7 +105,7 @@ function DownloadFileUnlock({ campaign }) {
         <div className="hero-overlay"></div>
         <div className="hero-content">
           <div className="hero-badge">📂 FILE READY</div>
-          <h1>{campaign?.title || 'Download Your File'}</h1>
+          <h1>{campaign?.title || 'Download Your Files'}</h1>
           <p>
             {campaign?.description ||
               'Complete the tasks below to unlock your download.'}
@@ -118,25 +118,42 @@ function DownloadFileUnlock({ campaign }) {
         </div>
       </section>
 
-      {/* ─── UNLOCK SECTION ─── */}
-      <section className="unlock-section">
-        <div className="unlock-card">
-          <h2>🔓 Unlock Your Download</h2>
-          <p>Complete the tasks below to get your file.</p>
-          <div className="task-preview">
-            <div className="task-item">
-              <span className="task-icon">✅</span>
-              <span>Complete all tasks</span>
+      {/* ─── MAIN CARD ─── */}
+      <section className="main-section">
+        <div className="main-card">
+          {/* File Preview */}
+          <div className="file-preview">
+            <div className="file-icon-wrapper">
+              <span className="file-icon">📄</span>
             </div>
-            <div className="task-item">
-              <span className="task-icon">📋</span>
-              <span>Verify your actions</span>
-            </div>
-            <div className="task-item">
-              <span className="task-icon">⬇️</span>
-              <span>Download instantly</span>
+            <div className="file-info">
+              <h3>{campaign?.file_name || 'Your File'}</h3>
+              <p className="file-meta">
+                {campaign?.file_size || '2.4 MB'} • {campaign?.file_type || 'PDF'}
+              </p>
+              {campaign?.file_description && (
+                <p className="file-desc">{campaign.file_description}</p>
+              )}
             </div>
           </div>
+
+          {/* Unlock Steps */}
+          <div className="unlock-steps">
+            <div className="step-item completed">
+              <span className="step-icon">✅</span>
+              <span className="step-text">File ready to download</span>
+            </div>
+            <div className="step-item active">
+              <span className="step-icon">🔓</span>
+              <span className="step-text">Complete tasks to unlock</span>
+            </div>
+            <div className="step-item">
+              <span className="step-icon">⬇️</span>
+              <span className="step-text">Download instantly</span>
+            </div>
+          </div>
+
+          {/* Download Button */}
           <button
             className="download-btn"
             onClick={handleDownload}
@@ -150,6 +167,7 @@ function DownloadFileUnlock({ campaign }) {
               'Download Now →'
             )}
           </button>
+
           <p className="secure-note">🔒 Your download is secure and private.</p>
         </div>
       </section>
@@ -207,8 +225,8 @@ function DownloadFileUnlock({ campaign }) {
 
       {/* ─── FOOTER ─── */}
       <footer className="site-footer">
-        <p>© 2026 FileUnlock. All rights reserved.</p>
-        <p className="footer-contact">Questions? support@fileunlock.com</p>
+        <p>© 2026 FileHub. All rights reserved.</p>
+        <p className="footer-contact">Questions? support@filehub.com</p>
       </footer>
 
       {/* ─── STYLES ─── */}
@@ -216,14 +234,14 @@ function DownloadFileUnlock({ campaign }) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Segoe UI', system-ui, sans-serif;
-          background: #f8fafc;
+          background: #f0f4f8;
           color: #1a1a2e;
           line-height: 1.6;
         }
         .page-wrapper {
           max-width: 100%;
           overflow-x: hidden;
-          background: #f8fafc;
+          background: #f0f4f8;
           min-height: 100vh;
           display: flex;
           flex-direction: column;
@@ -262,7 +280,7 @@ function DownloadFileUnlock({ campaign }) {
         /* ── Hero ── */
         .hero {
           position: relative;
-          min-height: 40vh;
+          min-height: 35vh;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -270,6 +288,7 @@ function DownloadFileUnlock({ campaign }) {
           padding: 2.5rem 1.5rem;
           background: linear-gradient(135deg, #eff6ff, #dbeafe);
           color: #1a1a2e;
+          overflow: hidden;
         }
         .hero-overlay {
           position: absolute; inset: 0;
@@ -321,36 +340,71 @@ function DownloadFileUnlock({ campaign }) {
         }
         .hero-stats span { margin-right: 6px; }
 
-        /* ── Unlock Section ── */
-        .unlock-section {
+        /* ── Main Section ── */
+        .main-section {
           padding: 2rem 1.5rem;
-          max-width: 560px;
-          margin: 0 auto;
+          max-width: 640px;
+          margin: -2rem auto 2rem;
+          position: relative;
+          z-index: 10;
         }
-        .unlock-card {
+        .main-card {
           background: #fff;
           border-radius: 32px;
           padding: 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
           border: 1px solid #eef2f6;
           text-align: center;
         }
-        .unlock-card h2 {
-          font-size: 1.6rem;
-          font-weight: 800;
+
+        /* File Preview */
+        .file-preview {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 1.5rem 0;
+          border-bottom: 1px solid #eef2f6;
+          margin-bottom: 1.5rem;
+        }
+        .file-icon-wrapper {
+          width: 80px;
+          height: 80px;
+          background: #eff6ff;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 0.8rem;
+          box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
+        }
+        .file-icon {
+          font-size: 2.8rem;
+          color: #2563EB;
+        }
+        .file-info h3 {
+          font-size: 1.2rem;
+          font-weight: 700;
           color: #1a1a2e;
+          margin-bottom: 0.1rem;
         }
-        .unlock-card p {
+        .file-meta {
+          font-size: 0.85rem;
           color: #6b7280;
-          margin-bottom: 1.2rem;
         }
-        .task-preview {
+        .file-desc {
+          font-size: 0.9rem;
+          color: #4b5563;
+          margin-top: 0.3rem;
+        }
+
+        /* Unlock Steps */
+        .unlock-steps {
           display: flex;
           flex-direction: column;
           gap: 0.6rem;
           margin-bottom: 1.5rem;
         }
-        .task-item {
+        .step-item {
           display: flex;
           align-items: center;
           gap: 0.8rem;
@@ -360,9 +414,27 @@ function DownloadFileUnlock({ campaign }) {
           border: 1px solid #eef2f6;
           font-size: 0.9rem;
           color: #1a1a2e;
+          transition: all 0.2s;
         }
-        .task-icon { font-size: 1.2rem; }
+        .step-item.completed {
+          background: #f0fdf4;
+          border-color: #22C55E;
+        }
+        .step-item.active {
+          background: #eff6ff;
+          border-color: #2563EB;
+          box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+        }
+        .step-icon {
+          font-size: 1.2rem;
+          width: 24px;
+          text-align: center;
+        }
+        .step-text {
+          font-weight: 500;
+        }
 
+        /* Download Button */
         .download-btn {
           width: 100%;
           padding: 0.9rem;
@@ -384,17 +456,23 @@ function DownloadFileUnlock({ campaign }) {
           transform: translateY(-2px);
           box-shadow: 0 8px 30px rgba(37, 99, 235, 0.3);
         }
-        .download-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .download-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
 
         .spinner {
           display: inline-block;
-          width: 18px; height: 18px;
+          width: 18px;
+          height: 18px;
           border: 2px solid rgba(255,255,255,0.3);
           border-top-color: #fff;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
 
         .secure-note {
           font-size: 0.75rem;
@@ -438,9 +516,12 @@ function DownloadFileUnlock({ campaign }) {
           border: 1px solid #eef2f6;
           transition: transform 0.2s;
         }
-        .step:hover { transform: translateY(-4px); }
+        .step:hover {
+          transform: translateY(-4px);
+        }
         .step-number {
-          width: 44px; height: 44px;
+          width: 44px;
+          height: 44px;
           background: linear-gradient(135deg, #2563EB, #1D4ED8);
           border-radius: 50%;
           display: flex;
@@ -451,8 +532,15 @@ function DownloadFileUnlock({ campaign }) {
           color: #fff;
           margin: 0 auto 0.6rem;
         }
-        .step-content h3 { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; }
-        .step-content p { font-size: 0.8rem; color: #888; }
+        .step-content h3 {
+          font-size: 0.95rem;
+          font-weight: 700;
+          color: #1a1a2e;
+        }
+        .step-content p {
+          font-size: 0.8rem;
+          color: #888;
+        }
 
         /* ── FAQ ── */
         .faq-section {
@@ -472,9 +560,19 @@ function DownloadFileUnlock({ campaign }) {
           border: 1px solid #eef2f6;
           transition: border-color 0.2s;
         }
-        .faq-item:hover { border-color: #2563EB; }
-        .faq-question { font-weight: 700; font-size: 0.9rem; color: #1a1a2e; }
-        .faq-answer p { font-size: 0.85rem; color: #6b7280; margin-top: 0.3rem; }
+        .faq-item:hover {
+          border-color: #2563EB;
+        }
+        .faq-question {
+          font-weight: 700;
+          font-size: 0.9rem;
+          color: #1a1a2e;
+        }
+        .faq-answer p {
+          font-size: 0.85rem;
+          color: #6b7280;
+          margin-top: 0.3rem;
+        }
 
         /* ── Footer ── */
         .site-footer {
@@ -485,14 +583,23 @@ function DownloadFileUnlock({ campaign }) {
           border-top: 1px solid rgba(255,255,255,0.04);
           margin-top: auto;
         }
-        .site-footer p { font-size: 0.75rem; margin-bottom: 0.2rem; }
-        .footer-contact { font-weight: 600; color: #e5e7eb; }
+        .site-footer p {
+          font-size: 0.75rem;
+          margin-bottom: 0.2rem;
+        }
+        .footer-contact {
+          font-weight: 600;
+          color: #e5e7eb;
+        }
 
         /* ── Modal ── */
         .modal-overlay {
           position: fixed;
-          top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(0,0,0,0.85);
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.85);
           backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
@@ -507,11 +614,23 @@ function DownloadFileUnlock({ campaign }) {
           width: 90%;
           text-align: center;
           border: 1px solid rgba(37, 99, 235, 0.15);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
         }
-        .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
-        .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
-        .modal-card p { color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .modal-icon {
+          font-size: 3rem;
+          margin-bottom: 0.3rem;
+        }
+        .modal-card h2 {
+          font-size: 1.4rem;
+          font-weight: 800;
+          color: #fff;
+          margin-bottom: 0.3rem;
+        }
+        .modal-card p {
+          color: #aaa;
+          font-size: 0.85rem;
+          margin-bottom: 1.5rem;
+        }
         .modal-actions {
           display: flex;
           gap: 10px;
@@ -519,8 +638,8 @@ function DownloadFileUnlock({ campaign }) {
           justify-content: center;
         }
         .modal-btn {
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           padding: 0.6rem 1.2rem;
           border-radius: 40px;
           font-weight: 600;
@@ -531,12 +650,16 @@ function DownloadFileUnlock({ campaign }) {
           flex: 1;
           min-width: 100px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.12); }
+        .modal-btn:hover {
+          background: rgba(255, 255, 255, 0.12);
+        }
         .modal-btn.primary {
           background: #2563EB;
           border: none;
         }
-        .modal-btn.primary:hover { background: #1D4ED8; }
+        .modal-btn.primary:hover {
+          background: #1D4ED8;
+        }
         .modal-btn.ghost {
           background: transparent;
           border: none;
@@ -544,18 +667,49 @@ function DownloadFileUnlock({ campaign }) {
           font-size: 0.7rem;
           margin-top: 0.3rem;
         }
-        .modal-btn.ghost:hover { color: #fff; }
+        .modal-btn.ghost:hover {
+          color: #fff;
+        }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
-          .steps { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
-          .hero-stats { gap: 0.8rem; }
-          .hero-stats div { font-size: 0.75rem; padding: 0.3rem 1rem; }
+          .steps {
+            grid-template-columns: 1fr;
+            max-width: 400px;
+            margin: 0 auto;
+          }
+          .hero-stats {
+            gap: 0.8rem;
+          }
+          .hero-stats div {
+            font-size: 0.75rem;
+            padding: 0.3rem 1rem;
+          }
+          .file-preview {
+            flex-direction: column;
+          }
+          .main-card {
+            padding: 1.5rem;
+          }
         }
         @media (max-width: 480px) {
-          .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
-          .unlock-card { padding: 1.5rem; }
-          .hero h1 { font-size: 1.8rem; }
+          .header-badge {
+            font-size: 0.55rem;
+            padding: 0.2rem 0.8rem;
+          }
+          .hero h1 {
+            font-size: 1.8rem;
+          }
+          .site-header {
+            padding: 0.5rem 1rem;
+          }
+          .main-section {
+            padding: 1rem 1rem;
+          }
+          .unlock-steps .step-item {
+            font-size: 0.8rem;
+            padding: 0.5rem 0.8rem;
+          }
         }
       `}} />
     </div>
@@ -570,4 +724,4 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── Wrap with Meta ──
-export default withCampaignMeta(DownloadFileUnlock, defaultMeta);
+export default withCampaignMeta(DownloadYourFiles, defaultMeta);
