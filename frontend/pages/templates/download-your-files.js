@@ -339,7 +339,7 @@ function DownloadYourFiles({ campaign }) {
         /* ── Download Section ── */
         .download-section {
           padding: 2rem 1.5rem;
-          max-width: 640px;
+          max-width: 760px; /* ← FIX: increased from 640px */
           margin: -2rem auto 2rem;
           position: relative;
           z-index: 10;
@@ -347,7 +347,7 @@ function DownloadYourFiles({ campaign }) {
         .download-card {
           background: #fff;
           border-radius: 32px;
-          padding: 2.5rem 2rem;
+          padding: 2.5rem 2.5rem; /* ← FIX: more horizontal padding */
           box-shadow: 0 20px 60px rgba(0,0,0,0.08);
           border: 1px solid #eef2f6;
           text-align: center;
@@ -738,6 +738,9 @@ function DownloadYourFiles({ campaign }) {
           }
           .download-section {
             padding: 1rem 1rem;
+          }
+          .download-card {
+            padding: 1.5rem 1rem;
           }
           .progress-steps {
             flex-direction: column;
