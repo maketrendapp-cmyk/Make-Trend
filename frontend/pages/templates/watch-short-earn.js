@@ -348,11 +348,8 @@ function WatchShortEarn({ campaign }) {
             </div>
           </div>
           <div className="faq-item">
-            <div className="faq-icon">?</div>
-            <div>
-              <div className="faq-question">Are there hidden fees?</div>
-              <div className="faq-answer">Absolutely none. Our advertisers pay us for your attention, and we pass the majority of that directly to you.</div>
-            </div>
+            <div className="faq-question">Are there hidden fees?</div>
+            <div className="faq-answer">Absolutely none. Our advertisers pay us for your attention, and we pass the majority of that directly to you.</div>
           </div>
         </div>
       </section>
@@ -434,8 +431,8 @@ function WatchShortEarn({ campaign }) {
         .hero-stats { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
         .stat-pill { background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 40px; border: 1px solid var(--border-color); font-weight: 600; font-size: 0.85rem; color: #d1d5db; display: flex; align-items: center; gap: 6px; }
 
-        /* ── Main Card ── */
-        .main-section { padding: 0 1.5rem; max-width: 640px; margin: -2rem auto 3rem; position: relative; z-index: 10; }
+        /* ── Main Card (Balanced for PC) ── */
+        .main-section { padding: 0 1.5rem; max-width: 760px; margin: -3.5rem auto 3rem; position: relative; z-index: 10; }
         .main-card {
           background: var(--bg-surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
           border-radius: 28px; padding: 2.5rem 2rem; border: 1px solid var(--border-color);
@@ -585,28 +582,64 @@ function WatchShortEarn({ campaign }) {
         .modal-btn.text-only { background: transparent; color: #6b7280; font-size: 0.8rem; margin-top: 1rem; }
         .modal-btn.text-only:hover { color: #fff; }
 
-        /* ── Responsive ── */
+        /* ── Responsive Mobile Optimization ── */
         @media (max-width: 768px) {
           .steps { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; gap: 1.2rem; }
           .why-grid { grid-template-columns: 1fr 1fr; }
           .testimonials-grid { grid-template-columns: 1fr; }
-          .main-section { margin-top: -2.5rem; }
+          .main-section { margin-top: -2.5rem; max-width: 100%; padding: 0 1rem; }
           .main-card { padding: 2rem 1.5rem; }
-          .reward-amount { font-size: 2rem; }
-          .hero { padding-top: 2rem; min-height: auto; padding-bottom: 5rem; }
+          .reward-amount { font-size: 2.2rem; }
+          .hero { padding-top: 2rem; min-height: auto; padding-bottom: 4rem; }
           .hero h1 { font-size: 2.2rem; }
           .stat-pill { font-size: 0.75rem; padding: 0.4rem 0.8rem; }
         }
+        
         @media (max-width: 480px) {
           .header-badge { font-size: 0.65rem; padding: 0.3rem 0.6rem; }
           .logo { font-size: 1.1rem; }
-          .main-card { border-radius: 20px; padding: 1.5rem 1rem; }
+          
+          /* FIX: Wider on mobile */
+          .main-section { padding: 0 0.8rem; margin-top: -2rem; }
+          
+          /* FIX: Shorter padding vertically */
+          .main-card { border-radius: 24px; padding: 1.25rem; }
+          
           .why-grid { grid-template-columns: 1fr; }
-          .features-row { flex-direction: column; gap: 0.8rem; align-items: stretch; }
-          .feature-item { justify-content: flex-start; padding: 0.5rem; background: rgba(255,255,255,0.02); border-radius: 8px; }
-          .feature-divider { display: none; }
-          .reward-display { flex-direction: column; text-align: center; }
-          .reward-info { text-align: center; }
+          
+          /* FIX: Horizontal Features Row instead of stacked to save vertical height */
+          .features-row { 
+            flex-direction: row; 
+            gap: 0; 
+            padding: 0.75rem 0.5rem; 
+            align-items: center; 
+            margin-bottom: 1.25rem; 
+          }
+          .feature-item { 
+            flex-direction: column; 
+            gap: 4px; 
+            padding: 0; 
+            background: transparent; 
+          }
+          .feature-text { align-items: center; }
+          .feature-title { font-size: 0.6rem; }
+          .feature-sub { font-size: 0.75rem; }
+          .feature-divider { display: block; height: 24px; align-self: center; margin: 0 0.5rem; }
+          
+          /* FIX: Horizontal Reward Display */
+          .reward-display { 
+            flex-direction: row; 
+            text-align: left; 
+            margin-bottom: 1.25rem; 
+            gap: 1rem; 
+          }
+          .reward-info { text-align: left; }
+          .reward-amount { font-size: 2rem; }
+          .reward-circle { width: 56px; height: 56px; }
+          .reward-icon { font-size: 1.6rem; }
+          
+          .video-preview-container { margin-bottom: 1.25rem; }
+          
           .continue-btn { font-size: 1rem; padding: 1rem; }
           .faq-item { padding: 1.2rem; flex-direction: column; gap: 0.8rem; }
         }
