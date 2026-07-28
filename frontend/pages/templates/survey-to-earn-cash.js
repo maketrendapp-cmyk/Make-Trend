@@ -1,4 +1,4 @@
-// pages/templates/survey-get-10.js
+// pages/templates/survey-to-earn-cash.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
@@ -6,7 +6,7 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 
 // ── Default Meta ──
 const defaultMeta = {
-  title: 'Survey & Get $10 – Share Your Opinion, Earn Reward',
+  title: 'Survey to Earn Cash – Get $10 Free!',
   description: 'Complete a short survey and earn $10 instantly. Share your opinion, help brands improve, and get paid.',
   image: 'https://maketrend.app/og-image.png',
   url: 'https://maketrend.app/survey-to-earn-cash?id={id}',
@@ -41,12 +41,12 @@ const SURVEY_QUESTIONS = [
   },
 ];
 
-function SurveyGet10({ campaign }) {
+function SurveyToEarnCash({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=info, 2=survey, 3=form, 4=claimed
+  const [step, setStep] = useState(1); // 1=survey, 2=form, 3=claimed
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
   const [name, setName] = useState('');
@@ -82,25 +82,6 @@ function SurveyGet10({ campaign }) {
     return () => clearInterval(timer);
   }, []);
 
-  // ── Validate info ──
-  const validateInfo = () => {
-    if (!name.trim()) return 'Please enter your full name.';
-    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) return 'Please enter a valid email address.';
-    if (!acceptedTerms) return 'You must accept the terms to continue.';
-    return null;
-  };
-
-  // ── Start survey ──
-  const startSurvey = () => {
-    const err = validateInfo();
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError('');
-    setStep(2);
-  };
-
   // ── Select answer ──
   const selectAnswer = (option) => {
     setAnswers(prev => ({
@@ -119,7 +100,8 @@ function SurveyGet10({ campaign }) {
     if (currentQuestion < SURVEY_QUESTIONS.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      setStep(3);
+      // Survey complete → move to form step
+      setStep(2);
     }
   };
 
@@ -130,10 +112,19 @@ function SurveyGet10({ campaign }) {
     }
   };
 
-  // ── Submit survey ──
-  const submitSurvey = () => {
-    if (!acceptedTerms) {
-      setError('You must accept the terms to continue.');
+  // ── Validate form ──
+  const validateForm = () => {
+    if (!name.trim()) return 'Please enter your full name.';
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) return 'Please enter a valid email address.';
+    if (!acceptedTerms) return 'You must accept the terms to continue.';
+    return null;
+  };
+
+  // ── Claim reward ──
+  const handleClaim = () => {
+    const err = validateForm();
+    if (err) {
+      setError(err);
       return;
     }
     setError('');
@@ -141,7 +132,7 @@ function SurveyGet10({ campaign }) {
 
     setTimeout(() => {
       setLoading(false);
-      setStep(4);
+      setStep(3);
     }, 1500);
   };
 
@@ -233,19 +224,12 @@ function SurveyGet10({ campaign }) {
           )}
           {step === 2 && (
             <>
-              <div className="hero-badge">📝 QUESTION {currentQuestion + 1} OF {SURVEY_QUESTIONS.length}</div>
-              <h1>Answer Honestly</h1>
-              <p>Your feedback helps brands improve.</p>
-            </>
-          )}
-          {step === 3 && (
-            <>
               <div className="hero-badge">✅ SURVEY COMPLETE</div>
               <h1>Almost Done!</h1>
               <p>Enter your details to claim your $10 reward.</p>
             </>
           )}
-          {step === 4 && (
+          {step === 3 && (
             <>
               <div className="hero-badge">🎉 REWARD READY</div>
               <h1>You Earned <span>$10</span>!</h1>
@@ -258,58 +242,8 @@ function SurveyGet10({ campaign }) {
       {/* ─── MAIN CONTENT ─── */}
       <main className="main-content">
 
-        {/* Step 1: Info Form */}
+        {/* Step 1: Survey Questions */}
         {step === 1 && (
-          <div className="info-card">
-            <h2>Enter Your Details</h2>
-            <p>We need your info to send the reward.</p>
-
-            <div className="form-group">
-              <label>Full Name <span className="required">*</span></label>
-              <input
-                type="text"
-                placeholder="e.g. John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Email Address <span className="required">*</span></label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div className="checkbox-group">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={acceptedTerms}
-                onChange={(e) => setAcceptedTerms(e.target.checked)}
-              />
-              <label htmlFor="terms">I agree to the <a href="#terms">Terms &amp; Conditions</a></label>
-            </div>
-
-            {error && <p className="form-error">{error}</p>}
-
-            <button className="start-btn" onClick={startSurvey} disabled={loading}>
-              Start Survey →
-            </button>
-
-            <div className="trust-badges">
-              <span><span className="badge-icon">🔒</span> Secure</span>
-              <span><span className="badge-icon">✅</span> Verified</span>
-              <span><span className="badge-icon">💰</span> Guaranteed</span>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Survey Questions */}
-        {step === 2 && (
           <div className="survey-card">
             <div className="survey-progress">
               <div className="progress-bar">
@@ -349,18 +283,18 @@ function SurveyGet10({ campaign }) {
                 ← Back
               </button>
               <button className="next-btn" onClick={nextQuestion}>
-                {currentQuestion === SURVEY_QUESTIONS.length - 1 ? 'Submit →' : 'Next →'}
+                {currentQuestion === SURVEY_QUESTIONS.length - 1 ? 'Submit Survey →' : 'Next →'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: Claim Form */}
-        {step === 3 && (
-          <div className="claim-card">
+        {/* Step 2: Form */}
+        {step === 2 && (
+          <div className="form-card">
             <div className="reward-badge">💰 $10 Reward</div>
-            <h2>Claim Your Reward</h2>
-            <p>Confirm your details to receive $10.</p>
+            <h2>Enter Your Details</h2>
+            <p>Fill in your information to claim your $10 reward.</p>
 
             <div className="form-group">
               <label>Full Name <span className="required">*</span></label>
@@ -385,16 +319,16 @@ function SurveyGet10({ campaign }) {
             <div className="checkbox-group">
               <input
                 type="checkbox"
-                id="terms-claim"
+                id="terms"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
               />
-              <label htmlFor="terms-claim">I confirm my details are correct.</label>
+              <label htmlFor="terms">I agree to the <a href="#terms">Terms &amp; Conditions</a></label>
             </div>
 
             {error && <p className="form-error">{error}</p>}
 
-            <button className="claim-btn" onClick={submitSurvey} disabled={loading}>
+            <button className="claim-btn" onClick={handleClaim} disabled={loading}>
               {loading ? (
                 <>
                   <span className="spinner"></span> Processing...
@@ -406,8 +340,8 @@ function SurveyGet10({ campaign }) {
           </div>
         )}
 
-        {/* Step 4: Claimed Success */}
-        {step === 4 && (
+        {/* Step 3: Claimed Success */}
+        {step === 3 && (
           <div className="success-card">
             <div className="success-icon">✅</div>
             <h2>$10 Reward Claimed!</h2>
@@ -467,15 +401,15 @@ function SurveyGet10({ campaign }) {
           <div className="step">
             <div className="step-number">1</div>
             <div className="step-content">
-              <h3>Enter Details</h3>
-              <p>Provide your name and email.</p>
+              <h3>Take Survey</h3>
+              <p>Answer 5 simple questions.</p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">2</div>
             <div className="step-content">
-              <h3>Take Survey</h3>
-              <p>Answer 5 simple questions.</p>
+              <h3>Enter Details</h3>
+              <p>Provide your name and email.</p>
             </div>
           </div>
           <div className="step">
@@ -651,117 +585,6 @@ function SurveyGet10({ campaign }) {
           z-index: 10;
         }
 
-        /* ── Info Card ── */
-        .info-card {
-          background: #fff;
-          border-radius: 32px;
-          padding: 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
-          border: 1px solid #eef2f6;
-        }
-        .info-card h2 {
-          font-size: 1.6rem;
-          font-weight: 800;
-          text-align: center;
-          color: #1a1a2e;
-        }
-        .info-card > p {
-          text-align: center;
-          color: #6b7280;
-          margin-bottom: 1.5rem;
-        }
-
-        .form-group {
-          margin-bottom: 1rem;
-        }
-        .form-group label {
-          display: block;
-          font-weight: 600;
-          font-size: 0.8rem;
-          color: #374151;
-          margin-bottom: 0.2rem;
-        }
-        .form-group .required { color: #ef4444; }
-        .form-group input {
-          width: 100%;
-          padding: 0.7rem 1rem;
-          border: 2px solid #e5e7eb;
-          border-radius: 12px;
-          font-size: 0.9rem;
-          background: #f9fafb;
-          transition: border-color 0.2s;
-          outline: none;
-        }
-        .form-group input:focus {
-          border-color: #00B4D8;
-          background: #fff;
-          box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.08);
-        }
-
-        .checkbox-group {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          margin: 1rem 0;
-        }
-        .checkbox-group input {
-          width: 18px; height: 18px;
-          margin-top: 2px;
-          accent-color: #00B4D8;
-          flex-shrink: 0;
-        }
-        .checkbox-group label {
-          font-size: 0.8rem;
-          color: #4b5563;
-        }
-        .checkbox-group label a {
-          color: #00B4D8;
-          text-decoration: none;
-        }
-        .form-error {
-          color: #ef4444;
-          font-size: 0.8rem;
-          margin: 0.5rem 0;
-        }
-
-        .start-btn {
-          width: 100%;
-          padding: 0.9rem;
-          background: linear-gradient(135deg, #00B4D8, #0077B6);
-          border: none;
-          border-radius: 60px;
-          font-weight: 800;
-          font-size: 1rem;
-          color: #fff;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 20px rgba(0, 180, 216, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-        .start-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(0, 180, 216, 0.3);
-        }
-        .start-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .trust-badges {
-          display: flex;
-          justify-content: center;
-          gap: 1.5rem;
-          margin-top: 1.2rem;
-          font-size: 0.7rem;
-          color: #888;
-        }
-        .trust-badges span {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-        }
-        .badge-icon { font-size: 0.8rem; }
-
         /* ── Survey Card ── */
         .survey-card {
           background: #fff;
@@ -876,9 +699,14 @@ function SurveyGet10({ campaign }) {
           transition: transform 0.2s, box-shadow 0.2s;
         }
         .next-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0, 180, 216, 0.2); }
+        .form-error {
+          color: #ef4444;
+          font-size: 0.8rem;
+          margin: 0.5rem 0;
+        }
 
-        /* ── Claim Card ── */
-        .claim-card {
+        /* ── Form Card ── */
+        .form-card {
           background: #fff;
           border-radius: 32px;
           padding: 2rem;
@@ -895,14 +723,62 @@ function SurveyGet10({ campaign }) {
           font-size: 0.8rem;
           margin-bottom: 0.5rem;
         }
-        .claim-card h2 {
+        .form-card h2 {
           font-size: 1.6rem;
           font-weight: 800;
           color: #1a1a2e;
         }
-        .claim-card > p {
+        .form-card > p {
           color: #6b7280;
           margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+          margin-bottom: 1rem;
+        }
+        .form-group label {
+          display: block;
+          font-weight: 600;
+          font-size: 0.8rem;
+          color: #374151;
+          margin-bottom: 0.2rem;
+        }
+        .form-group .required { color: #ef4444; }
+        .form-group input {
+          width: 100%;
+          padding: 0.7rem 1rem;
+          border: 2px solid #e5e7eb;
+          border-radius: 12px;
+          font-size: 0.9rem;
+          background: #f9fafb;
+          transition: border-color 0.2s;
+          outline: none;
+        }
+        .form-group input:focus {
+          border-color: #00B4D8;
+          background: #fff;
+          box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.08);
+        }
+
+        .checkbox-group {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin: 1rem 0;
+        }
+        .checkbox-group input {
+          width: 18px; height: 18px;
+          margin-top: 2px;
+          accent-color: #00B4D8;
+          flex-shrink: 0;
+        }
+        .checkbox-group label {
+          font-size: 0.8rem;
+          color: #4b5563;
+        }
+        .checkbox-group label a {
+          color: #00B4D8;
+          text-decoration: none;
         }
 
         .claim-btn {
@@ -1205,13 +1081,11 @@ function SurveyGet10({ campaign }) {
         @media (max-width: 480px) {
           .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
           .main-content { padding: 0 1rem; }
-          .info-card { padding: 1.5rem; }
           .survey-card { padding: 1.5rem; }
-          .claim-card { padding: 1.5rem; }
+          .form-card { padding: 1.5rem; }
           .success-card { padding: 1.5rem; }
           .why-grid { grid-template-columns: 1fr; }
           .hero h1 { font-size: 1.8rem; }
-          .trust-badges { flex-wrap: wrap; gap: 0.8rem; }
           .question-text { font-size: 1rem; }
         }
       `}} />
@@ -1227,4 +1101,4 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── Wrap with Meta ──
-export default withCampaignMeta(SurveyGet10, defaultMeta);
+export default withCampaignMeta(SurveyToEarnCash, defaultMeta);
