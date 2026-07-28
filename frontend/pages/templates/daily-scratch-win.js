@@ -346,7 +346,7 @@ function DailyScratchWin({ campaign }) {
               <div className="reward-badge">
                 <div className="reward-image-wrapper">
                   <img
-                    src="https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=100&h=100&fit=crop&auto=format"
+                    src="https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg"
                     alt="$10 Reward"
                     className="reward-image"
                   />
