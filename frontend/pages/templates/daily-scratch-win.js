@@ -12,6 +12,14 @@ const defaultMeta = {
   url: 'https://maketrend.app/daily-scratch-win?id={id}',
 };
 
+// ── Rewards Data (with real images) ──
+const DAILY_REWARDS = [
+  { day: 'Today', amount: '$10', icon: '💰', image: 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=200&h=200&fit=crop&auto=format', status: 'active' },
+  { day: 'Day 2', amount: '$5', icon: '🎁', image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=200&h=200&fit=crop&auto=format', status: 'locked' },
+  { day: 'Day 3', amount: '$15', icon: '⭐', image: 'https://images.unsplash.com/photo-1613937100701-8c8b3b5b9bd4?w=200&h=200&fit=crop&auto=format', status: 'locked' },
+  { day: 'Day 7', amount: '$50', icon: '🏆', image: 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=200&h=200&fit=crop&auto=format', status: 'locked' },
+];
+
 function DailyScratchWin({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
@@ -26,7 +34,7 @@ function DailyScratchWin({ campaign }) {
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [isScratched, setIsScratched] = useState(false);
-  const [scratchProgress, setScratchProgress] = useState(0);
+  const [moneyImage, setMoneyImage] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 23, minutes: 59, seconds: 59 });
 
   const canvasRef = useRef(null);
@@ -57,6 +65,14 @@ function DailyScratchWin({ campaign }) {
     return () => clearInterval(timer);
   }, []);
 
+  // ── Preload money image for canvas ──
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.src = 'https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=600&h=400&fit=crop&auto=format';
+    img.onload = () => setMoneyImage(img);
+  }, []);
+
   // ── Scratch card canvas ──
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -66,7 +82,6 @@ function DailyScratchWin({ campaign }) {
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    // Set canvas size
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
@@ -74,75 +89,71 @@ function DailyScratchWin({ campaign }) {
     const w = rect.width;
     const h = rect.height;
 
-    // ── Draw reward background ──
-    const gradient = ctx.createLinearGradient(0, 0, w, h);
-    gradient.addColorStop(0, '#f5f3ff');
-    gradient.addColorStop(0.5, '#ede9fe');
-    gradient.addColorStop(1, '#ddd6fe');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, w, h);
+    // ── Reward background ──
+    if (moneyImage) {
+      // Draw the $10 bill image
+      ctx.drawImage(moneyImage, 0, 0, w, h);
+      // Dark overlay to make text pop
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      // Fallback gradient
+      const gradient = ctx.createLinearGradient(0, 0, w, h);
+      gradient.addColorStop(0, '#f5f3ff');
+      gradient.addColorStop(0.5, '#ede9fe');
+      gradient.addColorStop(1, '#ddd6fe');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, w, h);
+    }
 
-    // ── $10 reward display ──
+    // ── "YOU WON $10!" text ──
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    ctx.fillText('🎉 YOU WON $10!', w / 2, h / 2 + 50);
+    ctx.shadowBlur = 0;
 
-    // Money icon
-    ctx.font = '60px sans-serif';
-    ctx.fillStyle = '#8B5CF6';
-    ctx.fillText('💰', w / 2, h / 2 - 30);
-
-    // $10 text
-    ctx.font = 'bold 48px sans-serif';
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillText('$10', w / 2, h / 2 + 40);
-
-    // "YOU WON!" text
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillStyle = '#6b7280';
-    ctx.fillText('YOU WON!', w / 2, h / 2 + 80);
-
-    // ── Scratch overlay (silver) ──
+    // ── Scratch overlay (dark metallic) ──
     const overlayGradient = ctx.createLinearGradient(0, 0, w, h);
-    overlayGradient.addColorStop(0, '#d1d5db');
-    overlayGradient.addColorStop(0.3, '#e5e7eb');
-    overlayGradient.addColorStop(0.6, '#d1d5db');
-    overlayGradient.addColorStop(0.8, '#f3f4f6');
-    overlayGradient.addColorStop(1, '#d1d5db');
+    overlayGradient.addColorStop(0, '#4b5563');
+    overlayGradient.addColorStop(0.3, '#9ca3af');
+    overlayGradient.addColorStop(0.6, '#6b7280');
+    overlayGradient.addColorStop(0.8, '#374151');
+    overlayGradient.addColorStop(1, '#4b5563');
     ctx.fillStyle = overlayGradient;
     ctx.fillRect(0, 0, w, h);
 
-    // ── Scratch me text ──
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = 'bold 20px sans-serif';
+    // ── Scratch me text (highly visible) ──
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🖐️ Scratch Me', w / 2, h / 2);
+    ctx.fillText('🖐️ Scratch Me', w / 2, h / 2 - 10);
+    ctx.shadowBlur = 0;
 
-    // ── Pattern lines ──
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 2;
-    for (let i = -h; i < w + h; i += 20) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i + h, h);
-      ctx.stroke();
-    }
-
-    // ── Border ──
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 2;
+    // ── Border glow ──
+    ctx.shadowColor = 'rgba(139, 92, 246, 0.3)';
+    ctx.shadowBlur = 20;
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
+    ctx.lineWidth = 3;
     ctx.strokeRect(0, 0, w, h);
+    ctx.shadowBlur = 0;
 
-    // ── Scratch event listeners ──
+    // ── Scratch logic ──
     const scratch = (x, y) => {
-      const radius = 25;
+      const radius = 30;
       ctx.globalCompositeOperation = 'destination-out';
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
 
-      // Update progress
+      // Check if enough scratched (10% threshold)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const pixels = imageData.data;
       let transparent = 0;
@@ -150,17 +161,15 @@ function DailyScratchWin({ campaign }) {
         if (pixels[i] === 0) transparent++;
       }
       const progress = (transparent / (canvas.width * canvas.height)) * 100;
-      setScratchProgress(progress);
 
-      if (progress > 40 && !isScratched) {
+      if (progress > 10 && !isScratched) {
         setIsScratched(true);
-        // Clear remaining overlay smoothly
+        // Reveal full reward instantly
         ctx.globalCompositeOperation = 'destination-out';
         ctx.fillStyle = 'rgba(0,0,0,1)';
         ctx.fillRect(0, 0, w, h);
         ctx.globalCompositeOperation = 'source-over';
-        setScratchProgress(100);
-        setTimeout(() => setStep(2), 500);
+        setTimeout(() => setStep(2), 400);
       }
     };
 
@@ -207,7 +216,7 @@ function DailyScratchWin({ campaign }) {
       canvas.removeEventListener('touchmove', onMove);
       canvas.removeEventListener('touchend', onEnd);
     };
-  }, [isScratched]);
+  }, [moneyImage, isScratched]);
 
   // ── Validate ──
   const validate = () => {
@@ -227,8 +236,6 @@ function DailyScratchWin({ campaign }) {
     }
     setError('');
     setLoading(true);
-
-    // Simulate claiming
     setTimeout(() => {
       setLoading(false);
       setStep(3);
@@ -327,14 +334,6 @@ function DailyScratchWin({ campaign }) {
           <div className="scratch-card-wrapper">
             <div className="scratch-card">
               <canvas ref={canvasRef} className="scratch-canvas"></canvas>
-              {scratchProgress > 0 && scratchProgress < 100 && (
-                <div className="scratch-progress">
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${scratchProgress}%` }}></div>
-                  </div>
-                  <span className="progress-text">{Math.round(scratchProgress)}%</span>
-                </div>
-              )}
             </div>
             <p className="scratch-hint">🖐️ Use your finger or mouse to scratch the card</p>
           </div>
@@ -345,9 +344,17 @@ function DailyScratchWin({ campaign }) {
           <div className="claim-card">
             <div className="reward-reveal">
               <div className="reward-badge">
-                <span className="reward-icon">💰</span>
-                <span className="reward-amount">$10</span>
-                <span className="reward-label">YOU WON!</span>
+                <div className="reward-image-wrapper">
+                  <img
+                    src="https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=100&h=100&fit=crop&auto=format"
+                    alt="$10 Reward"
+                    className="reward-image"
+                  />
+                </div>
+                <div>
+                  <span className="reward-amount">$10</span>
+                  <span className="reward-label">YOU WON!</span>
+                </div>
               </div>
               <p>Enter your details below to claim your reward.</p>
             </div>
@@ -415,7 +422,11 @@ function DailyScratchWin({ campaign }) {
             <h2>Reward Claimed!</h2>
             <p>Your $10 reward has been confirmed.</p>
             <div className="claimed-reward">
-              <span className="claimed-icon">💰</span>
+              <img
+                src="https://images.unsplash.com/photo-1580519549965-7e0e6a53af9f?w=100&h=100&fit=crop&auto=format"
+                alt="$10"
+                className="claimed-image"
+              />
               <span className="claimed-amount">$10</span>
             </div>
             <div className="success-info">
@@ -463,35 +474,23 @@ function DailyScratchWin({ campaign }) {
         </div>
       </section>
 
-      {/* ─── DAILY REWARDS ─── */}
+      {/* ─── DAILY REWARDS (with real images) ─── */}
       <section className="rewards-section">
         <h2 className="section-title">🎁 Daily Rewards</h2>
         <p className="section-subtitle">Come back every day to claim your reward.</p>
         <div className="rewards-grid">
-          <div className="reward-card active">
-            <div className="reward-day">Today</div>
-            <div className="reward-icon-large">💰</div>
-            <div className="reward-amount-large">$10</div>
-            <span className="reward-status">✅ Available Now</span>
-          </div>
-          <div className="reward-card locked">
-            <div className="reward-day">Day 2</div>
-            <div className="reward-icon-large">🎁</div>
-            <div className="reward-amount-large">$5</div>
-            <span className="reward-status">🔒 Coming Tomorrow</span>
-          </div>
-          <div className="reward-card locked">
-            <div className="reward-day">Day 3</div>
-            <div className="reward-icon-large">⭐</div>
-            <div className="reward-amount-large">$15</div>
-            <span className="reward-status">🔒 Coming Soon</span>
-          </div>
-          <div className="reward-card locked">
-            <div className="reward-day">Day 7</div>
-            <div className="reward-icon-large">🏆</div>
-            <div className="reward-amount-large">$50</div>
-            <span className="reward-status">🔒 Bonus Day</span>
-          </div>
+          {DAILY_REWARDS.map((reward, idx) => (
+            <div key={idx} className={`reward-card ${reward.status}`}>
+              <div className="reward-day">{reward.day}</div>
+              <div className="reward-image-wrapper">
+                <img src={reward.image} alt={reward.amount} className="reward-image-small" />
+              </div>
+              <div className="reward-amount-large">{reward.amount}</div>
+              <span className="reward-status">
+                {reward.status === 'active' ? '✅ Available Now' : '🔒 Coming Soon'}
+              </span>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -669,13 +668,14 @@ function DailyScratchWin({ campaign }) {
         .scratch-card {
           position: relative;
           width: 100%;
-          max-width: 380px;
+          max-width: 400px;
           margin: 0 auto;
           border-radius: 20px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.15);
           aspect-ratio: 4/3;
           background: #f5f3ff;
+          cursor: pointer;
         }
         .scratch-canvas {
           width: 100%;
@@ -683,40 +683,6 @@ function DailyScratchWin({ campaign }) {
           display: block;
           touch-action: none;
           cursor: pointer;
-        }
-        .scratch-progress {
-          position: absolute;
-          bottom: 12px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 80%;
-          display: flex;
-          align-items: center;
-          gap: 0.8rem;
-          background: rgba(0,0,0,0.5);
-          backdrop-filter: blur(8px);
-          padding: 0.3rem 0.8rem;
-          border-radius: 40px;
-        }
-        .progress-bar {
-          flex: 1;
-          height: 4px;
-          background: rgba(255,255,255,0.2);
-          border-radius: 99px;
-          overflow: hidden;
-        }
-        .progress-fill {
-          height: 100%;
-          background: #8B5CF6;
-          border-radius: 99px;
-          transition: width 0.3s ease;
-        }
-        .progress-text {
-          font-size: 0.7rem;
-          font-weight: 700;
-          color: #fff;
-          min-width: 32px;
-          text-align: right;
         }
         .scratch-hint {
           margin-top: 1rem;
@@ -742,15 +708,31 @@ function DailyScratchWin({ campaign }) {
         .reward-badge {
           display: inline-flex;
           align-items: center;
-          gap: 0.8rem;
+          gap: 1rem;
           background: #fff;
           padding: 0.5rem 1.5rem;
           border-radius: 60px;
           box-shadow: 0 4px 16px rgba(0,0,0,0.06);
           margin-bottom: 0.5rem;
         }
-        .reward-icon { font-size: 1.8rem; }
-        .reward-amount { font-size: 1.8rem; font-weight: 900; color: #8B5CF6; }
+        .reward-image-wrapper {
+          width: 50px;
+          height: 50px;
+          border-radius: 12px;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+        .reward-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .reward-amount {
+          font-size: 1.8rem;
+          font-weight: 900;
+          color: #8B5CF6;
+          margin-right: 0.5rem;
+        }
         .reward-label {
           font-size: 0.7rem;
           font-weight: 700;
@@ -873,13 +855,22 @@ function DailyScratchWin({ campaign }) {
           justify-content: center;
           gap: 0.8rem;
           background: #f5f3ff;
-          padding: 0.8rem 1.5rem;
+          padding: 0.6rem 1.2rem;
           border-radius: 60px;
           margin: 0 auto 1.2rem;
-          max-width: 200px;
+          max-width: 180px;
         }
-        .claimed-icon { font-size: 2rem; }
-        .claimed-amount { font-size: 1.4rem; font-weight: 800; color: #8B5CF6; }
+        .claimed-image {
+          width: 44px;
+          height: 44px;
+          object-fit: cover;
+          border-radius: 10px;
+        }
+        .claimed-amount {
+          font-size: 1.4rem;
+          font-weight: 800;
+          color: #8B5CF6;
+        }
         .success-info { margin-bottom: 1.5rem; }
         .success-info p { color: #6b7280; font-size: 0.9rem; }
 
@@ -994,9 +985,20 @@ function DailyScratchWin({ campaign }) {
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
-        .reward-icon-large { font-size: 2.2rem; display: block; margin: 0.3rem 0; }
+        .reward-image-wrapper {
+          width: 60px;
+          height: 60px;
+          margin: 0.3rem auto;
+          border-radius: 12px;
+          overflow: hidden;
+        }
+        .reward-image-small {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
         .reward-amount-large {
-          font-size: 1.4rem;
+          font-size: 1.2rem;
           font-weight: 900;
           color: #1a1a2e;
         }
@@ -1165,17 +1167,18 @@ function DailyScratchWin({ campaign }) {
           .rewards-grid { grid-template-columns: repeat(2, 1fr); }
           .hero-stats { gap: 0.8rem; }
           .hero-stats div { font-size: 0.75rem; padding: 0.3rem 1rem; }
-          .scratch-card { max-width: 320px; }
+          .scratch-card { max-width: 340px; }
         }
         @media (max-width: 480px) {
           .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
           .main-content { padding: 0 1rem; }
           .claim-card { padding: 1.5rem; }
           .success-card { padding: 1.8rem 1.2rem; }
-          .scratch-card { max-width: 280px; }
+          .scratch-card { max-width: 300px; }
           .hero h1 { font-size: 1.8rem; }
           .rewards-grid { grid-template-columns: 1fr 1fr; }
           .rewards-section { padding: 2rem 1rem; }
+          .reward-badge { flex-wrap: wrap; justify-content: center; }
         }
       `}} />
     </div>
