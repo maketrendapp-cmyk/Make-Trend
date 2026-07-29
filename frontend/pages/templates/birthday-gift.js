@@ -1,43 +1,112 @@
-// pages/templates/birthday-iphone-gift.js
+// pages/templates/birthday-gift.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
 import {
-  FaGift,
   FaApple,
+  FaGift,
   FaCalendarAlt,
   FaUser,
   FaCheckCircle,
-  FaConfetti,
   FaArrowRight,
   FaCopy,
   FaShareAlt,
   FaWhatsapp,
   FaFacebook,
   FaTwitter,
+  FaLaptop,
+  FaTv,
+  FaHeadphones,
+  FaTablet,
+  FaClock,
+  FaStar,
+  FaAward,
+  FaUsers,
+  FaRocket,
+  FaArrowLeft,
 } from 'react-icons/fa';
 
 // ── Default Meta ──
 const defaultMeta = {
-  title: 'Birthday Gift – Claim Your Free iPhone!',
-  description: 'Enter your name and birthday to claim a free iPhone 15 Pro Max. Limited time offer!',
+  title: 'Birthday Gift – Claim Your Free Premium Reward!',
+  description: 'Enter your name and birthday to claim a free premium gift. Choose from iPhone, MacBook, Watch, TV, and more!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/birthday-iphone-gift',
+  url: 'https://maketrend.app/birthday-gift',
 };
 
-function BirthdayIphoneGift({ campaign }) {
+// ── Rewards Data ──
+const REWARDS = [
+  {
+    id: 'iphone',
+    name: 'iPhone 15 Pro Max',
+    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=300&h=300&fit=crop&auto=format',
+    color: '#1a1a2e',
+    icon: <FaApple className="w-5 h-5" />,
+    value: '$1,199',
+    tag: 'Bestseller',
+  },
+  {
+    id: 'macbook',
+    name: 'MacBook Air M3',
+    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300&h=300&fit=crop&auto=format',
+    color: '#2d2d44',
+    icon: <FaLaptop className="w-5 h-5" />,
+    value: '$1,099',
+    tag: 'Popular',
+  },
+  {
+    id: 'watch',
+    name: 'Apple Watch Series 9',
+    image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=300&h=300&fit=crop&auto=format',
+    color: '#4a4a6a',
+    icon: <FaClock className="w-5 h-5" />,
+    value: '$399',
+    tag: 'Trending',
+  },
+  {
+    id: 'tv',
+    name: 'Samsung 55" 4K TV',
+    image: 'https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=300&h=300&fit=crop&auto=format',
+    color: '#1a1a2e',
+    icon: <FaTv className="w-5 h-5" />,
+    value: '$799',
+    tag: 'Limited',
+  },
+  {
+    id: 'airpods',
+    name: 'AirPods Pro 2',
+    image: 'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=300&h=300&fit=crop&auto=format',
+    color: '#4a4a6a',
+    icon: <FaHeadphones className="w-5 h-5" />,
+    value: '$249',
+    tag: 'Hot Deal',
+  },
+  {
+    id: 'ipad',
+    name: 'iPad Pro 12.9"',
+    image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=300&h=300&fit=crop&auto=format',
+    color: '#2d2d44',
+    icon: <FaTablet className="w-5 h-5" />,
+    value: '$1,099',
+    tag: "Editor's Pick",
+  },
+];
+
+function BirthdayGift({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=form, 2=gift-reveal, 3=redirect
+  const [step, setStep] = useState(1); // 1=rewards, 2=form, 3=gift-reveal, 4=redirect
+  const [selectedReward, setSelectedReward] = useState(null);
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
+  const [hoveredReward, setHoveredReward] = useState(null);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -76,6 +145,7 @@ function BirthdayIphoneGift({ campaign }) {
 
   // ── Validate ──
   const validate = () => {
+    if (!selectedReward) return 'Please select a gift.';
     if (!name.trim()) return 'Please enter your full name.';
     if (!birthday) return 'Please select your birthday.';
     const birthDate = new Date(birthday);
@@ -94,14 +164,14 @@ function BirthdayIphoneGift({ campaign }) {
       return;
     }
     setError('');
-    setStep(2);
+    setStep(3);
     setConfettiActive(true);
   };
 
   // ── Continue to tasks ──
   const handleContinue = () => {
     setLoading(true);
-    setStep(3);
+    setStep(4);
     if (!id) {
       router.push('/create');
     } else {
@@ -111,8 +181,8 @@ function BirthdayIphoneGift({ campaign }) {
 
   // ── Share handlers ──
   const handleShare = (platform) => {
-    const url = `${window.location.origin}/birthday-iphone-gift?id=${id || 'demo'}`;
-    const text = `🎂 Happy Birthday! Get your free iPhone here:`;
+    const url = `${window.location.origin}/birthday-gift?id=${id || 'demo'}`;
+    const text = `🎂 Happy Birthday! Get your free ${selectedReward?.name || 'gift'} here:`;
     switch (platform) {
       case 'whatsapp':
         window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
@@ -127,6 +197,11 @@ function BirthdayIphoneGift({ campaign }) {
         navigator.clipboard?.writeText(url);
         alert('Link copied!');
     }
+  };
+
+  // ── Go back to rewards selection ──
+  const goBack = () => {
+    setStep(1);
   };
 
   // ── WebView Modal ──
@@ -195,15 +270,22 @@ function BirthdayIphoneGift({ campaign }) {
           {step === 1 && (
             <>
               <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎂 BIRTHDAY GIVEAWAY</div>
-              <h1>Get a Free iPhone <span>on Your Birthday</span></h1>
-              <p>Enter your name and birthday to claim your gift from our partner brands.</p>
+              <h1>Choose Your <span>Birthday Gift</span></h1>
+              <p>Pick your favorite reward and enter your details to claim it.</p>
             </>
           )}
           {step === 2 && (
             <>
+              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎁 SELECTED</div>
+              <h1>You Chose <span>{selectedReward?.name}</span></h1>
+              <p>Enter your details to claim your birthday gift.</p>
+            </>
+          )}
+          {step === 3 && (
+            <>
               <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎉 CONGRATULATIONS</div>
               <h1>Happy Birthday, <span>{name}!</span></h1>
-              <p>You've been selected to receive a free iPhone 15 Pro Max.</p>
+              <p>You've won a <strong>{selectedReward?.name}</strong>!</p>
             </>
           )}
         </div>
@@ -211,12 +293,64 @@ function BirthdayIphoneGift({ campaign }) {
 
       {/* ─── MAIN CONTENT ─── */}
 
-      {/* Step 1: Form */}
+      {/* Step 1: Rewards Selection */}
       {step === 1 && (
+        <section className="rewards-section">
+          <h2 className="section-title">Select Your Gift</h2>
+          <p className="section-subtitle">Choose one premium reward to claim</p>
+          <div className="rewards-grid">
+            {REWARDS.map((reward) => (
+              <div
+                key={reward.id}
+                className={`reward-card ${selectedReward?.id === reward.id ? 'selected' : ''}`}
+                onClick={() => setSelectedReward(reward)}
+                onMouseEnter={() => setHoveredReward(reward.id)}
+                onMouseLeave={() => setHoveredReward(null)}
+                style={{
+                  borderColor: selectedReward?.id === reward.id ? reward.color : 'transparent',
+                  boxShadow: selectedReward?.id === reward.id ? `0 0 0 4px ${reward.color}40` : 'none',
+                }}
+              >
+                <div className="reward-image-wrapper">
+                  <img src={reward.image} alt={reward.name} className="reward-image" />
+                  <span className="reward-tag" style={{ background: reward.color }}>{reward.tag}</span>
+                </div>
+                <div className="reward-info">
+                  <div className="reward-icon" style={{ color: reward.color }}>{reward.icon}</div>
+                  <h3>{reward.name}</h3>
+                  <p className="reward-value">{reward.value}</p>
+                </div>
+                {selectedReward?.id === reward.id && (
+                  <div className="reward-check">
+                    <FaCheckCircle className="w-5 h-5 text-green-500" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            className={`select-btn ${!selectedReward ? 'disabled' : ''}`}
+            onClick={() => selectedReward && setStep(2)}
+            disabled={!selectedReward}
+          >
+            {selectedReward ? `Continue with ${selectedReward.name} →` : 'Select a gift first'}
+          </button>
+        </section>
+      )}
+
+      {/* Step 2: Form */}
+      {step === 2 && (
         <section className="form-section">
+          <button className="back-btn" onClick={goBack}>
+            <FaArrowLeft className="w-4 h-4" /> Back
+          </button>
           <div className="form-card">
+            <div className="selected-preview">
+              <img src={selectedReward?.image} alt={selectedReward?.name} className="preview-img" />
+              <span className="preview-name">{selectedReward?.name}</span>
+            </div>
             <h2>Enter Your Details</h2>
-            <p>We’ll verify your birthday and send you the gift.</p>
+            <p>We'll verify your birthday and send you the gift.</p>
 
             <div className="form-group">
               <label><FaUser className="w-4 h-4" /> Full Name <span className="required">*</span></label>
@@ -253,40 +387,40 @@ function BirthdayIphoneGift({ campaign }) {
         </section>
       )}
 
-      {/* Step 2: Gift Reveal */}
-      {step === 2 && (
+      {/* Step 3: Gift Reveal */}
+      {step === 3 && (
         <section className="gift-section">
           <div className="confetti-container"></div>
           <div className="gift-card">
             <div className="gift-icon"><FaGift className="w-12 h-12 text-amber-500" /></div>
             <h2>🎉 Happy Birthday, {name}!</h2>
-            <p>You've won a <strong>iPhone 15 Pro Max</strong></p>
+            <p>You've won a <strong>{selectedReward?.name}</strong>!</p>
 
             <div className="gift-image">
               <img
-                src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=400&h=400&fit=crop&auto=format"
-                alt="iPhone 15 Pro Max"
+                src={selectedReward?.image}
+                alt={selectedReward?.name}
                 className="gift-img"
               />
             </div>
 
             <div className="gift-details">
               <div className="gift-detail">
-                <span className="detail-label">Model</span>
-                <span className="detail-value">iPhone 15 Pro Max</span>
+                <span className="detail-label">Product</span>
+                <span className="detail-value">{selectedReward?.name}</span>
               </div>
               <div className="gift-detail">
-                <span className="detail-label">Color</span>
-                <span className="detail-value">Deep Purple</span>
+                <span className="detail-label">Value</span>
+                <span className="detail-value">{selectedReward?.value}</span>
               </div>
               <div className="gift-detail">
-                <span className="detail-label">Storage</span>
-                <span className="detail-value">128GB</span>
+                <span className="detail-label">Status</span>
+                <span className="detail-value text-green-500">✓ Claimable</span>
               </div>
             </div>
 
             <div className="brand-message">
-              <p>Presented by <strong>Apple Partner Program</strong></p>
+              <p>Presented by <strong>GiftZone Partner Program</strong></p>
               <p className="small-text">Terms & Conditions apply. Limited stock available.</p>
             </div>
 
@@ -312,8 +446,8 @@ function BirthdayIphoneGift({ campaign }) {
         </section>
       )}
 
-      {/* Step 3: Redirecting */}
-      {step === 3 && (
+      {/* Step 4: Redirecting */}
+      {step === 4 && (
         <section className="redirect-section">
           <div className="redirect-card">
             <div className="spinner-large"></div>
@@ -376,8 +510,7 @@ function BirthdayIphoneGift({ campaign }) {
         .logo-text span { color: #D4AF37; }
         .header-badge {
           display: flex;
-          align-items: center;
-          gap: 0.4rem;
+          align-items: center; gap: 0.4rem;
           background: linear-gradient(135deg, #D4AF37, #B8860B);
           color: #fff;
           font-weight: 700;
@@ -412,8 +545,7 @@ function BirthdayIphoneGift({ campaign }) {
         }
         .hero-badge {
           display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
+          align-items: center; gap: 0.4rem;
           background: rgba(212, 175, 55, 0.12);
           border: 1px solid rgba(212, 175, 55, 0.2);
           padding: 0.3rem 1.2rem;
@@ -441,6 +573,128 @@ function BirthdayIphoneGift({ campaign }) {
           margin-bottom: 1.2rem;
         }
 
+        /* ── Rewards Section ── */
+        .rewards-section {
+          padding: 2rem 1.5rem;
+          max-width: 1000px;
+          margin: -2rem auto 2rem;
+          position: relative;
+          z-index: 10;
+        }
+        .section-title {
+          font-size: 1.8rem;
+          font-weight: 800;
+          text-align: center;
+          color: #1a1a2e;
+        }
+        .section-subtitle {
+          text-align: center;
+          color: #6b7280;
+          margin-bottom: 1.5rem;
+          font-size: 1rem;
+        }
+        .rewards-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1.2rem;
+        }
+        .reward-card {
+          background: #fff;
+          border-radius: 24px;
+          padding: 1rem;
+          border: 2px solid transparent;
+          transition: all 0.3s ease;
+          cursor: pointer;
+          position: relative;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+        }
+        .reward-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+        }
+        .reward-card.selected {
+          background: #f8fafc;
+        }
+        .reward-image-wrapper {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 1/1;
+          border-radius: 16px;
+          overflow: hidden;
+          background: #f0f0f0;
+          margin-bottom: 0.6rem;
+        }
+        .reward-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .reward-tag {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          color: #fff;
+          font-size: 0.55rem;
+          font-weight: 700;
+          padding: 0.2rem 0.6rem;
+          border-radius: 40px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          background: #1a1a2e;
+        }
+        .reward-info {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-top: 0.2rem;
+        }
+        .reward-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #f0f0f0;
+          flex-shrink: 0;
+        }
+        .reward-info h3 {
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: #1a1a2e;
+          flex: 1;
+        }
+        .reward-value {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #6b7280;
+        }
+        .reward-check {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+        }
+        .select-btn {
+          width: 100%;
+          padding: 0.9rem;
+          background: linear-gradient(135deg, #D4AF37, #B8860B);
+          border: none;
+          border-radius: 60px;
+          font-weight: 800;
+          font-size: 1.05rem;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 1.5rem;
+        }
+        .select-btn:hover:not(.disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(212, 175, 55, 0.35); }
+        .select-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+
         /* ── Form Section ── */
         .form-section {
           padding: 2rem 1.5rem;
@@ -449,12 +703,46 @@ function BirthdayIphoneGift({ campaign }) {
           position: relative;
           z-index: 10;
         }
+        .back-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          background: none;
+          border: none;
+          color: #6b7280;
+          font-size: 0.85rem;
+          cursor: pointer;
+          margin-bottom: 0.8rem;
+          transition: color 0.2s;
+        }
+        .back-btn:hover { color: #1a1a2e; }
         .form-card {
           background: #fff;
           border-radius: 32px;
           padding: 2rem;
           box-shadow: 0 20px 60px rgba(0,0,0,0.08);
           border: 1px solid #eef2f6;
+        }
+        .selected-preview {
+          display: flex;
+          align-items: center;
+          gap: 0.8rem;
+          background: #f8fafc;
+          padding: 0.6rem 1rem;
+          border-radius: 16px;
+          margin-bottom: 1.2rem;
+          border: 1px solid #eef2f6;
+        }
+        .preview-img {
+          width: 48px;
+          height: 48px;
+          border-radius: 8px;
+          object-fit: cover;
+        }
+        .preview-name {
+          font-weight: 700;
+          font-size: 0.9rem;
+          color: #1a1a2e;
         }
         .form-card h2 {
           font-size: 1.6rem;
@@ -496,9 +784,7 @@ function BirthdayIphoneGift({ campaign }) {
           background: #fff;
           box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.08);
         }
-        .form-group input[type="date"] {
-          color-scheme: light;
-        }
+        .form-group input[type="date"] { color-scheme: light; }
         .form-error {
           color: #ef4444;
           font-size: 0.85rem;
@@ -520,7 +806,6 @@ function BirthdayIphoneGift({ campaign }) {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          margin-top: 0.5rem;
         }
         .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(212, 175, 55, 0.35); }
         .trust-badges {
@@ -767,17 +1052,19 @@ function BirthdayIphoneGift({ campaign }) {
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
+          .rewards-grid { grid-template-columns: repeat(2, 1fr); }
           .gift-details { grid-template-columns: 1fr; }
           .gift-image { width: 150px; height: 150px; }
           .form-card { padding: 1.5rem; }
           .gift-card { padding: 1.5rem; }
-          .trust-badges { flex-wrap: wrap; gap: 0.8rem; }
         }
         @media (max-width: 480px) {
+          .rewards-grid { grid-template-columns: 1fr; }
           .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
           .hero h1 { font-size: 1.8rem; }
           .site-header { padding: 0.5rem 1rem; }
           .gift-image { width: 120px; height: 120px; }
+          .trust-badges { flex-wrap: wrap; gap: 0.8rem; }
           .share-row { flex-wrap: wrap; }
         }
       `}} />
@@ -793,4 +1080,4 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── Wrap with Meta ──
-export default withCampaignMeta(BirthdayIphoneGift, defaultMeta);
+export default withCampaignMeta(BirthdayGift, defaultMeta);
