@@ -26,7 +26,7 @@ const defaultMeta = {
   title: 'Amazon Prime Deals – Get iPhone 15 Pro Max Free!',
   description: 'Invite friends, cut the price, and get iPhone 15 Pro Max or electronics for free on Amazon. Limited time offer!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/amazon-freebie',
+  url: 'https://maketrend.app/amazon-iphone-freebie?id={id}',
 };
 
 // ── Static Winner Data (Amazon themed) ──
