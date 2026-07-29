@@ -1,385 +1,333 @@
 
-// pages/index.js
-import { useState, useRef, useCallback, useEffect } from 'react';
+// pages/create.js
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import Head from 'next/head';
 import Image from 'next/image';
+import Link from 'next/link';
 import Meta from '../components/Meta';
-import { useFeaturedTemplates } from '../lib/queries';
-import {
-  FiZap,
-  FiTrendingUp,
-  FiUsers,
-  FiChevronRight,
-  FiChevronLeft,
-  FiSearch,
-  FiArrowRight,
-  FiEdit,
-  FiShare2,
-} from 'react-icons/fi';
-import { FaRocket } from 'react-icons/fa';
+import { useTemplates, useFeaturedTemplates } from '../lib/queries';
 
-// ── Custom hooks ──
-function useFadeUp(threshold = 0.1) {
-  const ref = useRef(null);
-  const [isVisible, setIsVisible] = useState(false);
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return { ref, isVisible };
-}
-
-function useCounter(target, duration = 2000, startOnView = true) {
-  const [count, setCount] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!startOnView) {
-      setIsVisible(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.3 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [startOnView]);
-  useEffect(() => {
-    if (!isVisible) return;
-    let startTime;
-    const step = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(eased * target));
-      if (progress < 1) {
-        requestAnimationFrame(step);
-      } else {
-        setCount(target);
-      }
-    };
-    requestAnimationFrame(step);
-  }, [target, duration, isVisible]);
-  return { count, ref };
-}
-
-// ── Emoji mapping for categories ──
-const getCategoryEmoji = (cat) => {
-  const emojis = {
-    giveaway: '🎁',
-    simcard: '📱',
-    contest: '🏆',
-    growth: '📈',
-    engagement: '💬',
-    followers: '👥',
-    views: '👁️',
-    likes: '❤️',
-    tiktok: '🎵',
-    instagram: '📸',
-    youtube: '▶️',
-    default: '✨',
-  };
-  return emojis[cat?.toLowerCase()] || emojis.default;
+// ── Category Icons ──
+const categoryIcons = {
+  giveaway: '🎁',
+  simcard: '📱',
+  contest: '🏆',
+  growth: '📈',
+  engagement: '💬',
+  followers: '👥',
+  views: '👁️',
+  likes: '❤️',
+  tiktok: '🎵',
+  instagram: '📸',
+  youtube: '▶️',
+  default: '✨',
 };
 
-const platformBadgeStyles = {
+// ── Platform Colors ──
+const platformColors = {
   tiktok: 'bg-black text-white',
   instagram: 'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white',
   youtube: 'bg-[#FF0000] text-white',
   facebook: 'bg-[#1877F2] text-white',
-  all: 'bg-slate-800 text-white',
+  twitter: 'bg-[#1DA1F2] text-white',
+  default: 'bg-slate-700 text-white',
 };
 
-export default function Home({ initialFeaturedTemplates }) {
+export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   const router = useRouter();
+  const { slug: highlightSlug, search: initialSearch, category: initialCategory, platform: initialPlatform } = router.query;
   const queryClient = useQueryClient();
 
-  // ── Hydrate React Query cache with pre‑fetched data ──
+  // ── Hydrate React Query cache ──
   useEffect(() => {
+    queryClient.setQueryData(['templates'], initialTemplates);
     queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
-  }, [initialFeaturedTemplates, queryClient]);
+  }, [initialTemplates, initialFeaturedTemplates, queryClient]);
+
+  // ── State ──
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [highlightedId, setHighlightedId] = useState(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // ── Sync search from URL (Runs once when router is ready) ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (initialSearch !== undefined) setSearchQuery(initialSearch);
+    if (initialCategory) setSelectedCategory(initialCategory);
+    if (initialPlatform) setSelectedPlatform(initialPlatform);
+  }, [router.isReady, initialSearch, initialCategory, initialPlatform]);
 
   // ── React Query data ──
-  const { data: featuredTemplates, isLoading: featuredLoading } = useFeaturedTemplates({}, initialFeaturedTemplates);
+  const activeFilters = useMemo(() => {
+    const filters = {};
+    if (selectedCategory) filters.category = selectedCategory;
+    if (selectedPlatform) filters.platform = selectedPlatform;
+    return filters;
+  }, [selectedCategory, selectedPlatform]);
 
-  const hasInitialData = initialFeaturedTemplates && initialFeaturedTemplates.length > 0;
-  const isLoading = featuredLoading && !hasInitialData;
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters, initialTemplates);
+  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters, initialFeaturedTemplates);
 
-  const [carouselIndex, setCarouselIndex] = useState(0);
-  const [isHovering, setIsHovering] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const hasInitialData = (initialTemplates && initialTemplates.length > 0) || 
+                         (initialFeaturedTemplates && initialFeaturedTemplates.length > 0);
+  const isLoading = (templatesLoading || featuredLoading) && !hasInitialData;
+
+  const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
-  const touchStartXRef = useRef(0);
 
-  // ── Fade‑up hooks ──
-  const heroFade = useFadeUp(0.1);
-  const statsFade = useFadeUp(0.1);
-  const carouselFade = useFadeUp(0.1);
-  const ctaFade = useFadeUp(0.1);
+  const hasFilters = Boolean(searchQuery.trim() || selectedCategory || selectedPlatform);
 
-  // ── Stats ──
-  const stats = [
-    { label: 'Campaigns Created', target: 5000, suffix: '+' },
-    { label: 'Total Shares', target: 10000, suffix: 'K+' },
-    { label: 'Templates', target: 500, suffix: '+' },
-    { label: 'Active Users', target: 1200, suffix: '+' },
-  ];
-  const counter1 = useCounter(5000);
-  const counter2 = useCounter(10000);
-  const counter3 = useCounter(500);
-  const counter4 = useCounter(1200);
-  const counters = [counter1, counter2, counter3, counter4];
-
-  // ── Carousel auto‑slide ──
+  // ── Update URL silently when filters change ──
   useEffect(() => {
-    if (featuredTemplates?.length > 1 && !isHovering) {
+    if (!router.isReady) return;
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('search', searchQuery);
+    if (selectedCategory) params.set('category', selectedCategory);
+    if (selectedPlatform) params.set('platform', selectedPlatform);
+    if (highlightSlug) params.set('slug', highlightSlug);
+    
+    const newUrl = params.toString() ? `/create?${params.toString()}` : '/create';
+    
+    // Only replace if the path actually changed to prevent infinite loops
+    if (router.asPath.split('?')[0] === '/create' && router.asPath !== newUrl) {
+      router.replace(newUrl, undefined, { shallow: true });
+    }
+  }, [searchQuery, selectedCategory, selectedPlatform, highlightSlug, router.isReady, router.asPath]);
+
+  // ── Apply search & filters locally ──
+  const filteredAll = useMemo(() => {
+    let filtered = [...templates];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q) ||
+        (t.hashtags || []).join(' ').toLowerCase().includes(q) ||
+        (t.category || '').toLowerCase().includes(q) ||
+        (t.platform || '').toLowerCase().includes(q)
+      );
+    }
+    if (selectedCategory && selectedCategory !== 'All') {
+      filtered = filtered.filter(t => t.category === selectedCategory);
+    }
+    if (selectedPlatform && selectedPlatform !== 'All') {
+      filtered = filtered.filter(t => t.platform === selectedPlatform);
+    }
+    return filtered;
+  }, [templates, searchQuery, selectedCategory, selectedPlatform]);
+
+  const regularTemplates = useMemo(() => {
+    return filteredAll.filter(t => !t.isHighlight);
+  }, [filteredAll]);
+
+  const featuredFiltered = useMemo(() => {
+    let filtered = [...featuredTemplates];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q) ||
+        (t.hashtags || []).join(' ').toLowerCase().includes(q) ||
+        (t.category || '').toLowerCase().includes(q) ||
+        (t.platform || '').toLowerCase().includes(q)
+      );
+    }
+    if (selectedCategory && selectedCategory !== 'All') {
+      filtered = filtered.filter(t => t.category === selectedCategory);
+    }
+    if (selectedPlatform && selectedPlatform !== 'All') {
+      filtered = filtered.filter(t => t.platform === selectedPlatform);
+    }
+    return filtered;
+  }, [featuredTemplates, searchQuery, selectedCategory, selectedPlatform]);
+
+  // ── Determine if slug is featured ──
+  const isSlugFeatured = useMemo(() => {
+    if (!highlightSlug) return false;
+    return templates.some(t => t.slug === highlightSlug && t.isHighlight);
+  }, [highlightSlug, templates]);
+
+  // ── Should show carousel? ──
+  const showCarousel = !hasFilters && !isSlugFeatured && featuredFiltered.length > 1;
+
+  // ── Carousel auto-slide ──
+  useEffect(() => {
+    if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
+    carouselIntervalRef.current = null;
+
+    if (showCarousel) {
       carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
+        setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
       }, 4000);
+    } else {
+      setCarouselIndex(0);
     }
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
     };
-  }, [featuredTemplates?.length, isHovering]);
+  }, [featuredFiltered.length, showCarousel]);
 
   const goToSlide = useCallback((index) => {
     setCarouselIndex(index);
+    if (carouselIntervalRef.current) {
+      clearInterval(carouselIntervalRef.current);
+      if (showCarousel) {
+        carouselIntervalRef.current = setInterval(() => {
+          setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
+        }, 4000);
+      }
+    }
+  }, [featuredFiltered.length, showCarousel]);
+
+  // ── Dynamic filter options ──
+  const availableCategories = useMemo(() => {
+    const cats = new Set();
+    const source = selectedPlatform
+      ? templates.filter(t => t.platform === selectedPlatform)
+      : templates;
+    source.forEach(t => { if (t.category) cats.add(t.category); });
+    return ['All', ...Array.from(cats)];
+  }, [templates, selectedPlatform]);
+
+  const availablePlatforms = useMemo(() => {
+    const plats = new Set();
+    const source = selectedCategory
+      ? templates.filter(t => t.category === selectedCategory)
+      : templates;
+    source.forEach(t => { if (t.platform) plats.add(t.platform); });
+    return ['All', ...Array.from(plats)];
+  }, [templates, selectedCategory]);
+
+  // ── Handle slug highlight & Scroll ──
+  useEffect(() => {
+    // Only attempt scroll if we have a slug, and templates are fully loaded into memory
+    if (!highlightSlug || isLoading || templates.length === 0) return;
+
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+
+    const found = templates.find(t => t.slug === highlightSlug);
+    if (!found) return;
+
+    setHighlightedId(found.id);
+    highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3500);
+
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, [highlightSlug, templates, isLoading]);
+
+  useEffect(() => {
+    if (highlightedId) {
+      // Small timeout ensures the DOM has fully painted the template card
+      setTimeout(() => {
+        const el = document.getElementById(`template-${highlightedId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [highlightedId]);
+
+  // ── Handlers ──
+  const handlePreview = useCallback((slug) => {
+    router.push(`/${slug}`);
+  }, [router]);
+
+  const handleUseTemplate = useCallback((slug) => {
+    router.push(`/createcampaign?slug=${slug}`);
+  }, [router]);
+
+  const handleCopyLink = (slug) => {
+    const url = `${window.location.origin}/create?slug=${slug}`;
+    navigator.clipboard.writeText(url);
+    alert('🔗 Link copied to clipboard!');
+  };
+
+  const clearAllFilters = useCallback(() => {
+    setSearchQuery('');
+    setSelectedCategory('');
+    setSelectedPlatform('');
+    setIsFilterOpen(false);
   }, []);
 
-  const nextSlide = useCallback(() => {
-    if (!featuredTemplates?.length) return;
-    setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-  }, [featuredTemplates?.length]);
+  const removeCategory = useCallback(() => setSelectedCategory(''), []);
+  const removePlatform = useCallback(() => setSelectedPlatform(''), []);
 
-  const prevSlide = useCallback(() => {
-    if (!featuredTemplates?.length) return;
-    setCarouselIndex((prev) => (prev - 1 + featuredTemplates.length) % featuredTemplates.length);
-  }, [featuredTemplates?.length]);
-
-  const handleTouchStart = (e) => {
-    touchStartXRef.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartXRef.current - touchEndX;
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) nextSlide();
-      else prevSlide();
-    }
-  };
-
-  const handleUseTemplate = (slug) => {
-    router.push(`/createcampaign?slug=${slug}`);
-  };
-
-  // ── Search handler ──
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/create?search=${encodeURIComponent(searchQuery.trim())}`);
+  const handleQuickFilter = (category) => {
+    if (category === 'All' || selectedCategory === category) {
+      setSelectedCategory('');
     } else {
-      router.push('/create');
+      setSelectedCategory(category);
     }
   };
 
-  // ── Render carousel with Next.js Image optimization ──
-  const renderCarousel = () => {
-    if (isLoading) {
-      return (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 animate-pulse">
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div className="w-full sm:w-72 h-48 sm:h-auto bg-slate-200 rounded-xl" />
-            <div className="flex-1 space-y-3">
-              <div className="h-6 bg-slate-200 rounded w-3/4" />
-              <div className="h-4 bg-slate-200 rounded w-1/2" />
-              <div className="h-4 bg-slate-200 rounded w-2/3" />
-            </div>
-          </div>
-        </div>
-      );
-    }
+  const getCategoryIcon = (cat) => categoryIcons[cat?.toLowerCase()] || categoryIcons.default;
+  const getPlatformColor = (platform) => platformColors[platform?.toLowerCase()] || platformColors.default;
 
-    if (!featuredTemplates || featuredTemplates.length === 0) {
-      return (
-        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
-          <p className="text-slate-500">No featured templates available.</p>
-        </div>
-      );
-    }
-
+  if (!isLoading && templates.length === 0) {
     return (
-      <div
-        className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-md group"
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div
-          className="flex transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
-        >
-          {featuredTemplates.map((template, index) => (
-            <div key={template.id} className="w-full flex-shrink-0">
-              <div className="p-5 sm:p-8">
-                <div className="flex flex-col sm:flex-row gap-6 items-center">
-                  <div className="w-full sm:w-72 aspect-video sm:aspect-square bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm relative">
-                    {template.image ? (
-                      <Image
-                        src={template.image}
-                        alt={template.title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 640px) 100vw, 288px"
-                        priority={index === 0}
-                        loading={index === 0 ? 'eager' : 'lazy'}
-                        quality={85}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">🎨</div>
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col justify-between w-full">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        {template.platform && (
-                          <span
-                            className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider ${
-                              platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
-                            }`}
-                          >
-                            {template.platform}
-                          </span>
-                        )}
-                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                          👥 {template.usageCount || 0} Uses
-                        </span>
-                        {template.category && (
-                          <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">
-                            {getCategoryEmoji(template.category)} {template.category}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">{template.title}</h3>
-                      <p className="text-slate-500 text-xs sm:text-sm mt-2 line-clamp-2 leading-relaxed">
-                        {template.description || 'Launch your campaign with this template.'}
-                      </p>
-                      {template.reward && (
-                        <div className="mt-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl w-fit flex items-center gap-1.5 shadow-sm">
-                          🎁 {template.reward}
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-5 grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => router.push(`/${template.slug}`)}
-                        className="flex items-center justify-center gap-1.5 text-xs font-black text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl py-2.5 transition active:scale-95"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        Preview
-                      </button>
-                      <button
-                        onClick={() => handleUseTemplate(template.slug)}
-                        className="flex items-center justify-center gap-1.5 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl py-2.5 transition shadow-sm active:scale-95 shadow-purple-600/20"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                        </svg>
-                        Use Template
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {featuredTemplates.length > 1 && (
-          <>
-            <button
-              onClick={prevSlide}
-              className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2.5 rounded-full shadow-lg backdrop-blur-md border border-slate-200 transition-all z-10 text-slate-800 hover:scale-105"
-              aria-label="Previous"
-            >
-              <FiChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={nextSlide}
-              className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2.5 rounded-full shadow-lg backdrop-blur-md border border-slate-200 transition-all z-10 text-slate-800 hover:scale-105"
-              aria-label="Next"
-            >
-              <FiChevronRight className="w-5 h-5" />
-            </button>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full z-10">
-              {featuredTemplates.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goToSlide(idx)}
-                  className={`h-1.5 rounded-full transition-all ${
-                    idx === carouselIndex ? 'bg-white w-5' : 'bg-white/50 w-1.5'
-                  }`}
-                  aria-label={`Go to slide ${idx + 1}`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      <>
+        <Meta title="No Templates" />
+        <main className="max-w-md mx-auto px-6 py-20 text-center">
+          <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">📭</span>
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">No templates found</h2>
+          <p className="text-slate-500 text-xs">Please explore our features later.</p>
+        </main>
+      </>
     );
-  };
+  }
 
-  const formatNumber = (value, label) => {
-    if (label === 'Total Shares') return (value / 1000).toFixed(1) + 'K';
-    return value + '+';
-  };
+  // ── SEO ──
+  const pageTitle = useMemo(() => {
+    if (selectedCategory && selectedCategory !== 'All') return `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Templates – Make Trend`;
+    if (selectedPlatform && selectedPlatform !== 'All') return `${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} Templates – Make Trend`;
+    if (searchQuery) return `"${searchQuery}" Templates – Make Trend`;
+    return 'Browse Campaign Templates – Make Trend';
+  }, [selectedCategory, selectedPlatform, searchQuery]);
 
+  const pageDescription = useMemo(() => {
+    if (selectedCategory && selectedCategory !== 'All') return `Explore the best ${selectedCategory} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
+    if (selectedPlatform && selectedPlatform !== 'All') return `Explore ${selectedPlatform} templates to launch viral campaigns. Customize, launch, and grow your audience.`;
+    if (searchQuery) return `Search results for "${searchQuery}". Find the perfect template to launch your campaign.`;
+    return 'Explore a curated collection of viral campaign templates. Customize, launch, and start growing your audience in minutes.';
+  }, [selectedCategory, selectedPlatform, searchQuery]);
+
+  const templateNames = templates.map(t => t.title).slice(0, 10);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.app';
+  
   const structuredData = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Make Trend",
-    "url": siteUrl,
-    "description": "Create viral share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates.",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": {
-        "@type": "EntryPoint",
-        "urlTemplate": `${siteUrl}/create?search={search_term_string}`
-      },
-      "query-input": "required name=search_term_string"
-    }
+    "@type": "ItemList",
+    "name": pageTitle,
+    "description": pageDescription,
+    "itemListElement": templates.map((template, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "url": `${siteUrl}/create?slug=${template.slug}`,
+      "name": template.title,
+      "image": template.image || `${siteUrl}/default-template.png`,
+      "description": template.description || 'Launch your campaign with this template.',
+    })),
   };
+
+  const activeFilterCount = (selectedCategory ? 1 : 0) + (selectedPlatform ? 1 : 0);
 
   return (
     <>
-      <Meta
-        title="Viral Campaign Maker Platform for Creators"
-        description="Create share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates."
-        url="/"
-        image="https://maketrend.app/og-image.png"
-        type="website"
+      <Meta 
+        title={pageTitle} 
+        description={pageDescription} 
+        extraKeywords={templateNames}
+        canonical={`${siteUrl}/create${searchQuery ? `?search=${searchQuery}` : ''}${selectedCategory ? `&category=${selectedCategory}` : ''}${selectedPlatform ? `&platform=${selectedPlatform}` : ''}`}
       />
       <Head>
         <script
@@ -387,241 +335,512 @@ export default function Home({ initialFeaturedTemplates }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
       </Head>
-      <main className="min-h-screen bg-gradient-to-b from-white to-gray-50/80">
-        
-        {/* ── Hero ── */}
-        <section
-          ref={heroFade.ref}
-          className={`relative overflow-hidden px-4 pt-12 pb-16 sm:pt-20 sm:pb-24 transition-all duration-700 ${
-            heroFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
-        >
-          <div className="absolute inset-0 opacity-30 pointer-events-none">
-            <div className="absolute top-10 left-10 w-64 h-64 bg-purple-200/20 rounded-full blur-3xl" />
-            <div className="absolute bottom-10 right-10 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl" />
-          </div>
+      <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
-          <div className="max-w-6xl mx-auto text-center relative z-10">
-            <div className="inline-block mb-4 px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-extrabold rounded-full tracking-wider uppercase shadow-sm">
-              🚀 Launch viral campaigns in minutes
+        {/* ─── PROFESSIONAL COMPACT BANNER ─── */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-4 sm:p-5 mb-5 text-white shadow-md">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-6">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-xl leading-none">🚀</span>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">Get Started</span>
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold mb-1 truncate">Create Your Campaign</h2>
+              <p className="text-xs sm:text-sm text-indigo-100 line-clamp-2">
+                Select a template, set tasks, add a redirect URL, and launch instantly!
+              </p>
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-tight">
-              Create & Share{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
-                Trending Campaigns
-              </span>
-            </h1>
-            <p className="mt-4 text-base sm:text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
-              Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2 minutes.
-            </p>
+            {/* Steps pills wrap neatly on mobile */}
+            <div className="flex flex-wrap items-center gap-1.5 lg:gap-2 flex-shrink-0 w-full lg:w-auto mt-1 lg:mt-0">
+              <span className="bg-white/10 backdrop-blur-sm px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold whitespace-nowrap border border-white/5">📋 Choose</span>
+              <span className="text-white/40 text-xs hidden sm:inline">→</span>
+              <span className="bg-white/10 backdrop-blur-sm px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold whitespace-nowrap border border-white/5">⚙️ Tasks</span>
+              <span className="text-white/40 text-xs hidden sm:inline">→</span>
+              <span className="bg-white/10 backdrop-blur-sm px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold whitespace-nowrap border border-white/5">🔗 Launch</span>
+            </div>
+          </div>
+        </div>
 
-            {/* ── Search Bar ── */}
-            <div className="max-w-xl mx-auto mt-8">
-              <form onSubmit={handleSearch} className="flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition focus-within:ring-4 focus-within:ring-purple-600/10 focus-within:border-purple-600">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search templates, rewards..."
-                  className="flex-1 bg-transparent px-6 py-3.5 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none"
-                />
+        {/* ─── Search & Advanced Filters ── */}
+        <div className="mb-5 space-y-3">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search templates, rewards..."
+                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-slate-400 font-semibold shadow-sm"
+              />
+              {searchQuery && (
                 <button
-                  type="submit"
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-full mr-1.5 transition text-sm shadow-sm"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full p-0.5"
                 >
-                  <FiSearch className="w-4 h-4" /> Search
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
-              </form>
+              )}
             </div>
-
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <button
-                onClick={() => router.push('/create')}
-                className="px-7 py-3 bg-purple-600 text-white font-extrabold rounded-xl shadow-md hover:shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2 text-sm"
-              >
-                Browse All Templates <FiChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => router.push('/about')}
-                className="px-7 py-3 bg-white border border-slate-200 text-slate-700 font-extrabold rounded-xl hover:bg-slate-50 transition-all shadow-sm text-sm"
-              >
-                Learn More
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Stats ── */}
-        <section
-          ref={statsFade.ref}
-          className={`border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-8 transition-all duration-700 ${
-            statsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
-        >
-          <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
-            {stats.map((stat, index) => {
-              const { count, ref } = counters[index];
-              const displayValue = formatNumber(count, stat.label);
-              return (
-                <div key={index} ref={ref} className="group">
-                  <p className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent transition-all duration-500 group-hover:scale-105">
-                    {displayValue}
-                  </p>
-                  <p className="text-xs text-slate-500 font-extrabold uppercase tracking-wider mt-1">
-                    {stat.label}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ── Featured Carousel ── */}
-        <section
-          ref={carouselFade.ref}
-          className={`py-16 px-4 transition-all duration-700 ${
-            carouselFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
-        >
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
-                  <span>⭐ Featured Templates</span>
-                </h2>
-                <p className="text-slate-500 text-xs sm:text-sm mt-0.5">Hand‑picked professional templates to get you started</p>
-              </div>
-              <button
-                onClick={() => router.push('/create')}
-                className="text-xs sm:text-sm font-bold text-purple-600 hover:underline flex items-center gap-1"
-              >
-                View all <FiChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-            {renderCarousel()}
-          </div>
-        </section>
-
-        {/* ── How It Works ── */}
-        <section className="py-16 px-4 bg-white/80 border-y border-slate-100">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-2">How It Works</h2>
-            <p className="text-slate-500 text-center text-sm max-w-xl mx-auto mb-10">
-              Launch your first campaign in three simple steps.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-              <div className="text-center p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl shadow-inner">
-                  <FaRocket className="w-6 h-6" />
-                </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">1. Choose a Template</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">Pick from our library of professionally designed viral templates.</p>
-              </div>
-              <div className="text-center p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl shadow-inner">
-                  <FiEdit className="w-6 h-6" />
-                </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">2. Customise & Launch</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">Customise the title, description, reward, and required tasks.</p>
-              </div>
-              <div className="text-center p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl shadow-inner">
-                  <FiShare2 className="w-6 h-6" />
-                </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">3. Share & Grow</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">Share your unique link and watch your audience expand instantly.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Why Make Trend ── */}
-        <section className="py-16 px-4 bg-gray-50/50">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-2">Why Make Trend?</h2>
-            <p className="text-slate-500 text-center text-sm max-w-xl mx-auto mb-10">
-              Everything you need to launch, track, and scale your campaigns in one dashboard.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl">
-                  <FiZap />
-                </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">Lightning Fast</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  Optimized server-side rendering and pre-cached queries for instant load speeds.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl">
-                  <FiTrendingUp />
-                </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">Real‑Time Analytics</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  Track views, shares, unlocks, and lead conversions as they happen live.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl">
-                  <FiUsers />
-                </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">Audience Growth</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  Built‑in referral tracking and social sharing tools to skyrocket your reach.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── CTA ── */}
-        <section
-          ref={ctaFade.ref}
-          className={`py-16 px-4 transition-all duration-700 ${
-            ctaFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
-        >
-          <div className="max-w-4xl mx-auto bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl p-8 sm:p-12 text-center text-white shadow-xl">
-            <h2 className="text-2xl sm:text-3xl font-black">Ready to Make Your Trend?</h2>
-            <p className="mt-2 text-purple-100 text-xs sm:text-sm max-w-xl mx-auto">
-              Join creators who are already launching successful share-to-unlock campaigns with Make Trend.
-            </p>
             <button
-              onClick={() => router.push('/create')}
-              className="mt-6 px-8 py-3.5 bg-white text-purple-700 font-extrabold rounded-xl shadow-lg hover:shadow-xl hover:bg-gray-50 transition-all inline-flex items-center gap-2 text-sm"
+              type="button"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`px-3 py-2.5 border rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                isFilterOpen || selectedCategory || selectedPlatform
+                  ? 'bg-primary/10 border-primary/20 text-primary'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
             >
-              Get Started for Free <FiArrowRight className="w-4 h-4" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              <span className="hidden sm:inline">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-primary text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {hasFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="px-3 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition shadow-sm"
+                title="Clear all filters"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* ── Active Filter Chips ── */}
+          {hasFilters && (
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedCategory && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 border border-purple-200 text-purple-700 rounded-full text-[11px] font-bold shadow-sm">
+                  {getCategoryIcon(selectedCategory)} {selectedCategory}
+                  <button onClick={removeCategory} className="hover:text-purple-900 ml-0.5 bg-purple-200/50 rounded-full p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                </span>
+              )}
+              {selectedPlatform && (
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-black/10 text-[11px] font-bold shadow-sm ${getPlatformColor(selectedPlatform)}`}>
+                  {selectedPlatform}
+                  <button onClick={removePlatform} className="hover:opacity-70 ml-0.5 bg-black/10 rounded-full p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                </span>
+              )}
+              {searchQuery && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-full text-[11px] font-bold shadow-sm">
+                  🔍 "{searchQuery}"
+                  <button onClick={() => setSearchQuery('')} className="hover:text-slate-900 ml-0.5 bg-slate-200/50 rounded-full p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* ── Filter Dropdown ── */}
+          {isFilterOpen && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-5 space-y-4 animate-fadeIn relative z-20">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-bold text-slate-800">Advanced Filters</h3>
+                <button onClick={() => setIsFilterOpen(false)} className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-lg transition">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Filter By Category</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => {
+                          if (cat === 'All' || selectedCategory === cat) setSelectedCategory('');
+                          else setSelectedCategory(cat);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize border ${
+                          (cat === 'All' && !selectedCategory) || selectedCategory === cat
+                            ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        {cat === 'All' ? 'All Categories' : `${getCategoryIcon(cat)} ${cat}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Filter By Platform</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availablePlatforms.map((plat) => (
+                      <button
+                        key={plat}
+                        onClick={() => {
+                          if (plat === 'All' || selectedPlatform === plat) setSelectedPlatform('');
+                          else setSelectedPlatform(plat);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize border ${
+                          (plat === 'All' && !selectedPlatform) || selectedPlatform === plat
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                        }`}
+                      >
+                        {plat === 'All' ? 'All Platforms' : plat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Featured Templates Section ── */}
+        {featuredFiltered.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-1.5 mb-3 px-1">
+              <span className="text-amber-500 text-sm drop-shadow-sm">★</span>
+              <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                {hasFilters || isSlugFeatured ? 'Featured Results' : 'Featured Spotlight'}
+              </h2>
+              {showCarousel && (
+                <span className="text-[9px] bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.5 rounded-md font-extrabold ml-2 flex items-center">
+                  Auto-play
+                </span>
+              )}
+            </div>
+
+            {showCarousel ? (
+              <div id="featured-carousel" className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-md group">
+                <div
+                  className="flex transition-transform duration-700 ease-in-out h-full"
+                  style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+                >
+                  {featuredFiltered.map((template) => (
+                    <div key={template.id} className="w-full flex-shrink-0">
+                      <div className="flex flex-col md:flex-row h-full">
+                        <div className="w-full md:w-1/2 lg:w-[55%] aspect-video md:aspect-auto md:min-h-[300px] bg-slate-100 overflow-hidden relative shrink-0">
+                          {template.image ? (
+                            <Image
+                              src={template.image}
+                              alt={template.title}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, 55vw"
+                              priority={carouselIndex === 0}
+                              loading={carouselIndex === 0 ? 'eager' : 'lazy'}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                              <span className="text-xs font-bold tracking-wider uppercase">No Preview Image</span>
+                            </div>
+                          )}
+                          <div className="absolute top-3 left-3 flex gap-1.5 z-10">
+                            <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider shadow-md border border-amber-300">
+                              ⭐ Featured
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="p-5 md:p-6 lg:p-8 bg-white flex flex-col justify-center flex-1">
+                          
+                          {/* Unified Tag Row for Featured */}
+                          <div className="flex flex-wrap items-center gap-2 mb-3">
+                            {template.platform && (
+                              <span className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm ${getPlatformColor(template.platform)}`}>
+                                {template.platform}
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm border ${template.plan === 'pro' || template.isPro ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                              {template.plan === 'pro' || template.isPro ? '👑 PRO' : '✅ FREE'}
+                            </span>
+                            {template.reward && (
+                              <span className="text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200 px-2.5 py-1 rounded-md shadow-sm flex items-center gap-1">
+                                🎁 {template.reward}
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-lg md:text-xl lg:text-2xl font-black leading-tight text-slate-900 mb-2">
+                            {template.title}
+                          </h3>
+                          <p className="text-slate-500 text-xs md:text-sm line-clamp-2 md:line-clamp-3 mb-4 leading-relaxed">
+                            {template.description || 'Premium campaign layout built to maximize your engagement and user conversion.'}
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-3 mt-auto">
+                            <button
+                              onClick={() => handlePreview(template.slug)}
+                              className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-black text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl py-3 transition active:scale-95"
+                            >
+                              <svg className="w-4 h-4 md:w-4.5 md:h-4.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                              Preview
+                            </button>
+                            <button
+                              onClick={() => handleUseTemplate(template.slug)}
+                              className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-black text-white bg-primary hover:bg-primary-600 rounded-xl py-3 transition shadow-md shadow-primary/20 active:scale-95"
+                            >
+                              <svg className="w-4 h-4 md:w-4.5 md:h-4.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                              Use Template
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Carousel Arrows (Always visibly floating on mobile & desktop) ── */}
+                {featuredFiltered.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => goToSlide((carouselIndex - 1 + featuredFiltered.length) % featuredFiltered.length)}
+                      className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-30 p-2 md:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-md backdrop-blur-md border border-slate-200 transition-all text-slate-800 hover:text-primary hover:scale-105 active:scale-95"
+                      aria-label="Previous slide"
+                    >
+                      <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => goToSlide((carouselIndex + 1) % featuredFiltered.length)}
+                      className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-30 p-2 md:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-md backdrop-blur-md border border-slate-200 transition-all text-slate-800 hover:text-primary hover:scale-105 active:scale-95"
+                      aria-label="Next slide"
+                    >
+                      <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-black/20 backdrop-blur-md px-2.5 py-1.5 rounded-full">
+                      {featuredFiltered.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => goToSlide(idx)}
+                          className={`h-1.5 rounded-full transition-all ${idx === carouselIndex ? 'bg-white w-5' : 'bg-white/50 w-1.5'}`}
+                          aria-label={`Go to slide ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {featuredFiltered.map((template) => (
+                  <TemplateCard
+                    key={template.id}
+                    template={template}
+                    isHighlighted={highlightedId === template.id}
+                    onPreview={handlePreview}
+                    onUse={handleUseTemplate}
+                    onCopy={handleCopyLink}
+                    getPlatformColor={getPlatformColor}
+                    isFeatured
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Normal Templates Header ── */}
+        <div className="flex items-center justify-between mb-3 px-1 border-t border-slate-200/60 pt-4">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">
+            {hasFilters || isSlugFeatured ? 'Search Results' : 'Explore All Templates'}
+          </h2>
+          <span className="text-[10px] text-slate-500 font-bold bg-white px-2 py-0.5 rounded-md border border-slate-200">
+            {regularTemplates.length} Available
+          </span>
+        </div>
+
+        {/* ── Regular Templates Grid ── */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
+                <div className="w-full aspect-video bg-slate-200" />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-slate-200 rounded w-3/4" />
+                  <div className="h-3 bg-slate-200 rounded w-1/2" />
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div className="h-9 bg-slate-200 rounded-xl" />
+                    <div className="h-9 bg-slate-200 rounded-xl" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : regularTemplates.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm px-4 max-w-lg mx-auto">
+            <span className="text-4xl mb-3 block">🔍</span>
+            <h3 className="text-base font-bold text-slate-900 mb-1">No templates match</h3>
+            <p className="text-xs text-slate-500 mb-4">Try adjusting or clearing your filters to see more templates.</p>
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="px-5 py-2.5 bg-primary/10 text-primary font-bold rounded-xl text-sm hover:bg-primary/20 transition-colors shadow-sm"
+            >
+              Reset All Filters
             </button>
           </div>
-        </section>
-
-        {/* ── Footer ── */}
-        <footer className="border-t border-slate-200/60 py-6 px-4 bg-white/50">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 font-medium">
-            <span>© {new Date().getFullYear()} Make Trend. All rights reserved.</span>
-            <div className="flex gap-4">
-              <a href="/terms" className="hover:text-slate-700 transition">Terms</a>
-              <a href="/privacy" className="hover:text-slate-700 transition">Privacy</a>
-              <a href="/support" className="hover:text-slate-700 transition">Support</a>
-            </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {regularTemplates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                isHighlighted={highlightedId === template.id}
+                onPreview={handlePreview}
+                onUse={handleUseTemplate}
+                onCopy={handleCopyLink}
+                getPlatformColor={getPlatformColor}
+                isFeatured={false}
+              />
+            ))}
           </div>
-        </footer>
+        )}
       </main>
     </>
   );
 }
 
-// ── Pre‑fetch featured templates at build time ──
+// ── Reusable Template Card (Tightened spacing to prevent empty gaps) ──
+function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, getPlatformColor, isFeatured }) {
+  return (
+    <div
+      id={`template-${template.id}`}
+      className={`group bg-white rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col shadow-sm hover:shadow-lg hover:-translate-y-1 ${
+        isHighlighted
+          ? 'border-primary ring-4 ring-primary/20'
+          : isFeatured
+          ? 'border-amber-200 hover:border-amber-400'
+          : 'border-slate-200 hover:border-slate-300'
+      }`}
+    >
+      <div className="w-full aspect-video bg-slate-100 relative overflow-hidden flex-shrink-0">
+        {template.image ? (
+          <Image
+            src={template.image}
+            alt={template.title}
+            fill
+            className="object-cover group-hover:scale-105 transition duration-500"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            loading="lazy"
+            quality={80}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+            <span className="text-[10px] font-bold tracking-wider uppercase">No Image</span>
+          </div>
+        )}
+        <div className="absolute top-2.5 inset-x-2.5 flex justify-between items-start pointer-events-none z-20">
+          <div className="flex flex-col gap-1">
+            {isFeatured && (
+              <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-md shadow-md border border-amber-300">
+                ⭐ Featured
+              </span>
+            )}
+          </div>
+          {template.platform && (
+            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shadow-md ${getPlatformColor(template.platform)}`}>
+              {template.platform}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-3.5 flex flex-col flex-grow">
+        <h3 className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-1 group-hover:text-primary transition-colors mb-1">
+          {template.title}
+        </h3>
+        <p className="text-slate-500 text-[11px] mb-2.5 line-clamp-2 leading-relaxed">
+          {template.description || 'Customizable campaign layout built to match viral social trends.'}
+        </p>
+
+        {/* Unified Tags Row (Hashtags, Plan, Reward) */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+          {template.hashtags && template.hashtags.length > 0 ? (
+            template.hashtags.slice(0, 1).map((tag, i) => (
+              <span key={i} className="text-[9px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
+                {tag}
+              </span>
+            ))
+          ) : (
+            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
+              #Trending
+            </span>
+          )}
+
+          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${template.plan === 'pro' || template.isPro ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+            {template.plan === 'pro' || template.isPro ? '👑 PRO' : '✅ FREE'}
+          </span>
+
+          {template.reward && (
+            <span className="text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-200 px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+              🎁 {template.reward}
+            </span>
+          )}
+        </div>
+        
+        {/* Uses count and Copy Button pushed right above the buttons line */}
+        <div className="mt-auto flex items-center justify-between mb-3">
+          <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+            <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            {template.usageCount || 0} Uses
+          </div>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopy(template.slug);
+            }}
+            className="text-slate-400 hover:text-primary transition-colors p-1 rounded-lg hover:bg-slate-100 border border-transparent hover:border-slate-200"
+            title="Copy link to this template"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="pt-2.5 border-t border-slate-100 grid grid-cols-2 gap-2">
+          <Link
+            href={`/${template.slug}`}
+            className="flex items-center justify-center gap-1.5 text-[11px] font-black text-slate-700 bg-slate-50 hover:bg-slate-200 border border-slate-200 rounded-lg py-2 transition active:scale-95"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+            Preview
+          </Link>
+          <button
+            onClick={() => onUse(template.slug)}
+            className="flex items-center justify-center gap-1.5 text-[11px] font-black text-white bg-primary hover:bg-primary-600 rounded-lg py-2 transition shadow-sm active:scale-95"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+            Use
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export async function getStaticProps() {
   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
   if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
   
-  const res = await fetch(`${BACKEND_URL}/api/templates?highlight=true&limit=10`);
+  const res = await fetch(`${BACKEND_URL}/api/templates`);
   const data = await res.json();
-  const featuredTemplates = data.templates || [];
+  const templates = data.templates || [];
+
+  const featuredRes = await fetch(`${BACKEND_URL}/api/templates?highlight=true`);
+  const featuredData = await featuredRes.json();
+  const featuredTemplates = featuredData.templates || [];
 
   return {
     props: {
+      initialTemplates: templates,
       initialFeaturedTemplates: featuredTemplates,
     },
     revalidate: 60,
