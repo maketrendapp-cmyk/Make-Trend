@@ -1,5 +1,5 @@
 // pages/templates/birthday-gift.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
@@ -33,7 +33,7 @@ const defaultMeta = {
   url: 'https://maketrend.app/birthday-gift',
 };
 
-// ── Rewards Data (Studio Quality Realistic Unsplash Photos) ──
+// ── Rewards Data ──
 const REWARDS = [
   {
     id: 'iphone',
@@ -94,9 +94,11 @@ const REWARDS = [
 function BirthdayGift({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
+  const confettiContainerRef = useRef(null);
+  const confettiIntervalRef = useRef(null);
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=rewards, 2=form, 3=gift-reveal, 4=redirect
+  const [step, setStep] = useState(1);
   const [selectedReward, setSelectedReward] = useState(null);
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -115,27 +117,59 @@ function BirthdayGift({ campaign }) {
     if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Confetti effect ──
+  // ── Confetti effect (fixed with proper cleanup) ──
   useEffect(() => {
-    if (confettiActive) {
-      const container = document.querySelector('.confetti-container');
-      if (!container) return;
-      const colors = ['#f59e0b', '#ec4899', '#3b82f6', '#10b981', '#6366f1', '#fbbf24', '#f43f5e'];
-      for (let i = 0; i < 90; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'confetti-particle';
-        particle.style.left = Math.random() * 100 + '%';
-        particle.style.top = '-10px';
-        particle.style.width = (Math.random() * 10 + 5) + 'px';
-        particle.style.height = (Math.random() * 10 + 5) + 'px';
-        particle.style.background = colors[Math.floor(Math.random() * colors.length)];
-        particle.style.borderRadius = Math.random() > 0.5 ? '50%' : '3px';
-        particle.style.position = 'absolute';
-        particle.style.pointerEvents = 'none';
-        particle.style.animation = `confettiFall ${Math.random() * 2.5 + 2}s linear forwards`;
-        container.appendChild(particle);
-      }
+    if (!confettiActive || typeof window === 'undefined') return;
+
+    const container = confettiContainerRef.current;
+    if (!container) return;
+
+    // Clear any existing confetti
+    container.innerHTML = '';
+
+    const colors = ['#f59e0b', '#ec4899', '#3b82f6', '#10b981', '#6366f1', '#fbbf24', '#f43f5e', '#8b5cf6'];
+    const particles = [];
+
+    for (let i = 0; i < 90; i++) {
+      const particle = document.createElement('div');
+      const size = Math.random() * 10 + 5;
+      const left = Math.random() * 100;
+      const delay = Math.random() * 2;
+      const duration = Math.random() * 2.5 + 2;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const isCircle = Math.random() > 0.5;
+
+      particle.style.cssText = `
+        position: absolute;
+        left: ${left}%;
+        top: -10px;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        border-radius: ${isCircle ? '50%' : '3px'};
+        pointer-events: none;
+        opacity: 1;
+        animation: confettiFall ${duration}s ${delay}s linear forwards;
+        transform: rotate(${Math.random() * 360}deg);
+      `;
+
+      container.appendChild(particle);
+      particles.push(particle);
     }
+
+    // Cleanup after animation
+    const cleanupTimeout = setTimeout(() => {
+      if (container) {
+        container.innerHTML = '';
+      }
+    }, 5000);
+
+    return () => {
+      clearTimeout(cleanupTimeout);
+      if (container) {
+        container.innerHTML = '';
+      }
+    };
   }, [confettiActive]);
 
   // ── Validate ──
@@ -178,6 +212,7 @@ function BirthdayGift({ campaign }) {
   const handleShare = (platform) => {
     const url = `${window.location.origin}/birthday-gift?id=${id || 'demo'}`;
     const text = `🎂 Happy Birthday! I just claimed my free ${selectedReward?.name || 'gift'}:`;
+
     switch (platform) {
       case 'whatsapp':
         window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
@@ -191,9 +226,7 @@ function BirthdayGift({ campaign }) {
       default:
         const copyText = `${text} ${url}`;
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(copyText).catch(() => {
-            fallbackCopy(copyText);
-          });
+          navigator.clipboard.writeText(copyText).catch(() => fallbackCopy(copyText));
         } else {
           fallbackCopy(copyText);
         }
@@ -210,7 +243,10 @@ function BirthdayGift({ campaign }) {
     document.body.removeChild(textarea);
   };
 
-  const goBack = () => setStep(1);
+  const goBack = () => {
+    setStep(1);
+    setConfettiActive(false);
+  };
 
   // ── WebView Modal ──
   const WebViewModal = () => {
@@ -229,9 +265,7 @@ function BirthdayGift({ campaign }) {
               onClick={() => {
                 const copyText = window.location.href;
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                  navigator.clipboard.writeText(copyText).catch(() => {
-                    fallbackCopy(copyText);
-                  });
+                  navigator.clipboard.writeText(copyText).catch(() => fallbackCopy(copyText));
                 } else {
                   fallbackCopy(copyText);
                 }
@@ -424,8 +458,8 @@ function BirthdayGift({ campaign }) {
       {/* Step 3: Gift Reveal */}
       {step === 3 && (
         <section className="gift-section">
-          <div className="confetti-container"></div>
           <div className="gift-card">
+            <div className="confetti-container" ref={confettiContainerRef}></div>
             <div className="gift-success-badge">
               <FaSparkles className="text-amber-400" /> Verified Winner
             </div>
@@ -500,11 +534,10 @@ function BirthdayGift({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── ENHANCED STYLING & CSS ─── */}
+      {/* ─── STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --brand-gold: #d4af37;
-          --brand-gold-light: #fef08a;
           --brand-dark: #0f172a;
           --bg-base: #f8fafc;
           --card-bg: #ffffff;
@@ -516,10 +549,17 @@ function BirthdayGift({ campaign }) {
         body { background: var(--bg-base); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
         .page-wrapper { max-width: 100%; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
 
+        @keyframes confettiFall {
+          0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; }
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
-          background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+          background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px);
           border-bottom: 1px solid rgba(0,0,0,0.05); padding: 1rem 1.5rem;
         }
         .header-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
@@ -543,10 +583,9 @@ function BirthdayGift({ campaign }) {
         .shape-1 { width: 400px; height: 400px; background: var(--brand-gold); top: -150px; left: -100px; }
         .shape-2 { width: 350px; height: 350px; background: #6366f1; bottom: -100px; right: -50px; }
         .hero-content { position: relative; z-index: 2; max-width: 700px; }
-        
         .hero-badge-wrap { display: flex; justify-content: center; margin-bottom: 1.2rem; }
         .hero-badge {
-          background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); padding: 0.4rem 1.1rem;
+          background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 0.4rem 1.1rem;
           border-radius: 40px; font-size: 0.7rem; font-weight: 700; color: #fde047;
           letter-spacing: 1px; backdrop-filter: blur(4px);
         }
@@ -559,35 +598,31 @@ function BirthdayGift({ campaign }) {
         .section-header { text-align: center; margin-bottom: 2rem; }
         .section-title { font-size: 1.8rem; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
         .section-subtitle { font-size: 1rem; color: #cbd5e1; margin-top: 0.3rem; }
-        
         .rewards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
         .reward-card {
           background: var(--card-bg); border-radius: 24px; padding: 1.2rem; border: 2px solid #e2e8f0;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; position: relative;
-          box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between;
+          box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
         .reward-card:hover { transform: translateY(-6px); box-shadow: 0 20px 35px -10px rgba(0,0,0,0.1); border-color: #cbd5e1; }
-        .reward-card.selected { border-color: var(--brand-gold); background: #fffdf5; box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15); }
-        
+        .reward-card.selected { border-color: var(--brand-gold); background: #fffdf5; box-shadow: 0 0 0 4px rgba(212,175,55,0.15); }
         .reward-image-wrapper { position: relative; width: 100%; aspect-ratio: 1/1; border-radius: 16px; overflow: hidden; background: #f8fafc; margin-bottom: 1rem; }
         .reward-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
         .reward-card:hover .reward-image { transform: scale(1.05); }
         .reward-tag { position: absolute; top: 10px; right: 10px; color: #fff; font-size: 0.65rem; font-weight: 800; padding: 0.3rem 0.8rem; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        .reward-check-overlay { position: absolute; inset: 0; background: rgba(212, 175, 55, 0.3); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; }
-        
+        .reward-check-overlay { position: absolute; inset: 0; background: rgba(212,175,55,0.3); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; }
         .reward-info-wrap { padding: 0.2rem; }
         .reward-info { display: flex; align-items: center; gap: 12px; }
         .reward-icon-box { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .reward-info h3 { font-size: 1rem; font-weight: 800; color: var(--text-main); line-height: 1.2; margin-bottom: 2px; }
         .reward-value { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
-        
         .action-container { margin-top: 2.5rem; display: flex; justify-content: center; }
         .select-btn {
           width: 100%; max-width: 450px; padding: 1.1rem; background: linear-gradient(135deg, #d4af37, #b8860b);
           border: none; border-radius: 16px; font-weight: 800; font-size: 1.1rem; color: #fff; cursor: pointer;
-          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(212, 175, 55, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px;
+          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(212,175,55,0.4);
         }
-        .select-btn:hover:not(.disabled) { transform: translateY(-3px); box-shadow: 0 15px 35px -5px rgba(212, 175, 55, 0.6); }
+        .select-btn:hover:not(.disabled) { transform: translateY(-3px); box-shadow: 0 15px 35px -5px rgba(212,175,55,0.6); }
         .select-btn.disabled { opacity: 0.5; cursor: not-allowed; background: #cbd5e1; box-shadow: none; color: #64748b; }
 
         /* ── Form Section ── */
@@ -595,15 +630,12 @@ function BirthdayGift({ campaign }) {
         .back-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: #cbd5e1; font-weight: 600; font-size: 0.9rem; cursor: pointer; margin-bottom: 1rem; transition: color 0.2s; }
         .back-btn:hover { color: #fff; }
         .form-card { background: var(--card-bg); border-radius: 28px; padding: 2.5rem 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; }
-        
         .selected-preview { display: flex; align-items: center; gap: 1rem; background: #f8fafc; padding: 0.8rem 1.2rem; border-radius: 16px; margin-bottom: 1.5rem; border: 1px solid #e2e8f0; }
         .preview-img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
         .preview-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; }
         .preview-name { font-weight: 800; font-size: 1.05rem; color: var(--text-main); display: block; }
-        
         .form-card h2 { font-size: 1.6rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.3rem; letter-spacing: -0.5px; }
         .form-card > p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem; }
-        
         .form-group { margin-bottom: 1.5rem; }
         .form-group label { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; color: #334155; margin-bottom: 0.5rem; }
         .form-group .required { color: #ef4444; }
@@ -611,16 +643,14 @@ function BirthdayGift({ campaign }) {
           width: 100%; padding: 0.9rem 1rem; border: 2px solid #e2e8f0; border-radius: 14px; font-size: 1rem;
           background: #f8fafc; transition: all 0.2s; outline: none; font-family: inherit; color: var(--text-main);
         }
-        .form-group input:focus { border-color: var(--brand-gold); background: #fff; box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1); }
+        .form-group input:focus { border-color: var(--brand-gold); background: #fff; box-shadow: 0 0 0 4px rgba(212,175,55,0.1); }
         .form-error { background: #fef2f2; color: #dc2626; padding: 0.8rem 1rem; border-radius: 12px; font-size: 0.9rem; font-weight: 600; margin-bottom: 1.2rem; border: 1px solid #fee2e2; }
-        
         .submit-btn {
           width: 100%; padding: 1.1rem; background: linear-gradient(135deg, #d4af37, #b8860b);
           border: none; border-radius: 16px; font-weight: 800; font-size: 1.1rem; color: #fff; cursor: pointer;
-          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(212, 175, 55, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px;
+          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(212,175,55,0.4);
         }
-        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 35px -5px rgba(212, 175, 55, 0.6); }
-        
+        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 35px -5px rgba(212,175,55,0.6); }
         .trust-badges { display: flex; justify-content: center; gap: 1.5rem; margin-top: 1.5rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
         .trust-badges span { display: flex; align-items: center; gap: 5px; }
 
@@ -630,38 +660,29 @@ function BirthdayGift({ campaign }) {
           background: var(--card-bg); border-radius: 28px; padding: 2.5rem 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
           border: 1px solid #e2e8f0; text-align: center; position: relative; overflow: hidden;
         }
-        .confetti-container { position: absolute; inset: 0; pointer-events: none; border-radius: 28px; }
-        @keyframes confettiFall { 0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; } }
-        
+        .confetti-container { position: absolute; inset: 0; pointer-events: none; border-radius: 28px; overflow: hidden; }
         .gift-success-badge { display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #b45309; padding: 0.4rem 1rem; border-radius: 30px; font-weight: 800; font-size: 0.75rem; margin-bottom: 1rem; border: 1px solid #fde68a; }
         .gift-card h2 { font-size: 1.8rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.3rem; }
         .gift-card > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1rem; }
-        
         .gift-image-container { width: 220px; height: 220px; margin: 0 auto 1.5rem; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.1); background: #f8fafc; }
         .gift-img { width: 100%; height: 100%; object-fit: cover; }
-        
         .gift-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; background: #f8fafc; padding: 1rem; border-radius: 16px; border: 1px solid #e2e8f0; }
         .detail-label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         .detail-value { display: block; font-weight: 800; font-size: 0.95rem; color: var(--text-main); margin-top: 2px; }
         .text-amber-400 { color: #d97706; }
         .text-emerald-400 { color: #059669; }
-        
         .brand-message { margin-bottom: 1.5rem; }
         .brand-message p { font-size: 0.85rem; color: var(--text-muted); }
-        
         .continue-btn {
           width: 100%; padding: 1.1rem; background: linear-gradient(135deg, #10b981, #059669);
           border: none; border-radius: 16px; font-weight: 800; font-size: 1.1rem; color: #fff; cursor: pointer;
-          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px;
+          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(16,185,129,0.4);
         }
-        .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 35px -5px rgba(16, 185, 129, 0.6); }
+        .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 35px -5px rgba(16,185,129,0.6); }
         .continue-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        
         .share-row { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.2rem; font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
         .share-row button { background: none; border: none; cursor: pointer; }
-
         .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ── Redirect Section ── */
         .redirect-section { padding: 4rem 1.5rem; max-width: 560px; margin: 0 auto; }
@@ -677,7 +698,7 @@ function BirthdayGift({ campaign }) {
         .footer-contact { font-weight: 600; color: #cbd5e1; }
 
         /* ── Modal ── */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; }
         .modal-card { background: #fff; border-radius: 28px; padding: 2.5rem 2rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
         .modal-icon-container { width: 64px; height: 64px; background: #fef3c7; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; }
         .modal-icon { font-size: 2rem; }
@@ -710,6 +731,7 @@ function BirthdayGift({ campaign }) {
           .form-card { padding: 1.5rem 1rem; }
           .gift-card { padding: 1.5rem 1rem; }
           .gift-image-container { width: 140px; height: 140px; }
+          .header-badge { font-size: 0.6rem; padding: 0.2rem 0.6rem; }
         }
       `}} />
     </div>
