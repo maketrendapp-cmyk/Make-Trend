@@ -1,9 +1,9 @@
-
 // pages/create.js
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import Head from 'next/head';
+import Image from 'next/image';
 import Meta from '../components/Meta';
 import { useTemplates, useFeaturedTemplates } from '../lib/queries';
 
@@ -47,14 +47,12 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   if (selectedCategory) activeFilters.category = selectedCategory;
   if (selectedPlatform) activeFilters.platform = selectedPlatform;
 
-  // Pass initial data from getStaticProps – no fetch on initial load
-const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters, initialTemplates);
-const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters, initialFeaturedTemplates);
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters, initialTemplates);
+  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters, initialFeaturedTemplates);
 
-// Determine if we have initial data (for loading states)
-const hasInitialData = (initialTemplates && initialTemplates.length > 0) || 
-                       (initialFeaturedTemplates && initialFeaturedTemplates.length > 0);
-const isLoading = (templatesLoading || featuredLoading) && !hasInitialData;
+  const hasInitialData = (initialTemplates && initialTemplates.length > 0) || 
+                         (initialFeaturedTemplates && initialFeaturedTemplates.length > 0);
+  const isLoading = (templatesLoading || featuredLoading) && !hasInitialData;
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
@@ -132,7 +130,7 @@ const isLoading = (templatesLoading || featuredLoading) && !hasInitialData;
     if (showCarousel) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
-      }, 3500); // Increased slightly for better reading experience on PC
+      }, 3500);
     } else {
       setCarouselIndex(0);
     }
@@ -241,8 +239,7 @@ const isLoading = (templatesLoading || featuredLoading) && !hasInitialData;
     return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
   };
 
-  // Use the new isLoading with initial data check
-if (!isLoading && templates.length === 0) {
+  if (!isLoading && templates.length === 0) {
     return (
       <>
         <Meta title="No Templates" />
@@ -405,7 +402,6 @@ if (!isLoading && templates.length === 0) {
             </div>
 
             {showCarousel ? (
-              // ── Carousel (Responsive Layout Fix Applied Here) ──
               <div id="featured-carousel" className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div
                   className="flex transition-transform duration-700 ease-in-out h-full"
@@ -413,18 +409,17 @@ if (!isLoading && templates.length === 0) {
                 >
                   {featuredFiltered.map((template) => (
                     <div key={template.id} className="w-full flex-shrink-0">
-                      
-                      {/* PC FIX: 'md:flex-row' makes it sit side-by-side on desktop to save height! */}
                       <div className="flex flex-col md:flex-row h-full">
-                        
-                        {/* Image Container */}
                         <div className="w-full md:w-1/2 lg:w-[55%] aspect-video md:aspect-auto md:min-h-[280px] bg-slate-100 overflow-hidden relative shrink-0">
                           {template.image ? (
-                            <img
+                            <Image
                               src={template.image}
                               alt={template.title}
-                              className="w-full h-full object-cover md:absolute md:inset-0"
-                              loading="lazy"
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, 55vw"
+                              priority={carouselIndex === 0}
+                              loading={carouselIndex === 0 ? 'eager' : 'lazy'}
                             />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
@@ -438,7 +433,6 @@ if (!isLoading && templates.length === 0) {
                           </div>
                         </div>
 
-                        {/* Content Container */}
                         <div className="p-4 md:p-6 lg:p-8 bg-white flex flex-col justify-center flex-1">
                           <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-3">
                             {template.platform && (
@@ -500,7 +494,6 @@ if (!isLoading && templates.length === 0) {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
-                    {/* Centered navigation dots at the bottom */}
                     <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-white/50 backdrop-blur-md px-2 py-1 rounded-full">
                       {featuredFiltered.map((_, idx) => (
                         <button
@@ -515,7 +508,6 @@ if (!isLoading && templates.length === 0) {
                 )}
               </div>
             ) : (
-              // ── Grid when filters or slug matches featured ──
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {featuredFiltered.map((template) => (
                   <TemplateCard
@@ -546,22 +538,22 @@ if (!isLoading && templates.length === 0) {
 
         {/* ── Regular Templates Grid ── */}
         {isLoading ? (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-    {[1, 2, 3].map((i) => (
-      <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
-        <div className="w-full aspect-video bg-slate-200" />
-        <div className="p-3 space-y-2">
-          <div className="h-3 bg-slate-200 rounded w-2/3" />
-          <div className="h-2.5 bg-slate-200 rounded w-1/2" />
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <div className="h-6 bg-slate-200 rounded-lg" />
-            <div className="h-6 bg-slate-200 rounded-lg" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-pulse">
+                <div className="w-full aspect-video bg-slate-200" />
+                <div className="p-3 space-y-2">
+                  <div className="h-3 bg-slate-200 rounded w-2/3" />
+                  <div className="h-2.5 bg-slate-200 rounded w-1/2" />
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="h-6 bg-slate-200 rounded-lg" />
+                    <div className="h-6 bg-slate-200 rounded-lg" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      </div>
-    ))}
-  </div>
-) : regularTemplates.length === 0 ? (
+        ) : regularTemplates.length === 0 ? (
           <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm px-4">
             <span className="text-2xl mb-1.5 block">🔍</span>
             <h3 className="text-xs font-bold text-slate-900 mb-0.5">No templates match</h3>
@@ -595,7 +587,7 @@ if (!isLoading && templates.length === 0) {
   );
 }
 
-// ── Reusable Template Card ──
+// ── Reusable Template Card with Lazy Loading ──
 function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platformBadgeStyles, isFeatured }) {
   return (
     <div
@@ -610,11 +602,14 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platf
     >
       <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
         {template.image ? (
-          <img
+          <Image
             src={template.image}
             alt={template.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            fill
+            className="object-cover group-hover:scale-105 transition duration-300"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             loading="lazy"
+            quality={80}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
