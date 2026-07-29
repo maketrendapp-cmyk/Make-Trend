@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
 import { getDeviceId } from '../utils/deviceId';
@@ -28,12 +29,14 @@ const defaultMeta = {
   url: 'https://maketrend.app/tasks?id={id}',
 };
 
-function CampaignTasks({ campaign }) {
+// ── Query key for campaign data ──
+const campaignQueryKey = (id) => ['campaign', id];
+
+function CampaignTasks({ campaign: initialCampaign }) {
   const router = useRouter();
   const { id } = router.query;
+  const queryClient = useQueryClient();
 
-  const [loading, setLoading] = useState(!campaign);
-  const [error, setError] = useState('');
   const [completedIndices, setCompletedIndices] = useState([]);
   const [pendingIndex, setPendingIndex] = useState(null);
   const [countdown, setCountdown] = useState(0);
@@ -42,39 +45,32 @@ function CampaignTasks({ campaign }) {
   const timerRef = useRef(null);
   const intervalRef = useRef(null);
 
-  // ── Check if campaign is valid ──
-  useEffect(() => {
-    if (campaign) {
-      setLoading(false);
-      if (!campaign.tasks || campaign.tasks.length === 0) {
-        router.push(`/share?id=${id}`);
-      }
-    } else if (id) {
-      // If campaign not provided via props, fetch it (fallback)
-      fetchCampaignData();
-    }
-  }, [id, campaign]);
+  // ── React Query: fetch campaign with background updates ──
+  const { data: campaign, isLoading } = useQuery({
+    queryKey: campaignQueryKey(id),
+    queryFn: () => fetchCampaign(id),
+    initialData: initialCampaign,
+    // Refetch on mount and window focus to keep data fresh
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always consider stale to trigger background refetch
+    enabled: !!id, // Only run if id exists
+  });
 
-  const fetchCampaignData = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchCampaign(id);
-      if (!data) {
-        setError('Campaign not found');
-        setLoading(false);
-        return;
-      }
-      setCampaign(data);
-      if (!data.tasks || data.tasks.length === 0) {
-        router.push(`/share?id=${id}`);
-      }
-      setLoading(false);
-    } catch (err) {
-      console.error('Error fetching campaign:', err);
-      setError('Could not load campaign. Please try again.');
-      setLoading(false);
+  // ── Redirect if no tasks ──
+  useEffect(() => {
+    if (campaign && (!campaign.tasks || campaign.tasks.length === 0)) {
+      router.push(`/share?id=${id}`);
     }
-  };
+  }, [campaign, id]);
+
+  // ── Cleanup timers ──
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
 
   const cleanupTimers = () => {
     if (timerRef.current) {
@@ -122,7 +118,8 @@ function CampaignTasks({ campaign }) {
   };
 
   const handleContinueToShare = async () => {
-    const allCompleted = completedIndices.length === campaign?.tasks?.length;
+    const tasks = campaign?.tasks || [];
+    const allCompleted = completedIndices.length === tasks.length;
     if (!allCompleted) return;
 
     setIsSubmitting(true);
@@ -133,6 +130,8 @@ function CampaignTasks({ campaign }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId }),
       });
+      // After unlock, we can invalidate the query to refetch
+      queryClient.invalidateQueries(campaignQueryKey(id));
     } catch (err) {
       console.error('Unlock error:', err);
     } finally {
@@ -152,15 +151,12 @@ function CampaignTasks({ campaign }) {
     return <FaLink className="text-gray-400" />;
   };
 
-  const tasks = campaign?.tasks || [];
-  const allCompleted = tasks.length > 0 && completedIndices.length === tasks.length;
-  const progress = tasks.length > 0 ? (completedIndices.length / tasks.length) * 100 : 0;
-
-  // ── Loading State ──
-  if (loading) {
+  // ── Loading state (only while initial data is loading) ──
+  if (isLoading && !campaign) {
     return (
       <div className="min-h-screen bg-gray-50 py-4 px-4 sm:py-6">
         <div className="max-w-3xl mx-auto animate-pulse">
+          {/* Skeleton loader */}
           <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="h-48 sm:h-56 bg-gray-200" />
@@ -186,14 +182,14 @@ function CampaignTasks({ campaign }) {
     );
   }
 
-  // ── Error State ──
-  if (error || !campaign) {
+  // ── Error state ──
+  if (!campaign) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <div className="text-5xl mb-4">😕</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign not found</h2>
-          <p className="text-gray-500">{error || 'The campaign you\'re looking for doesn\'t exist.'}</p>
+          <p className="text-gray-500">The campaign you're looking for doesn't exist.</p>
           <button
             onClick={() => router.push('/')}
             className="mt-6 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition"
@@ -204,6 +200,10 @@ function CampaignTasks({ campaign }) {
       </div>
     );
   }
+
+  const tasks = campaign?.tasks || [];
+  const allCompleted = tasks.length > 0 && completedIndices.length === tasks.length;
+  const progress = tasks.length > 0 ? (completedIndices.length / tasks.length) * 100 : 0;
 
   // ── Main Render ──
   return (
@@ -408,7 +408,7 @@ function CampaignTasks({ campaign }) {
   );
 }
 
-// ── Server‑side props ──
+// ── Server‑side props (pre‑render with initial data) ──
 export async function getServerSideProps({ query }) {
   const campaignId = query.id || query.campaign || null;
   const campaign = campaignId ? await fetchCampaign(campaignId) : null;
