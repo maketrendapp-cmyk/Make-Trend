@@ -95,7 +95,6 @@ function BirthdayGift({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
   const confettiContainerRef = useRef(null);
-  const confettiIntervalRef = useRef(null);
 
   // ── State ──
   const [step, setStep] = useState(1);
@@ -117,18 +116,17 @@ function BirthdayGift({ campaign }) {
     if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Confetti effect (fixed with proper cleanup) ──
+  // ── Confetti effect (FIXED: uses ref and proper checks) ──
   useEffect(() => {
     if (!confettiActive || typeof window === 'undefined') return;
 
     const container = confettiContainerRef.current;
     if (!container) return;
 
-    // Clear any existing confetti
+    // Clear existing confetti
     container.innerHTML = '';
 
     const colors = ['#f59e0b', '#ec4899', '#3b82f6', '#10b981', '#6366f1', '#fbbf24', '#f43f5e', '#8b5cf6'];
-    const particles = [];
 
     for (let i = 0; i < 90; i++) {
       const particle = document.createElement('div');
@@ -154,7 +152,6 @@ function BirthdayGift({ campaign }) {
       `;
 
       container.appendChild(particle);
-      particles.push(particle);
     }
 
     // Cleanup after animation
@@ -208,7 +205,16 @@ function BirthdayGift({ campaign }) {
     }
   };
 
-  // ── Share handlers ──
+  // ── Share handlers (with fallback for clipboard) ──
+  const fallbackCopy = (text) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  };
+
   const handleShare = (platform) => {
     const url = `${window.location.origin}/birthday-gift?id=${id || 'demo'}`;
     const text = `🎂 Happy Birthday! I just claimed my free ${selectedReward?.name || 'gift'}:`;
@@ -232,15 +238,6 @@ function BirthdayGift({ campaign }) {
         }
         alert('🔗 Referral link copied to clipboard!');
     }
-  };
-
-  const fallbackCopy = (text) => {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
   };
 
   const goBack = () => {
