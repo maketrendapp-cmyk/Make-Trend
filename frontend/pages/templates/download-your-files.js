@@ -10,7 +10,7 @@ const defaultMeta = {
   title: 'Download Your Files – Complete Tasks to Unlock',
   description: 'Get your files by completing a few simple tasks. Safe, secure, and free. Start now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/download-your-files',
+  url: 'https://maketrend.app/download-your-files?id={id}',
 };
 
 function DownloadYourFiles({ campaign }) {
