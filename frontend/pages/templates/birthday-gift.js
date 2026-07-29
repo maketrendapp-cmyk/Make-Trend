@@ -6,10 +6,7 @@ import { fetchCampaign } from '../../lib/fetchCampaign';
 import {
   FaApple,
   FaGift,
-  FaCalendarAlt,
-  FaUser,
   FaCheckCircle,
-  FaArrowRight,
   FaCopy,
   FaShareAlt,
   FaWhatsapp,
@@ -20,17 +17,12 @@ import {
   FaHeadphones,
   FaTablet,
   FaClock,
-  FaStar,
-  FaAward,
-  FaUsers,
-  FaRocket,
-  FaArrowLeft,
 } from 'react-icons/fa';
 
 // ── Default Meta ──
 const defaultMeta = {
   title: 'Birthday Gift – Claim Your Free Premium Reward!',
-  description: 'Enter your name and birthday to claim a free premium gift. Choose from iPhone, MacBook, Watch, TV, and more!',
+  description: 'Choose a free premium gift to claim. Choose from iPhone, MacBook, Watch, TV, and more!',
   image: 'https://maketrend.app/og-image.png',
   url: 'https://maketrend.app/birthday-gift?id={id}',
 };
@@ -98,15 +90,11 @@ function BirthdayGift({ campaign }) {
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=rewards, 2=form, 3=gift-reveal, 4=redirect
+  const [step, setStep] = useState(1); // 1=rewards, 2=gift-reveal, 3=redirect
   const [selectedReward, setSelectedReward] = useState(null);
-  const [name, setName] = useState('');
-  const [birthday, setBirthday] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
-  const [hoveredReward, setHoveredReward] = useState(null);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -143,35 +131,17 @@ function BirthdayGift({ campaign }) {
     }
   }, [confettiActive]);
 
-  // ── Validate ──
-  const validate = () => {
-    if (!selectedReward) return 'Please select a gift.';
-    if (!name.trim()) return 'Please enter your full name.';
-    if (!birthday) return 'Please select your birthday.';
-    const birthDate = new Date(birthday);
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
-    if (age < 13) return 'You must be at least 13 years old.';
-    if (age > 100) return 'Please enter a valid birthday.';
-    return null;
-  };
-
-  // ── Submit form ──
-  const handleSubmit = () => {
-    const err = validate();
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError('');
-    setStep(3);
+  // ── Select and Proceed to Reveal ──
+  const handleSelectReward = () => {
+    if (!selectedReward) return;
+    setStep(2);
     setConfettiActive(true);
   };
 
   // ── Continue to tasks ──
   const handleContinue = () => {
     setLoading(true);
-    setStep(4);
+    setStep(3);
     if (!id) {
       router.push('/create');
     } else {
@@ -182,7 +152,7 @@ function BirthdayGift({ campaign }) {
   // ── Share handlers ──
   const handleShare = (platform) => {
     const url = `${window.location.origin}/birthday-gift?id=${id || 'demo'}`;
-    const text = `🎂 Happy Birthday! Get your free ${selectedReward?.name || 'gift'} here:`;
+    const text = `🎂 Get your free ${selectedReward?.name || 'gift'} here:`;
     switch (platform) {
       case 'whatsapp':
         window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
@@ -197,11 +167,6 @@ function BirthdayGift({ campaign }) {
         navigator.clipboard?.writeText(url);
         alert('Link copied!');
     }
-  };
-
-  // ── Go back to rewards selection ──
-  const goBack = () => {
-    setStep(1);
   };
 
   // ── WebView Modal ──
@@ -259,7 +224,7 @@ function BirthdayGift({ campaign }) {
           <span className="logo-text">Gift<span>Zone</span></span>
         </div>
         <div className="header-badge">
-          <FaGift className="w-3 h-3" /> Birthday Special
+          <FaGift className="w-3 h-3" /> Special Reward
         </div>
       </header>
 
@@ -269,23 +234,16 @@ function BirthdayGift({ campaign }) {
         <div className="hero-content">
           {step === 1 && (
             <>
-              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎂 BIRTHDAY GIVEAWAY</div>
-              <h1>Choose Your <span>Birthday Gift</span></h1>
-              <p>Pick your favorite reward and enter your details to claim it.</p>
+              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎁 GIVEAWAY EVENT</div>
+              <h1>Choose Your <span>Free Gift</span></h1>
+              <p>Pick your favorite reward below to claim it instantly.</p>
             </>
           )}
           {step === 2 && (
             <>
-              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎁 SELECTED</div>
-              <h1>You Chose <span>{selectedReward?.name}</span></h1>
-              <p>Enter your details to claim your birthday gift.</p>
-            </>
-          )}
-          {step === 3 && (
-            <>
               <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎉 CONGRATULATIONS</div>
-              <h1>Happy Birthday, <span>{name}!</span></h1>
-              <p>You've won a <strong>{selectedReward?.name}</strong>!</p>
+              <h1>You've Unlocked a <span>{selectedReward?.name}!</span></h1>
+              <p>Your gift has been successfully reserved.</p>
             </>
           )}
         </div>
@@ -304,11 +262,9 @@ function BirthdayGift({ campaign }) {
                 key={reward.id}
                 className={`reward-card ${selectedReward?.id === reward.id ? 'selected' : ''}`}
                 onClick={() => setSelectedReward(reward)}
-                onMouseEnter={() => setHoveredReward(reward.id)}
-                onMouseLeave={() => setHoveredReward(null)}
                 style={{
-                  borderColor: selectedReward?.id === reward.id ? reward.color : 'transparent',
-                  boxShadow: selectedReward?.id === reward.id ? `0 0 0 4px ${reward.color}40` : 'none',
+                  borderColor: selectedReward?.id === reward.id ? reward.color : '#e2e8f0',
+                  boxShadow: selectedReward?.id === reward.id ? `0 10px 30px ${reward.color}30` : '0 4px 12px rgba(0,0,0,0.03)',
                 }}
               >
                 <div className="reward-image-wrapper">
@@ -316,13 +272,15 @@ function BirthdayGift({ campaign }) {
                   <span className="reward-tag" style={{ background: reward.color }}>{reward.tag}</span>
                 </div>
                 <div className="reward-info">
-                  <div className="reward-icon" style={{ color: reward.color }}>{reward.icon}</div>
-                  <h3>{reward.name}</h3>
-                  <p className="reward-value">{reward.value}</p>
+                  <div className="reward-icon" style={{ color: reward.color, background: `${reward.color}15` }}>{reward.icon}</div>
+                  <div className="reward-text-group">
+                    <h3>{reward.name}</h3>
+                    <p className="reward-value">Value: <strong>{reward.value}</strong></p>
+                  </div>
                 </div>
                 {selectedReward?.id === reward.id && (
                   <div className="reward-check">
-                    <FaCheckCircle className="w-5 h-5 text-green-500" />
+                    <FaCheckCircle className="w-5 h-5 text-amber-500 drop-shadow-sm" />
                   </div>
                 )}
               </div>
@@ -330,7 +288,7 @@ function BirthdayGift({ campaign }) {
           </div>
           <button
             className={`select-btn ${!selectedReward ? 'disabled' : ''}`}
-            onClick={() => selectedReward && setStep(2)}
+            onClick={handleSelectReward}
             disabled={!selectedReward}
           >
             {selectedReward ? `Continue with ${selectedReward.name} →` : 'Select a gift first'}
@@ -338,63 +296,14 @@ function BirthdayGift({ campaign }) {
         </section>
       )}
 
-      {/* Step 2: Form */}
+      {/* Step 2: Gift Reveal */}
       {step === 2 && (
-        <section className="form-section">
-          <button className="back-btn" onClick={goBack}>
-            <FaArrowLeft className="w-4 h-4" /> Back
-          </button>
-          <div className="form-card">
-            <div className="selected-preview">
-              <img src={selectedReward?.image} alt={selectedReward?.name} className="preview-img" />
-              <span className="preview-name">{selectedReward?.name}</span>
-            </div>
-            <h2>Enter Your Details</h2>
-            <p>We'll verify your birthday and send you the gift.</p>
-
-            <div className="form-group">
-              <label><FaUser className="w-4 h-4" /> Full Name <span className="required">*</span></label>
-              <input
-                type="text"
-                placeholder="e.g. John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label><FaCalendarAlt className="w-4 h-4" /> Date of Birth <span className="required">*</span></label>
-              <input
-                type="date"
-                value={birthday}
-                onChange={(e) => setBirthday(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-
-            {error && <p className="form-error">{error}</p>}
-
-            <button className="submit-btn" onClick={handleSubmit}>
-              Claim Your Gift →
-            </button>
-
-            <div className="trust-badges">
-              <span><FaCheckCircle className="w-3.5 h-3.5" /> Verified</span>
-              <span><FaCheckCircle className="w-3.5 h-3.5" /> Secure</span>
-              <span><FaCheckCircle className="w-3.5 h-3.5" /> Trusted Partner</span>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Step 3: Gift Reveal */}
-      {step === 3 && (
         <section className="gift-section">
           <div className="confetti-container"></div>
           <div className="gift-card">
-            <div className="gift-icon"><FaGift className="w-12 h-12 text-amber-500" /></div>
-            <h2>🎉 Happy Birthday, {name}!</h2>
-            <p>You've won a <strong>{selectedReward?.name}</strong>!</p>
+            <div className="gift-icon-badge"><FaGift className="w-8 h-8 text-amber-600" /></div>
+            <h2>🎉 Reward Unlocked!</h2>
+            <p>You've successfully claimed a <strong>{selectedReward?.name}</strong>!</p>
 
             <div className="gift-image">
               <img
@@ -411,11 +320,11 @@ function BirthdayGift({ campaign }) {
               </div>
               <div className="gift-detail">
                 <span className="detail-label">Value</span>
-                <span className="detail-value">{selectedReward?.value}</span>
+                <span className="detail-value text-amber-600 font-extrabold">{selectedReward?.value}</span>
               </div>
               <div className="gift-detail">
                 <span className="detail-label">Status</span>
-                <span className="detail-value text-green-500">✓ Claimable</span>
+                <span className="detail-value text-emerald-600 font-extrabold">✓ Claimable</span>
               </div>
             </div>
 
@@ -436,18 +345,18 @@ function BirthdayGift({ campaign }) {
               </button>
               <div className="share-row">
                 <span>Share this joy:</span>
-                <button onClick={() => handleShare('whatsapp')}><FaWhatsapp className="w-5 h-5 text-green-500" /></button>
-                <button onClick={() => handleShare('facebook')}><FaFacebook className="w-5 h-5 text-blue-600" /></button>
-                <button onClick={() => handleShare('twitter')}><FaTwitter className="w-5 h-5 text-blue-400" /></button>
-                <button onClick={() => handleShare('copy')}><FaCopy className="w-5 h-5 text-gray-600" /></button>
+                <button onClick={() => handleShare('whatsapp')}><FaWhatsapp className="w-5 h-5 text-emerald-500 hover:scale-110 transition" /></button>
+                <button onClick={() => handleShare('facebook')}><FaFacebook className="w-5 h-5 text-blue-600 hover:scale-110 transition" /></button>
+                <button onClick={() => handleShare('twitter')}><FaTwitter className="w-5 h-5 text-sky-400 hover:scale-110 transition" /></button>
+                <button onClick={() => handleShare('copy')}><FaCopy className="w-5 h-5 text-slate-600 hover:scale-110 transition" /></button>
               </div>
             </div>
           </div>
         </section>
       )}
 
-      {/* Step 4: Redirecting */}
-      {step === 4 && (
+      {/* Step 3: Redirecting */}
+      {step === 3 && (
         <section className="redirect-section">
           <div className="redirect-card">
             <div className="spinner-large"></div>
@@ -468,14 +377,14 @@ function BirthdayGift({ campaign }) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-          background: #f0f4f8;
-          color: #1a1a2e;
+          background: #f8fafc;
+          color: #1e293b;
           line-height: 1.6;
         }
         .page-wrapper {
           max-width: 100%;
           overflow-x: hidden;
-          background: #f0f4f8;
+          background: #f8fafc;
           min-height: 100vh;
           display: flex;
           flex-direction: column;
@@ -484,10 +393,10 @@ function BirthdayGift({ campaign }) {
         /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
-          background: rgba(255,255,255,0.92);
+          background: rgba(255,255,255,0.9);
           backdrop-filter: blur(16px);
-          border-bottom: 1px solid rgba(212, 175, 55, 0.15);
-          padding: 0.7rem 1.5rem;
+          border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+          padding: 0.75rem 1.5rem;
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -495,18 +404,19 @@ function BirthdayGift({ campaign }) {
         .logo {
           display: flex;
           align-items: center; gap: 0.6rem;
-          font-weight: 800; font-size: 1.2rem;
+          font-weight: 800; font-size: 1.25rem;
         }
         .logo-icon {
-          width: 36px; height: 36px;
-          background: linear-gradient(135deg, #1a1a2e, #2d2d44);
-          border-radius: 10px;
+          width: 38px; height: 38px;
+          background: linear-gradient(135deg, #0f172a, #1e293b);
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
           color: #fff;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
         }
-        .logo-text { color: #1a1a2e; }
+        .logo-text { color: #0f172a; }
         .logo-text span { color: #D4AF37; }
         .header-badge {
           display: flex;
@@ -514,12 +424,12 @@ function BirthdayGift({ campaign }) {
           background: linear-gradient(135deg, #D4AF37, #B8860B);
           color: #fff;
           font-weight: 700;
-          font-size: 0.65rem;
-          padding: 0.3rem 1rem;
+          font-size: 0.7rem;
+          padding: 0.35rem 1rem;
           border-radius: 40px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          box-shadow: 0 2px 12px rgba(212, 175, 55, 0.2);
+          box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25);
         }
 
         /* ── Hero ── */
@@ -530,14 +440,15 @@ function BirthdayGift({ campaign }) {
           align-items: center;
           justify-content: center;
           text-align: center;
-          padding: 2.5rem 1.5rem;
-          background: linear-gradient(135deg, #fef9e7, #fdf2d0);
-          color: #1a1a2e;
+          padding: 3rem 1.5rem;
+          background: linear-gradient(135deg, #fefce8, #fef08a33);
+          color: #0f172a;
           overflow: hidden;
+          border-bottom: 1px solid #fef08a66;
         }
         .hero-overlay {
           position: absolute; inset: 0;
-          background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+          background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
         }
         .hero-content {
           position: relative; z-index: 2;
@@ -546,74 +457,83 @@ function BirthdayGift({ campaign }) {
         .hero-badge {
           display: inline-flex;
           align-items: center; gap: 0.4rem;
-          background: rgba(212, 175, 55, 0.12);
-          border: 1px solid rgba(212, 175, 55, 0.2);
-          padding: 0.3rem 1.2rem;
+          background: rgba(212, 175, 55, 0.15);
+          border: 1px solid rgba(212, 175, 55, 0.3);
+          padding: 0.35rem 1.25rem;
           border-radius: 40px;
-          font-size: 0.65rem;
+          font-size: 0.7rem;
           text-transform: uppercase;
-          font-weight: 700;
-          color: #B8860B;
+          font-weight: 800;
+          color: #b45309;
           margin-bottom: 0.8rem;
           letter-spacing: 1px;
         }
         .hero h1 {
-          font-size: clamp(2rem, 6vw, 3rem);
+          font-size: clamp(2rem, 5vw, 3.2rem);
           font-weight: 900;
-          line-height: 1.1;
-          margin-bottom: 0.3rem;
-          color: #1a1a2e;
+          line-height: 1.15;
+          margin-bottom: 0.4rem;
+          color: #0f172a;
+          letter-spacing: -0.5px;
         }
         .hero h1 span {
-          color: #D4AF37;
+          background: linear-gradient(135deg, #D4AF37, #92400e);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
         .hero p {
           font-size: 1.05rem;
-          color: #555;
-          margin-bottom: 1.2rem;
+          color: #475569;
+          margin-bottom: 1rem;
         }
 
         /* ── Rewards Section ── */
         .rewards-section {
-          padding: 2rem 1.5rem;
-          max-width: 1000px;
-          margin: -2rem auto 2rem;
+          padding: 2.5rem 1.5rem;
+          max-width: 1050px;
+          margin: -2.5rem auto 2rem;
           position: relative;
           z-index: 10;
         }
         .section-title {
           font-size: 1.8rem;
-          font-weight: 800;
+          font-weight: 900;
           text-align: center;
-          color: #1a1a2e;
+          color: #0f172a;
+          letter-spacing: -0.5px;
         }
         .section-subtitle {
           text-align: center;
-          color: #6b7280;
-          margin-bottom: 1.5rem;
-          font-size: 1rem;
+          color: #64748b;
+          margin-bottom: 2rem;
+          font-size: 0.95rem;
         }
         .rewards-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 1.2rem;
+          gap: 1.5rem;
         }
         .reward-card {
           background: #fff;
           border-radius: 24px;
-          padding: 1rem;
-          border: 2px solid transparent;
-          transition: all 0.3s ease;
+          padding: 1.2rem;
+          border: 2px solid #e2e8f0;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           cursor: pointer;
           position: relative;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
         .reward-card:hover {
-          transform: translateY(-6px);
-          box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+          transform: translateY(-5px);
+          box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+          border-color: #cbd5e1;
         }
         .reward-card.selected {
-          background: #f8fafc;
+          background: #fffdf5;
+          border-color: #D4AF37;
         }
         .reward-image-wrapper {
           position: relative;
@@ -621,62 +541,75 @@ function BirthdayGift({ campaign }) {
           aspect-ratio: 1/1;
           border-radius: 16px;
           overflow: hidden;
-          background: #f0f0f0;
-          margin-bottom: 0.6rem;
+          background: #f1f5f9;
+          margin-bottom: 0.8rem;
         }
         .reward-image {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          transition: transform 0.5s ease;
+        }
+        .reward-card:hover .reward-image {
+          transform: scale(1.05);
         }
         .reward-tag {
           position: absolute;
-          top: 8px;
-          right: 8px;
+          top: 10px;
+          right: 10px;
           color: #fff;
-          font-size: 0.55rem;
-          font-weight: 700;
-          padding: 0.2rem 0.6rem;
-          border-radius: 40px;
+          font-size: 0.6rem;
+          font-weight: 800;
+          padding: 0.25rem 0.7rem;
+          border-radius: 20px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          background: #1a1a2e;
+          background: #0f172a;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
         .reward-info {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.8rem;
           margin-top: 0.2rem;
         }
         .reward-icon {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          background: #f0f0f0;
+          width: 36px;
+          height: 36px;
+          border-radius: 12px;
           flex-shrink: 0;
         }
-        .reward-info h3 {
-          font-size: 0.85rem;
-          font-weight: 700;
-          color: #1a1a2e;
-          flex: 1;
+        .reward-text-group h3 {
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #0f172a;
+          line-height: 1.3;
         }
         .reward-value {
-          font-size: 0.75rem;
+          font-size: 0.8rem;
           font-weight: 600;
-          color: #6b7280;
+          color: #64748b;
+          margin-top: 2px;
         }
         .reward-check {
           position: absolute;
-          top: 12px;
-          left: 12px;
+          top: 16px;
+          left: 16px;
+          background: #fff;
+          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
         .select-btn {
           width: 100%;
-          padding: 0.9rem;
+          padding: 1.05rem;
           background: linear-gradient(135deg, #D4AF37, #B8860B);
           border: none;
           border-radius: 60px;
@@ -684,148 +617,21 @@ function BirthdayGift({ campaign }) {
           font-size: 1.05rem;
           color: #fff;
           cursor: pointer;
-          transition: all 0.2s;
-          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 10px 25px rgba(212, 175, 55, 0.3);
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          margin-top: 1.5rem;
+          margin-top: 2rem;
         }
-        .select-btn:hover:not(.disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(212, 175, 55, 0.35); }
-        .select-btn.disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* ── Form Section ── */
-        .form-section {
-          padding: 2rem 1.5rem;
-          max-width: 560px;
-          margin: -2rem auto 2rem;
-          position: relative;
-          z-index: 10;
-        }
-        .back-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          background: none;
-          border: none;
-          color: #6b7280;
-          font-size: 0.85rem;
-          cursor: pointer;
-          margin-bottom: 0.8rem;
-          transition: color 0.2s;
-        }
-        .back-btn:hover { color: #1a1a2e; }
-        .form-card {
-          background: #fff;
-          border-radius: 32px;
-          padding: 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-          border: 1px solid #eef2f6;
-        }
-        .selected-preview {
-          display: flex;
-          align-items: center;
-          gap: 0.8rem;
-          background: #f8fafc;
-          padding: 0.6rem 1rem;
-          border-radius: 16px;
-          margin-bottom: 1.2rem;
-          border: 1px solid #eef2f6;
-        }
-        .preview-img {
-          width: 48px;
-          height: 48px;
-          border-radius: 8px;
-          object-fit: cover;
-        }
-        .preview-name {
-          font-weight: 700;
-          font-size: 0.9rem;
-          color: #1a1a2e;
-        }
-        .form-card h2 {
-          font-size: 1.6rem;
-          font-weight: 800;
-          text-align: center;
-          color: #1a1a2e;
-        }
-        .form-card > p {
-          text-align: center;
-          color: #6b7280;
-          margin-bottom: 1.5rem;
-        }
-        .form-group {
-          margin-bottom: 1.2rem;
-        }
-        .form-group label {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          font-weight: 600;
-          font-size: 0.85rem;
-          color: #374151;
-          margin-bottom: 0.3rem;
-        }
-        .form-group .required { color: #ef4444; }
-        .form-group input {
-          width: 100%;
-          padding: 0.8rem 1rem;
-          border: 2px solid #e5e7eb;
-          border-radius: 14px;
-          font-size: 0.95rem;
-          background: #f9fafb;
-          transition: all 0.2s;
-          outline: none;
-          font-family: inherit;
-        }
-        .form-group input:focus {
-          border-color: #D4AF37;
-          background: #fff;
-          box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.08);
-        }
-        .form-group input[type="date"] { color-scheme: light; }
-        .form-error {
-          color: #ef4444;
-          font-size: 0.85rem;
-          margin-top: 0.5rem;
-        }
-        .submit-btn {
-          width: 100%;
-          padding: 0.9rem;
-          background: linear-gradient(135deg, #D4AF37, #B8860B);
-          border: none;
-          border-radius: 60px;
-          font-weight: 800;
-          font-size: 1.05rem;
-          color: #fff;
-          cursor: pointer;
-          transition: all 0.2s;
-          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(212, 175, 55, 0.35); }
-        .trust-badges {
-          display: flex;
-          justify-content: center;
-          gap: 1.5rem;
-          margin-top: 1.2rem;
-          font-size: 0.75rem;
-          color: #6b7280;
-        }
-        .trust-badges span {
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-        }
+        .select-btn:hover:not(.disabled) { transform: translateY(-2px); box-shadow: 0 15px 35px rgba(212, 175, 55, 0.45); }
+        .select-btn.disabled { opacity: 0.5; cursor: not-allowed; background: #cbd5e1; box-shadow: none; color: #64748b; }
 
         /* ── Gift Section ── */
         .gift-section {
-          padding: 2rem 1.5rem;
-          max-width: 640px;
+          padding: 2.5rem 1.5rem;
+          max-width: 620px;
           margin: -2rem auto 2rem;
           position: relative;
           z-index: 10;
@@ -833,11 +639,12 @@ function BirthdayGift({ campaign }) {
         .gift-card {
           background: #fff;
           border-radius: 32px;
-          padding: 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-          border: 1px solid #eef2f6;
+          padding: 2.5rem 2rem;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.06);
+          border: 1px solid #e2e8f0;
           text-align: center;
           position: relative;
+          overflow: hidden;
         }
         .confetti-container {
           position: absolute;
@@ -850,25 +657,38 @@ function BirthdayGift({ campaign }) {
           0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
           100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; }
         }
-        .gift-icon { margin: 0 auto 0.5rem; }
+        .gift-icon-badge {
+          width: 64px; height: 64px;
+          background: #fef3c7;
+          border-radius: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 1rem;
+          border: 1px solid #fde68a;
+          box-shadow: 0 8px 20px rgba(212, 175, 55, 0.15);
+        }
         .gift-card h2 {
           font-size: 1.8rem;
-          font-weight: 800;
-          color: #1a1a2e;
+          font-weight: 900;
+          color: #0f172a;
           margin-bottom: 0.3rem;
+          letter-spacing: -0.5px;
         }
         .gift-card p {
-          color: #6b7280;
-          margin-bottom: 1.2rem;
+          color: #64748b;
+          margin-bottom: 1.5rem;
+          font-size: 1rem;
         }
         .gift-card p strong { color: #D4AF37; }
         .gift-image {
           width: 200px;
           height: 200px;
-          margin: 0 auto 1.2rem;
-          border-radius: 20px;
+          margin: 0 auto 1.5rem;
+          border-radius: 24px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+          box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+          background: #f1f5f9;
         }
         .gift-img {
           width: 100%;
@@ -878,62 +698,64 @@ function BirthdayGift({ campaign }) {
         .gift-details {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 0.8rem;
-          margin-bottom: 1.2rem;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
           background: #f8fafc;
-          padding: 0.8rem;
-          border-radius: 16px;
-          border: 1px solid #eef2f6;
+          padding: 1rem;
+          border-radius: 18px;
+          border: 1px solid #e2e8f0;
         }
         .gift-detail {
           text-align: center;
         }
         .detail-label {
           display: block;
-          font-size: 0.65rem;
-          font-weight: 600;
-          color: #888;
+          font-size: 0.7rem;
+          font-weight: 700;
+          color: #64748b;
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
         .detail-value {
           display: block;
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: #1a1a2e;
+          font-weight: 800;
+          font-size: 0.95rem;
+          color: #0f172a;
+          margin-top: 2px;
         }
         .brand-message {
-          margin: 1rem 0 1.2rem;
+          margin: 1.2rem 0 1.5rem;
         }
-        .brand-message p { font-size: 0.9rem; color: #555; }
-        .brand-message .small-text { font-size: 0.7rem; color: #888; }
+        .brand-message p { font-size: 0.85rem; color: #64748b; margin-bottom: 0.2rem; }
+        .brand-message .small-text { font-size: 0.75rem; color: #94a3b8; }
         .gift-actions .continue-btn {
           width: 100%;
-          padding: 0.9rem;
-          background: linear-gradient(135deg, #22C55E, #16A34A);
+          padding: 1.1rem;
+          background: linear-gradient(135deg, #10b981, #059669);
           border: none;
           border-radius: 60px;
           font-weight: 800;
-          font-size: 1rem;
+          font-size: 1.05rem;
           color: #fff;
           cursor: pointer;
-          transition: all 0.2s;
-          box-shadow: 0 4px 20px rgba(34, 197, 94, 0.25);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
         }
-        .gift-actions .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(34, 197, 94, 0.35); }
+        .gift-actions .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 35px rgba(16, 185, 129, 0.45); }
         .gift-actions .continue-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .share-row {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 0.8rem;
-          margin-top: 1rem;
-          font-size: 0.85rem;
-          color: #6b7280;
+          gap: 1rem;
+          margin-top: 1.2rem;
+          font-size: 0.9rem;
+          color: #64748b;
+          font-weight: 600;
         }
         .share-row button {
           background: none;
@@ -941,13 +763,13 @@ function BirthdayGift({ campaign }) {
           cursor: pointer;
           transition: transform 0.2s;
         }
-        .share-row button:hover { transform: scale(1.1); }
+        .share-row button:hover { transform: scale(1.15); }
 
         .spinner {
           display: inline-block;
           width: 20px;
           height: 20px;
-          border: 2px solid rgba(255,255,255,0.3);
+          border: 3px solid rgba(255,255,255,0.3);
           border-top-color: #fff;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
@@ -955,49 +777,49 @@ function BirthdayGift({ campaign }) {
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .spinner-large {
-          width: 48px;
-          height: 48px;
-          border: 4px solid rgba(212, 175, 55, 0.15);
+          width: 52px;
+          height: 52px;
+          border: 4px solid rgba(212, 175, 55, 0.2);
           border-top-color: #D4AF37;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
-          margin: 0 auto 1rem;
+          margin: 0 auto 1.2rem;
         }
 
         /* ── Redirect Section ── */
         .redirect-section {
           padding: 4rem 1.5rem;
           max-width: 560px;
-          margin: -2rem auto 2rem;
+          margin: 0 auto;
         }
         .redirect-card {
           background: #fff;
           border-radius: 32px;
           padding: 3rem 2rem;
           text-align: center;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-          border: 1px solid #eef2f6;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.06);
+          border: 1px solid #e2e8f0;
         }
-        .redirect-card h2 { font-size: 1.6rem; font-weight: 800; color: #1a1a2e; margin-bottom: 0.3rem; }
-        .redirect-card p { color: #6b7280; }
+        .redirect-card h2 { font-size: 1.6rem; font-weight: 900; color: #0f172a; margin-bottom: 0.4rem; }
+        .redirect-card p { color: #64748b; }
 
         /* ── Footer ── */
         .site-footer {
-          background: #1a1a2e;
-          color: #9ca3af;
-          padding: 1.5rem 1.5rem;
+          background: #0f172a;
+          color: #94a3b8;
+          padding: 2rem 1.5rem;
           text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.04);
+          border-top: 1px solid rgba(255,255,255,0.05);
           margin-top: auto;
         }
-        .site-footer p { font-size: 0.7rem; margin-bottom: 0.2rem; }
-        .footer-contact { font-weight: 600; color: #e5e7eb; }
+        .site-footer p { font-size: 0.75rem; margin-bottom: 0.2rem; }
+        .footer-contact { font-weight: 600; color: #cbd5e1; }
 
         /* ── Modal ── */
         .modal-overlay {
           position: fixed;
           top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(0,0,0,0.85);
+          background: rgba(15, 23, 42, 0.85);
           backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
@@ -1005,66 +827,66 @@ function BirthdayGift({ campaign }) {
           z-index: 9999;
         }
         .modal-card {
-          background: #1a1c22;
-          border-radius: 36px;
+          background: #1e293b;
+          border-radius: 32px;
           padding: 2.5rem 2rem;
           max-width: 400px;
           width: 90%;
           text-align: center;
-          border: 1px solid rgba(212, 175, 55, 0.15);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          border: 1px solid rgba(212, 175, 55, 0.2);
+          box-shadow: 0 25px 50px rgba(0,0,0,0.5);
         }
-        .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
-        .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
-        .modal-card p { color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .modal-icon { font-size: 3rem; margin-bottom: 0.4rem; }
+        .modal-card h2 { font-size: 1.4rem; font-weight: 900; color: #fff; margin-bottom: 0.4rem; }
+        .modal-card p { color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.8rem; line-height: 1.5; }
         .modal-actions {
           display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
         }
         .modal-btn {
           display: flex; align-items: center; gap: 0.4rem;
           background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.08);
-          padding: 0.6rem 1.2rem;
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 0.7rem 1.2rem;
           border-radius: 40px;
-          font-weight: 600;
-          font-size: 0.75rem;
+          font-weight: 700;
+          font-size: 0.8rem;
           color: #fff;
           cursor: pointer;
           transition: 0.2s;
           flex: 1;
-          min-width: 100px;
+          min-width: 110px;
         }
         .modal-btn:hover { background: rgba(255,255,255,0.12); }
         .modal-btn.primary {
           background: #D4AF37;
           border: none;
-          color: #0a0a0a;
+          color: #0f172a;
         }
         .modal-btn.primary:hover { background: #B8860B; }
         .modal-btn.ghost {
           background: transparent;
           border: none;
-          color: #666;
-          font-size: 0.7rem;
-          margin-top: 0.3rem;
+          color: #64748b;
+          font-size: 0.75rem;
+          margin-top: 0.4rem;
         }
         .modal-btn.ghost:hover { color: #fff; }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
-          .rewards-grid { grid-template-columns: repeat(2, 1fr); }
-          .gift-details { grid-template-columns: 1fr; }
-          .gift-image { width: 150px; height: 150px; }
-          .form-card { padding: 1.5rem; }
-          .gift-card { padding: 1.5rem; }
+          .rewards-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+          .rewards-section { margin-top: -2rem; }
+          .gift-section { margin-top: -2rem; }
+          .gift-details { grid-template-columns: 1fr; gap: 0.6rem; }
+          .gift-image { width: 160px; height: 160px; }
+          .gift-card { padding: 1.8rem 1.5rem; }
         }
         @media (max-width: 480px) {
           .rewards-grid { grid-template-columns: 1fr; }
-          .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
+          .header-badge { font-size: 0.55rem; padding: 0.25rem 0.8rem; }
           .hero h1 { font-size: 1.8rem; }
-          .site-header { padding: 0.5rem 1rem; }
-          .gift-image { width: 120px; height: 120px; }
-          .trust-badges { flex-wrap: wrap; gap: 0.8rem; }
+          .site-header { padding: 0.6rem 1rem; }
+          .gift-image { width: 130px; height: 130px; }
           .share-row { flex-wrap: wrap; }
         }
       `}} />
