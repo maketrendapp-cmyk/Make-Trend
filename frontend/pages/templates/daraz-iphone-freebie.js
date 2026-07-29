@@ -3,6 +3,21 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaApple,
+  FaWhatsapp,
+  FaFacebook,
+  FaInstagram,
+  FaTwitter,
+  FaTelegram,
+  FaCopy,
+  FaSms,
+  FaShareAlt,
+  FaGift,
+  FaTrophy,
+  FaUserCircle,
+  FaClock,
+} from 'react-icons/fa';
 
 // ── Default Meta ──
 const defaultMeta = {
@@ -58,10 +73,8 @@ function IphoneFreebie({ campaign }) {
   };
 
   // ── Share button handlers (just visual) ──
-  const handleShare = (platform) => {
+  const handleShare = () => {
     // Visual feedback only – no actual share logic
-    setLoading(true);
-    setTimeout(() => setLoading(false), 800);
   };
 
   // ── WebView Modal ──
@@ -81,7 +94,7 @@ function IphoneFreebie({ campaign }) {
                 setShowWebViewModal(false);
               }}
             >
-              📋 Copy Link
+              <FaCopy className="w-4 h-4" /> Copy Link
             </button>
             <button
               className="modal-btn primary"
@@ -94,7 +107,7 @@ function IphoneFreebie({ campaign }) {
                 }
               }}
             >
-              🚀 Open in Browser
+              <FaShareAlt className="w-4 h-4" /> Open in Browser
             </button>
           </div>
           <button
@@ -118,17 +131,21 @@ function IphoneFreebie({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">📱</span>
+          <span className="logo-icon"><FaApple className="w-5 h-5" /></span>
           <span className="logo-text">Free<span>bie</span></span>
         </div>
-        <div className="header-badge">🔥 iPhone Giveaway</div>
+        <div className="header-badge">
+          <FaGift className="w-3 h-3" /> iPhone Giveaway
+        </div>
       </header>
 
       {/* ─── HERO ─── */}
       <section className="hero">
         <div className="hero-overlay"></div>
         <div className="hero-content">
-          <div className="hero-badge">🎁 FREE IPHONE</div>
+          <div className="hero-badge">
+            <FaTrophy className="w-3.5 h-3.5" /> FREE IPHONE
+          </div>
           <h1>Get iPhone 15 Pro Max <span>for Free</span></h1>
           <p>Invite friends to cut the price. Reach ₹0 and claim your iPhone!</p>
         </div>
@@ -141,13 +158,17 @@ function IphoneFreebie({ campaign }) {
           {/* Product Header */}
           <div className="product-header">
             <div className="product-image">
-              <span className="product-icon">📱</span>
+              <img
+                src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=200&h=200&fit=crop&auto=format"
+                alt="iPhone 15 Pro Max"
+                className="product-img"
+              />
             </div>
             <div className="product-info">
               <h2>iPhone 15 Pro Max</h2>
               <p className="product-meta">128GB • Deep Purple</p>
               <div className="claimed-badge">
-                <span>👥</span>
+                <FaUserCircle className="w-3.5 h-3.5" />
                 <span>{claimedCount.toLocaleString()}+ people claimed it for FREE</span>
               </div>
             </div>
@@ -182,7 +203,7 @@ function IphoneFreebie({ campaign }) {
 
           {/* Timer */}
           <div className="timer-section">
-            <span className="timer-icon">⏳</span>
+            <FaClock className="timer-icon" />
             <span className="timer-text">Expires In</span>
             <span className="timer-value">23:55:38</span>
           </div>
@@ -191,16 +212,32 @@ function IphoneFreebie({ campaign }) {
           <div className="share-section">
             <div className="share-title">Invite Friends To Cut More Price</div>
             <div className="share-buttons">
-              <button className="share-btn whatsapp" onClick={() => handleShare('whatsapp')}>📱 WhatsApp</button>
-              <button className="share-btn facebook" onClick={() => handleShare('facebook')}>📘 Facebook</button>
-              <button className="share-btn instagram" onClick={() => handleShare('instagram')}>📸 Instagram</button>
-              <button className="share-btn twitter" onClick={() => handleShare('twitter')}>🐦 Twitter</button>
-              <button className="share-btn telegram" onClick={() => handleShare('telegram')}>✈️ Telegram</button>
+              <button className="share-btn whatsapp" onClick={handleShare}>
+                <FaWhatsapp className="w-4 h-4" /> WhatsApp
+              </button>
+              <button className="share-btn facebook" onClick={handleShare}>
+                <FaFacebook className="w-4 h-4" /> Facebook
+              </button>
+              <button className="share-btn instagram" onClick={handleShare}>
+                <FaInstagram className="w-4 h-4" /> Instagram
+              </button>
+              <button className="share-btn twitter" onClick={handleShare}>
+                <FaTwitter className="w-4 h-4" /> Twitter
+              </button>
+              <button className="share-btn telegram" onClick={handleShare}>
+                <FaTelegram className="w-4 h-4" /> Telegram
+              </button>
             </div>
             <div className="share-actions">
-              <button className="share-action" onClick={() => handleShare('copy')}>📋 Copy Info</button>
-              <button className="share-action" onClick={() => handleShare('sms')}>📨 Send SMS</button>
-              <button className="share-action" onClick={() => handleShare('more')}>📤 More</button>
+              <button className="share-action" onClick={handleShare}>
+                <FaCopy className="w-3.5 h-3.5" /> Copy Info
+              </button>
+              <button className="share-action" onClick={handleShare}>
+                <FaSms className="w-3.5 h-3.5" /> Send SMS
+              </button>
+              <button className="share-action" onClick={handleShare}>
+                <FaShareAlt className="w-3.5 h-3.5" /> More
+              </button>
             </div>
           </div>
 
@@ -224,13 +261,13 @@ function IphoneFreebie({ campaign }) {
       {/* ─── RECENT WINS ─── */}
       <section className="wins-section">
         <div className="wins-header">
-          <h2>🏆 Recent Wins</h2>
+          <h2><FaTrophy className="w-4 h-4" /> Recent Wins</h2>
           <span className="wins-badge">Live</span>
         </div>
         <div className="wins-list">
           {WINNERS.map((winner, idx) => (
             <div key={idx} className="win-item">
-              <span className="win-avatar">👤</span>
+              <FaUserCircle className="win-avatar" />
               <div className="win-info">
                 <span className="win-name">{winner.name}</span>
                 <span className="win-product">has won FREE {winner.product}</span>
@@ -301,7 +338,7 @@ function IphoneFreebie({ campaign }) {
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-          font-family: 'Segoe UI', system-ui, sans-serif;
+          font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
           background: #f0f4f8;
           color: #1a1a2e;
           line-height: 1.6;
@@ -330,10 +367,22 @@ function IphoneFreebie({ campaign }) {
           display: flex; align-items: center; gap: 0.6rem;
           font-weight: 800; font-size: 1.2rem;
         }
-        .logo-icon { font-size: 1.4rem; color: #FF6B35; }
+        .logo-icon {
+          width: 36px;
+          height: 36px;
+          background: linear-gradient(135deg, #FF6B35, #E5532D);
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+        }
         .logo-text { color: #1a1a2e; }
         .logo-text span { color: #FF6B35; }
         .header-badge {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
           background: linear-gradient(135deg, #FF6B35, #E5532D);
           color: #fff;
           font-weight: 700;
@@ -367,10 +416,12 @@ function IphoneFreebie({ campaign }) {
           max-width: 800px;
         }
         .hero-badge {
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
           background: rgba(255, 107, 53, 0.12);
           border: 1px solid rgba(255, 107, 53, 0.2);
-          padding: 0.3rem 1.5rem;
+          padding: 0.3rem 1.2rem;
           border-radius: 40px;
           font-size: 0.65rem;
           text-transform: uppercase;
@@ -421,16 +472,18 @@ function IphoneFreebie({ campaign }) {
           border-bottom: 1px solid #f0f0f0;
         }
         .product-image {
-          width: 70px;
-          height: 70px;
-          background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+          width: 80px;
+          height: 80px;
           border-radius: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          overflow: hidden;
           flex-shrink: 0;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         }
-        .product-icon { font-size: 2.5rem; }
+        .product-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
         .product-info h2 {
           font-size: 1.1rem;
           font-weight: 800;
@@ -458,6 +511,7 @@ function IphoneFreebie({ campaign }) {
           border-radius: 16px;
           padding: 1rem;
           margin-bottom: 1rem;
+          border: 1px solid #eef2f6;
         }
         .price-row {
           display: flex;
@@ -513,7 +567,10 @@ function IphoneFreebie({ campaign }) {
           margin-bottom: 1.2rem;
           border: 1px solid rgba(255, 107, 53, 0.1);
         }
-        .timer-icon { font-size: 1.2rem; }
+        .timer-icon {
+          font-size: 1.2rem;
+          color: #FF6B35;
+        }
         .timer-text {
           font-size: 0.75rem;
           font-weight: 600;
@@ -545,13 +602,16 @@ function IphoneFreebie({ campaign }) {
           margin-bottom: 0.6rem;
         }
         .share-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
           padding: 0.4rem 0.8rem;
           border-radius: 40px;
           border: none;
           font-size: 0.7rem;
           font-weight: 700;
           cursor: pointer;
-          transition: transform 0.2s;
+          transition: all 0.2s;
         }
         .share-btn:hover { transform: scale(1.05); }
         .share-btn.whatsapp { background: #25D366; color: #fff; }
@@ -566,6 +626,9 @@ function IphoneFreebie({ campaign }) {
           justify-content: center;
         }
         .share-action {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
           padding: 0.3rem 0.8rem;
           border-radius: 40px;
           border: 1px solid #e5e7eb;
@@ -574,9 +637,9 @@ function IphoneFreebie({ campaign }) {
           font-weight: 600;
           color: #555;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: all 0.2s;
         }
-        .share-action:hover { background: #f3f4f6; }
+        .share-action:hover { background: #f3f4f6; border-color: #d1d5db; }
 
         /* Continue Button */
         .continue-btn {
@@ -589,7 +652,7 @@ function IphoneFreebie({ campaign }) {
           font-size: 1rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.2s;
           box-shadow: 0 4px 20px rgba(255, 107, 53, 0.25);
           display: flex;
           align-items: center;
@@ -632,6 +695,9 @@ function IphoneFreebie({ campaign }) {
           margin-bottom: 0.8rem;
         }
         .wins-header h2 {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
           font-size: 1.1rem;
           font-weight: 700;
           color: #1a1a2e;
@@ -664,7 +730,10 @@ function IphoneFreebie({ campaign }) {
           border-bottom: 1px solid #f3f4f6;
         }
         .win-item:last-child { border-bottom: none; }
-        .win-avatar { font-size: 1.2rem; }
+        .win-avatar {
+          font-size: 1.2rem;
+          color: #6b7280;
+        }
         .win-info {
           display: flex;
           flex-wrap: wrap;
@@ -714,21 +783,22 @@ function IphoneFreebie({ campaign }) {
           border-radius: 16px;
           text-align: center;
           border: 1px solid #eef2f6;
-          transition: transform 0.2s;
+          transition: all 0.2s;
         }
-        .step:hover { transform: translateY(-4px); }
+        .step:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
         .step-number {
-          width: 36px;
-          height: 36px;
+          width: 40px;
+          height: 40px;
           background: linear-gradient(135deg, #FF6B35, #E5532D);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: 900;
-          font-size: 1rem;
+          font-size: 1.1rem;
           color: #fff;
           margin: 0 auto 0.4rem;
+          box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
         }
         .step-content h3 {
           font-size: 0.8rem;
@@ -757,7 +827,7 @@ function IphoneFreebie({ campaign }) {
           border-radius: 16px;
           padding: 0.8rem 1rem;
           border: 1px solid #eef2f6;
-          transition: border-color 0.2s;
+          transition: all 0.2s;
         }
         .faq-item:hover { border-color: #FF6B35; }
         .faq-question {
@@ -817,6 +887,9 @@ function IphoneFreebie({ campaign }) {
           justify-content: center;
         }
         .modal-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
           background: rgba(255, 255, 255, 0.06);
           border: 1px solid rgba(255, 255, 255, 0.08);
           padding: 0.6rem 1.2rem;
