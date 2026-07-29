@@ -45,42 +45,44 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
   }, [initialTemplates, initialFeaturedTemplates, queryClient]);
 
-  // ── State ──
+  // ── State (initialized from URL) ──
   const [searchQuery, setSearchQuery] = useState(initialSearch || '');
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || '');
   const [selectedPlatform, setSelectedPlatform] = useState(initialPlatform || '');
-  const [showFilters, setShowFilters] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasScrolledToHighlight, setHasScrolledToHighlight] = useState(false);
-
-  // ── React Query data ──
-  const activeFilters = {};
-  if (selectedCategory) activeFilters.category = selectedCategory;
-  if (selectedPlatform) activeFilters.platform = selectedPlatform;
-
-  const { data: templates = [], isLoading: templatesLoading } = useTemplates(activeFilters, initialTemplates);
-  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(activeFilters, initialFeaturedTemplates);
-
-  const hasInitialData = (initialTemplates && initialTemplates.length > 0) || 
-                         (initialFeaturedTemplates && initialFeaturedTemplates.length > 0);
-  const isLoading = (templatesLoading || featuredLoading) && !hasInitialData;
 
   const highlightTimeoutRef = useRef(null);
   const carouselIntervalRef = useRef(null);
 
+  // ── Determine if we have filters ──
   const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
+  
+  // ── Build active filters object ──
+  const activeFilters = {};
+  if (selectedCategory) activeFilters.category = selectedCategory;
+  if (selectedPlatform) activeFilters.platform = selectedPlatform;
+
+  // ── ⭐ KEY FIX: Only pass initialData when NO filters are applied ──
+  // When filters are applied, let the hook fetch fresh data from API
+  const shouldUseInitialData = !hasFilters;
+  
+  const { data: templates = [], isLoading: templatesLoading } = useTemplates(
+    activeFilters,
+    shouldUseInitialData ? initialTemplates : null
+  );
+  
+  const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(
+    activeFilters,
+    shouldUseInitialData ? initialFeaturedTemplates : null
+  );
+
+  const isLoading = templatesLoading || featuredLoading;
 
   // ── Update URL when filters change (after initial load) ──
   useEffect(() => {
-    // Skip on first load to avoid overwriting URL params
-    if (isInitialLoad) {
-      setIsInitialLoad(false);
-      return;
-    }
-
     const params = new URLSearchParams();
     if (searchQuery) params.set('search', searchQuery);
     if (selectedCategory) params.set('category', selectedCategory);
@@ -199,7 +201,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   // ── Handle slug highlight and scroll ──
   useEffect(() => {
     if (!highlightSlug || templates.length === 0) return;
-    if (hasScrolledToHighlight) return; // only scroll once
+    if (hasScrolledToHighlight) return;
 
     if (highlightTimeoutRef.current) {
       clearTimeout(highlightTimeoutRef.current);
@@ -210,14 +212,12 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     if (!found) return;
 
     setHighlightedId(found.id);
-    setHasScrolledToHighlight(true); // prevent repeated scrolls
+    setHasScrolledToHighlight(true);
 
-    // Delay to ensure DOM is ready
     setTimeout(() => {
       const el = document.getElementById(`template-${found.id}`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Remove highlight after 3 seconds
         highlightTimeoutRef.current = setTimeout(() => {
           setHighlightedId(null);
         }, 3000);
@@ -248,7 +248,6 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedPlatform('');
-    setShowFilters(false);
     setIsFilterOpen(false);
   }, []);
 
@@ -259,14 +258,6 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   const removePlatform = useCallback(() => {
     setSelectedPlatform('');
   }, []);
-
-  const handleQuickFilter = (category) => {
-    if (category === 'All' || selectedCategory === category) {
-      setSelectedCategory('');
-    } else {
-      setSelectedCategory(category);
-    }
-  };
 
   const getCategoryIcon = (cat) => {
     return categoryIcons[cat?.toLowerCase()] || categoryIcons.default;
@@ -342,20 +333,22 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
       </Head>
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
-        {/* ─── COMPACT BANNER ─── */}
-        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-xl px-4 sm:px-6 py-3 mb-5 text-white shadow-md flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <span className="text-xl flex-shrink-0">🚀</span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-bold truncate">Create Your Campaign</h2>
-              <p className="text-xs text-indigo-100 truncate hidden sm:block">Select template → Set tasks & share → Add redirect → Launch</p>
+        {/* ─── BANNER ─── */}
+        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl px-6 py-4 mb-6 text-white shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <span className="text-2xl flex-shrink-0">🚀</span>
+              <div>
+                <h2 className="text-base font-bold">Create Your Campaign in Minutes</h2>
+                <p className="text-sm text-indigo-100 truncate max-w-lg">Select a template → Set tasks & share count → Add your final redirect URL → Launch</p>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-1 flex-shrink-0">
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">📋 Template</span>
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">⚙️ Tasks</span>
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">📤 Share</span>
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">🔗 Redirect</span>
+            <div className="flex flex-wrap gap-2 flex-shrink-0">
+              <span className="text-[10px] bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full font-medium border border-white/10">📋 Template</span>
+              <span className="text-[10px] bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full font-medium border border-white/10">⚙️ Tasks</span>
+              <span className="text-[10px] bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full font-medium border border-white/10">📤 Share</span>
+              <span className="text-[10px] bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full font-medium border border-white/10">🔗 Redirect</span>
+            </div>
           </div>
         </div>
 
@@ -723,7 +716,6 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
 // ── Reusable Template Card ──
 function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, getPlatformColor, isFeatured }) {
-  // Determine plan from template data (fallback to 'free')
   const isPro = template.plan === 'pro' || template.isPro === true;
   const planBadge = isPro ? '💎 Pro' : '✅ Free';
 
