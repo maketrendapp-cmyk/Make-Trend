@@ -164,7 +164,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     if (showCarousel) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
-      }, 3500);
+      }, 4000);
     } else {
       setCarouselIndex(0);
     }
@@ -180,7 +180,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
       if (showCarousel) {
         carouselIntervalRef.current = setInterval(() => {
           setCarouselIndex(prev => (prev + 1) % featuredFiltered.length);
-        }, 3500);
+        }, 4000);
       }
     }
   }, [featuredFiltered.length, showCarousel]);
@@ -257,21 +257,19 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     setIsFilterOpen(false);
   }, []);
 
-  const removeCategory = useCallback(() => {
-    setSelectedCategory('');
-  }, []);
+  const removeCategory = useCallback(() => setSelectedCategory(''), []);
+  const removePlatform = useCallback(() => setSelectedPlatform(''), []);
 
-  const removePlatform = useCallback(() => {
-    setSelectedPlatform('');
-  }, []);
-
-  const getCategoryIcon = (cat) => {
-    return categoryIcons[cat?.toLowerCase()] || categoryIcons.default;
+  const handleQuickFilter = (category) => {
+    if (category === 'All' || selectedCategory === category) {
+      setSelectedCategory('');
+    } else {
+      setSelectedCategory(category);
+    }
   };
 
-  const getPlatformColor = (platform) => {
-    return platformColors[platform?.toLowerCase()] || platformColors.default;
-  };
+  const getCategoryIcon = (cat) => categoryIcons[cat?.toLowerCase()] || categoryIcons.default;
+  const getPlatformColor = (platform) => platformColors[platform?.toLowerCase()] || platformColors.default;
 
   if (!isLoading && templates.length === 0) {
     return (
@@ -504,7 +502,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
           <div className="mb-6">
             <div className="flex items-center gap-1.5 mb-3 px-1">
               <span className="text-amber-500 text-sm drop-shadow-sm">★</span>
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">
+              <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
                 {hasFilters || isSlugFeatured ? 'Featured Results' : 'Featured Spotlight'}
               </h2>
               {showCarousel && (
@@ -577,14 +575,14 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                               onClick={() => handlePreview(template.slug)}
                               className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-black text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl py-3 transition active:scale-95"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                              <svg className="w-4 h-4 md:w-4.5 md:h-4.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                               Preview
                             </button>
                             <button
                               onClick={() => handleUseTemplate(template.slug)}
                               className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-black text-white bg-primary hover:bg-primary-600 rounded-xl py-3 transition shadow-md shadow-primary/20 active:scale-95"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                              <svg className="w-4 h-4 md:w-4.5 md:h-4.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
                               Use Template
                             </button>
                           </div>
@@ -594,27 +592,28 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                   ))}
                 </div>
 
+                {/* ── Carousel Arrows (Always visibly floating on mobile & desktop) ── */}
                 {featuredFiltered.length > 1 && (
                   <>
                     <button
                       onClick={() => goToSlide((carouselIndex - 1 + featuredFiltered.length) % featuredFiltered.length)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 z-30 p-2.5 rounded-full bg-white/90 hover:bg-white shadow-lg backdrop-blur-md border border-slate-200 transition-all opacity-0 group-hover:opacity-100"
+                      className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-30 p-2 md:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-md backdrop-blur-md border border-slate-200 transition-all text-slate-800 hover:text-primary hover:scale-105 active:scale-95"
                       aria-label="Previous slide"
                     >
-                      <svg className="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
                     <button
                       onClick={() => goToSlide((carouselIndex + 1) % featuredFiltered.length)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 z-30 p-2.5 rounded-full bg-white/90 hover:bg-white shadow-lg backdrop-blur-md border border-slate-200 transition-all opacity-0 group-hover:opacity-100"
+                      className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-30 p-2 md:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-md backdrop-blur-md border border-slate-200 transition-all text-slate-800 hover:text-primary hover:scale-105 active:scale-95"
                       aria-label="Next slide"
                     >
-                      <svg className="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-black/20 backdrop-blur-md px-2.5 py-1.5 rounded-full">
+                    <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-black/20 backdrop-blur-md px-2.5 py-1.5 rounded-full">
                       {featuredFiltered.map((_, idx) => (
                         <button
                           key={idx}
@@ -707,12 +706,12 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   );
 }
 
-// ── Reusable Template Card ──
+// ── Reusable Template Card (Tightened spacing to prevent empty gaps) ──
 function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, getPlatformColor, isFeatured }) {
   return (
     <div
       id={`template-${template.id}`}
-      className={`group bg-white rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-lg hover:-translate-y-1 ${
+      className={`group bg-white rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col shadow-sm hover:shadow-lg hover:-translate-y-1 ${
         isHighlighted
           ? 'border-primary ring-4 ring-primary/20'
           : isFeatured
@@ -720,7 +719,7 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, getPl
           : 'border-slate-200 hover:border-slate-300'
       }`}
     >
-      <div className="w-full aspect-video bg-slate-100 relative overflow-hidden">
+      <div className="w-full aspect-video bg-slate-100 relative overflow-hidden flex-shrink-0">
         {template.image ? (
           <Image
             src={template.image}
@@ -752,75 +751,71 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, getPl
         </div>
       </div>
 
-      <div className="p-4 flex-grow flex flex-col justify-between">
-        <div>
-          <div className="flex items-start justify-between gap-2 mb-1.5">
-            <h3 className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-1 group-hover:text-primary transition-colors">
-              {template.title}
-            </h3>
-          </div>
-          <p className="text-slate-500 text-[11px] mb-3 line-clamp-2 leading-relaxed">
-            {template.description || 'Customizable campaign layout built to match viral social trends.'}
-          </p>
+      <div className="p-3.5 flex flex-col flex-grow">
+        <h3 className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-1 group-hover:text-primary transition-colors mb-1">
+          {template.title}
+        </h3>
+        <p className="text-slate-500 text-[11px] mb-2.5 line-clamp-2 leading-relaxed">
+          {template.description || 'Customizable campaign layout built to match viral social trends.'}
+        </p>
 
-          {/* Unified Tags Row (Hashtags, Plan, Reward) */}
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <div className="flex flex-wrap gap-1.5">
-              {template.hashtags && template.hashtags.length > 0 ? (
-                template.hashtags.slice(0, 1).map((tag, i) => (
-                  <span key={i} className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                    {tag}
-                  </span>
-                ))
-              ) : (
-                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                  #Trending
-                </span>
-              )}
-            </div>
-
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${template.plan === 'pro' || template.isPro ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-              {template.plan === 'pro' || template.isPro ? '👑 PRO' : '✅ FREE'}
-            </span>
-
-            {template.reward && (
-              <span className="text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
-                🎁 {template.reward}
+        {/* Unified Tags Row (Hashtags, Plan, Reward) */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+          {template.hashtags && template.hashtags.length > 0 ? (
+            template.hashtags.slice(0, 1).map((tag, i) => (
+              <span key={i} className="text-[9px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
+                {tag}
               </span>
-            )}
+            ))
+          ) : (
+            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
+              #Trending
+            </span>
+          )}
+
+          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${template.plan === 'pro' || template.isPro ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+            {template.plan === 'pro' || template.isPro ? '👑 PRO' : '✅ FREE'}
+          </span>
+
+          {template.reward && (
+            <span className="text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-200 px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+              🎁 {template.reward}
+            </span>
+          )}
+        </div>
+        
+        {/* Uses count and Copy Button pushed right above the buttons line */}
+        <div className="mt-auto flex items-center justify-between mb-3">
+          <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+            <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            {template.usageCount || 0} Uses
           </div>
           
-          <div className="flex items-center justify-between">
-            <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-              👥 {template.usageCount || 0} Uses
-            </div>
-            
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCopy(template.slug);
-              }}
-              className="text-slate-400 hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-slate-100 border border-transparent hover:border-slate-200"
-              title="Copy link to this template"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
-          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopy(template.slug);
+            }}
+            className="text-slate-400 hover:text-primary transition-colors p-1 rounded-lg hover:bg-slate-100 border border-transparent hover:border-slate-200"
+            title="Copy link to this template"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2.5">
+        <div className="pt-2.5 border-t border-slate-100 grid grid-cols-2 gap-2">
           <Link
             href={`/${template.slug}`}
-            className="flex items-center justify-center gap-1.5 text-[11px] font-black text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2.5 transition active:scale-95"
+            className="flex items-center justify-center gap-1.5 text-[11px] font-black text-slate-700 bg-slate-50 hover:bg-slate-200 border border-slate-200 rounded-lg py-2 transition active:scale-95"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             Preview
           </Link>
           <button
             onClick={() => onUse(template.slug)}
-            className="flex items-center justify-center gap-1.5 text-[11px] font-black text-white bg-primary hover:bg-primary-600 rounded-xl py-2.5 transition shadow-sm active:scale-95"
+            className="flex items-center justify-center gap-1.5 text-[11px] font-black text-white bg-primary hover:bg-primary-600 rounded-lg py-2 transition shadow-sm active:scale-95"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
             Use
