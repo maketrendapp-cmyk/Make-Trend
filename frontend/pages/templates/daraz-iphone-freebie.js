@@ -1,3 +1,4 @@
+
 // pages/templates/iphone-freebie.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
@@ -27,13 +28,13 @@ const defaultMeta = {
   url: 'https://maketrend.app/iphone-freebie',
 };
 
-// ── Static Winner Data ──
+// ── Static Winner Data (Updated to match Apple Ecosystem) ──
 const WINNERS = [
-  { name: 'sahraj***', product: 'Privilege Bold Deodorant' },
-  { name: 'Grishm***', product: 'Combo Pack Chocolate' },
-  { name: 'reshma***', product: 'TWS Airpods Premium' },
-  { name: 'subedi***', product: 'Uttam Special Tea' },
-  { name: 'Rohit ***', product: 'Uttam Special Tea' },
+  { name: 'sahraj***', product: 'AirPods Pro (2nd Gen)' },
+  { name: 'Grishm***', product: 'iPhone 15 Pro FineWoven Case' },
+  { name: 'reshma***', product: 'Apple AirTag 4-Pack' },
+  { name: 'subedi***', product: 'MagSafe Wireless Charger' },
+  { name: 'Rohit ***', product: 'AirPods (3rd Gen)' },
 ];
 
 function IphoneFreebie({ campaign }) {
@@ -83,14 +84,17 @@ function IphoneFreebie({ campaign }) {
     return (
       <div className="modal-overlay">
         <div className="modal-card">
-          <div className="modal-icon">🌐</div>
-          <h2>Open in Browser</h2>
-          <p>For the best experience, open this page in your default browser.</p>
+          <div className="modal-icon-container">
+            <span className="modal-icon">🌐</span>
+          </div>
+          <h2>Action Required</h2>
+          <p>For the best experience and to track your price cuts accurately, open this page in your default browser.</p>
           <div className="modal-actions">
             <button
-              className="modal-btn"
+              className="modal-btn ghost"
               onClick={() => {
                 navigator.clipboard?.writeText(window.location.href);
+                alert('Link copied! Paste it in Safari or Chrome.');
                 setShowWebViewModal(false);
               }}
             >
@@ -111,10 +115,10 @@ function IphoneFreebie({ campaign }) {
             </button>
           </div>
           <button
-            className="modal-btn ghost"
+            className="modal-btn text-only"
             onClick={() => setShowWebViewModal(false)}
           >
-            Continue Anyway
+            Continue anyway (Not Recommended)
           </button>
         </div>
       </div>
@@ -125,29 +129,35 @@ function IphoneFreebie({ campaign }) {
   return (
     <div className="page-wrapper">
 
-      {/* ─── WEBVIEW MODAL ─── */}
       <WebViewModal />
 
       {/* ─── HEADER ─── */}
       <header className="site-header">
-        <div className="logo">
-          <span className="logo-icon"><FaApple className="w-5 h-5" /></span>
-          <span className="logo-text">Free<span>bie</span></span>
-        </div>
-        <div className="header-badge">
-          <FaGift className="w-3 h-3" /> iPhone Giveaway
+        <div className="header-container">
+          <div className="logo">
+            <div className="logo-icon-bg">
+              <FaApple className="w-5 h-5 text-white" />
+            </div>
+            <span className="logo-text">Free<span>bie</span></span>
+          </div>
+          <div className="header-badge">
+            <span className="pulse-dot"></span> <FaGift className="w-3 h-3" /> Live Giveaway
+          </div>
         </div>
       </header>
 
       {/* ─── HERO ─── */}
       <section className="hero">
-        <div className="hero-overlay"></div>
+        <div className="hero-glow shape-1"></div>
+        <div className="hero-glow shape-2"></div>
         <div className="hero-content">
-          <div className="hero-badge">
-            <FaTrophy className="w-3.5 h-3.5" /> FREE IPHONE
+          <div className="hero-badge-wrap">
+            <div className="hero-badge">
+              <FaTrophy className="w-3.5 h-3.5 text-yellow-400" /> LIMITED TIME OFFER
+            </div>
           </div>
-          <h1>Get iPhone 15 Pro Max <span>for Free</span></h1>
-          <p>Invite friends to cut the price. Reach ₹0 and claim your iPhone!</p>
+          <h1>Get iPhone 15 Pro Max<br /><span className="text-gradient">for Free</span></h1>
+          <p>Invite friends to cut the price. Reach $0 and claim your brand new iPhone instantly!</p>
         </div>
       </section>
 
@@ -159,17 +169,17 @@ function IphoneFreebie({ campaign }) {
           <div className="product-header">
             <div className="product-image">
               <img
-                src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=200&h=200&fit=crop&auto=format"
+                src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=400&h=400&fit=crop&auto=format"
                 alt="iPhone 15 Pro Max"
                 className="product-img"
               />
             </div>
             <div className="product-info">
               <h2>iPhone 15 Pro Max</h2>
-              <p className="product-meta">128GB • Deep Purple</p>
+              <p className="product-meta">256GB • Natural Titanium</p>
               <div className="claimed-badge">
                 <FaUserCircle className="w-3.5 h-3.5" />
-                <span>{claimedCount.toLocaleString()}+ people claimed it for FREE</span>
+                <span>{claimedCount.toLocaleString()}+ claimed for FREE</span>
               </div>
             </div>
           </div>
@@ -178,39 +188,42 @@ function IphoneFreebie({ campaign }) {
           <div className="price-section">
             <div className="price-row">
               <span className="price-label">You Have Cut</span>
-              <span className="price-value cut">₹800.81</span>
+              <span className="price-value cut">$1,180.50</span>
             </div>
             <div className="price-row">
-              <span className="price-label">Left</span>
-              <span className="price-value remaining">₹157.19</span>
+              <span className="price-label">Left to Cut</span>
+              <span className="price-value remaining">$18.50</span>
             </div>
-            <div className="price-row">
-              <span className="price-label">FREE</span>
-              <span className="price-value free">83.59%</span>
+            <div className="price-divider"></div>
+            <div className="price-row highlight-row">
+              <span className="price-label free-label">Status</span>
+              <span className="price-value free">98.45% FREE</span>
             </div>
           </div>
 
           {/* Progress Bar */}
           <div className="progress-wrapper">
             <div className="progress-bar">
-              <div className="progress-fill" style={{ width: '83.59%' }}></div>
+              <div className="progress-fill" style={{ width: '98.45%' }}>
+                <div className="progress-glow"></div>
+              </div>
             </div>
             <div className="progress-labels">
-              <span>₹157.19 Left</span>
-              <span>83.59% FREE</span>
+              <span className="text-red-400">Only $18.50 Left!</span>
+              <span className="text-green-400">98.45% Completed</span>
             </div>
           </div>
 
           {/* Timer */}
           <div className="timer-section">
             <FaClock className="timer-icon" />
-            <span className="timer-text">Expires In</span>
+            <span className="timer-text">Offer Expires In</span>
             <span className="timer-value">23:55:38</span>
           </div>
 
           {/* Share Buttons */}
           <div className="share-section">
-            <div className="share-title">Invite Friends To Cut More Price</div>
+            <div className="share-title">Invite Friends To Cut The Remaining Price</div>
             <div className="share-buttons">
               <button className="share-btn whatsapp" onClick={handleShare}>
                 <FaWhatsapp className="w-4 h-4" /> WhatsApp
@@ -230,20 +243,20 @@ function IphoneFreebie({ campaign }) {
             </div>
             <div className="share-actions">
               <button className="share-action" onClick={handleShare}>
-                <FaCopy className="w-3.5 h-3.5" /> Copy Info
+                <FaCopy className="w-3.5 h-3.5" /> Copy Link
               </button>
               <button className="share-action" onClick={handleShare}>
-                <FaSms className="w-3.5 h-3.5" /> Send SMS
+                <FaSms className="w-3.5 h-3.5" /> SMS
               </button>
               <button className="share-action" onClick={handleShare}>
-                <FaShareAlt className="w-3.5 h-3.5" /> More
+                <FaShareAlt className="w-3.5 h-3.5" /> Share More
               </button>
             </div>
           </div>
 
           {/* Continue Button */}
           <button
-            className="continue-btn"
+            className={`continue-btn ${loading ? 'loading' : ''}`}
             onClick={handleContinue}
             disabled={loading}
           >
@@ -252,7 +265,7 @@ function IphoneFreebie({ campaign }) {
                 <span className="spinner"></span> Processing...
               </>
             ) : (
-              'Continue to Claim →'
+              'Continue to Claim iPhone →'
             )}
           </button>
         </div>
@@ -261,16 +274,18 @@ function IphoneFreebie({ campaign }) {
       {/* ─── RECENT WINS ─── */}
       <section className="wins-section">
         <div className="wins-header">
-          <h2><FaTrophy className="w-4 h-4" /> Recent Wins</h2>
-          <span className="wins-badge">Live</span>
+          <h2><FaTrophy className="w-4 h-4 text-yellow-400" /> Recent Winners</h2>
+          <span className="wins-badge"><span className="pulse-dot-small"></span> Live</span>
         </div>
         <div className="wins-list">
           {WINNERS.map((winner, idx) => (
             <div key={idx} className="win-item">
-              <FaUserCircle className="win-avatar" />
+              <div className="win-avatar-wrap">
+                <FaUserCircle className="win-avatar" />
+              </div>
               <div className="win-info">
                 <span className="win-name">{winner.name}</span>
-                <span className="win-product">has won FREE {winner.product}</span>
+                <span className="win-product">won FREE <strong className="text-white">{winner.product}</strong></span>
               </div>
             </div>
           ))}
@@ -279,662 +294,303 @@ function IphoneFreebie({ campaign }) {
 
       {/* ─── HOW TO WIN ─── */}
       <section className="how-section">
-        <h2 className="section-title">How to Win</h2>
+        <div className="section-header">
+          <h2 className="section-title">How it Works</h2>
+        </div>
         <div className="steps">
-          <div className="step">
-            <div className="step-number">1</div>
-            <div className="step-content">
-              <h3>Share Link to Friends</h3>
-              <p>Share your invite link with friends and family.</p>
-            </div>
+          <div className="step-card">
+            <div className="step-number-wrap">1</div>
+            <h3>Invite Friends</h3>
+            <p>Share your unique invite link with friends and family.</p>
           </div>
-          <div className="step">
-            <div className="step-number">2</div>
-            <div className="step-content">
-              <h3>Friends Cut the Price</h3>
-              <p>Each friend who clicks cuts the price randomly.</p>
-            </div>
+          <div className="step-card">
+            <div className="step-number-wrap">2</div>
+            <h3>Cut The Price</h3>
+            <p>Every friend who clicks your link cuts the price down randomly.</p>
           </div>
-          <div className="step">
-            <div className="step-number">3</div>
-            <div className="step-content">
-              <h3>Get It Free</h3>
-              <p>Once the price reaches ₹0, claim your iPhone!</p>
-            </div>
+          <div className="step-card">
+            <div className="step-number-wrap">3</div>
+            <h3>Get It Free</h3>
+            <p>Once the price drops to exactly $0, claim your iPhone!</p>
           </div>
         </div>
       </section>
 
       {/* ─── FAQ ─── */}
       <section className="faq-section">
-        <h2 className="section-title">❓ FAQ</h2>
+        <div className="section-header">
+          <h2 className="section-title">Frequently Asked Questions</h2>
+        </div>
         <div className="faq-list">
           <div className="faq-item">
-            <div className="faq-question">What is iPhone Freebie?</div>
-            <div className="faq-answer">A referral-based program where you invite friends to cut the price of an iPhone. When it reaches ₹0, you get it for free.</div>
+            <div className="faq-icon">?</div>
+            <div>
+              <div className="faq-question">What is iPhone Freebie?</div>
+              <div className="faq-answer">A referral program where you invite friends to cut the price of an iPhone. When it reaches $0, you get it for free.</div>
+            </div>
           </div>
           <div className="faq-item">
-            <div className="faq-question">How do I invite friends?</div>
-            <div className="faq-answer">Tap the share buttons above and share your link via WhatsApp, Facebook, or other platforms.</div>
+            <div className="faq-icon">?</div>
+            <div>
+              <div className="faq-question">How much price is cut per referral?</div>
+              <div className="faq-answer">The cut amount is random, from $0.50 to $10.00. New users cut significantly more!</div>
+            </div>
           </div>
           <div className="faq-item">
-            <div className="faq-question">How much price is cut per referral?</div>
-            <div className="faq-answer">The cut amount is random, from ₹0.01 to higher amounts. New users cut more!</div>
-          </div>
-          <div className="faq-item">
-            <div className="faq-question">What if the voucher expires?</div>
-            <div className="faq-answer">Vouchers cannot be reissued after expiry. Use them before the time runs out.</div>
+            <div className="faq-icon">?</div>
+            <div>
+              <div className="faq-question">Are there hidden shipping fees?</div>
+              <div className="faq-answer">No! Once the price reaches $0, shipping and handling are completely covered by us.</div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ─── FOOTER ─── */}
       <footer className="site-footer">
-        <p>© 2026 iPhone Freebie. All rights reserved.</p>
-        <p className="footer-contact">Questions? support@iphonefreebie.com</p>
+        <div className="footer-content">
+          <div className="logo footer-logo">
+            <FaApple className="w-4 h-4" /> Freebie Events
+          </div>
+          <p>© {new Date().getFullYear()} MakeTrend Promotions. All rights reserved.</p>
+          <p className="footer-contact">Apple is not a participant in or sponsor of this promotion.</p>
+        </div>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED CSS ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-          background: #f0f4f8;
-          color: #1a1a2e;
-          line-height: 1.6;
+        :root {
+          --brand-primary: #0A84FF; /* Apple Blue */
+          --brand-primary-light: #5E5CE6;
+          --brand-primary-dark: #0066CC;
+          
+          --bg-base: #000000;
+          --bg-surface: #111111;
+          --bg-surface-solid: #1c1c1e;
+          --border-color: rgba(255, 255, 255, 0.1);
+          --border-highlight: rgba(10, 132, 255, 0.3);
+          
+          --text-main: #f5f5f7;
+          --text-muted: #86868b;
+          
+          --success: #30D158;
+          --danger: #FF453A;
+          --warning: #FF9F0A;
         }
-        .page-wrapper {
-          max-width: 100%;
-          overflow-x: hidden;
-          background: #f0f4f8;
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background: var(--bg-base); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        .page-wrapper { max-width: 100%; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
 
         /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
-          background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(16px);
-          border-bottom: 1px solid rgba(255, 107, 53, 0.15);
-          padding: 0.7rem 1.5rem;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+          background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+          border-bottom: 1px solid var(--border-color); padding: 1rem 1.5rem;
         }
-        .logo {
-          display: flex; align-items: center; gap: 0.6rem;
-          font-weight: 800; font-size: 1.2rem;
-        }
-        .logo-icon {
-          width: 36px;
-          height: 36px;
-          background: linear-gradient(135deg, #FF6B35, #E5532D);
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-        }
-        .logo-text { color: #1a1a2e; }
-        .logo-text span { color: #FF6B35; }
+        .header-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 700; font-size: 1.25rem; letter-spacing: -0.5px; }
+        .logo-icon-bg { width: 32px; height: 32px; background: linear-gradient(135deg, #333, #111); border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1); }
+        .logo-text { color: var(--text-main); }
+        .logo-text span { color: var(--brand-primary); }
         .header-badge {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          background: linear-gradient(135deg, #FF6B35, #E5532D);
-          color: #fff;
-          font-weight: 700;
-          font-size: 0.65rem;
-          padding: 0.3rem 1rem;
-          border-radius: 40px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          box-shadow: 0 2px 12px rgba(255, 107, 53, 0.2);
+          background: rgba(48, 209, 88, 0.15); color: var(--success); font-weight: 600; font-size: 0.75rem;
+          padding: 0.4rem 0.8rem; border-radius: 40px; display: flex; align-items: center; gap: 6px;
+          border: 1px solid rgba(48, 209, 88, 0.3);
         }
+        .pulse-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; animation: pulse-green 2s infinite; }
+        .pulse-dot-small { display: inline-block; width: 4px; height: 4px; background: #fff; border-radius: 50%; animation: pulse-green 2s infinite; margin-right: 4px; margin-bottom: 2px;}
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(48, 209, 88, 0); } 100% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0); } }
 
         /* ── Hero ── */
         .hero {
-          position: relative;
-          min-height: 35vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          padding: 2.5rem 1.5rem;
-          background: linear-gradient(135deg, #fff5f0, #ffede6);
-          color: #1a1a2e;
-          overflow: hidden;
+          position: relative; min-height: 35vh; display: flex; align-items: center; justify-content: center;
+          text-align: center; padding: 4rem 1.5rem; overflow: hidden;
         }
-        .hero-overlay {
-          position: absolute; inset: 0;
-          background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FF6B35' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-        .hero-content {
-          position: relative; z-index: 2;
-          max-width: 800px;
-        }
+        .hero-glow { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.4; z-index: 1; }
+        .shape-1 { width: 400px; height: 400px; background: #5E5CE6; top: -150px; left: -100px; }
+        .shape-2 { width: 300px; height: 300px; background: #0A84FF; bottom: -100px; right: -50px; }
+        .hero-content { position: relative; z-index: 2; max-width: 700px; }
+        
+        .hero-badge-wrap { display: flex; justify-content: center; margin-bottom: 1.2rem; }
         .hero-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          background: rgba(255, 107, 53, 0.12);
-          border: 1px solid rgba(255, 107, 53, 0.2);
-          padding: 0.3rem 1.2rem;
-          border-radius: 40px;
-          font-size: 0.65rem;
-          text-transform: uppercase;
-          font-weight: 700;
-          color: #FF6B35;
-          margin-bottom: 0.8rem;
-          letter-spacing: 1px;
+          background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); padding: 0.4rem 1rem;
+          border-radius: 40px; font-size: 0.7rem; font-weight: 600; color: #fff;
+          letter-spacing: 1px; backdrop-filter: blur(4px); display: flex; align-items: center; gap: 6px;
         }
-        .hero h1 {
-          font-size: clamp(2rem, 6vw, 3rem);
-          font-weight: 900;
-          line-height: 1.1;
-          margin-bottom: 0.3rem;
-          color: #1a1a2e;
-        }
-        .hero h1 span {
-          color: #FF6B35;
-        }
-        .hero p {
-          font-size: 1.05rem;
-          color: #555;
-          margin-bottom: 1.2rem;
-        }
+        .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; line-height: 1.1; margin-bottom: 1rem; letter-spacing: -1px; }
+        .text-gradient { background: linear-gradient(to right, #0A84FF, #30D158); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 600px; margin: 0 auto; font-weight: 400; }
 
-        /* ── Main Section ── */
-        .main-section {
-          padding: 2rem 1.5rem;
-          max-width: 600px;
-          margin: -2rem auto 2rem;
-          position: relative;
-          z-index: 10;
-        }
+        /* ── Main Card (Balanced for PC) ── */
+        .main-section { padding: 0 1.5rem; max-width: 720px; margin: -2rem auto 3rem; position: relative; z-index: 10; }
         .main-card {
-          background: #fff;
-          border-radius: 28px;
-          padding: 1.8rem 1.5rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-          border: 1px solid #eef2f6;
+          background: var(--bg-surface); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+          border-radius: 32px; padding: 2.5rem 2rem; border: 1px solid rgba(255,255,255,0.08);
+          box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
         }
 
         /* Product Header */
-        .product-header {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          margin-bottom: 1.5rem;
-          padding-bottom: 1rem;
-          border-bottom: 1px solid #f0f0f0;
-        }
-        .product-image {
-          width: 80px;
-          height: 80px;
-          border-radius: 16px;
-          overflow: hidden;
-          flex-shrink: 0;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-        }
-        .product-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .product-info h2 {
-          font-size: 1.1rem;
-          font-weight: 800;
-          color: #1a1a2e;
-        }
-        .product-meta {
-          font-size: 0.75rem;
-          color: #888;
-        }
-        .claimed-badge {
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-          font-size: 0.7rem;
-          color: #FF6B35;
-          background: #fff5f0;
-          padding: 0.2rem 0.6rem;
-          border-radius: 40px;
-          margin-top: 0.2rem;
-        }
+        .product-header { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .product-image { width: 90px; height: 90px; border-radius: 20px; overflow: hidden; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.05); background: #fff; }
+        .product-img { width: 100%; height: 100%; object-fit: cover; }
+        .product-info h2 { font-size: 1.3rem; font-weight: 700; color: #fff; letter-spacing: -0.5px; margin-bottom: 2px;}
+        .product-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;}
+        .claimed-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--success); background: rgba(48, 209, 88, 0.1); padding: 0.3rem 0.8rem; border-radius: 40px; border: 1px solid rgba(48,209,88,0.2); font-weight: 500;}
 
         /* Price Section */
-        .price-section {
-          background: #f8fafc;
-          border-radius: 16px;
-          padding: 1rem;
-          margin-bottom: 1rem;
-          border: 1px solid #eef2f6;
-        }
-        .price-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.2rem 0;
-        }
-        .price-label {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: #888;
-        }
-        .price-value {
-          font-weight: 700;
-          font-size: 0.95rem;
-        }
-        .price-value.cut { color: #22C55E; }
-        .price-value.remaining { color: #EF4444; }
-        .price-value.free { color: #FF6B35; font-size: 1.1rem; }
+        .price-section { background: rgba(0,0,0,0.3); border-radius: 20px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color); }
+        .price-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; }
+        .price-divider { height: 1px; background: var(--border-color); margin: 0.5rem 0; }
+        .highlight-row { padding-top: 0.8rem; }
+        .price-label { font-size: 0.85rem; font-weight: 500; color: var(--text-muted); }
+        .free-label { color: #fff; font-weight: 600; }
+        .price-value { font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+        .price-value.cut { color: var(--success); }
+        .price-value.remaining { color: var(--danger); }
+        .price-value.free { background: linear-gradient(to right, #0A84FF, #30D158); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 1.3rem; font-weight: 800; }
 
         /* Progress Bar */
-        .progress-wrapper {
-          margin-bottom: 1rem;
-        }
-        .progress-bar {
-          height: 10px;
-          background: #e5e7eb;
-          border-radius: 99px;
-          overflow: hidden;
-        }
-        .progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #FF6B35, #FF8C5A);
-          border-radius: 99px;
-        }
-        .progress-labels {
-          display: flex;
-          justify-content: space-between;
-          font-size: 0.7rem;
-          color: #888;
-          margin-top: 0.3rem;
-        }
+        .progress-wrapper { margin-bottom: 2rem; }
+        .progress-bar { height: 12px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden; position: relative; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5); }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #0A84FF, #30D158); border-radius: 99px; position: relative; transition: width 1s ease-in-out; }
+        .progress-glow { position: absolute; right: 0; top: 0; bottom: 0; width: 20px; background: #fff; filter: blur(5px); opacity: 0.5; }
+        .progress-labels { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; margin-top: 0.6rem; }
+        .text-red-400 { color: #FF6961; }
+        .text-green-400 { color: #32D74B; }
 
         /* Timer */
-        .timer-section {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.8rem;
-          background: #fef3f0;
-          padding: 0.6rem 1rem;
-          border-radius: 60px;
-          margin-bottom: 1.2rem;
-          border: 1px solid rgba(255, 107, 53, 0.1);
-        }
-        .timer-icon {
-          font-size: 1.2rem;
-          color: #FF6B35;
-        }
-        .timer-text {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: #888;
-        }
-        .timer-value {
-          font-weight: 800;
-          color: #FF6B35;
-          font-size: 1rem;
-          font-family: monospace;
-        }
+        .timer-section { display: flex; align-items: center; justify-content: center; gap: 0.8rem; background: rgba(255, 159, 10, 0.1); padding: 0.8rem 1.5rem; border-radius: 16px; margin-bottom: 2rem; border: 1px solid rgba(255, 159, 10, 0.2); }
+        .timer-icon { font-size: 1.2rem; color: var(--warning); }
+        .timer-text { font-size: 0.85rem; font-weight: 500; color: #fff; }
+        .timer-value { font-weight: 700; color: var(--warning); font-size: 1.1rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 1px;}
 
         /* Share Section */
-        .share-section {
-          margin-bottom: 1.2rem;
-        }
-        .share-title {
-          font-size: 0.85rem;
-          font-weight: 700;
-          color: #1a1a2e;
-          margin-bottom: 0.6rem;
-          text-align: center;
-        }
-        .share-buttons {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          justify-content: center;
-          margin-bottom: 0.6rem;
-        }
-        .share-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          padding: 0.4rem 0.8rem;
-          border-radius: 40px;
-          border: none;
-          font-size: 0.7rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .share-btn:hover { transform: scale(1.05); }
+        .share-section { margin-bottom: 2rem; }
+        .share-title { font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 1rem; text-align: center; }
+        .share-buttons { display: flex; flex-wrap: wrap; gap: 0.8rem; justify-content: center; margin-bottom: 1rem; }
+        .share-btn { display: flex; align-items: center; gap: 6px; padding: 0.6rem 1rem; border-radius: 12px; border: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .share-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
         .share-btn.whatsapp { background: #25D366; color: #fff; }
         .share-btn.facebook { background: #1877F2; color: #fff; }
-        .share-btn.instagram { background: #E4405F; color: #fff; }
-        .share-btn.twitter { background: #1DA1F2; color: #fff; }
+        .share-btn.instagram { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); color: #fff; }
+        .share-btn.twitter { background: #000; color: #fff; border: 1px solid rgba(255,255,255,0.2); }
         .share-btn.telegram { background: #0088CC; color: #fff; }
 
-        .share-actions {
-          display: flex;
-          gap: 0.5rem;
-          justify-content: center;
-        }
-        .share-action {
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-          padding: 0.3rem 0.8rem;
-          border-radius: 40px;
-          border: 1px solid #e5e7eb;
-          background: #fff;
-          font-size: 0.65rem;
-          font-weight: 600;
-          color: #555;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .share-action:hover { background: #f3f4f6; border-color: #d1d5db; }
+        .share-actions { display: flex; gap: 0.8rem; justify-content: center; }
+        .share-action { display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); font-size: 0.75rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: all 0.2s; }
+        .share-action:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
 
         /* Continue Button */
         .continue-btn {
-          width: 100%;
-          padding: 0.9rem;
-          background: linear-gradient(135deg, #FF6B35, #E5532D);
-          border: none;
-          border-radius: 60px;
-          font-weight: 800;
-          font-size: 1rem;
-          color: #fff;
-          cursor: pointer;
-          transition: all 0.2s;
-          box-shadow: 0 4px 20px rgba(255, 107, 53, 0.25);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
+          width: 100%; padding: 1.1rem; background: var(--text-main); color: #000;
+          border: none; border-radius: 16px; font-weight: 700; font-size: 1.1rem; cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; gap: 10px;
         }
-        .continue-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(255, 107, 53, 0.35);
-        }
-        .continue-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
+        .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255,255,255,0.1); }
+        .continue-btn:active:not(:disabled) { transform: translateY(0); }
+        .continue-btn.loading { opacity: 0.8; cursor: wait; }
+        .spinner { width: 20px; height: 20px; border: 3px solid rgba(0,0,0,0.1); border-top-color: #000; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .spinner {
-          display: inline-block;
-          width: 20px;
-          height: 20px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        /* ── Sections Common ── */
+        .section-header { text-align: center; margin-bottom: 2rem; }
+        .section-title { font-size: 1.6rem; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
 
         /* ── Recent Wins ── */
-        .wins-section {
-          padding: 1.5rem 1.5rem;
-          max-width: 600px;
-          margin: 0 auto;
-          width: 100%;
-        }
-        .wins-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 0.8rem;
-        }
-        .wins-header h2 {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          font-size: 1.1rem;
-          font-weight: 700;
-          color: #1a1a2e;
-        }
-        .wins-badge {
-          font-size: 0.6rem;
-          font-weight: 700;
-          background: #22C55E;
-          color: #fff;
-          padding: 0.2rem 0.8rem;
-          border-radius: 40px;
-          animation: pulse-dot 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse-dot {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        .wins-list {
-          background: #fff;
-          border-radius: 20px;
-          padding: 0.8rem 1rem;
-          border: 1px solid #eef2f6;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.04);
-        }
-        .win-item {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-          padding: 0.4rem 0;
-          border-bottom: 1px solid #f3f4f6;
-        }
+        .wins-section { padding: 1rem 1.5rem 3rem; max-width: 600px; margin: 0 auto; width: 100%; }
+        .wins-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .wins-header h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.2rem; font-weight: 700; color: #fff; }
+        .wins-badge { display: flex; align-items: center; font-size: 0.65rem; font-weight: 600; background: rgba(48, 209, 88, 0.15); color: var(--success); border: 1px solid rgba(48, 209, 88, 0.3); padding: 0.2rem 0.6rem; border-radius: 40px; }
+        .wins-list { background: var(--bg-surface-solid); border-radius: 20px; padding: 0.5rem 1rem; border: 1px solid var(--border-color); }
+        .win-item { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .win-item:last-child { border-bottom: none; }
-        .win-avatar {
-          font-size: 1.2rem;
-          color: #6b7280;
-        }
-        .win-info {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.2rem 0.4rem;
-        }
-        .win-name {
-          font-weight: 600;
-          font-size: 0.8rem;
-          color: #1a1a2e;
-        }
-        .win-product {
-          font-size: 0.75rem;
-          color: #888;
-        }
+        .win-avatar-wrap { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;}
+        .win-avatar { font-size: 1.2rem; color: var(--text-muted); }
+        .win-info { display: flex; flex-direction: column; gap: 2px;}
+        .win-name { font-weight: 600; font-size: 0.85rem; color: #fff; }
+        .win-product { font-size: 0.8rem; color: var(--text-muted); }
 
         /* ── How It Works ── */
-        .how-section {
-          padding: 2rem 1.5rem;
-          max-width: 600px;
-          margin: 0 auto;
-          width: 100%;
-        }
-        .section-title {
-          font-size: 1.4rem;
-          font-weight: 800;
-          text-align: center;
-          margin-bottom: 1.5rem;
-          color: #1a1a2e;
-        }
-        .section-title::after {
-          content: '';
-          display: block;
-          width: 50px;
-          height: 3px;
-          background: linear-gradient(90deg, #FF6B35, #FF8C5A);
-          margin: 0.4rem auto 0;
-          border-radius: 4px;
-        }
-        .steps {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-        }
-        .step {
-          background: #fff;
-          padding: 1.2rem 0.8rem;
-          border-radius: 16px;
-          text-align: center;
-          border: 1px solid #eef2f6;
-          transition: all 0.2s;
-        }
-        .step:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
-        .step-number {
-          width: 40px;
-          height: 40px;
-          background: linear-gradient(135deg, #FF6B35, #E5532D);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-          font-size: 1.1rem;
-          color: #fff;
-          margin: 0 auto 0.4rem;
-          box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
-        }
-        .step-content h3 {
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: #1a1a2e;
-        }
-        .step-content p {
-          font-size: 0.7rem;
-          color: #888;
-        }
+        .how-section { padding: 3rem 1.5rem; max-width: 900px; margin: 0 auto; width: 100%; }
+        .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        .step-card { background: var(--bg-surface-solid); padding: 2rem 1.5rem; border-radius: 24px; text-align: center; border: 1px solid var(--border-color); transition: all 0.3s; }
+        .step-card:hover { transform: translateY(-5px); border-color: rgba(10, 132, 255, 0.5); background: rgba(28, 28, 30, 0.8); }
+        .step-number-wrap { width: 44px; height: 44px; background: rgba(10, 132, 255, 0.1); border: 1px solid rgba(10, 132, 255, 0.3); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--brand-primary); font-weight: 700; font-size: 1.1rem; }
+        .step-card h3 { font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+        .step-card p { font-size: 0.85rem; color: var(--text-muted); }
 
         /* ── FAQ ── */
-        .faq-section {
-          padding: 2rem 1.5rem;
-          max-width: 600px;
-          margin: 0 auto;
-          width: 100%;
-        }
-        .faq-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.6rem;
-        }
-        .faq-item {
-          background: #fff;
-          border-radius: 16px;
-          padding: 0.8rem 1rem;
-          border: 1px solid #eef2f6;
-          transition: all 0.2s;
-        }
-        .faq-item:hover { border-color: #FF6B35; }
-        .faq-question {
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: #1a1a2e;
-        }
-        .faq-answer p {
-          font-size: 0.8rem;
-          color: #888;
-          margin-top: 0.2rem;
-        }
+        .faq-section { padding: 3rem 1.5rem 5rem; max-width: 700px; margin: 0 auto; width: 100%; }
+        .faq-list { display: flex; flex-direction: column; gap: 1rem; }
+        .faq-item { background: var(--bg-surface-solid); border-radius: 16px; padding: 1.2rem 1.5rem; border: 1px solid var(--border-color); display: flex; gap: 1.2rem; transition: all 0.2s; }
+        .faq-item:hover { border-color: rgba(255,255,255,0.2); }
+        .faq-icon { width: 28px; height: 28px; flex-shrink: 0; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text-muted); font-size: 0.9rem;}
+        .faq-question { font-weight: 600; font-size: 0.95rem; color: #fff; margin-bottom: 0.3rem; }
+        .faq-answer { font-size: 0.85rem; color: var(--text-muted); }
 
         /* ── Footer ── */
-        .site-footer {
-          background: #1a1a2e;
-          color: #9ca3af;
-          padding: 1.5rem 1.5rem;
-          text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.04);
-          margin-top: auto;
-        }
-        .site-footer p { font-size: 0.7rem; margin-bottom: 0.2rem; }
-        .footer-contact { font-weight: 600; color: #e5e7eb; }
+        .site-footer { background: #000; border-top: 1px solid var(--border-color); padding: 3rem 1.5rem; text-align: center; margin-top: auto; }
+        .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+        .footer-logo { font-size: 1.1rem; opacity: 0.4; margin-bottom: 0.5rem; justify-content: center; color: #fff;}
+        .site-footer p { font-size: 0.8rem; color: var(--text-muted); }
+        .footer-contact { font-weight: 500; color: #555; font-size: 0.75rem;}
 
         /* ── Modal ── */
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.85);
-          backdrop-filter: blur(16px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-        }
-        .modal-card {
-          background: #1a1c22;
-          border-radius: 36px;
-          padding: 2.5rem 2rem;
-          max-width: 400px;
-          width: 90%;
-          text-align: center;
-          border: 1px solid rgba(255, 107, 53, 0.15);
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-        }
-        .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
-        .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
-        .modal-card p { color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem; }
-        .modal-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: center;
-        }
-        .modal-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 0.6rem 1.2rem;
-          border-radius: 40px;
-          font-weight: 600;
-          font-size: 0.75rem;
-          color: #fff;
-          cursor: pointer;
-          transition: 0.2s;
-          flex: 1;
-          min-width: 100px;
-        }
-        .modal-btn:hover { background: rgba(255, 255, 255, 0.12); }
-        .modal-btn.primary {
-          background: #FF6B35;
-          border: none;
-        }
-        .modal-btn.primary:hover { background: #E5532D; }
-        .modal-btn.ghost {
-          background: transparent;
-          border: none;
-          color: #666;
-          font-size: 0.7rem;
-          margin-top: 0.3rem;
-        }
-        .modal-btn.ghost:hover { color: #fff; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; }
+        .modal-card { background: var(--bg-surface-solid); border-radius: 28px; padding: 2.5rem 2rem; max-width: 420px; width: 100%; text-align: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes modalIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .modal-icon-container { width: 56px; height: 56px; background: rgba(255,255,255,0.05); border-radius: 18px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; border: 1px solid rgba(255,255,255,0.05); }
+        .modal-icon { font-size: 1.8rem; }
+        .modal-card h2 { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; letter-spacing: -0.5px; }
+        .modal-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; line-height: 1.5; }
+        .modal-actions { display: flex; flex-direction: column; gap: 10px; }
+        .modal-btn { padding: 1rem; border-radius: 14px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; }
+        .modal-btn.primary { background: var(--text-main); color: #000; }
+        .modal-btn.primary:hover { opacity: 0.9; }
+        .modal-btn.ghost { background: transparent; color: #fff; border: 1px solid var(--border-color); }
+        .modal-btn.ghost:hover { background: rgba(255,255,255,0.05); }
+        .modal-btn.text-only { background: transparent; color: #666; font-size: 0.8rem; margin-top: 1rem; }
+        .modal-btn.text-only:hover { color: #fff; }
 
-        /* ── Responsive ── */
+        /* ── Responsive Mobile Optimization ── */
         @media (max-width: 768px) {
-          .steps { grid-template-columns: 1fr; }
-          .share-buttons { flex-wrap: wrap; justify-content: center; }
-          .share-btn { font-size: 0.65rem; padding: 0.3rem 0.6rem; }
-          .product-header { flex-direction: column; text-align: center; }
-          .claimed-badge { justify-content: center; }
-          .main-card { padding: 1.5rem 1rem; }
+          .steps { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; gap: 1.2rem; }
+          .main-section { max-width: 100%; padding: 0 1rem; margin-top: -1.5rem; }
+          .main-card { padding: 2rem 1.5rem; }
+          .hero { padding-top: 2rem; min-height: auto; padding-bottom: 4rem; }
+          .hero h1 { font-size: 2.2rem; }
         }
+        
         @media (max-width: 480px) {
-          .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
-          .hero h1 { font-size: 1.8rem; }
-          .site-header { padding: 0.5rem 1rem; }
-          .main-section { padding: 1rem 1rem; }
-          .price-section { padding: 0.8rem; }
-          .price-value { font-size: 0.85rem; }
-          .wins-header h2 { font-size: 0.95rem; }
-          .win-item { flex-wrap: wrap; }
+          .header-badge { font-size: 0.65rem; padding: 0.3rem 0.6rem; }
+          .logo { font-size: 1.1rem; }
+          
+          .main-section { padding: 0 0.8rem; margin-top: -1.5rem; }
+          .main-card { border-radius: 24px; padding: 1.5rem 1.25rem; }
+          
+          .product-header { flex-direction: row; gap: 1rem; text-align: left; margin-bottom: 1.5rem; padding-bottom: 1rem;}
+          .product-image { width: 70px; height: 70px; border-radius: 16px;}
+          .product-info h2 { font-size: 1.1rem; }
+          .product-meta { font-size: 0.75rem; }
+          .claimed-badge { font-size: 0.7rem; padding: 0.2rem 0.6rem; margin-top: 4px; }
+          
+          .price-section { padding: 1rem; margin-bottom: 1.2rem;}
+          .price-label { font-size: 0.75rem; }
+          .price-value { font-size: 1rem; }
+          .price-value.free { font-size: 1.15rem; }
+          
+          .share-buttons { gap: 0.5rem; }
+          .share-btn { font-size: 0.75rem; padding: 0.5rem 0.8rem; border-radius: 10px;}
+          .share-actions { flex-wrap: wrap; }
+          .share-action { font-size: 0.7rem; padding: 0.4rem 0.8rem; }
+          
+          .timer-section { padding: 0.6rem 1rem; }
+          .timer-text { font-size: 0.75rem; }
+          .timer-value { font-size: 1rem; }
+          
+          .continue-btn { font-size: 1rem; padding: 1rem; }
+          .faq-item { padding: 1.2rem; flex-direction: column; gap: 0.8rem; }
         }
       `}} />
     </div>
