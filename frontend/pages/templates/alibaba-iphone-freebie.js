@@ -26,7 +26,7 @@ const defaultMeta = {
   title: 'Alibaba Global Trade – Get iPhone 15 Pro Max Sample Free!',
   description: 'Invite business partners or friends, cut the price, and get iPhone 15 Pro Max for free. Limited global supply!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/alibaba-freebie?id={id}',
+  url: 'https://maketrend.app/alibaba-iphone-freebie?id={id}',
 };
 
 // ── Static Winner Data (Alibaba themed) ──
