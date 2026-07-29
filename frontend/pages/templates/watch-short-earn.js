@@ -10,7 +10,7 @@ const defaultMeta = {
   title: 'Watch Short & Earn – Get Paid to Watch Videos',
   description: 'Watch short videos and earn rewards instantly. Complete tasks to unlock your earnings. Start now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/watch-short-earn',
+  url: 'https://maketrend.app/watch-short-earn?id={id}',
 };
 
 function WatchShortEarn({ campaign }) {
