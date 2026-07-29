@@ -32,7 +32,7 @@ const defaultMeta = {
   title: 'Birthday Gift – Claim Your Free Premium Reward!',
   description: 'Enter your name and birthday to claim a free premium gift. Choose from iPhone, MacBook, Watch, TV, and more!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/birthday-gift',
+  url: 'https://maketrend.app/birthday-gift?id={id}',
 };
 
 // ── Rewards Data ──
