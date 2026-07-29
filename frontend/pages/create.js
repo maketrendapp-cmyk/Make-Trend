@@ -4,11 +4,12 @@ import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import Head from 'next/head';
 import Image from 'next/image';
+import Link from 'next/link';
 import Meta from '../components/Meta';
 import { useTemplates, useFeaturedTemplates } from '../lib/queries';
 
-// ── Emoji mapping for categories ──
-const categoryEmojis = {
+// ── Category Icons ──
+const categoryIcons = {
   giveaway: '🎁',
   simcard: '📱',
   contest: '🏆',
@@ -23,9 +24,19 @@ const categoryEmojis = {
   default: '✨',
 };
 
+// ── Platform Colors ──
+const platformColors = {
+  tiktok: 'bg-black text-white',
+  instagram: 'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white',
+  youtube: 'bg-[#FF0000] text-white',
+  facebook: 'bg-[#1877F2] text-white',
+  twitter: 'bg-[#1DA1F2] text-white',
+  default: 'bg-slate-700 text-white',
+};
+
 export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   const router = useRouter();
-  const { slug: highlightSlug, search: initialSearch } = router.query;
+  const { slug: highlightSlug, search: initialSearch, category: initialCategory, platform: initialPlatform } = router.query;
   const queryClient = useQueryClient();
 
   // ── Hydrate React Query cache ──
@@ -36,11 +47,12 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   // ── State ──
   const [searchQuery, setSearchQuery] = useState(initialSearch || '');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory || '');
+  const [selectedPlatform, setSelectedPlatform] = useState(initialPlatform || '');
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // ── React Query data ──
   const activeFilters = {};
@@ -61,10 +73,23 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   // ── Sync search from URL ──
   useEffect(() => {
-    if (initialSearch !== undefined) {
-      setSearchQuery(initialSearch);
+    if (initialSearch !== undefined) setSearchQuery(initialSearch);
+    if (initialCategory) setSelectedCategory(initialCategory);
+    if (initialPlatform) setSelectedPlatform(initialPlatform);
+  }, [initialSearch, initialCategory, initialPlatform]);
+
+  // ── Update URL when filters change ──
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('search', searchQuery);
+    if (selectedCategory) params.set('category', selectedCategory);
+    if (selectedPlatform) params.set('platform', selectedPlatform);
+    
+    const newUrl = params.toString() ? `/create?${params.toString()}` : '/create';
+    if (router.asPath !== newUrl) {
+      router.replace(newUrl, undefined, { shallow: true });
     }
-  }, [initialSearch]);
+  }, [searchQuery, selectedCategory, selectedPlatform]);
 
   // ── Apply search & filters ──
   const filteredAll = useMemo(() => {
@@ -212,31 +237,36 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     alert('🔗 Link copied to clipboard!');
   };
 
-  const clearFilters = useCallback(() => {
+  const clearAllFilters = useCallback(() => {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedPlatform('');
     setShowFilters(false);
+    setIsFilterOpen(false);
   }, []);
 
-  const platformBadgeStyles = {
-    tiktok: 'bg-black text-white hover:bg-neutral-900',
-    instagram: 'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white',
-    youtube: 'bg-[#FF0000] text-white hover:bg-red-700',
-    facebook: 'bg-[#1877F2] text-white hover:bg-blue-700',
-    all: 'bg-slate-800 text-white',
-  };
+  const removeCategory = useCallback(() => {
+    setSelectedCategory('');
+  }, []);
+
+  const removePlatform = useCallback(() => {
+    setSelectedPlatform('');
+  }, []);
 
   const handleQuickFilter = (category) => {
-    if (category === 'All') {
+    if (category === 'All' || selectedCategory === category) {
       setSelectedCategory('');
     } else {
       setSelectedCategory(category);
     }
   };
 
-  const getCategoryEmoji = (cat) => {
-    return categoryEmojis[cat?.toLowerCase()] || categoryEmojis.default;
+  const getCategoryIcon = (cat) => {
+    return categoryIcons[cat?.toLowerCase()] || categoryIcons.default;
+  };
+
+  const getPlatformColor = (platform) => {
+    return platformColors[platform?.toLowerCase()] || platformColors.default;
   };
 
   if (!isLoading && templates.length === 0) {
@@ -271,6 +301,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   const templateNames = templates.map(t => t.title).slice(0, 10);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.app';
+  
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -286,9 +317,17 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     })),
   };
 
+  // ── Active filter count ──
+  const activeFilterCount = (selectedCategory ? 1 : 0) + (selectedPlatform ? 1 : 0);
+
   return (
     <>
-      <Meta title={pageTitle} description={pageDescription} extraKeywords={templateNames} />
+      <Meta 
+        title={pageTitle} 
+        description={pageDescription} 
+        extraKeywords={templateNames}
+        canonical={`${siteUrl}/create${searchQuery ? `?search=${searchQuery}` : ''}${selectedCategory ? `&category=${selectedCategory}` : ''}${selectedPlatform ? `&platform=${selectedPlatform}` : ''}`}
+      />
       <Head>
         <script
           type="application/ld+json"
@@ -297,7 +336,37 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
       </Head>
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
-        {/* ── Search & Quick Filters ── */}
+        {/* ─── PROFESSIONAL BANNER ─── */}
+        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl p-6 mb-6 text-white shadow-lg">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-2xl">🚀</span>
+                <span className="text-xs font-bold uppercase tracking-wider bg-white/20 px-3 py-0.5 rounded-full">Get Started</span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-bold">Create Your Campaign in Minutes</h2>
+              <p className="text-sm text-indigo-100 max-w-xl">
+                Select a template → Set tasks & share count → Add your final redirect URL → Launch and grow your social engagement!
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium">
+                <span>📋</span> Choose Template
+              </div>
+              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium">
+                <span>⚙️</span> Set Tasks
+              </div>
+              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium">
+                <span>📤</span> Share Count
+              </div>
+              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium">
+                <span>🔗</span> Redirect URL
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Search & Quick Filters ── */}
         <div className="mb-5 space-y-2.5">
           <div className="flex gap-2">
             <div className="flex-1 relative">
@@ -313,12 +382,20 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                 placeholder="Search templates, rewards..."
                 className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-slate-400 font-semibold"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={`p-2 border rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-sm ${
-                showFilters || selectedCategory || selectedPlatform
+                isFilterOpen || selectedCategory || selectedPlatform
                   ? 'bg-primary/10 border-primary/20 text-primary'
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
@@ -327,15 +404,54 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
               <span className="hidden sm:inline">Filters</span>
-              {(selectedCategory || selectedPlatform) && (
+              {activeFilterCount > 0 && (
                 <span className="bg-primary text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">
-                  {(selectedCategory ? 1 : 0) + (selectedPlatform ? 1 : 0)}
+                  {activeFilterCount}
                 </span>
               )}
             </button>
+            {hasFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="p-2 text-xs font-bold text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition"
+                title="Clear all filters"
+              >
+                ✕ Clear
+              </button>
+            )}
           </div>
 
-          {/* ── Dynamic Quick Filter Pills ── */}
+          {/* ── Active Filter Chips ── */}
+          {hasFilters && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {selectedCategory && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-bold">
+                  {getCategoryIcon(selectedCategory)} {selectedCategory}
+                  <button onClick={removeCategory} className="hover:text-purple-900 ml-0.5">✕</button>
+                </span>
+              )}
+              {selectedPlatform && (
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-white ${getPlatformColor(selectedPlatform)}`}>
+                  {selectedPlatform}
+                  <button onClick={removePlatform} className="hover:opacity-70 ml-0.5">✕</button>
+                </span>
+              )}
+              {searchQuery && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-full text-[10px] font-bold">
+                  🔍 "{searchQuery}"
+                  <button onClick={() => setSearchQuery('')} className="hover:text-slate-900 ml-0.5">✕</button>
+                </span>
+              )}
+              <button
+                onClick={clearAllFilters}
+                className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+
+          {/* ── Category Quick Filters ── */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
             {availableCategories.map((cat) => (
               <button
@@ -348,35 +464,78 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                     : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
                 }`}
               >
-                {cat === 'All' ? '🔥 All' : `${getCategoryEmoji(cat)} ${cat}`}
+                {cat === 'All' ? '🔥 All' : `${getCategoryIcon(cat)} ${cat}`}
               </button>
             ))}
           </div>
 
-          {showFilters && (
-            <div className="grid grid-cols-2 gap-2 p-2 bg-slate-100 rounded-xl border border-slate-200">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full appearance-none bg-white border border-slate-200 rounded-lg pl-2 pr-6 py-1.5 text-[11px] font-bold text-slate-700 focus:border-primary focus:outline-none"
-              >
-                {availableCategories.map(cat => (
-                  <option key={cat} value={cat === 'All' ? '' : cat}>
-                    {cat === 'All' ? 'Categories (All)' : cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedPlatform}
-                onChange={(e) => setSelectedPlatform(e.target.value)}
-                className="w-full appearance-none bg-white border border-slate-200 rounded-lg pl-2 pr-6 py-1.5 text-[11px] font-bold text-slate-700 focus:border-primary focus:outline-none"
-              >
-                {availablePlatforms.map(plat => (
-                  <option key={plat} value={plat === 'All' ? '' : plat}>
-                    {plat === 'All' ? 'Platforms (All)' : plat.charAt(0).toUpperCase() + plat.slice(1)}
-                  </option>
-                ))}
-              </select>
+          {/* ── Filter Dropdown ── */}
+          {isFilterOpen && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-lg p-4 space-y-3 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-700">Filter Templates</h3>
+                <button onClick={() => setIsFilterOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  ✕
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => {
+                          if (cat === 'All' || selectedCategory === cat) {
+                            setSelectedCategory('');
+                          } else {
+                            setSelectedCategory(cat);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all capitalize ${
+                          (cat === 'All' && !selectedCategory) || selectedCategory === cat
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {cat === 'All' ? 'All' : `${getCategoryIcon(cat)} ${cat}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Platform</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availablePlatforms.map((plat) => (
+                      <button
+                        key={plat}
+                        onClick={() => {
+                          if (plat === 'All' || selectedPlatform === plat) {
+                            setSelectedPlatform('');
+                          } else {
+                            setSelectedPlatform(plat);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all capitalize ${
+                          (plat === 'All' && !selectedPlatform) || selectedPlatform === plat
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {plat === 'All' ? 'All' : plat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  onClick={clearAllFilters}
+                  className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                >
+                  Clear all filters
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -436,12 +595,15 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                         <div className="p-4 md:p-6 lg:p-8 bg-white flex flex-col justify-center flex-1">
                           <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-3">
                             {template.platform && (
-                              <span className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+                              <span className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${getPlatformColor(template.platform)}`}>
                                 {template.platform}
                               </span>
                             )}
                             <span className="bg-slate-50 text-slate-500 text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded flex items-center border border-slate-100">
                               👥 {template.usageCount || 0} Uses
+                            </span>
+                            <span className="bg-green-50 text-green-700 text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded">
+                              ✅ Free
                             </span>
                           </div>
 
@@ -517,7 +679,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                     onPreview={handlePreview}
                     onUse={handleUseTemplate}
                     onCopy={handleCopyLink}
-                    platformBadgeStyles={platformBadgeStyles}
+                    getPlatformColor={getPlatformColor}
                     isFeatured
                   />
                 ))}
@@ -557,10 +719,10 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
           <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm px-4">
             <span className="text-2xl mb-1.5 block">🔍</span>
             <h3 className="text-xs font-bold text-slate-900 mb-0.5">No templates match</h3>
-            <p className="text-[11px] text-slate-500 mb-3 max-w-xs mx-auto">Try resetting filters to view all templates.</p>
+            <p className="text-[11px] text-slate-500 mb-3 max-w-xs mx-auto">Try adjusting your filters to see more templates.</p>
             <button
               type="button"
-              onClick={clearFilters}
+              onClick={clearAllFilters}
               className="px-3.5 py-1.5 bg-primary/10 text-primary font-bold rounded-lg text-xs hover:bg-primary/20 transition-colors"
             >
               Reset Filters
@@ -576,7 +738,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
                 onPreview={handlePreview}
                 onUse={handleUseTemplate}
                 onCopy={handleCopyLink}
-                platformBadgeStyles={platformBadgeStyles}
+                getPlatformColor={getPlatformColor}
                 isFeatured={false}
               />
             ))}
@@ -587,8 +749,8 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   );
 }
 
-// ── Reusable Template Card with Lazy Loading ──
-function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platformBadgeStyles, isFeatured }) {
+// ── Reusable Template Card ──
+function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, getPlatformColor, isFeatured }) {
   return (
     <div
       id={`template-${template.id}`}
@@ -625,7 +787,7 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platf
             )}
           </div>
           {template.platform && (
-            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'}`}>
+            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm ${getPlatformColor(template.platform)}`}>
               {template.platform}
             </span>
           )}
@@ -681,16 +843,25 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, platf
               </button>
             </div>
           )}
+
+          <div className="mt-1 flex items-center gap-1">
+            <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">✅ Free</span>
+            {template.category && (
+              <span className="text-[8px] font-bold text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">
+                {template.category}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
-          <button
-            onClick={() => onPreview(template.slug)}
+          <Link
+            href={`/${template.slug}`}
             className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-            Preview
-          </button>
+            View Template
+          </Link>
           <button
             onClick={() => onUse(template.slug)}
             className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black text-white bg-primary hover:opacity-95 rounded-xl py-2 transition shadow-sm active:scale-95"
