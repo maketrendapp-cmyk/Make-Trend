@@ -1,5 +1,5 @@
 // pages/templates/birthday-gift.js
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
@@ -9,6 +9,7 @@ import {
   FaCalendarAlt,
   FaUser,
   FaCheckCircle,
+  FaArrowRight,
   FaCopy,
   FaShareAlt,
   FaWhatsapp,
@@ -19,10 +20,11 @@ import {
   FaHeadphones,
   FaTablet,
   FaClock,
+  FaStar,
+  FaAward,
+  FaUsers,
+  FaRocket,
   FaArrowLeft,
-  FaShieldAlt,
-  FaLock,
-  FaSparkles,
 } from 'react-icons/fa';
 
 // ── Default Meta ──
@@ -38,8 +40,8 @@ const REWARDS = [
   {
     id: 'iphone',
     name: 'iPhone 15 Pro Max',
-    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&h=600&fit=crop&auto=format',
-    color: '#3b82f6',
+    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=300&h=300&fit=crop&auto=format',
+    color: '#1a1a2e',
     icon: <FaApple className="w-5 h-5" />,
     value: '$1,199',
     tag: 'Bestseller',
@@ -47,8 +49,8 @@ const REWARDS = [
   {
     id: 'macbook',
     name: 'MacBook Air M3',
-    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=600&h=600&fit=crop&auto=format',
-    color: '#6366f1',
+    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300&h=300&fit=crop&auto=format',
+    color: '#2d2d44',
     icon: <FaLaptop className="w-5 h-5" />,
     value: '$1,099',
     tag: 'Popular',
@@ -56,26 +58,26 @@ const REWARDS = [
   {
     id: 'watch',
     name: 'Apple Watch Series 9',
-    image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=600&h=600&fit=crop&auto=format',
-    color: '#ec4899',
+    image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=300&h=300&fit=crop&auto=format',
+    color: '#4a4a6a',
     icon: <FaClock className="w-5 h-5" />,
     value: '$399',
     tag: 'Trending',
   },
   {
     id: 'tv',
-    name: 'Samsung 55" 4K OLED TV',
-    image: 'https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=600&h=600&fit=crop&auto=format',
-    color: '#8b5cf6',
+    name: 'Samsung 55" 4K TV',
+    image: 'https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=300&h=300&fit=crop&auto=format',
+    color: '#1a1a2e',
     icon: <FaTv className="w-5 h-5" />,
     value: '$799',
     tag: 'Limited',
   },
   {
     id: 'airpods',
-    name: 'AirPods Pro 2nd Gen',
-    image: 'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=600&h=600&fit=crop&auto=format',
-    color: '#10b981',
+    name: 'AirPods Pro 2',
+    image: 'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=300&h=300&fit=crop&auto=format',
+    color: '#4a4a6a',
     icon: <FaHeadphones className="w-5 h-5" />,
     value: '$249',
     tag: 'Hot Deal',
@@ -83,8 +85,8 @@ const REWARDS = [
   {
     id: 'ipad',
     name: 'iPad Pro 12.9"',
-    image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&h=600&fit=crop&auto=format',
-    color: '#f59e0b',
+    image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=300&h=300&fit=crop&auto=format',
+    color: '#2d2d44',
     icon: <FaTablet className="w-5 h-5" />,
     value: '$1,099',
     tag: "Editor's Pick",
@@ -94,10 +96,9 @@ const REWARDS = [
 function BirthdayGift({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
-  const confettiContainerRef = useRef(null);
 
   // ── State ──
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1); // 1=rewards, 2=form, 3=gift-reveal, 4=redirect
   const [selectedReward, setSelectedReward] = useState(null);
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -105,6 +106,7 @@ function BirthdayGift({ campaign }) {
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
+  const [hoveredReward, setHoveredReward] = useState(null);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -116,57 +118,29 @@ function BirthdayGift({ campaign }) {
     if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Confetti effect (FIXED: uses ref and proper checks) ──
+  // ── Confetti effect ──
   useEffect(() => {
-    if (!confettiActive || typeof window === 'undefined') return;
-
-    const container = confettiContainerRef.current;
-    if (!container) return;
-
-    // Clear existing confetti
-    container.innerHTML = '';
-
-    const colors = ['#f59e0b', '#ec4899', '#3b82f6', '#10b981', '#6366f1', '#fbbf24', '#f43f5e', '#8b5cf6'];
-
-    for (let i = 0; i < 90; i++) {
-      const particle = document.createElement('div');
-      const size = Math.random() * 10 + 5;
-      const left = Math.random() * 100;
-      const delay = Math.random() * 2;
-      const duration = Math.random() * 2.5 + 2;
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const isCircle = Math.random() > 0.5;
-
-      particle.style.cssText = `
-        position: absolute;
-        left: ${left}%;
-        top: -10px;
-        width: ${size}px;
-        height: ${size}px;
-        background: ${color};
-        border-radius: ${isCircle ? '50%' : '3px'};
-        pointer-events: none;
-        opacity: 1;
-        animation: confettiFall ${duration}s ${delay}s linear forwards;
-        transform: rotate(${Math.random() * 360}deg);
-      `;
-
-      container.appendChild(particle);
+    if (confettiActive) {
+      const container = document.querySelector('.confetti-container');
+      if (!container) return;
+      const colors = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#FF6B6B', '#FF8A5C', '#A29BFE', '#FD79A8'];
+      for (let i = 0; i < 80; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'confetti-particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.top = '-10px';
+        particle.style.width = (Math.random() * 8 + 4) + 'px';
+        particle.style.height = (Math.random() * 8 + 4) + 'px';
+        particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+        particle.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        particle.style.animationDuration = (Math.random() * 2 + 2) + 's';
+        particle.style.animationDelay = (Math.random() * 2) + 's';
+        particle.style.position = 'absolute';
+        particle.style.pointerEvents = 'none';
+        particle.style.animation = `confettiFall ${Math.random() * 2 + 2}s linear forwards`;
+        container.appendChild(particle);
+      }
     }
-
-    // Cleanup after animation
-    const cleanupTimeout = setTimeout(() => {
-      if (container) {
-        container.innerHTML = '';
-      }
-    }, 5000);
-
-    return () => {
-      clearTimeout(cleanupTimeout);
-      if (container) {
-        container.innerHTML = '';
-      }
-    };
   }, [confettiActive]);
 
   // ── Validate ──
@@ -205,20 +179,10 @@ function BirthdayGift({ campaign }) {
     }
   };
 
-  // ── Share handlers (with fallback for clipboard) ──
-  const fallbackCopy = (text) => {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-  };
-
+  // ── Share handlers ──
   const handleShare = (platform) => {
     const url = `${window.location.origin}/birthday-gift?id=${id || 'demo'}`;
-    const text = `🎂 Happy Birthday! I just claimed my free ${selectedReward?.name || 'gift'}:`;
-
+    const text = `🎂 Happy Birthday! Get your free ${selectedReward?.name || 'gift'} here:`;
     switch (platform) {
       case 'whatsapp':
         window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
@@ -230,19 +194,14 @@ function BirthdayGift({ campaign }) {
         window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
         break;
       default:
-        const copyText = `${text} ${url}`;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(copyText).catch(() => fallbackCopy(copyText));
-        } else {
-          fallbackCopy(copyText);
-        }
-        alert('🔗 Referral link copied to clipboard!');
+        navigator.clipboard?.writeText(url);
+        alert('Link copied!');
     }
   };
 
+  // ── Go back to rewards selection ──
   const goBack = () => {
     setStep(1);
-    setConfettiActive(false);
   };
 
   // ── WebView Modal ──
@@ -251,21 +210,14 @@ function BirthdayGift({ campaign }) {
     return (
       <div className="modal-overlay">
         <div className="modal-card">
-          <div className="modal-icon-container">
-            <span className="modal-icon">🌐</span>
-          </div>
+          <div className="modal-icon">🌐</div>
           <h2>Open in Browser</h2>
-          <p>For the best experience and to secure your birthday reward, please open this page in your default browser.</p>
+          <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
             <button
-              className="modal-btn ghost"
+              className="modal-btn"
               onClick={() => {
-                const copyText = window.location.href;
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                  navigator.clipboard.writeText(copyText).catch(() => fallbackCopy(copyText));
-                } else {
-                  fallbackCopy(copyText);
-                }
+                navigator.clipboard?.writeText(window.location.href);
                 setShowWebViewModal(false);
               }}
             >
@@ -285,8 +237,8 @@ function BirthdayGift({ campaign }) {
               <FaShareAlt className="w-4 h-4" /> Open in Browser
             </button>
           </div>
-          <button className="modal-btn text-only" onClick={() => setShowWebViewModal(false)}>
-            Continue anyway (Not Recommended)
+          <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>
+            Continue Anyway
           </button>
         </div>
       </div>
@@ -297,53 +249,43 @@ function BirthdayGift({ campaign }) {
   return (
     <div className="page-wrapper">
 
+      {/* ─── WEBVIEW MODAL ─── */}
       <WebViewModal />
 
       {/* ─── HEADER ─── */}
       <header className="site-header">
-        <div className="header-container">
-          <div className="logo">
-            <div className="logo-icon-bg">
-              <FaGift className="w-4 h-4 text-white" />
-            </div>
-            <span className="logo-text">Gift<span>Zone</span></span>
-          </div>
-          <div className="header-badge">
-            <FaSparkles className="w-3 h-3 text-amber-400" /> Birthday Special
-          </div>
+        <div className="logo">
+          <div className="logo-icon"><FaApple className="w-5 h-5 text-white" /></div>
+          <span className="logo-text">Gift<span>Zone</span></span>
+        </div>
+        <div className="header-badge">
+          <FaGift className="w-3 h-3" /> Birthday Special
         </div>
       </header>
 
       {/* ─── HERO ─── */}
       <section className="hero">
-        <div className="hero-glow shape-1"></div>
-        <div className="hero-glow shape-2"></div>
+        <div className="hero-overlay"></div>
         <div className="hero-content">
           {step === 1 && (
             <>
-              <div className="hero-badge-wrap">
-                <div className="hero-badge">🎉 ANNUAL BIRTHDAY GIVEAWAY</div>
-              </div>
-              <h1>Select Your Premium <br /><span className="text-gradient">Birthday Gift</span></h1>
-              <p>Pick your favorite tech reward below to claim it instantly for your special day.</p>
+              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎂 BIRTHDAY GIVEAWAY</div>
+              <h1>Choose Your <span>Birthday Gift</span></h1>
+              <p>Pick your favorite reward and enter your details to claim it.</p>
             </>
           )}
           {step === 2 && (
             <>
-              <div className="hero-badge-wrap">
-                <div className="hero-badge">🎁 GIFT SELECTED</div>
-              </div>
-              <h1>Claim Your <span className="text-gradient">{selectedReward?.name}</span></h1>
-              <p>Verify your birthday details to lock in your free gift delivery.</p>
+              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎁 SELECTED</div>
+              <h1>You Chose <span>{selectedReward?.name}</span></h1>
+              <p>Enter your details to claim your birthday gift.</p>
             </>
           )}
           {step === 3 && (
             <>
-              <div className="hero-badge-wrap">
-                <div className="hero-badge">✨ REWARD UNLOCKED</div>
-              </div>
-              <h1>Happy Birthday, <span className="text-gradient">{name}!</span></h1>
-              <p>Your <strong>{selectedReward?.name}</strong> has been successfully reserved!</p>
+              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> 🎉 CONGRATULATIONS</div>
+              <h1>Happy Birthday, <span>{name}!</span></h1>
+              <p>You've won a <strong>{selectedReward?.name}</strong>!</p>
             </>
           )}
         </div>
@@ -354,49 +296,45 @@ function BirthdayGift({ campaign }) {
       {/* Step 1: Rewards Selection */}
       {step === 1 && (
         <section className="rewards-section">
-          <div className="section-header">
-            <h2 className="section-title">Available Rewards</h2>
-            <p className="section-subtitle">Select one item to claim your gift</p>
-          </div>
+          <h2 className="section-title">Select Your Gift</h2>
+          <p className="section-subtitle">Choose one premium reward to claim</p>
           <div className="rewards-grid">
             {REWARDS.map((reward) => (
               <div
                 key={reward.id}
                 className={`reward-card ${selectedReward?.id === reward.id ? 'selected' : ''}`}
                 onClick={() => setSelectedReward(reward)}
+                onMouseEnter={() => setHoveredReward(reward.id)}
+                onMouseLeave={() => setHoveredReward(null)}
+                style={{
+                  borderColor: selectedReward?.id === reward.id ? reward.color : 'transparent',
+                  boxShadow: selectedReward?.id === reward.id ? `0 0 0 4px ${reward.color}40` : 'none',
+                }}
               >
                 <div className="reward-image-wrapper">
                   <img src={reward.image} alt={reward.name} className="reward-image" />
                   <span className="reward-tag" style={{ background: reward.color }}>{reward.tag}</span>
-                  {selectedReward?.id === reward.id && (
-                    <div className="reward-check-overlay">
-                      <FaCheckCircle className="w-8 h-8 text-white drop-shadow-md" />
-                    </div>
-                  )}
                 </div>
-                <div className="reward-info-wrap">
-                  <div className="reward-info">
-                    <div className="reward-icon-box" style={{ color: reward.color, background: `${reward.color}15` }}>
-                      {reward.icon}
-                    </div>
-                    <div>
-                      <h3>{reward.name}</h3>
-                      <p className="reward-value">Retail: <strong>{reward.value}</strong></p>
-                    </div>
+                <div className="reward-info">
+                  <div className="reward-icon" style={{ color: reward.color }}>{reward.icon}</div>
+                  <h3>{reward.name}</h3>
+                  <p className="reward-value">{reward.value}</p>
+                </div>
+                {selectedReward?.id === reward.id && (
+                  <div className="reward-check">
+                    <FaCheckCircle className="w-5 h-5 text-green-500" />
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
-          <div className="action-container">
-            <button
-              className={`select-btn ${!selectedReward ? 'disabled' : ''}`}
-              onClick={() => selectedReward && setStep(2)}
-              disabled={!selectedReward}
-            >
-              {selectedReward ? `Continue with ${selectedReward.name} →` : 'Please select a gift above'}
-            </button>
-          </div>
+          <button
+            className={`select-btn ${!selectedReward ? 'disabled' : ''}`}
+            onClick={() => selectedReward && setStep(2)}
+            disabled={!selectedReward}
+          >
+            {selectedReward ? `Continue with ${selectedReward.name} →` : 'Select a gift first'}
+          </button>
         </section>
       )}
 
@@ -404,31 +342,28 @@ function BirthdayGift({ campaign }) {
       {step === 2 && (
         <section className="form-section">
           <button className="back-btn" onClick={goBack}>
-            <FaArrowLeft className="w-4 h-4" /> Back to gifts
+            <FaArrowLeft className="w-4 h-4" /> Back
           </button>
           <div className="form-card">
             <div className="selected-preview">
               <img src={selectedReward?.image} alt={selectedReward?.name} className="preview-img" />
-              <div>
-                <span className="preview-label">Selected Reward</span>
-                <span className="preview-name">{selectedReward?.name}</span>
-              </div>
+              <span className="preview-name">{selectedReward?.name}</span>
             </div>
-            <h2>Recipient Information</h2>
-            <p>Enter your details for verification and gift shipping.</p>
+            <h2>Enter Your Details</h2>
+            <p>We'll verify your birthday and send you the gift.</p>
 
             <div className="form-group">
-              <label><FaUser className="w-4 h-4 text-amber-500" /> Full Name <span className="required">*</span></label>
+              <label><FaUser className="w-4 h-4" /> Full Name <span className="required">*</span></label>
               <input
                 type="text"
-                placeholder="e.g. Alex Morgan"
+                placeholder="e.g. John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
 
             <div className="form-group">
-              <label><FaCalendarAlt className="w-4 h-4 text-amber-500" /> Date of Birth <span className="required">*</span></label>
+              <label><FaCalendarAlt className="w-4 h-4" /> Date of Birth <span className="required">*</span></label>
               <input
                 type="date"
                 value={birthday}
@@ -437,16 +372,16 @@ function BirthdayGift({ campaign }) {
               />
             </div>
 
-            {error && <div className="form-error">{error}</div>}
+            {error && <p className="form-error">{error}</p>}
 
             <button className="submit-btn" onClick={handleSubmit}>
-              Verify & Claim Gift →
+              Claim Your Gift →
             </button>
 
             <div className="trust-badges">
-              <span><FaCheckCircle className="text-emerald-500" /> Verified Event</span>
-              <span><FaShieldAlt className="text-blue-500" /> 256-bit Secure</span>
-              <span><FaLock className="text-amber-500" /> Privacy Protected</span>
+              <span><FaCheckCircle className="w-3.5 h-3.5" /> Verified</span>
+              <span><FaCheckCircle className="w-3.5 h-3.5" /> Secure</span>
+              <span><FaCheckCircle className="w-3.5 h-3.5" /> Trusted Partner</span>
             </div>
           </div>
         </section>
@@ -455,15 +390,13 @@ function BirthdayGift({ campaign }) {
       {/* Step 3: Gift Reveal */}
       {step === 3 && (
         <section className="gift-section">
+          <div className="confetti-container"></div>
           <div className="gift-card">
-            <div className="confetti-container" ref={confettiContainerRef}></div>
-            <div className="gift-success-badge">
-              <FaSparkles className="text-amber-400" /> Verified Winner
-            </div>
-            <h2>Happy Birthday, {name}!</h2>
-            <p>Your reward has been successfully locked in.</p>
+            <div className="gift-icon"><FaGift className="w-12 h-12 text-amber-500" /></div>
+            <h2>🎉 Happy Birthday, {name}!</h2>
+            <p>You've won a <strong>{selectedReward?.name}</strong>!</p>
 
-            <div className="gift-image-container">
+            <div className="gift-image">
               <img
                 src={selectedReward?.image}
                 alt={selectedReward?.name}
@@ -473,39 +406,40 @@ function BirthdayGift({ campaign }) {
 
             <div className="gift-details">
               <div className="gift-detail">
-                <span className="detail-label">Reward Item</span>
+                <span className="detail-label">Product</span>
                 <span className="detail-value">{selectedReward?.name}</span>
               </div>
               <div className="gift-detail">
-                <span className="detail-label">Estimated Value</span>
-                <span className="detail-value text-amber-400">{selectedReward?.value}</span>
+                <span className="detail-label">Value</span>
+                <span className="detail-value">{selectedReward?.value}</span>
               </div>
               <div className="gift-detail">
-                <span className="detail-label">Delivery Status</span>
-                <span className="detail-value text-emerald-400">Ready to Ship</span>
+                <span className="detail-label">Status</span>
+                <span className="detail-value text-green-500">✓ Claimable</span>
               </div>
             </div>
 
             <div className="brand-message">
-              <p>GiftZone Partner Rewards Program • Limited Stock Allocation</p>
+              <p>Presented by <strong>GiftZone Partner Program</strong></p>
+              <p className="small-text">Terms & Conditions apply. Limited stock available.</p>
             </div>
 
             <div className="gift-actions">
               <button className="continue-btn" onClick={handleContinue} disabled={loading}>
                 {loading ? (
                   <>
-                    <span className="spinner"></span> Finalizing...
+                    <span className="spinner"></span> Processing...
                   </>
                 ) : (
-                  'Proceed to Secure Claim →'
+                  'Continue to Claim →'
                 )}
               </button>
               <div className="share-row">
-                <span>Share with friends:</span>
-                <button onClick={() => handleShare('whatsapp')}><FaWhatsapp className="w-5 h-5 text-emerald-400 hover:scale-110 transition" /></button>
-                <button onClick={() => handleShare('facebook')}><FaFacebook className="w-5 h-5 text-blue-500 hover:scale-110 transition" /></button>
-                <button onClick={() => handleShare('twitter')}><FaTwitter className="w-5 h-5 text-sky-400 hover:scale-110 transition" /></button>
-                <button onClick={() => handleShare('copy')}><FaCopy className="w-5 h-5 text-slate-400 hover:scale-110 transition" /></button>
+                <span>Share this joy:</span>
+                <button onClick={() => handleShare('whatsapp')}><FaWhatsapp className="w-5 h-5 text-green-500" /></button>
+                <button onClick={() => handleShare('facebook')}><FaFacebook className="w-5 h-5 text-blue-600" /></button>
+                <button onClick={() => handleShare('twitter')}><FaTwitter className="w-5 h-5 text-blue-400" /></button>
+                <button onClick={() => handleShare('copy')}><FaCopy className="w-5 h-5 text-gray-600" /></button>
               </div>
             </div>
           </div>
@@ -517,218 +451,621 @@ function BirthdayGift({ campaign }) {
         <section className="redirect-section">
           <div className="redirect-card">
             <div className="spinner-large"></div>
-            <h2>Connecting Securely...</h2>
-            <p>Please wait while we route you to the final verification step.</p>
+            <h2>🚀 Redirecting...</h2>
+            <p>Please wait while we complete your request.</p>
           </div>
         </section>
       )}
 
       {/* ─── FOOTER ─── */}
       <footer className="site-footer">
-        <div className="footer-content">
-          <p>© {new Date().getFullYear()} GiftZone Ecosystem. All rights reserved.</p>
-          <p className="footer-contact">Secure Promotional Verification Platform.</p>
-        </div>
+        <p>© 2026 GiftZone. All rights reserved.</p>
+        <p className="footer-contact">Questions? support@giftzone.com</p>
       </footer>
 
       {/* ─── STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
-        :root {
-          --brand-gold: #d4af37;
-          --brand-dark: #0f172a;
-          --bg-base: #f8fafc;
-          --card-bg: #ffffff;
-          --text-main: #0f172a;
-          --text-muted: #64748b;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+          background: #f0f4f8;
+          color: #1a1a2e;
+          line-height: 1.6;
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        body { background: var(--bg-base); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
-        .page-wrapper { max-width: 100%; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
-
-        @keyframes confettiFall {
-          0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
-          100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; }
+        .page-wrapper {
+          max-width: 100%;
+          overflow-x: hidden;
+          background: #f0f4f8;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
         }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
-          background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(0,0,0,0.05); padding: 1rem 1.5rem;
+          background: rgba(255,255,255,0.92);
+          backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+          padding: 0.7rem 1.5rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
-        .header-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
-        .logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.25rem; }
-        .logo-icon-bg { width: 34px; height: 34px; background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .logo-text { color: var(--text-main); }
-        .logo-text span { color: var(--brand-gold); }
+        .logo {
+          display: flex;
+          align-items: center; gap: 0.6rem;
+          font-weight: 800; font-size: 1.2rem;
+        }
+        .logo-icon {
+          width: 36px; height: 36px;
+          background: linear-gradient(135deg, #1a1a2e, #2d2d44);
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+        }
+        .logo-text { color: #1a1a2e; }
+        .logo-text span { color: #D4AF37; }
         .header-badge {
-          background: #fef3c7; color: #b45309; font-weight: 700; font-size: 0.75rem;
-          padding: 0.4rem 0.9rem; border-radius: 40px; display: flex; align-items: center; gap: 6px;
-          border: 1px solid #fde68a;
+          display: flex;
+          align-items: center; gap: 0.4rem;
+          background: linear-gradient(135deg, #D4AF37, #B8860B);
+          color: #fff;
+          font-weight: 700;
+          font-size: 0.65rem;
+          padding: 0.3rem 1rem;
+          border-radius: 40px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 12px rgba(212, 175, 55, 0.2);
         }
 
         /* ── Hero ── */
         .hero {
-          position: relative; min-height: 36vh; display: flex; align-items: center; justify-content: center;
-          text-align: center; padding: 4rem 1.5rem; overflow: hidden; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-          color: #fff;
+          position: relative;
+          min-height: 35vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 2.5rem 1.5rem;
+          background: linear-gradient(135deg, #fef9e7, #fdf2d0);
+          color: #1a1a2e;
+          overflow: hidden;
         }
-        .hero-glow { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.35; z-index: 1; }
-        .shape-1 { width: 400px; height: 400px; background: var(--brand-gold); top: -150px; left: -100px; }
-        .shape-2 { width: 350px; height: 350px; background: #6366f1; bottom: -100px; right: -50px; }
-        .hero-content { position: relative; z-index: 2; max-width: 700px; }
-        .hero-badge-wrap { display: flex; justify-content: center; margin-bottom: 1.2rem; }
+        .hero-overlay {
+          position: absolute; inset: 0;
+          background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .hero-content {
+          position: relative; z-index: 2;
+          max-width: 800px;
+        }
         .hero-badge {
-          background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 0.4rem 1.1rem;
-          border-radius: 40px; font-size: 0.7rem; font-weight: 700; color: #fde047;
-          letter-spacing: 1px; backdrop-filter: blur(4px);
+          display: inline-flex;
+          align-items: center; gap: 0.4rem;
+          background: rgba(212, 175, 55, 0.12);
+          border: 1px solid rgba(212, 175, 55, 0.2);
+          padding: 0.3rem 1.2rem;
+          border-radius: 40px;
+          font-size: 0.65rem;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: #B8860B;
+          margin-bottom: 0.8rem;
+          letter-spacing: 1px;
         }
-        .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; line-height: 1.1; margin-bottom: 1rem; letter-spacing: -1px; }
-        .text-gradient { background: linear-gradient(to right, #fde047, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero p { font-size: 1.1rem; color: #cbd5e1; max-width: 600px; margin: 0 auto; }
+        .hero h1 {
+          font-size: clamp(2rem, 6vw, 3rem);
+          font-weight: 900;
+          line-height: 1.1;
+          margin-bottom: 0.3rem;
+          color: #1a1a2e;
+        }
+        .hero h1 span {
+          color: #D4AF37;
+        }
+        .hero p {
+          font-size: 1.05rem;
+          color: #555;
+          margin-bottom: 1.2rem;
+        }
 
         /* ── Rewards Section ── */
-        .rewards-section { padding: 0 1.5rem 4rem; max-width: 1100px; margin: -3.5rem auto 2rem; position: relative; z-index: 10; }
-        .section-header { text-align: center; margin-bottom: 2rem; }
-        .section-title { font-size: 1.8rem; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
-        .section-subtitle { font-size: 1rem; color: #cbd5e1; margin-top: 0.3rem; }
-        .rewards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        .rewards-section {
+          padding: 2rem 1.5rem;
+          max-width: 1000px;
+          margin: -2rem auto 2rem;
+          position: relative;
+          z-index: 10;
+        }
+        .section-title {
+          font-size: 1.8rem;
+          font-weight: 800;
+          text-align: center;
+          color: #1a1a2e;
+        }
+        .section-subtitle {
+          text-align: center;
+          color: #6b7280;
+          margin-bottom: 1.5rem;
+          font-size: 1rem;
+        }
+        .rewards-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1.2rem;
+        }
         .reward-card {
-          background: var(--card-bg); border-radius: 24px; padding: 1.2rem; border: 2px solid #e2e8f0;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; position: relative;
-          box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+          background: #fff;
+          border-radius: 24px;
+          padding: 1rem;
+          border: 2px solid transparent;
+          transition: all 0.3s ease;
+          cursor: pointer;
+          position: relative;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
         }
-        .reward-card:hover { transform: translateY(-6px); box-shadow: 0 20px 35px -10px rgba(0,0,0,0.1); border-color: #cbd5e1; }
-        .reward-card.selected { border-color: var(--brand-gold); background: #fffdf5; box-shadow: 0 0 0 4px rgba(212,175,55,0.15); }
-        .reward-image-wrapper { position: relative; width: 100%; aspect-ratio: 1/1; border-radius: 16px; overflow: hidden; background: #f8fafc; margin-bottom: 1rem; }
-        .reward-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
-        .reward-card:hover .reward-image { transform: scale(1.05); }
-        .reward-tag { position: absolute; top: 10px; right: 10px; color: #fff; font-size: 0.65rem; font-weight: 800; padding: 0.3rem 0.8rem; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        .reward-check-overlay { position: absolute; inset: 0; background: rgba(212,175,55,0.3); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; }
-        .reward-info-wrap { padding: 0.2rem; }
-        .reward-info { display: flex; align-items: center; gap: 12px; }
-        .reward-icon-box { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .reward-info h3 { font-size: 1rem; font-weight: 800; color: var(--text-main); line-height: 1.2; margin-bottom: 2px; }
-        .reward-value { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
-        .action-container { margin-top: 2.5rem; display: flex; justify-content: center; }
+        .reward-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+        }
+        .reward-card.selected {
+          background: #f8fafc;
+        }
+        .reward-image-wrapper {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 1/1;
+          border-radius: 16px;
+          overflow: hidden;
+          background: #f0f0f0;
+          margin-bottom: 0.6rem;
+        }
+        .reward-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .reward-tag {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          color: #fff;
+          font-size: 0.55rem;
+          font-weight: 700;
+          padding: 0.2rem 0.6rem;
+          border-radius: 40px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          background: #1a1a2e;
+        }
+        .reward-info {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-top: 0.2rem;
+        }
+        .reward-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #f0f0f0;
+          flex-shrink: 0;
+        }
+        .reward-info h3 {
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: #1a1a2e;
+          flex: 1;
+        }
+        .reward-value {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #6b7280;
+        }
+        .reward-check {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+        }
         .select-btn {
-          width: 100%; max-width: 450px; padding: 1.1rem; background: linear-gradient(135deg, #d4af37, #b8860b);
-          border: none; border-radius: 16px; font-weight: 800; font-size: 1.1rem; color: #fff; cursor: pointer;
-          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(212,175,55,0.4);
+          width: 100%;
+          padding: 0.9rem;
+          background: linear-gradient(135deg, #D4AF37, #B8860B);
+          border: none;
+          border-radius: 60px;
+          font-weight: 800;
+          font-size: 1.05rem;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 1.5rem;
         }
-        .select-btn:hover:not(.disabled) { transform: translateY(-3px); box-shadow: 0 15px 35px -5px rgba(212,175,55,0.6); }
-        .select-btn.disabled { opacity: 0.5; cursor: not-allowed; background: #cbd5e1; box-shadow: none; color: #64748b; }
+        .select-btn:hover:not(.disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(212, 175, 55, 0.35); }
+        .select-btn.disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* ── Form Section ── */
-        .form-section { padding: 0 1.5rem 4rem; max-width: 600px; margin: -3.5rem auto 2rem; position: relative; z-index: 10; }
-        .back-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: #cbd5e1; font-weight: 600; font-size: 0.9rem; cursor: pointer; margin-bottom: 1rem; transition: color 0.2s; }
-        .back-btn:hover { color: #fff; }
-        .form-card { background: var(--card-bg); border-radius: 28px; padding: 2.5rem 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; }
-        .selected-preview { display: flex; align-items: center; gap: 1rem; background: #f8fafc; padding: 0.8rem 1.2rem; border-radius: 16px; margin-bottom: 1.5rem; border: 1px solid #e2e8f0; }
-        .preview-img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
-        .preview-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; }
-        .preview-name { font-weight: 800; font-size: 1.05rem; color: var(--text-main); display: block; }
-        .form-card h2 { font-size: 1.6rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.3rem; letter-spacing: -0.5px; }
-        .form-card > p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem; }
-        .form-group { margin-bottom: 1.5rem; }
-        .form-group label { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; color: #334155; margin-bottom: 0.5rem; }
+        .form-section {
+          padding: 2rem 1.5rem;
+          max-width: 560px;
+          margin: -2rem auto 2rem;
+          position: relative;
+          z-index: 10;
+        }
+        .back-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          background: none;
+          border: none;
+          color: #6b7280;
+          font-size: 0.85rem;
+          cursor: pointer;
+          margin-bottom: 0.8rem;
+          transition: color 0.2s;
+        }
+        .back-btn:hover { color: #1a1a2e; }
+        .form-card {
+          background: #fff;
+          border-radius: 32px;
+          padding: 2rem;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+          border: 1px solid #eef2f6;
+        }
+        .selected-preview {
+          display: flex;
+          align-items: center;
+          gap: 0.8rem;
+          background: #f8fafc;
+          padding: 0.6rem 1rem;
+          border-radius: 16px;
+          margin-bottom: 1.2rem;
+          border: 1px solid #eef2f6;
+        }
+        .preview-img {
+          width: 48px;
+          height: 48px;
+          border-radius: 8px;
+          object-fit: cover;
+        }
+        .preview-name {
+          font-weight: 700;
+          font-size: 0.9rem;
+          color: #1a1a2e;
+        }
+        .form-card h2 {
+          font-size: 1.6rem;
+          font-weight: 800;
+          text-align: center;
+          color: #1a1a2e;
+        }
+        .form-card > p {
+          text-align: center;
+          color: #6b7280;
+          margin-bottom: 1.5rem;
+        }
+        .form-group {
+          margin-bottom: 1.2rem;
+        }
+        .form-group label {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-weight: 600;
+          font-size: 0.85rem;
+          color: #374151;
+          margin-bottom: 0.3rem;
+        }
         .form-group .required { color: #ef4444; }
         .form-group input {
-          width: 100%; padding: 0.9rem 1rem; border: 2px solid #e2e8f0; border-radius: 14px; font-size: 1rem;
-          background: #f8fafc; transition: all 0.2s; outline: none; font-family: inherit; color: var(--text-main);
+          width: 100%;
+          padding: 0.8rem 1rem;
+          border: 2px solid #e5e7eb;
+          border-radius: 14px;
+          font-size: 0.95rem;
+          background: #f9fafb;
+          transition: all 0.2s;
+          outline: none;
+          font-family: inherit;
         }
-        .form-group input:focus { border-color: var(--brand-gold); background: #fff; box-shadow: 0 0 0 4px rgba(212,175,55,0.1); }
-        .form-error { background: #fef2f2; color: #dc2626; padding: 0.8rem 1rem; border-radius: 12px; font-size: 0.9rem; font-weight: 600; margin-bottom: 1.2rem; border: 1px solid #fee2e2; }
+        .form-group input:focus {
+          border-color: #D4AF37;
+          background: #fff;
+          box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.08);
+        }
+        .form-group input[type="date"] { color-scheme: light; }
+        .form-error {
+          color: #ef4444;
+          font-size: 0.85rem;
+          margin-top: 0.5rem;
+        }
         .submit-btn {
-          width: 100%; padding: 1.1rem; background: linear-gradient(135deg, #d4af37, #b8860b);
-          border: none; border-radius: 16px; font-weight: 800; font-size: 1.1rem; color: #fff; cursor: pointer;
-          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(212,175,55,0.4);
+          width: 100%;
+          padding: 0.9rem;
+          background: linear-gradient(135deg, #D4AF37, #B8860B);
+          border: none;
+          border-radius: 60px;
+          font-weight: 800;
+          font-size: 1.05rem;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
         }
-        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 35px -5px rgba(212,175,55,0.6); }
-        .trust-badges { display: flex; justify-content: center; gap: 1.5rem; margin-top: 1.5rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
-        .trust-badges span { display: flex; align-items: center; gap: 5px; }
+        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(212, 175, 55, 0.35); }
+        .trust-badges {
+          display: flex;
+          justify-content: center;
+          gap: 1.5rem;
+          margin-top: 1.2rem;
+          font-size: 0.75rem;
+          color: #6b7280;
+        }
+        .trust-badges span {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
 
         /* ── Gift Section ── */
-        .gift-section { padding: 0 1.5rem 4rem; max-width: 640px; margin: -3.5rem auto 2rem; position: relative; z-index: 10; }
+        .gift-section {
+          padding: 2rem 1.5rem;
+          max-width: 640px;
+          margin: -2rem auto 2rem;
+          position: relative;
+          z-index: 10;
+        }
         .gift-card {
-          background: var(--card-bg); border-radius: 28px; padding: 2.5rem 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
-          border: 1px solid #e2e8f0; text-align: center; position: relative; overflow: hidden;
+          background: #fff;
+          border-radius: 32px;
+          padding: 2rem;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+          border: 1px solid #eef2f6;
+          text-align: center;
+          position: relative;
         }
-        .confetti-container { position: absolute; inset: 0; pointer-events: none; border-radius: 28px; overflow: hidden; }
-        .gift-success-badge { display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #b45309; padding: 0.4rem 1rem; border-radius: 30px; font-weight: 800; font-size: 0.75rem; margin-bottom: 1rem; border: 1px solid #fde68a; }
-        .gift-card h2 { font-size: 1.8rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.3rem; }
-        .gift-card > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1rem; }
-        .gift-image-container { width: 220px; height: 220px; margin: 0 auto 1.5rem; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.1); background: #f8fafc; }
-        .gift-img { width: 100%; height: 100%; object-fit: cover; }
-        .gift-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; background: #f8fafc; padding: 1rem; border-radius: 16px; border: 1px solid #e2e8f0; }
-        .detail-label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .detail-value { display: block; font-weight: 800; font-size: 0.95rem; color: var(--text-main); margin-top: 2px; }
-        .text-amber-400 { color: #d97706; }
-        .text-emerald-400 { color: #059669; }
-        .brand-message { margin-bottom: 1.5rem; }
-        .brand-message p { font-size: 0.85rem; color: var(--text-muted); }
-        .continue-btn {
-          width: 100%; padding: 1.1rem; background: linear-gradient(135deg, #10b981, #059669);
-          border: none; border-radius: 16px; font-weight: 800; font-size: 1.1rem; color: #fff; cursor: pointer;
-          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(16,185,129,0.4);
+        .confetti-container {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          pointer-events: none;
+          border-radius: 32px;
         }
-        .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 35px -5px rgba(16,185,129,0.6); }
-        .continue-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .share-row { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.2rem; font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
-        .share-row button { background: none; border: none; cursor: pointer; }
-        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes confettiFall {
+          0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; }
+        }
+        .gift-icon { margin: 0 auto 0.5rem; }
+        .gift-card h2 {
+          font-size: 1.8rem;
+          font-weight: 800;
+          color: #1a1a2e;
+          margin-bottom: 0.3rem;
+        }
+        .gift-card p {
+          color: #6b7280;
+          margin-bottom: 1.2rem;
+        }
+        .gift-card p strong { color: #D4AF37; }
+        .gift-image {
+          width: 200px;
+          height: 200px;
+          margin: 0 auto 1.2rem;
+          border-radius: 20px;
+          overflow: hidden;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        .gift-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .gift-details {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.8rem;
+          margin-bottom: 1.2rem;
+          background: #f8fafc;
+          padding: 0.8rem;
+          border-radius: 16px;
+          border: 1px solid #eef2f6;
+        }
+        .gift-detail {
+          text-align: center;
+        }
+        .detail-label {
+          display: block;
+          font-size: 0.65rem;
+          font-weight: 600;
+          color: #888;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .detail-value {
+          display: block;
+          font-weight: 700;
+          font-size: 0.85rem;
+          color: #1a1a2e;
+        }
+        .brand-message {
+          margin: 1rem 0 1.2rem;
+        }
+        .brand-message p { font-size: 0.9rem; color: #555; }
+        .brand-message .small-text { font-size: 0.7rem; color: #888; }
+        .gift-actions .continue-btn {
+          width: 100%;
+          padding: 0.9rem;
+          background: linear-gradient(135deg, #22C55E, #16A34A);
+          border: none;
+          border-radius: 60px;
+          font-weight: 800;
+          font-size: 1rem;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 4px 20px rgba(34, 197, 94, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+        .gift-actions .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(34, 197, 94, 0.35); }
+        .gift-actions .continue-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .share-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.8rem;
+          margin-top: 1rem;
+          font-size: 0.85rem;
+          color: #6b7280;
+        }
+        .share-row button {
+          background: none;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.2s;
+        }
+        .share-row button:hover { transform: scale(1.1); }
+
+        .spinner {
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .spinner-large {
+          width: 48px;
+          height: 48px;
+          border: 4px solid rgba(212, 175, 55, 0.15);
+          border-top-color: #D4AF37;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin: 0 auto 1rem;
+        }
 
         /* ── Redirect Section ── */
-        .redirect-section { padding: 4rem 1.5rem; max-width: 560px; margin: 0 auto; }
-        .redirect-card { background: var(--card-bg); border-radius: 28px; padding: 3rem 2rem; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; }
-        .spinner-large { width: 50px; height: 50px; border: 4px solid #e2e8f0; border-top-color: var(--brand-gold); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem; }
-        .redirect-card h2 { font-size: 1.6rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.4rem; }
-        .redirect-card p { color: var(--text-muted); }
+        .redirect-section {
+          padding: 4rem 1.5rem;
+          max-width: 560px;
+          margin: -2rem auto 2rem;
+        }
+        .redirect-card {
+          background: #fff;
+          border-radius: 32px;
+          padding: 3rem 2rem;
+          text-align: center;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+          border: 1px solid #eef2f6;
+        }
+        .redirect-card h2 { font-size: 1.6rem; font-weight: 800; color: #1a1a2e; margin-bottom: 0.3rem; }
+        .redirect-card p { color: #6b7280; }
 
         /* ── Footer ── */
-        .site-footer { background: #0f172a; color: #94a3b8; padding: 2.5rem 1.5rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto; }
-        .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .site-footer p { font-size: 0.8rem; }
-        .footer-contact { font-weight: 600; color: #cbd5e1; }
+        .site-footer {
+          background: #1a1a2e;
+          color: #9ca3af;
+          padding: 1.5rem 1.5rem;
+          text-align: center;
+          border-top: 1px solid rgba(255,255,255,0.04);
+          margin-top: auto;
+        }
+        .site-footer p { font-size: 0.7rem; margin-bottom: 0.2rem; }
+        .footer-contact { font-weight: 600; color: #e5e7eb; }
 
         /* ── Modal ── */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; }
-        .modal-card { background: #fff; border-radius: 28px; padding: 2.5rem 2rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
-        .modal-icon-container { width: 64px; height: 64px; background: #fef3c7; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; }
-        .modal-icon { font-size: 2rem; }
-        .modal-card h2 { font-size: 1.5rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.5rem; }
-        .modal-card p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5; }
-        .modal-actions { display: flex; flex-direction: column; gap: 10px; }
-        .modal-btn { padding: 1rem; border-radius: 14px; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; }
-        .modal-btn.primary { background: var(--brand-dark); color: #fff; box-shadow: 0 4px 12px rgba(15,23,42,0.3); }
-        .modal-btn.primary:hover { background: #1e293b; transform: translateY(-2px); }
-        .modal-btn.ghost { background: #f1f5f9; color: var(--text-main); border: 1px solid #e2e8f0; }
-        .modal-btn.ghost:hover { background: #e2e8f0; }
-        .modal-btn.text-only { background: transparent; color: #94a3b8; font-size: 0.8rem; margin-top: 1rem; }
-        .modal-btn.text-only:hover { color: var(--text-main); }
+        .modal-overlay {
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(16px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .modal-card {
+          background: #1a1c22;
+          border-radius: 36px;
+          padding: 2.5rem 2rem;
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+          border: 1px solid rgba(212, 175, 55, 0.15);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+        .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
+        .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
+        .modal-card p { color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .modal-actions {
+          display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+        }
+        .modal-btn {
+          display: flex; align-items: center; gap: 0.4rem;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.08);
+          padding: 0.6rem 1.2rem;
+          border-radius: 40px;
+          font-weight: 600;
+          font-size: 0.75rem;
+          color: #fff;
+          cursor: pointer;
+          transition: 0.2s;
+          flex: 1;
+          min-width: 100px;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.12); }
+        .modal-btn.primary {
+          background: #D4AF37;
+          border: none;
+          color: #0a0a0a;
+        }
+        .modal-btn.primary:hover { background: #B8860B; }
+        .modal-btn.ghost {
+          background: transparent;
+          border: none;
+          color: #666;
+          font-size: 0.7rem;
+          margin-top: 0.3rem;
+        }
+        .modal-btn.ghost:hover { color: #fff; }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
-          .rewards-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-          .rewards-section { margin-top: -2.5rem; }
-          .form-section { margin-top: -2.5rem; }
-          .gift-section { margin-top: -2.5rem; }
-          .gift-details { grid-template-columns: 1fr; gap: 0.6rem; }
-          .gift-image-container { width: 160px; height: 160px; }
-          .form-card { padding: 1.8rem 1.5rem; }
-          .gift-card { padding: 1.8rem 1.5rem; }
+          .rewards-grid { grid-template-columns: repeat(2, 1fr); }
+          .gift-details { grid-template-columns: 1fr; }
+          .gift-image { width: 150px; height: 150px; }
+          .form-card { padding: 1.5rem; }
+          .gift-card { padding: 1.5rem; }
         }
         @media (max-width: 480px) {
           .rewards-grid { grid-template-columns: 1fr; }
-          .hero h1 { font-size: 2.2rem; }
-          .trust-badges { flex-direction: column; gap: 0.5rem; align-items: center; }
-          .form-card { padding: 1.5rem 1rem; }
-          .gift-card { padding: 1.5rem 1rem; }
-          .gift-image-container { width: 140px; height: 140px; }
-          .header-badge { font-size: 0.6rem; padding: 0.2rem 0.6rem; }
+          .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
+          .hero h1 { font-size: 1.8rem; }
+          .site-header { padding: 0.5rem 1rem; }
+          .gift-image { width: 120px; height: 120px; }
+          .trust-badges { flex-wrap: wrap; gap: 0.8rem; }
+          .share-row { flex-wrap: wrap; }
         }
       `}} />
     </div>
