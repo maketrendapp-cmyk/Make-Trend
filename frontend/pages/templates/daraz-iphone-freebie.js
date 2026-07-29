@@ -25,7 +25,7 @@ const defaultMeta = {
   title: 'iPhone Freebie – Get iPhone 15 Pro Max for Free!',
   description: 'Invite friends, cut the price, and get iPhone 15 Pro Max for free. Limited time offer!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/iphone-freebie',
+  url: 'https://maketrend.app/daraz-iphone-freebie',
 };
 
 // ── Static Winner Data (Updated to match Apple Ecosystem) ──
