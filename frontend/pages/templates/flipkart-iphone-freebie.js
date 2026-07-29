@@ -26,7 +26,7 @@ const defaultMeta = {
   title: 'Flipkart Big Billion Days – Get iPhone 15 & Electronics Free!',
   description: 'Invite friends, cut the price, and get rewards or electronics for free on Flipkart. Limited time offer!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/flipkart-freebie',
+  url: 'https://maketrend.app/flipkart-iphone-freebie?id={id}',
 };
 
 // ── Static Winner Data (Flipkart themed) ──
