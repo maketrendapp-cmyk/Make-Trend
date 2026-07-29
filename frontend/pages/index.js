@@ -132,6 +132,7 @@ export default function Home({ initialFeaturedTemplates }) {
   const heroFade = useFadeUp(0.1);
   const statsFade = useFadeUp(0.1);
   const carouselFade = useFadeUp(0.1);
+  const featuresFade = useFadeUp(0.1);
   const ctaFade = useFadeUp(0.1);
 
   // ── Stats ──
@@ -152,7 +153,7 @@ export default function Home({ initialFeaturedTemplates }) {
     if (featuredTemplates?.length > 1 && !isHovering) {
       carouselIntervalRef.current = setInterval(() => {
         setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-      }, 4000);
+      }, 2000);
     }
     return () => {
       if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
@@ -181,8 +182,11 @@ export default function Home({ initialFeaturedTemplates }) {
     const touchEndX = e.changedTouches[0].clientX;
     const diff = touchStartXRef.current - touchEndX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0) nextSlide();
-      else prevSlide();
+      if (diff > 0) {
+        nextSlide();
+      } else {
+        prevSlide();
+      }
     }
   };
 
@@ -200,17 +204,21 @@ export default function Home({ initialFeaturedTemplates }) {
     }
   };
 
-  // ── Render carousel with Next.js Image optimization ──
+  // ── Render carousel with Next.js Image Optimization ──
   const renderCarousel = () => {
     if (isLoading) {
       return (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 animate-pulse">
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div className="w-full sm:w-72 h-48 sm:h-auto bg-slate-200 rounded-xl" />
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 sm:p-6 animate-pulse">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+            <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-200 rounded-xl" />
             <div className="flex-1 space-y-3">
               <div className="h-6 bg-slate-200 rounded w-3/4" />
               <div className="h-4 bg-slate-200 rounded w-1/2" />
               <div className="h-4 bg-slate-200 rounded w-2/3" />
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="h-9 bg-slate-200 rounded-xl" />
+                <div className="h-9 bg-slate-200 rounded-xl" />
+              </div>
             </div>
           </div>
         </div>
@@ -227,73 +235,73 @@ export default function Home({ initialFeaturedTemplates }) {
 
     return (
       <div
-        className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-md group"
+        className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm"
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
         <div
-          className="flex transition-transform duration-700 ease-in-out"
+          className="flex transition-transform duration-500 ease-in-out"
           style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
         >
           {featuredTemplates.map((template, index) => (
             <div key={template.id} className="w-full flex-shrink-0">
-              <div className="p-5 sm:p-8">
-                <div className="flex flex-col sm:flex-row gap-6 items-center">
-                  <div className="w-full sm:w-72 aspect-video sm:aspect-square bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm relative">
+              <div className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                  <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm relative">
                     {template.image ? (
                       <Image
                         src={template.image}
                         alt={template.title}
                         fill
                         className="object-cover"
-                        sizes="(max-width: 640px) 100vw, 288px"
+                        sizes="(max-width: 640px) 100vw, 224px"
                         priority={index === 0}
                         loading={index === 0 ? 'eager' : 'lazy'}
-                        quality={85}
+                        quality={80}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">🎨</div>
+                      <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">🎨</div>
                     )}
                   </div>
-                  <div className="flex-1 flex flex-col justify-between w-full">
+                  <div className="flex-1 flex flex-col justify-between">
                     <div>
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1">
                         {template.platform && (
                           <span
-                            className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider ${
+                            className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
                               platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
                             }`}
                           >
                             {template.platform}
                           </span>
                         )}
-                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                          👥 {template.usageCount || 0} Uses
+                        <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded flex items-center">
+                          👥 {template.usageCount || 0} uses
                         </span>
                         {template.category && (
-                          <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                             {getCategoryEmoji(template.category)} {template.category}
                           </span>
                         )}
                       </div>
-                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">{template.title}</h3>
-                      <p className="text-slate-500 text-xs sm:text-sm mt-2 line-clamp-2 leading-relaxed">
+                      <h3 className="text-2xl font-bold text-slate-900">{template.title}</h3>
+                      <p className="text-slate-500 text-sm mt-1 line-clamp-2">
                         {template.description || 'Launch your campaign with this template.'}
                       </p>
                       {template.reward && (
-                        <div className="mt-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl w-fit flex items-center gap-1.5 shadow-sm">
+                        <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-lg w-fit">
                           🎁 {template.reward}
                         </div>
                       )}
                     </div>
-                    <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         onClick={() => router.push(`/${template.slug}`)}
-                        className="flex items-center justify-center gap-1.5 text-xs font-black text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl py-2.5 transition active:scale-95"
+                        className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
@@ -301,9 +309,9 @@ export default function Home({ initialFeaturedTemplates }) {
                       </button>
                       <button
                         onClick={() => handleUseTemplate(template.slug)}
-                        className="flex items-center justify-center gap-1.5 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl py-2.5 transition shadow-sm active:scale-95 shadow-purple-600/20"
+                        className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl py-2 transition shadow-sm active:scale-95"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                         </svg>
                         Use Template
@@ -320,25 +328,25 @@ export default function Home({ initialFeaturedTemplates }) {
           <>
             <button
               onClick={prevSlide}
-              className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2.5 rounded-full shadow-lg backdrop-blur-md border border-slate-200 transition-all z-10 text-slate-800 hover:scale-105"
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
               aria-label="Previous"
             >
-              <FiChevronLeft className="w-5 h-5" />
+              <FiChevronLeft className="w-5 h-5 text-slate-700" />
             </button>
             <button
               onClick={nextSlide}
-              className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2.5 rounded-full shadow-lg backdrop-blur-md border border-slate-200 transition-all z-10 text-slate-800 hover:scale-105"
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
               aria-label="Next"
             >
-              <FiChevronRight className="w-5 h-5" />
+              <FiChevronRight className="w-5 h-5 text-slate-700" />
             </button>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full z-10">
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
               {featuredTemplates.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => goToSlide(idx)}
-                  className={`h-1.5 rounded-full transition-all ${
-                    idx === carouselIndex ? 'bg-white w-5' : 'bg-white/50 w-1.5'
+                  className={`h-2 rounded-full transition-all ${
+                    idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-2'
                   }`}
                   aria-label={`Go to slide ${idx + 1}`}
                 />
@@ -371,6 +379,17 @@ export default function Home({ initialFeaturedTemplates }) {
       "query-input": "required name=search_term_string"
     }
   };
+  const organizationData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Make Trend",
+    "url": siteUrl,
+    "logo": `${siteUrl}/favicon.ico`,
+    "sameAs": [
+      "https://twitter.com/maketrend",
+      "https://instagram.com/maketrend"
+    ]
+  };
 
   return (
     <>
@@ -385,6 +404,10 @@ export default function Home({ initialFeaturedTemplates }) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }}
         />
       </Head>
       <main className="min-h-screen bg-gradient-to-b from-white to-gray-50/80">
@@ -402,74 +425,77 @@ export default function Home({ initialFeaturedTemplates }) {
           </div>
 
           <div className="max-w-6xl mx-auto text-center relative z-10">
-            <div className="inline-block mb-4 px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-extrabold rounded-full tracking-wider uppercase shadow-sm">
+            <div className="inline-block mb-4 px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full tracking-wider uppercase">
               🚀 Launch viral campaigns in minutes
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight">
               Create & Share{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
                 Trending Campaigns
               </span>
             </h1>
-            <p className="mt-4 text-base sm:text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
+            <p className="mt-4 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto">
               Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2 minutes.
             </p>
 
             {/* ── Search Bar ── */}
             <div className="max-w-xl mx-auto mt-8">
-              <form onSubmit={handleSearch} className="flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition focus-within:ring-4 focus-within:ring-purple-600/10 focus-within:border-purple-600">
+              <form onSubmit={handleSearch} className="flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition focus-within:ring-2 focus-within:ring-purple-300 focus-within:border-purple-400">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search templates, rewards..."
-                  className="flex-1 bg-transparent px-6 py-3.5 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none"
+                  className="flex-1 bg-transparent px-6 py-3 text-sm text-slate-700 placeholder:text-slate-400 outline-none"
                 />
                 <button
                   type="submit"
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-full mr-1.5 transition text-sm shadow-sm"
+                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-2.5 rounded-full mr-1 transition text-sm"
                 >
                   <FiSearch className="w-4 h-4" /> Search
                 </button>
               </form>
             </div>
 
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
               <button
                 onClick={() => router.push('/create')}
-                className="px-7 py-3 bg-purple-600 text-white font-extrabold rounded-xl shadow-md hover:shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2 text-sm"
+                className="px-6 py-3 bg-purple-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2"
               >
                 Browse All Templates <FiChevronRight className="w-4 h-4" />
               </button>
               <button
                 onClick={() => router.push('/about')}
-                className="px-7 py-3 bg-white border border-slate-200 text-slate-700 font-extrabold rounded-xl hover:bg-slate-50 transition-all shadow-sm text-sm"
+                className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm"
               >
                 Learn More
               </button>
             </div>
           </div>
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none" />
         </section>
 
         {/* ── Stats ── */}
         <section
           ref={statsFade.ref}
-          className={`border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-8 transition-all duration-700 ${
+          className={`border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6 transition-all duration-700 ${
             statsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+          <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             {stats.map((stat, index) => {
               const { count, ref } = counters[index];
               const displayValue = formatNumber(count, stat.label);
               return (
                 <div key={index} ref={ref} className="group">
-                  <p className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent transition-all duration-500 group-hover:scale-105">
+                  <p className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent transition-all duration-500 group-hover:scale-105">
                     {displayValue}
                   </p>
-                  <p className="text-xs text-slate-500 font-extrabold uppercase tracking-wider mt-1">
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mt-0.5">
                     {stat.label}
                   </p>
+                  <div className="w-12 h-0.5 mx-auto mt-1 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-full transition-all duration-500 group-hover:w-16" />
                 </div>
               );
             })}
@@ -486,14 +512,14 @@ export default function Home({ initialFeaturedTemplates }) {
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                   <span>⭐ Featured Templates</span>
                 </h2>
-                <p className="text-slate-500 text-xs sm:text-sm mt-0.5">Hand‑picked professional templates to get you started</p>
+                <p className="text-slate-500 text-sm mt-0.5">Hand‑picked templates to get you started</p>
               </div>
               <button
                 onClick={() => router.push('/create')}
-                className="text-xs sm:text-sm font-bold text-purple-600 hover:underline flex items-center gap-1"
+                className="text-sm font-semibold text-purple-600 hover:underline flex items-center gap-1"
               >
                 View all <FiChevronRight className="w-4 h-4" />
               </button>
@@ -503,33 +529,33 @@ export default function Home({ initialFeaturedTemplates }) {
         </section>
 
         {/* ── How It Works ── */}
-        <section className="py-16 px-4 bg-white/80 border-y border-slate-100">
+        <section className="py-16 px-4 bg-white/80">
           <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-2">How It Works</h2>
-            <p className="text-slate-500 text-center text-sm max-w-xl mx-auto mb-10">
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">How It Works</h2>
+            <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
               Launch your first campaign in three simple steps.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-              <div className="text-center p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl shadow-inner">
-                  <FaRocket className="w-6 h-6" />
+              <div className="text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
+                  <FaRocket className="w-8 h-8" />
                 </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">1. Choose a Template</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">Pick from our library of professionally designed viral templates.</p>
+                <h3 className="font-bold text-slate-900">1. Choose a Template</h3>
+                <p className="text-slate-500 text-sm mt-1">Pick from our library of professionally designed templates.</p>
               </div>
-              <div className="text-center p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl shadow-inner">
-                  <FiEdit className="w-6 h-6" />
+              <div className="text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
+                  <FiEdit className="w-8 h-8" />
                 </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">2. Customise & Launch</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">Customise the title, description, reward, and required tasks.</p>
+                <h3 className="font-bold text-slate-900">2. Customise & Launch</h3>
+                <p className="text-slate-500 text-sm mt-1">Customise the title, description, reward, and features.</p>
               </div>
-              <div className="text-center p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl shadow-inner">
-                  <FiShare2 className="w-6 h-6" />
+              <div className="text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
+                  <FiShare2 className="w-8 h-8" />
                 </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">3. Share & Grow</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">Share your unique link and watch your audience expand instantly.</p>
+                <h3 className="font-bold text-slate-900">3. Share & Grow</h3>
+                <p className="text-slate-500 text-sm mt-1">Share your unique link and watch your metrics climb.</p>
               </div>
             </div>
           </div>
@@ -538,36 +564,36 @@ export default function Home({ initialFeaturedTemplates }) {
         {/* ── Why Make Trend ── */}
         <section className="py-16 px-4 bg-gray-50/50">
           <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-2">Why Make Trend?</h2>
-            <p className="text-slate-500 text-center text-sm max-w-xl mx-auto mb-10">
-              Everything you need to launch, track, and scale your campaigns in one dashboard.
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">Why Make Trend?</h2>
+            <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
+              Everything you need to launch, track, and grow your campaigns – all in one place.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
                   <FiZap />
                 </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">Lightning Fast</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  Optimized server-side rendering and pre-cached queries for instant load speeds.
+                <h3 className="font-bold text-slate-900">Launch in Minutes</h3>
+                <p className="text-slate-500 text-sm mt-1">
+                  Choose a template, customise it, and share your campaign in under 2 minutes.
                 </p>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
                   <FiTrendingUp />
                 </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">Real‑Time Analytics</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  Track views, shares, unlocks, and lead conversions as they happen live.
+                <h3 className="font-bold text-slate-900">Real‑Time Analytics</h3>
+                <p className="text-slate-500 text-sm mt-1">
+                  Track views, shares, unlocks, and completions as they happen.
                 </p>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-xl">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
                   <FiUsers />
                 </div>
-                <h3 className="font-extrabold text-slate-900 mb-1">Audience Growth</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  Built‑in referral tracking and social sharing tools to skyrocket your reach.
+                <h3 className="font-bold text-slate-900">Grow Your Audience</h3>
+                <p className="text-slate-500 text-sm mt-1">
+                  Built‑in referral tracking and social sharing features to expand your reach.
                 </p>
               </div>
             </div>
@@ -582,22 +608,22 @@ export default function Home({ initialFeaturedTemplates }) {
           }`}
         >
           <div className="max-w-4xl mx-auto bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl p-8 sm:p-12 text-center text-white shadow-xl">
-            <h2 className="text-2xl sm:text-3xl font-black">Ready to Make Your Trend?</h2>
-            <p className="mt-2 text-purple-100 text-xs sm:text-sm max-w-xl mx-auto">
-              Join creators who are already launching successful share-to-unlock campaigns with Make Trend.
+            <h2 className="text-3xl font-bold">Ready to Make Your Trend?</h2>
+            <p className="mt-2 text-purple-100 max-w-2xl mx-auto">
+              Join thousands of creators who are already launching successful campaigns with Make Trend.
             </p>
             <button
               onClick={() => router.push('/create')}
-              className="mt-6 px-8 py-3.5 bg-white text-purple-700 font-extrabold rounded-xl shadow-lg hover:shadow-xl hover:bg-gray-50 transition-all inline-flex items-center gap-2 text-sm"
+              className="mt-6 px-8 py-3 bg-white text-purple-700 font-bold rounded-xl shadow-lg hover:shadow-xl hover:bg-gray-50 transition-all inline-flex items-center gap-2"
             >
-              Get Started for Free <FiArrowRight className="w-4 h-4" />
+              Get Started for Free <FiArrowRight className="w-5 h-5" />
             </button>
           </div>
         </section>
 
         {/* ── Footer ── */}
         <footer className="border-t border-slate-200/60 py-6 px-4 bg-white/50">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 font-medium">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <span>© {new Date().getFullYear()} Make Trend. All rights reserved.</span>
             <div className="flex gap-4">
               <a href="/terms" className="hover:text-slate-700 transition">Terms</a>
