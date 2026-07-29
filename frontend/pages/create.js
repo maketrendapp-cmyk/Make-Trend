@@ -54,6 +54,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [hasScrolledToHighlight, setHasScrolledToHighlight] = useState(false);
 
   // ── React Query data ──
   const activeFilters = {};
@@ -72,8 +73,9 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
 
-  // ── Update URL when filters change (but not on initial load) ──
+  // ── Update URL when filters change (after initial load) ──
   useEffect(() => {
+    // Skip on first load to avoid overwriting URL params
     if (isInitialLoad) {
       setIsInitialLoad(false);
       return;
@@ -194,9 +196,10 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     return ['All', ...Array.from(plats)];
   }, [templates, selectedCategory]);
 
-  // ── Handle slug highlight ──
+  // ── Handle slug highlight and scroll ──
   useEffect(() => {
     if (!highlightSlug || templates.length === 0) return;
+    if (hasScrolledToHighlight) return; // only scroll once
 
     if (highlightTimeoutRef.current) {
       clearTimeout(highlightTimeoutRef.current);
@@ -207,19 +210,24 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     if (!found) return;
 
     setHighlightedId(found.id);
-    highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 3000);
+    setHasScrolledToHighlight(true); // prevent repeated scrolls
+
+    // Delay to ensure DOM is ready
+    setTimeout(() => {
+      const el = document.getElementById(`template-${found.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Remove highlight after 3 seconds
+        highlightTimeoutRef.current = setTimeout(() => {
+          setHighlightedId(null);
+        }, 3000);
+      }
+    }, 300);
 
     return () => {
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
     };
-  }, [highlightSlug, templates]);
-
-  useEffect(() => {
-    if (highlightedId) {
-      const el = document.getElementById(`template-${highlightedId}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [highlightedId]);
+  }, [highlightSlug, templates, hasScrolledToHighlight]);
 
   // ── Handlers ──
   const handlePreview = useCallback((slug) => {
@@ -316,7 +324,6 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     })),
   };
 
-  // ── Active filter count ──
   const activeFilterCount = (selectedCategory ? 1 : 0) + (selectedPlatform ? 1 : 0);
 
   return (
@@ -336,19 +343,19 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 bg-slate-50/40 min-h-screen">
 
         {/* ─── COMPACT BANNER ─── */}
-        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-xl px-4 py-2.5 mb-4 text-white shadow-md flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-xl px-4 sm:px-6 py-3 mb-5 text-white shadow-md flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <span className="text-xl flex-shrink-0">🚀</span>
-            <div>
-              <h2 className="text-sm font-bold">Create Your Campaign</h2>
-              <p className="text-xs text-indigo-100 truncate max-w-md">Select template → Set tasks & share → Add redirect → Launch</p>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold truncate">Create Your Campaign</h2>
+              <p className="text-xs text-indigo-100 truncate hidden sm:block">Select template → Set tasks & share → Add redirect → Launch</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-1 flex-shrink-0">
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white">📋 Template</span>
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white">⚙️ Tasks</span>
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white">📤 Share</span>
-            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white">🔗 Redirect</span>
+            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">📋 Template</span>
+            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">⚙️ Tasks</span>
+            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">📤 Share</span>
+            <span className="text-[10px] bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full font-medium text-white whitespace-nowrap">🔗 Redirect</span>
           </div>
         </div>
 
@@ -776,16 +783,16 @@ function TemplateCard({ template, isHighlighted, onPreview, onUse, onCopy, getPl
 
           {/* ── One‑line row: plan + hashtag + reward ── */}
           <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-            <span className={`text-[8px] font-black ${isPro ? 'text-amber-600 bg-amber-50' : 'text-green-600 bg-green-50'} px-1.5 py-0.5 rounded`}>
+            <span className={`text-[9px] font-black ${isPro ? 'text-amber-600 bg-amber-50' : 'text-green-600 bg-green-50'} px-1.5 py-0.5 rounded`}>
               {planBadge}
             </span>
             {template.hashtags && template.hashtags.length > 0 ? (
-              <span className="text-[8px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded">
-                {template.hashtags[0]}
+              <span className="text-[9px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded">
+                #{template.hashtags[0]}
               </span>
             ) : null}
             {template.reward && (
-              <span className="text-[8px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                 🎁 {template.reward}
               </span>
             )}
