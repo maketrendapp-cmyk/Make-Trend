@@ -7,16 +7,16 @@ Allow: /
 # ── Sitemap location ──
 Sitemap: https://maketrend.app/sitemap.xml
 
-# ── Disallow sensitive / private paths (already handled by auth) ──
-# These are still blocked if not authenticated, but we exclude them from crawl anyway.
+# ── Disallow sensitive / private / dynamic paths ──
 Disallow: /profile
 Disallow: /stats
-Disallow: /support
 Disallow: /edit-profile
 Disallow: /change-password
 Disallow: /refer-earn
 Disallow: /campaign-created
 Disallow: /createcampaign
+Disallow: /share          # Dynamic – campaign share pages (not for search)
+Disallow: /tasks          # Dynamic – campaign task pages (not for search)
 Disallow: /api/
 Disallow: /_next/
 Disallow: /icons/
