@@ -188,7 +188,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
     {
       icon: <FaWhatsapp className="w-6 h-6" />,
       title: 'WhatsApp',
-      value: '+977 986-123-4567',
+      value: '+977 971-4501791',
       link: 'https://wa.me/9779861234567',
       color: 'bg-green-100 text-green-600 hover:bg-green-200',
     },
