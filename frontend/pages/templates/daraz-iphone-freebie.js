@@ -138,7 +138,7 @@ function IphoneFreebie({ campaign }) {
             <div className="logo-icon-bg">
               <FaApple className="w-5 h-5 text-white" />
             </div>
-            <span className="logo-text">Free<span>bie</span></span>
+            <span className="logo-text">Daraz<span>Freebie</span></span>
           </div>
           <div className="header-badge">
             <span className="pulse-dot"></span> <FaGift className="w-3 h-3" /> Live Giveaway
