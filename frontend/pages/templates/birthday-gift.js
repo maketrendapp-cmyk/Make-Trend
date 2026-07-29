@@ -24,7 +24,7 @@ const defaultMeta = {
   title: 'Birthday Gift – Claim Your Free Premium Reward!',
   description: 'Choose a free premium gift to claim. Choose from iPhone, MacBook, Watch, TV, and more!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/birthday-gift?id={id}',
+  url: 'https://maketrend.app/birthday-gift',
 };
 
 // ── Rewards Data ──
@@ -96,6 +96,14 @@ function BirthdayGift({ campaign }) {
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
 
+  // ── Clean URL if no id parameter is present ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
+
   // ── WebView detection ──
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -151,7 +159,7 @@ function BirthdayGift({ campaign }) {
 
   // ── Share handlers ──
   const handleShare = (platform) => {
-    const url = `${window.location.origin}/birthday-gift?id=${id || 'demo'}`;
+    const url = id ? `${window.location.origin}/birthday-gift?id=${id}` : `${window.location.origin}/birthday-gift`;
     const text = `🎂 Get your free ${selectedReward?.name || 'gift'} here:`;
     switch (platform) {
       case 'whatsapp':
@@ -763,7 +771,7 @@ function BirthdayGift({ campaign }) {
           cursor: pointer;
           transition: transform 0.2s;
         }
-        .share-row button:hover { transform: scale(1.15); }
+        .share-row button:hover { transform: scale(1.1); }
 
         .spinner {
           display: inline-block;
