@@ -148,11 +148,11 @@ function CampaignShare({ campaign: initialCampaign }) {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
-  // ── Build full share content (title + description + link) ──
+  // ── Build full content for clipboard ──
   const buildFullContent = () => {
     const title = campaign?.title || 'Check out this campaign!';
     const description = campaign?.description || 'Share to unlock rewards!';
-    const link = `${window.location.origin}/${templateSlug}/${id}`;
+    const link = getShareUrl();
     return `${title}\n\n${description}\n\nOpen The Link:\n${link}`;
   };
 
@@ -161,15 +161,12 @@ function CampaignShare({ campaign: initialCampaign }) {
     return `${window.location.origin}/${templateSlug}/${id}`;
   };
 
-  // ── Native Share (WITH full content) ──
+  // ── Native Share (ONLY URL – platform handles preview) ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
 
-    const fullText = buildFullContent();
     const shareData = {
-      title: campaign?.title || 'Check out this campaign!',
-      text: fullText,
       url: getShareUrl(),
     };
 
@@ -184,39 +181,9 @@ function CampaignShare({ campaign: initialCampaign }) {
         }
       }
     } else {
-      // Fallback: copy full content
+      // Fallback: copy full content for devices without native share
       copyFullContent();
     }
-  };
-
-  // ── Copy full content (title + description + link) ──
-  const copyFullContent = () => {
-    const fullText = buildFullContent();
-    navigator.clipboard
-      .writeText(fullText)
-      .then(() => {
-        setIsCopied(true);
-        setToastMessage('📋 Full details copied!');
-        setTimeout(() => {
-          setIsCopied(false);
-          setToastMessage('');
-        }, 3000);
-      })
-      .catch(() => {
-        // fallback
-        const textarea = document.createElement('textarea');
-        textarea.value = fullText;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        setIsCopied(true);
-        setToastMessage('📋 Full details copied!');
-        setTimeout(() => {
-          setIsCopied(false);
-          setToastMessage('');
-        }, 3000);
-      });
   };
 
   // ── Messenger share (ONLY URL) ──
@@ -237,6 +204,35 @@ function CampaignShare({ campaign: initialCampaign }) {
     const shareUrl = getShareUrl();
     window.open(`https://wa.me/?text=${encodeURIComponent(shareUrl)}`, '_blank');
     startVerification('share', 6);
+  };
+
+  // ── Copy full content to clipboard ──
+  const copyFullContent = () => {
+    const fullText = buildFullContent();
+    navigator.clipboard
+      .writeText(fullText)
+      .then(() => {
+        setIsCopied(true);
+        setToastMessage('📋 Full details copied!');
+        setTimeout(() => {
+          setIsCopied(false);
+          setToastMessage('');
+        }, 3000);
+      })
+      .catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = fullText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setIsCopied(true);
+        setToastMessage('📋 Full details copied!');
+        setTimeout(() => {
+          setIsCopied(false);
+          setToastMessage('');
+        }, 3000);
+      });
   };
 
   const startVerification = (type, duration) => {
@@ -513,7 +509,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               </button>
             </div>
 
-            {/* ── Main Native Share Button (WITH full content) ── */}
+            {/* ── Main Native Share Button (ONLY URL) ── */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -534,7 +530,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               <FaArrowRight className="w-4 h-4" />
             </motion.button>
 
-            {/* ── Copy Full Content ── */}
+            {/* ── Copy Full Details ── */}
             <div className="relative z-10 mt-3 flex items-center justify-center gap-2 text-sm">
               <span className="text-gray-400">or</span>
               <button
