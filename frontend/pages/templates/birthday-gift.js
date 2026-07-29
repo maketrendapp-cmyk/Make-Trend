@@ -1,4 +1,3 @@
-
 // pages/templates/birthday-gift.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
@@ -190,9 +189,25 @@ function BirthdayGift({ campaign }) {
         window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
         break;
       default:
-        navigator.clipboard?.writeText(url);
+        const copyText = `${text} ${url}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(copyText).catch(() => {
+            fallbackCopy(copyText);
+          });
+        } else {
+          fallbackCopy(copyText);
+        }
         alert('🔗 Referral link copied to clipboard!');
     }
+  };
+
+  const fallbackCopy = (text) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
   };
 
   const goBack = () => setStep(1);
@@ -212,8 +227,14 @@ function BirthdayGift({ campaign }) {
             <button
               className="modal-btn ghost"
               onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
-                alert('Link copied! Open Chrome or Safari.');
+                const copyText = window.location.href;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  navigator.clipboard.writeText(copyText).catch(() => {
+                    fallbackCopy(copyText);
+                  });
+                } else {
+                  fallbackCopy(copyText);
+                }
                 setShowWebViewModal(false);
               }}
             >
@@ -686,6 +707,9 @@ function BirthdayGift({ campaign }) {
           .rewards-grid { grid-template-columns: 1fr; }
           .hero h1 { font-size: 2.2rem; }
           .trust-badges { flex-direction: column; gap: 0.5rem; align-items: center; }
+          .form-card { padding: 1.5rem 1rem; }
+          .gift-card { padding: 1.5rem 1rem; }
+          .gift-image-container { width: 140px; height: 140px; }
         }
       `}} />
     </div>
