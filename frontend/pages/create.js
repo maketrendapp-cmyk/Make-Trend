@@ -59,29 +59,22 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
 
   // ── Determine if we have filters ──
   const hasFilters = searchQuery.trim() || selectedCategory || selectedPlatform;
-  
-  // ── Build active filters object ──
-  const activeFilters = {};
-  if (selectedCategory) activeFilters.category = selectedCategory;
-  if (selectedPlatform) activeFilters.platform = selectedPlatform;
 
-  // ── ⭐ KEY FIX: Only pass initialData when NO filters are applied ──
-  // When filters are applied, let the hook fetch fresh data from API
-  const shouldUseInitialData = !hasFilters;
-  
+  // ── ⭐ FIX: ALWAYS use initialData (no API calls for filtering) ──
+  // Filters are applied client-side on the already-loaded data
   const { data: templates = [], isLoading: templatesLoading } = useTemplates(
-    activeFilters,
-    shouldUseInitialData ? initialTemplates : null
+    {}, // No filters passed to API – fetch all data once
+    initialTemplates // Always use initial data
   );
   
   const { data: featuredTemplates = [], isLoading: featuredLoading } = useFeaturedTemplates(
-    activeFilters,
-    shouldUseInitialData ? initialFeaturedTemplates : null
+    {},
+    initialFeaturedTemplates
   );
 
   const isLoading = templatesLoading || featuredLoading;
 
-  // ── Update URL when filters change (after initial load) ──
+  // ── Update URL when filters change ──
   useEffect(() => {
     const params = new URLSearchParams();
     if (searchQuery) params.set('search', searchQuery);
@@ -94,7 +87,7 @@ export default function Create({ initialTemplates, initialFeaturedTemplates }) {
     }
   }, [searchQuery, selectedCategory, selectedPlatform]);
 
-  // ── Apply search & filters ──
+  // ── Apply search & filters (client-side) ──
   const filteredAll = useMemo(() => {
     let filtered = [...templates];
     if (searchQuery.trim()) {
