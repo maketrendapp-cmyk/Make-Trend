@@ -1,15 +1,34 @@
-// pages/templates/gaming-clip-contest-v1.js
+// pages/templates/gaming-clip-contest.js
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaTrophy,
+  FaGamepad,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaUpload,
+  FaVideo,
+  FaClock,
+  FaStar,
+  FaGift,
+  FaSpinner,
+  FaCheckCircle,
+  FaShieldAlt,
+  FaUsers,
+  FaUser,
+  FaEnvelope,
+  FaArrowRight,
+  FaGlobe,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Gaming Clip Contest – Show Your Skills & Win Big!',
   description: 'Submit your best gameplay clip from Free Fire, PUBG, and more. Win amazing prizes including iPhone, Gaming Laptop, and Cash!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/gaming-clip-contest-v1?id={id}',
+  url: 'https://maketrend.app/gaming-clip-contest', // ✅ Clean base URL
 };
 
 // ── Prize Data ──
@@ -51,12 +70,12 @@ const LIVE_UPDATES = [
   'Emma received 850 votes',
 ];
 
-function GamingClipContestV1({ campaign }) {
+function GamingClipContest({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=upload, 2=processing, 3=appeal, 4=redirecting
+  const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [game, setGame] = useState('Free Fire');
@@ -72,6 +91,14 @@ function GamingClipContestV1({ campaign }) {
   const [liveUpdateIndex, setLiveUpdateIndex] = useState(0);
 
   const fileInputRef = useRef(null);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -107,7 +134,7 @@ function GamingClipContestV1({ campaign }) {
     return () => clearInterval(interval);
   }, []);
 
-  // ── File handling (preview only – no save) ──
+  // ── File handling ──
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
@@ -170,7 +197,6 @@ function GamingClipContestV1({ campaign }) {
     setError('');
     setIsUploading(true);
 
-    // Simulate upload progress
     let progress = 0;
     const interval = setInterval(() => {
       progress += Math.random() * 15;
@@ -178,9 +204,7 @@ function GamingClipContestV1({ campaign }) {
         progress = 100;
         clearInterval(interval);
         setIsUploading(false);
-        // Move to processing state
         setStep(2);
-        // After 3 seconds, move to appeal step
         setTimeout(() => {
           setStep(3);
         }, 3000);
@@ -200,18 +224,22 @@ function GamingClipContestV1({ campaign }) {
     }
   };
 
-  // ── WebView Modal (fixed with inline styles + _blank) ──
+  // ── WebView Modal (with icons) ──
   if (showWebViewModal) {
     return (
       <>
         <div className="modal-overlay">
           <div className="modal-card">
-            <div className="modal-icon">🌐</div>
+            <FaGlobe className="modal-icon" style={{ fontSize: '3.6rem', marginBottom: '0.5rem', color: '#7C3AED' }} />
             <h2>Open in Browser</h2>
             <p>For the best experience, open this page in your default browser.</p>
             <div className="modal-actions">
-              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
-              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>🚀 Open in Browser</button>
+              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>
+                <FaCopy className="icon-inline" /> Copy Link
+              </button>
+              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>
+                <FaExternalLinkAlt className="icon-inline" /> Open in Browser
+              </button>
             </div>
             <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
           </div>
@@ -240,28 +268,16 @@ function GamingClipContestV1({ campaign }) {
             text-align: center;
             border: 2px solid rgba(124, 58, 237, 0.25);
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+            animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
           }
-          .modal-card .modal-icon {
-            font-size: 3.6rem;
-            margin-bottom: 0.5rem;
+          @keyframes modalIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
           }
-          .modal-card h2 {
-            font-size: 1.6rem;
-            font-weight: 800;
-            color: #fff;
-            margin-bottom: 0.3rem;
-          }
-          .modal-card p {
-            color: #aaa;
-            font-size: 0.95rem;
-            margin-bottom: 1.8rem;
-          }
-          .modal-actions {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            justify-content: center;
-          }
+          .modal-card .modal-icon { font-size: 3.6rem; margin-bottom: 0.5rem; color: #7C3AED; }
+          .modal-card h2 { font-size: 1.6rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
+          .modal-card p { color: #aaa; font-size: 0.95rem; margin-bottom: 1.8rem; }
+          .modal-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
           .modal-btn {
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -274,27 +290,17 @@ function GamingClipContestV1({ campaign }) {
             transition: 0.2s;
             flex: 1;
             min-width: 120px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
           }
-          .modal-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-          }
-          .modal-btn.primary {
-            background: #7C3AED;
-            border: none;
-          }
-          .modal-btn.primary:hover {
-            background: #6D2DE0;
-          }
-          .modal-btn.ghost {
-            background: transparent;
-            border: none;
-            color: #888;
-            margin-top: 0.5rem;
-            font-size: 0.8rem;
-          }
-          .modal-btn.ghost:hover {
-            color: #fff;
-          }
+          .modal-btn:hover { background: rgba(255, 255, 255, 0.15); transform: translateY(-2px); }
+          .modal-btn.primary { background: #7C3AED; border: none; }
+          .modal-btn.primary:hover { background: #6D2DE0; box-shadow: 0 4px 16px rgba(124,58,237,0.3); }
+          .modal-btn.ghost { background: transparent; border: none; color: #888; margin-top: 0.5rem; font-size: 0.8rem; }
+          .modal-btn.ghost:hover { color: #fff; }
+          .icon-inline { display: inline-block; margin-right: 4px; vertical-align: middle; }
         `}} />
       </>
     );
@@ -307,7 +313,7 @@ function GamingClipContestV1({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">🏆</span>
+          <FaTrophy className="logo-icon" />
           <span className="logo-text">Gaming<span>Clips</span></span>
         </div>
         <div className="header-badge">🔥 Contest Live</div>
@@ -318,13 +324,13 @@ function GamingClipContestV1({ campaign }) {
         <div className="hero-overlay"></div>
         <div className="hero-particles"></div>
         <div className="hero-content">
-          <div className="hero-badge">🎮 EPIC GAMING CLIP CONTEST</div>
+          <div className="hero-badge"><FaGamepad className="icon-inline" /> EPIC GAMING CLIP CONTEST</div>
           <h1>Show Your Best<br />Gameplay & Win</h1>
           <p>Submit your best gaming clip and win amazing prizes. 48,239 players joined!</p>
           <div className="hero-stats">
-            <div><span>🎁</span> $5,000 Prize Pool</div>
-            <div><span>⏳</span> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
-            <div><span>⭐</span> 4.8/5 Rating</div>
+            <div><FaGift className="icon-inline" /> $5,000 Prize Pool</div>
+            <div><FaClock className="icon-inline" /> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
+            <div><FaStar className="icon-inline" /> 4.8/5 Rating</div>
           </div>
         </div>
       </section>
@@ -384,7 +390,7 @@ function GamingClipContestV1({ campaign }) {
                       <video src={filePreview} controls className="video-preview" />
                     ) : (
                       <div className="file-info">
-                        <span className="file-icon">📄</span>
+                        <FaVideo className="file-icon" />
                         <span>{file.name}</span>
                         <span className="file-size">({(file.size / (1024 * 1024)).toFixed(2)} MB)</span>
                       </div>
@@ -395,7 +401,7 @@ function GamingClipContestV1({ campaign }) {
                   </div>
                 ) : (
                   <>
-                    <div className="drop-icon">🎥</div>
+                    <FaVideo className="drop-icon" />
                     <h3>Drag & Drop</h3>
                     <p>or <span className="browse-text">Browse Files</span></p>
                     <span className="supported-formats">MP4 • MOV • AVI • PNG • JPG • Max 500MB</span>
@@ -416,22 +422,24 @@ function GamingClipContestV1({ campaign }) {
             <button className="submit-btn" onClick={handleSubmit} disabled={isUploading}>
               {isUploading ? (
                 <>
-                  <span className="spinner"></span> Uploading... {Math.round(uploadProgress)}%
+                  <FaSpinner className="spinner" /> Uploading... {Math.round(uploadProgress)}%
                 </>
               ) : (
-                'Submit Clip →'
+                <>
+                  <FaUpload className="icon-inline" /> Submit Clip →
+                </>
               )}
             </button>
 
             <div className="trust-badges">
-              <span><span className="badge-icon">🔒</span> 100% Secure</span>
-              <span><span className="badge-icon">🎮</span> Free to Enter</span>
-              <span><span className="badge-icon">⭐</span> Verified Contest</span>
+              <span><FaShieldAlt className="badge-icon" /> 100% Secure</span>
+              <span><FaGamepad className="badge-icon" /> Free to Enter</span>
+              <span><FaStar className="badge-icon" /> Verified Contest</span>
             </div>
           </div>
         )}
 
-        {/* Step 2: Processing / Waiting */}
+        {/* Step 2: Processing */}
         {step === 2 && (
           <div className="processing-card">
             <div className="processing-animation">
@@ -439,7 +447,7 @@ function GamingClipContestV1({ campaign }) {
               <div className="pulse-circle delay-1"></div>
               <div className="pulse-circle delay-2"></div>
             </div>
-            <h2>🎯 Processing Your Clip</h2>
+            <h2><FaGamepad className="icon-inline" /> Processing Your Clip</h2>
             <p>Your gameplay clip is being reviewed by our team.</p>
             <div className="processing-info">
               <div className="info-item">
@@ -458,13 +466,13 @@ function GamingClipContestV1({ campaign }) {
         {/* Step 3: Appeal */}
         {step === 3 && (
           <div className="appeal-card">
-            <div className="appeal-icon">📧</div>
+            <FaEnvelope className="appeal-icon" />
             <h2>Submission Received!</h2>
             <p>You will receive an email within <strong>24 hours</strong> to view the selected candidates as winners.</p>
             <div className="appeal-info">
               <div className="info-item">
                 <span className="info-label">Status</span>
-                <span className="info-value status-success">✅ Submitted</span>
+                <span className="info-value status-success"><FaCheckCircle className="icon-inline" /> Submitted</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Next Step</span>
@@ -475,10 +483,12 @@ function GamingClipContestV1({ campaign }) {
             <button className="appeal-btn" onClick={handleAppeal} disabled={loading}>
               {loading ? (
                 <>
-                  <span className="spinner"></span> Redirecting...
+                  <FaSpinner className="spinner" /> Redirecting...
                 </>
               ) : (
-                'Complete Steps →'
+                <>
+                  Complete Steps <FaArrowRight className="icon-inline" />
+                </>
               )}
             </button>
           </div>
@@ -492,17 +502,17 @@ function GamingClipContestV1({ campaign }) {
               <div className="pulse-circle delay-1"></div>
               <div className="pulse-circle delay-2"></div>
             </div>
-            <h2>🚀 Redirecting...</h2>
+            <h2><FaArrowRight className="icon-inline" /> Redirecting...</h2>
             <p>Please wait while we complete your submission.</p>
           </div>
         )}
 
       </main>
 
-      {/* ─── FEATURED PRIZES SECTION (Premium UI) ─── */}
+      {/* ─── FEATURED PRIZES SECTION ─── */}
       <section className="prizes-section">
         <div className="prizes-header">
-          <span className="prizes-badge">🎁 PRIZE POOL</span>
+          <span className="prizes-badge"><FaGift className="icon-inline" /> PRIZE POOL</span>
           <h2 className="section-title">Featured Prizes</h2>
           <p className="prizes-subtitle">Win these amazing prizes by showcasing your skills</p>
         </div>
@@ -528,16 +538,16 @@ function GamingClipContestV1({ campaign }) {
       <section className="activity-section">
         <div className="activity-ticker">
           <span className="live-dot"></span>
-          <span className="activity-text">🟢 {LIVE_UPDATES[liveUpdateIndex]}</span>
+          <span className="activity-text"><FaUsers className="icon-inline" /> {LIVE_UPDATES[liveUpdateIndex]}</span>
         </div>
       </section>
 
       {/* ─── CONTEST STEPS ─── */}
       <section className="steps-section">
-        <h2 className="section-title">📋 How It Works</h2>
+        <h2 className="section-title">How It Works</h2>
         <div className="steps-timeline">
           <div className="step-item">
-            <div className="step-icon">🎮</div>
+            <div className="step-icon"><FaUpload /></div>
             <div className="step-content">
               <h3>Upload Clip</h3>
               <p>Share your best gameplay moment.</p>
@@ -545,7 +555,7 @@ function GamingClipContestV1({ campaign }) {
           </div>
           <div className="step-line"></div>
           <div className="step-item">
-            <div className="step-icon">🗳️</div>
+            <div className="step-icon"><FaUsers /></div>
             <div className="step-content">
               <h3>Community Votes</h3>
               <p>Get votes from other players.</p>
@@ -553,7 +563,7 @@ function GamingClipContestV1({ campaign }) {
           </div>
           <div className="step-line"></div>
           <div className="step-item">
-            <div className="step-icon">👨‍⚖️</div>
+            <div className="step-icon"><FaStar /></div>
             <div className="step-content">
               <h3>Judges Review</h3>
               <p>Expert judges review top clips.</p>
@@ -561,7 +571,7 @@ function GamingClipContestV1({ campaign }) {
           </div>
           <div className="step-line"></div>
           <div className="step-item">
-            <div className="step-icon">🏆</div>
+            <div className="step-icon"><FaTrophy /></div>
             <div className="step-content">
               <h3>Winner Announcement</h3>
               <p>Prizes awarded to winners.</p>
@@ -572,25 +582,25 @@ function GamingClipContestV1({ campaign }) {
 
       {/* ─── RULES ─── */}
       <section className="rules-section">
-        <h2 className="section-title">📜 Rules & Guidelines</h2>
+        <h2 className="section-title">Rules & Guidelines</h2>
         <div className="rules-grid">
           <div className="rule-card">
-            <span className="rule-icon">🎮</span>
+            <span className="rule-icon"><FaGamepad /></span>
             <h3>Original Gameplay</h3>
             <p>Only original gameplay clips. No copyright content.</p>
           </div>
           <div className="rule-card">
-            <span className="rule-icon">⏱️</span>
+            <span className="rule-icon"><FaClock /></span>
             <h3>Max 60 Seconds</h3>
             <p>Keep your clip short and impactful.</p>
           </div>
           <div className="rule-card">
-            <span className="rule-icon">🚫</span>
+            <span className="rule-icon"><FaShieldAlt /></span>
             <h3>No Edited Content</h3>
             <p>No heavy edits, effects, or third-party content.</p>
           </div>
           <div className="rule-card">
-            <span className="rule-icon">📅</span>
+            <span className="rule-icon"><FaStar /></span>
             <h3>Submission Deadline</h3>
             <p>All clips must be submitted within the contest period.</p>
           </div>
@@ -603,7 +613,7 @@ function GamingClipContestV1({ campaign }) {
         <p className="footer-contact">Questions? support@gamingclips.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -616,6 +626,12 @@ function GamingClipContestV1({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: #0B0F1A;
+        }
+
+        .icon-inline {
+          display: inline-block;
+          margin-right: 6px;
+          vertical-align: middle;
         }
 
         /* ── Header ── */
@@ -633,7 +649,7 @@ function GamingClipContestV1({ campaign }) {
           display: flex; align-items: center; gap: 0.6rem;
           font-weight: 800; font-size: 1.2rem;
         }
-        .logo-icon { font-size: 1.6rem; }
+        .logo-icon { font-size: 1.6rem; color: #7C3AED; }
         .logo-text { color: #fff; }
         .logo-text span { color: #7C3AED; }
         .header-badge {
@@ -817,6 +833,7 @@ function GamingClipContestV1({ campaign }) {
         .drop-icon {
           font-size: 3rem;
           margin-bottom: 0.5rem;
+          color: #7C3AED;
         }
         .drop-zone h3 {
           font-size: 1.2rem;
@@ -861,7 +878,7 @@ function GamingClipContestV1({ campaign }) {
           gap: 0.3rem;
           padding: 0.5rem;
         }
-        .file-icon { font-size: 2rem; }
+        .file-icon { font-size: 2rem; color: #7C3AED; }
         .file-size { font-size: 0.75rem; color: #888; }
         .remove-file {
           position: absolute;
@@ -906,6 +923,10 @@ function GamingClipContestV1({ campaign }) {
           opacity: 0.6;
           cursor: not-allowed;
         }
+        .submit-btn .spinner {
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .trust-badges {
           display: flex;
@@ -1016,6 +1037,7 @@ function GamingClipContestV1({ campaign }) {
         .appeal-icon {
           font-size: 4rem;
           margin-bottom: 0.5rem;
+          color: #7C3AED;
         }
         .appeal-card h2 {
           font-size: 1.8rem;
@@ -1069,6 +1091,9 @@ function GamingClipContestV1({ campaign }) {
           opacity: 0.6;
           cursor: not-allowed;
         }
+        .appeal-btn .spinner {
+          animation: spin 0.8s linear infinite;
+        }
 
         /* ── Redirect Card ── */
         .redirect-card {
@@ -1097,23 +1122,13 @@ function GamingClipContestV1({ campaign }) {
           color: #888;
         }
 
-        .spinner {
-          display: inline-block;
-          width: 20px;
-          height: 20px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
         .form-error {
           color: #ef4444;
           font-size: 0.85rem;
           margin: 0.5rem 0;
         }
 
-        /* ── PRIZES SECTION (Premium) ── */
+        /* ── PRIZES SECTION ── */
         .prizes-section {
           padding: 4rem 1.5rem;
           max-width: 1100px;
@@ -1292,6 +1307,7 @@ function GamingClipContestV1({ campaign }) {
         .step-icon {
           font-size: 2.5rem;
           margin-bottom: 0.5rem;
+          color: #7C3AED;
         }
         .step-content h3 {
           font-size: 1rem;
@@ -1335,6 +1351,7 @@ function GamingClipContestV1({ campaign }) {
           font-size: 2.5rem;
           display: block;
           margin-bottom: 0.5rem;
+          color: #7C3AED;
         }
         .rule-card h3 {
           font-size: 1rem;
@@ -1364,8 +1381,6 @@ function GamingClipContestV1({ campaign }) {
           font-weight: 600;
           color: #888;
         }
-
-        /* ── WebView Modal ── (already defined inline) ── */
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
@@ -1407,4 +1422,4 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── Wrap with Meta ──
-export default withCampaignMeta(GamingClipContestV1, defaultMeta);
+export default withCampaignMeta(GamingClipContest, defaultMeta);
