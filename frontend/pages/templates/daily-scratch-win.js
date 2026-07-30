@@ -94,12 +94,13 @@ function DailyScratchWin({ campaign }) {
   // ── Scratch card canvas ──
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !moneyImage) return;
 
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
+    // Set canvas size with proper scaling
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
@@ -516,8 +517,7 @@ function DailyScratchWin({ campaign }) {
         .logo-text { color: #1e293b; }
         .logo-text span { color: #8B5CF6; }
         .header-badge {
-          display: flex;
-          align-items: center; gap: 0.4rem;
+          display: flex; align-items: center; gap: 0.4rem;
           background: linear-gradient(135deg, #8B5CF6, #EC4899);
           color: #fff;
           font-weight: 700;
