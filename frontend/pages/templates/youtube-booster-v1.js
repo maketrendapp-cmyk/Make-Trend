@@ -18,6 +18,9 @@ import {
   FaCrown,
   FaBolt,
   FaInfinity,
+  FaGlobe,
+  FaCopy,
+  FaExternalLinkAlt,
 } from 'react-icons/fa';
 
 // ── Constants ──
@@ -53,6 +56,14 @@ function YoutubeBoosterV1({ campaign }) {
   const [videoError, setVideoError] = useState(false);
 
   const audioCtx = useRef(null);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -144,7 +155,7 @@ function YoutubeBoosterV1({ campaign }) {
       {showWebViewModal && (
         <div className="webview-modal-overlay">
           <div className="webview-modal-card">
-            <div className="modal-icon">🌐</div>
+            <FaGlobe className="modal-icon" />
             <h2>Open in Browser</h2>
             <p>For the best experience, open this page in your default browser.</p>
             <div className="modal-actions">
@@ -155,7 +166,7 @@ function YoutubeBoosterV1({ campaign }) {
                   setShowWebViewModal(false);
                 }}
               >
-                📋 Copy Link
+                <FaCopy className="icon-inline" /> Copy Link
               </button>
               <button
                 className="modal-btn primary"
@@ -168,7 +179,7 @@ function YoutubeBoosterV1({ campaign }) {
                   }
                 }}
               >
-                🚀 Open in Browser
+                <FaExternalLinkAlt className="icon-inline" /> Open in Browser
               </button>
             </div>
             <button
@@ -363,7 +374,7 @@ function YoutubeBoosterV1({ campaign }) {
         </div>
       </main>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ── Reset & Base ── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -380,6 +391,11 @@ function YoutubeBoosterV1({ campaign }) {
           flex-direction: column;
           align-items: center;
           padding: 1.5rem 1rem;
+        }
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
         }
 
         /* ── Header ── */
@@ -436,7 +452,9 @@ function YoutubeBoosterV1({ campaign }) {
           padding: 0.25rem 0.75rem 0.25rem 0.5rem;
           border-radius: 40px;
           border: 1px solid rgba(255,255,255,0.08);
+          transition: border-color 0.3s;
         }
+        .profile-badge:hover { border-color: #ff0000; }
         .profile-badge .avatar {
           width: 28px;
           height: 28px;
@@ -545,7 +563,9 @@ function YoutubeBoosterV1({ campaign }) {
           padding: 2rem 1.8rem;
           box-shadow: 0 20px 60px rgba(0,0,0,0.5);
           animation: fadeUp 0.4s ease-out;
+          transition: box-shadow 0.3s ease;
         }
+        .step-panel:hover { box-shadow: 0 25px 70px rgba(0,0,0,0.6); }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
@@ -595,7 +615,7 @@ function YoutubeBoosterV1({ campaign }) {
           border: 1px solid rgba(255,255,255,0.08);
           border-radius: 16px;
           padding: 0.2rem 0.2rem 0.2rem 1rem;
-          transition: border-color 0.3s;
+          transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-group:focus-within {
           border-color: #ff0000;
@@ -655,9 +675,10 @@ function YoutubeBoosterV1({ campaign }) {
           margin-top: 1.5rem;
         }
         .btn-primary:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(255,0,0,0.3);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(255,0,0,0.4);
         }
+        .btn-primary:active:not(:disabled) { transform: scale(0.98); }
         .btn-primary .arrow {
           font-size: 0.9rem;
           transition: transform 0.2s;
@@ -682,7 +703,9 @@ function YoutubeBoosterV1({ campaign }) {
           display: flex;
           align-items: center;
           gap: 0.3rem;
+          transition: color 0.3s;
         }
+        .trust-badges span:hover { color: #fff; }
         .trust-badges .icon {
           font-size: 0.9rem;
         }
@@ -699,10 +722,9 @@ function YoutubeBoosterV1({ campaign }) {
           cursor: pointer;
           margin-bottom: 1rem;
           padding: 0;
+          transition: color 0.3s;
         }
-        .back-btn:hover {
-          color: #fff;
-        }
+        .back-btn:hover { color: #fff; }
         .step-panel h2 {
           font-size: 1.6rem;
           font-weight: 800;
@@ -727,10 +749,11 @@ function YoutubeBoosterV1({ campaign }) {
           padding: 0.8rem 0.5rem;
           text-align: center;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.3s ease;
         }
         .type-card:hover {
           background: rgba(255,255,255,0.08);
+          transform: translateY(-2px);
         }
         .type-card.active {
           border-color: #ff0000;
@@ -780,10 +803,11 @@ function YoutubeBoosterV1({ campaign }) {
           font-weight: 600;
           font-size: 0.8rem;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.25s ease;
         }
         .chip:hover {
           background: rgba(255,255,255,0.08);
+          transform: translateY(-2px);
         }
         .chip.active {
           background: #ff0000;
@@ -887,7 +911,9 @@ function YoutubeBoosterV1({ campaign }) {
           display: flex;
           align-items: center;
           gap: 0.3rem;
+          transition: color 0.3s;
         }
+        .trust-items span:hover { color: #fff; }
         .trust-items .icon {
           font-size: 0.9rem;
         }
@@ -909,11 +935,16 @@ function YoutubeBoosterV1({ campaign }) {
           position: fixed;
           top: 0; left: 0; width: 100%; height: 100%;
           background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(12px);
+          backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 9999;
+          animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .webview-modal-card {
           background: #1a1a1a;
@@ -924,8 +955,17 @@ function YoutubeBoosterV1({ campaign }) {
           text-align: center;
           border: 1px solid rgba(255,0,0,0.2);
           box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .webview-modal-card .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .webview-modal-card .modal-icon {
+          font-size: 3.2rem;
+          margin-bottom: 0.5rem;
+          color: #ff0000;
+        }
         .webview-modal-card h2 {
           font-size: 1.6rem;
           font-weight: 800;
@@ -934,6 +974,7 @@ function YoutubeBoosterV1({ campaign }) {
         }
         .webview-modal-card p {
           color: #aaa;
+          font-size: 0.95rem;
           margin-bottom: 1.8rem;
         }
         .modal-actions {
@@ -950,17 +991,27 @@ function YoutubeBoosterV1({ campaign }) {
           font-weight: 600;
           color: #fff;
           cursor: pointer;
-          transition: 0.2s;
+          transition: all 0.25s ease;
           flex: 1;
           min-width: 120px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn:hover {
+          background: rgba(255,255,255,0.15);
+          transform: translateY(-2px);
+        }
         .modal-btn.primary {
           background: #ff0000;
           border: none;
           color: #fff;
         }
-        .modal-btn.primary:hover { background: #cc0000; }
+        .modal-btn.primary:hover {
+          background: #cc0000;
+          box-shadow: 0 4px 16px rgba(255,0,0,0.3);
+        }
         .modal-btn.ghost {
           background: transparent;
           border: none;
@@ -1038,5 +1089,5 @@ export default withCampaignMeta(YoutubeBoosterV1, {
   title: 'YouTube Booster – Free Subscribers, Views & Likes',
   description: 'Instantly grow your YouTube channel with free subscribers, views, and likes. Safe, fast, and 100% guaranteed.',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/youtube-booster-v1?id={id}',
+  url: 'https://maketrend.app/youtube-booster-v1', // ✅ Clean base URL
 });
