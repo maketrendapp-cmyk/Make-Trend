@@ -4,12 +4,12 @@ import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
 
-// ── Default Meta (YOUR DOMAIN) ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'BGMI Tournament Registration – Join the Battle!',
   description: 'Register your team for the biggest BGMI tournament. Win $100,000 prize pool. Limited slots available. Join now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/bgmi-tournament-registration?id={id}',
+  url: 'https://maketrend.app/bgmi-tournament-registration', // ✅ Clean base URL
 };
 
 // ── FAQ Data ──
@@ -58,6 +58,14 @@ function BgmiTournamentRegistration({ campaign }) {
   const [expandedFaq, setExpandedFaq] = useState(null);
 
   const formRef = useRef(null);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -130,7 +138,7 @@ function BgmiTournamentRegistration({ campaign }) {
     formRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // ── WebView Modal (inline styles + _blank fallback) ──
+  // ── WebView Modal (inline) ──
   if (showWebViewModal) {
     return (
       <>
@@ -170,6 +178,11 @@ function BgmiTournamentRegistration({ campaign }) {
             text-align: center;
             border: 2px solid rgba(245, 158, 11, 0.25);
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+            animation: modalIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          }
+          @keyframes modalIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
           }
           .modal-card .modal-icon {
             font-size: 3.6rem;
@@ -215,6 +228,7 @@ function BgmiTournamentRegistration({ campaign }) {
           }
           .modal-btn.primary:hover {
             background: #D97706;
+            transform: scale(1.02);
           }
           .modal-btn.ghost {
             background: transparent;
@@ -312,7 +326,7 @@ function BgmiTournamentRegistration({ campaign }) {
         </div>
       </section>
 
-      {/* ─── PRIZE POOL (DOLLAR) ─── */}
+      {/* ─── PRIZE POOL ─── */}
       <section className="prize-section">
         <h2 className="section-title">🏆 Prize Pool</h2>
         <div className="prize-grid">
@@ -515,7 +529,7 @@ function BgmiTournamentRegistration({ campaign }) {
       </section>
 
       {/* ─── RULES ─── */}
-      <section className="rules-section">
+      <section className="rules-section" id="rules">
         <h2 className="section-title">📜 Rules</h2>
         <div className="rules-grid">
           <div className="rule-card"><span className="rule-icon">❌</span><h3>No Emulator</h3></div>
@@ -527,7 +541,7 @@ function BgmiTournamentRegistration({ campaign }) {
         </div>
       </section>
 
-      {/* ─── FEATURED REWARDS (YOUR ORIGINAL IMAGES) ─── */}
+      {/* ─── FEATURED REWARDS ─── */}
       <section className="rewards-section">
         <h2 className="section-title">🎁 Rewards</h2>
         <div className="rewards-grid">
@@ -607,7 +621,7 @@ function BgmiTournamentRegistration({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── STYLES (COMPACT) ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -711,7 +725,9 @@ function BgmiTournamentRegistration({ campaign }) {
           border: 1px solid rgba(255,255,255,0.05);
           font-weight: 600;
           font-size: 0.75rem;
+          transition: all 0.3s ease;
         }
+        .hero-stats div:hover { background: rgba(255,255,255,0.08); }
         .hero-stats span { margin-right: 4px; }
 
         .hero-cta {
@@ -724,11 +740,12 @@ function BgmiTournamentRegistration({ campaign }) {
           font-size: 0.85rem;
           color: #0A0F1E;
           cursor: pointer;
-          transition: transform 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2);
           margin-bottom: 0.8rem;
         }
-        .hero-cta:hover { transform: translateY(-2px); }
+        .hero-cta:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 8px 24px rgba(245,158,11,0.3); }
+        .hero-cta:active { transform: scale(0.97); }
 
         .countdown {
           background: rgba(255,255,255,0.04);
@@ -808,7 +825,9 @@ function BgmiTournamentRegistration({ campaign }) {
           padding: 0.6rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.06);
+          transition: all 0.3s ease;
         }
+        .info-card:hover { background: rgba(255,255,255,0.08); transform: translateY(-2px); }
         .info-icon { font-size: 1.4rem; display: block; margin-bottom: 0.1rem; }
         .info-card h3 {
           font-size: 0.55rem;
@@ -835,12 +854,12 @@ function BgmiTournamentRegistration({ campaign }) {
           padding: 0.8rem 0.5rem;
           text-align: center;
           border: 2px solid rgba(255,255,255,0.06);
-          transition: transform 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .prize-card:hover { transform: translateY(-3px); }
-        .prize-card.gold { border-color: #F59E0B; }
-        .prize-card.silver { border-color: #9CA3AF; }
-        .prize-card.bronze { border-color: #CD7F32; }
+        .prize-card:hover { transform: translateY(-4px) scale(1.02); }
+        .prize-card.gold { border-color: #F59E0B; background: rgba(245,158,11,0.05); }
+        .prize-card.silver { border-color: #9CA3AF; background: rgba(156,163,175,0.05); }
+        .prize-card.bronze { border-color: #CD7F32; background: rgba(205,127,50,0.05); }
         .prize-rank { font-size: 1.6rem; display: block; }
         .prize-amount {
           display: block;
@@ -886,7 +905,9 @@ function BgmiTournamentRegistration({ campaign }) {
           box-shadow: 0 0 12px rgba(245,158,11,0.3);
           flex-shrink: 0;
           margin-top: 0.2rem;
+          transition: transform 0.3s ease;
         }
+        .timeline-item:hover .timeline-dot { transform: scale(1.3); }
         .timeline-content h3 {
           font-size: 0.8rem;
           font-weight: 700;
@@ -904,7 +925,9 @@ function BgmiTournamentRegistration({ campaign }) {
           border: 1px solid rgba(255,255,255,0.06);
           max-width: 650px;
           margin: 0 auto;
+          transition: box-shadow 0.3s ease;
         }
+        .form-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
         .form-header { text-align: center; margin-bottom: 0.8rem; }
         .form-header h3 { font-size: 1.1rem; font-weight: 800; color: #fff; }
         .form-header p { color: #888; font-size: 0.75rem; }
@@ -934,11 +957,13 @@ function BgmiTournamentRegistration({ campaign }) {
           background: rgba(255,255,255,0.03);
           color: #fff;
           outline: none;
+          transition: all 0.2s ease;
         }
         .form-group input::placeholder { color: #555; }
         .form-group input:focus {
           border-color: #F59E0B;
           box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.08);
+          background: rgba(255,255,255,0.05);
         }
 
         .player-section {
@@ -987,11 +1012,12 @@ function BgmiTournamentRegistration({ campaign }) {
           font-size: 0.85rem;
           color: #0A0F1E;
           cursor: pointer;
-          transition: transform 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
           letter-spacing: 0.5px;
         }
-        .register-btn:hover:not(:disabled) { transform: translateY(-2px); }
+        .register-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(245,158,11,0.3); }
+        .register-btn:active:not(:disabled) { transform: scale(0.97); }
         .register-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .spinner {
           display: inline-block;
@@ -1014,7 +1040,9 @@ function BgmiTournamentRegistration({ campaign }) {
           padding: 0.5rem 0.3rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.06);
+          transition: all 0.3s ease;
         }
+        .rule-card:hover { background: rgba(255,255,255,0.08); transform: translateY(-3px); }
         .rule-icon { font-size: 1.2rem; display: block; margin-bottom: 0.1rem; }
         .rule-card h3 {
           font-size: 0.5rem;
@@ -1034,9 +1062,9 @@ function BgmiTournamentRegistration({ campaign }) {
           padding: 0.5rem 0.3rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.06);
-          transition: transform 0.2s;
+          transition: all 0.3s ease;
         }
-        .reward-card:hover { transform: translateY(-3px); }
+        .reward-card:hover { transform: translateY(-4px); background: rgba(255,255,255,0.08); }
         .reward-card img {
           width: 40px;
           height: 40px;
@@ -1062,6 +1090,7 @@ function BgmiTournamentRegistration({ campaign }) {
           border-radius: 10px;
           border: 1px solid rgba(255,255,255,0.06);
           overflow: hidden;
+          transition: border-color 0.3s ease;
         }
         .faq-item.expanded { border-color: rgba(245, 158, 11, 0.3); }
         .faq-question {
@@ -1078,6 +1107,7 @@ function BgmiTournamentRegistration({ campaign }) {
           cursor: pointer;
           text-align: left;
           font-family: inherit;
+          transition: color 0.2s;
         }
         .faq-question:hover { color: #F59E0B; }
         .faq-icon {
@@ -1086,7 +1116,9 @@ function BgmiTournamentRegistration({ campaign }) {
           font-weight: 300;
           flex-shrink: 0;
           margin-left: 0.6rem;
+          transition: transform 0.3s ease;
         }
+        .faq-item.expanded .faq-icon { transform: rotate(180deg); }
         .faq-answer {
           padding: 0 0.8rem 0.6rem;
           color: #aaa;
@@ -1136,8 +1168,8 @@ function BgmiTournamentRegistration({ campaign }) {
           gap: 0.6rem;
           font-size: 1.2rem;
         }
-        .social-links a { color: #888; text-decoration: none; transition: color 0.2s; }
-        .social-links a:hover { color: #F59E0B; }
+        .social-links a { color: #888; text-decoration: none; transition: color 0.2s, transform 0.2s; }
+        .social-links a:hover { color: #F59E0B; transform: scale(1.15); }
         .footer-bottom {
           text-align: center;
           padding-top: 0.8rem;
@@ -1149,8 +1181,6 @@ function BgmiTournamentRegistration({ campaign }) {
           margin-left: auto;
           margin-right: auto;
         }
-
-        /* ── WebView Modal ── (already defined inline, but keep for fallback) ── */
 
         @media (max-width: 768px) {
           .info-grid { grid-template-columns: 1fr 1fr; }
