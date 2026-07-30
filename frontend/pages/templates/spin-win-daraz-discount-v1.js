@@ -3,26 +3,50 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaShoppingBag,
+  FaGift,
+  FaTag,
+  FaPercent,
+  FaTruck,
+  FaFire,
+  FaStar,
+  FaArrowRight,
+  FaClock,
+  FaTrophy,
+  FaUser,
+  FaPhone,
+  FaCheckSquare,
+  FaLock,
+  FaGlobe,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaSpinner,
+  FaGem,
+  FaShieldAlt,
+  FaMedal,
+  FaCircle,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Spin & Win – Exclusive Daraz Discount Vouchers',
   description:
     'Spin the wheel and win exclusive discount vouchers for your next Daraz shopping spree. Up to 50% off + free delivery!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/spin-win-daraz-discount-v1?id={id}',
+  url: 'https://maketrend.app/spin-win-daraz-discount-v1', // ✅ Clean base URL
 };
 
 // ── Wheel Segments (also used as rewards list) ──
 const SEGMENTS = [
-  { label: '10% OFF', color: '#FF6B35', icon: '🛍️' },
-  { label: '20% OFF', color: '#F7931E', icon: '🎉' },
-  { label: 'Free Delivery', color: '#00B4D8', icon: '🚚' },
-  { label: '30% OFF', color: '#FF6B35', icon: '🔥' },
-  { label: '50% OFF', color: '#E63946', icon: '⭐' },
-  { label: '15% OFF', color: '#F7931E', icon: '💫' },
-  { label: 'Free Gift', color: '#2A9D8F', icon: '🎁' },
-  { label: '25% OFF', color: '#00B4D8', icon: '✨' },
+  { label: '10% OFF', color: '#FF6B35', icon: FaPercent },
+  { label: '20% OFF', color: '#F7931E', icon: FaPercent },
+  { label: 'Free Delivery', color: '#00B4D8', icon: FaTruck },
+  { label: '30% OFF', color: '#FF6B35', icon: FaPercent },
+  { label: '50% OFF', color: '#E63946', icon: FaPercent },
+  { label: '15% OFF', color: '#F7931E', icon: FaPercent },
+  { label: 'Free Gift', color: '#2A9D8F', icon: FaGift },
+  { label: '25% OFF', color: '#00B4D8', icon: FaPercent },
 ];
 
 function SpinWinDarazDiscountV1({ campaign }) {
@@ -44,6 +68,14 @@ function SpinWinDarazDiscountV1({ campaign }) {
 
   const canvasRef = useRef(null);
   const audioCtx = useRef(null);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -113,10 +145,19 @@ function SpinWinDarazDiscountV1({ campaign }) {
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 6;
 
+        // Draw icon as text (using Unicode emoji fallback; we already have react-icons but canvas can't render them directly)
+        // For simplicity, we keep the emoji in canvas for now, but we will replace with icons in the UI later.
+        // Since the canvas uses emoji, we keep them for the wheel, but we've replaced the emoji in the UI with icons.
+        const iconMap = {
+          FaPercent: '%',
+          FaTruck: '🚚',
+          FaGift: '🎁',
+        };
+        // Actually we need a simpler approach: we'll just render the label and maybe a symbol
+        // For the canvas, we'll keep the label text only, and use icons elsewhere.
         const textRadius = radius * 0.65;
-        ctx.fillText(segment.icon, textRadius, -10);
         ctx.font = 'bold 12px "Segoe UI", system-ui, sans-serif';
-        ctx.fillText(segment.label, textRadius, 16);
+        ctx.fillText(segment.label, textRadius, 8);
         ctx.restore();
       });
 
@@ -195,7 +236,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
   const handleSpin = () => {
     if (isSpinning) return;
 
-    // Safety validation (should already be validated, but keep it)
+    // Safety validation (already validated, but keep it)
     if (!name.trim()) {
       setError('Please enter your full name.');
       return;
@@ -273,18 +314,22 @@ function SpinWinDarazDiscountV1({ campaign }) {
     setStep(2);
   };
 
-  // ── WebView Modal (fixed with inline styles + _blank) ──
+  // ── WebView Modal ──
   if (showWebViewModal) {
     return (
       <>
         <div className="modal-overlay">
           <div className="modal-card">
-            <div className="modal-icon">🌐</div>
+            <FaGlobe className="modal-icon" style={{ fontSize: '3.6rem', marginBottom: '0.5rem', color: '#FF6B35' }} />
             <h2>Open in Browser</h2>
             <p>For the best experience, open this page in your default browser.</p>
             <div className="modal-actions">
-              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
-              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>🚀 Open in Browser</button>
+              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>
+                <FaCopy className="icon-inline" /> Copy Link
+              </button>
+              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>
+                <FaExternalLinkAlt className="icon-inline" /> Open in Browser
+              </button>
             </div>
             <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
           </div>
@@ -303,6 +348,11 @@ function SpinWinDarazDiscountV1({ campaign }) {
             align-items: center;
             justify-content: center;
             z-index: 9999;
+            animation: fadeIn 0.3s ease;
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
           }
           .modal-card {
             background: #1a1c22;
@@ -313,11 +363,13 @@ function SpinWinDarazDiscountV1({ campaign }) {
             text-align: center;
             border: 2px solid rgba(255, 107, 53, 0.25);
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+            animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
           }
-          .modal-card .modal-icon {
-            font-size: 3.6rem;
-            margin-bottom: 0.5rem;
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
           }
+          .modal-card .modal-icon { font-size: 3.6rem; margin-bottom: 0.5rem; }
           .modal-card h2 {
             font-size: 1.6rem;
             font-weight: 800;
@@ -344,12 +396,17 @@ function SpinWinDarazDiscountV1({ campaign }) {
             font-size: 0.85rem;
             color: #fff;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.25s ease;
             flex: 1;
             min-width: 120px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
           }
           .modal-btn:hover {
             background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
           }
           .modal-btn.primary {
             background: #FF6B35;
@@ -358,6 +415,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
           }
           .modal-btn.primary:hover {
             background: #e65a2a;
+            box-shadow: 0 4px 16px rgba(255,107,53,0.3);
           }
           .modal-btn.ghost {
             background: transparent;
@@ -369,6 +427,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
           .modal-btn.ghost:hover {
             color: #fff;
           }
+          .icon-inline { display: inline-block; margin-right: 4px; vertical-align: middle; }
         `}} />
       </>
     );
@@ -381,10 +440,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">🛒</span>
+          <FaShoppingBag className="logo-icon" />
           <span className="logo-text">Daraz<span>Spin</span></span>
         </div>
-        <div className="header-badge">🎰 Win Discounts</div>
+        <div className="header-badge"><FaGift className="icon-inline" /> Win Discounts</div>
       </header>
 
       {/* ─── HERO ─── */}
@@ -393,30 +452,30 @@ function SpinWinDarazDiscountV1({ campaign }) {
         <div className="hero-content">
           {step === 1 && (
             <>
-              <div className="hero-badge">🔥 Limited Time Offer</div>
+              <div className="hero-badge"><FaFire className="icon-inline" /> Limited Time Offer</div>
               <h1>Spin & Win<br />Daraz Discounts</h1>
               <p>Spin the wheel and win exclusive vouchers for your next shopping spree.</p>
               <div className="hero-stats">
-                <div><span>🎁</span> Up to 50% OFF</div>
-                <div><span>🚚</span> Free Delivery</div>
-                <div><span>⏳</span> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
+                <div><FaPercent className="icon-inline" /> Up to 50% OFF</div>
+                <div><FaTruck className="icon-inline" /> Free Delivery</div>
+                <div><FaClock className="icon-inline" /> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
               </div>
             </>
           )}
           {step === 2 && (
             <>
-              <div className="hero-badge">🎯 Spin the Wheel</div>
+              <div className="hero-badge"><FaGem className="icon-inline" /> Spin the Wheel</div>
               <h1>Try Your Luck!</h1>
               <p>Click the SPIN button below and win an exclusive discount.</p>
             </>
           )}
           {step === 3 && result && (
             <>
-              <div className="hero-badge">🎉 Congratulations!</div>
+              <div className="hero-badge"><FaGift className="icon-inline" /> Congratulations!</div>
               <h1>You Won!</h1>
               <p>You have won an exclusive discount for your next Daraz order.</p>
               <div className="result-display">
-                <span className="result-icon">{result.icon}</span>
+                <span className="result-icon"><FaPercent style={{ fontSize: '2rem', color: '#FF6B35' }} /></span>
                 <span className="result-label">{result.label}</span>
               </div>
             </>
@@ -466,26 +525,34 @@ function SpinWinDarazDiscountV1({ campaign }) {
             {error && <p className="form-error">{error}</p>}
 
             <button className="join-btn" onClick={goToSpin}>
-              Spin Now →
+              Spin Now <FaArrowRight className="icon-inline" />
             </button>
 
-            <p className="form-footnote">🔒 Your information is secure and will not be shared.</p>
+            <p className="form-footnote"><FaLock className="icon-inline" /> Your information is secure and will not be shared.</p>
           </div>
         )}
 
         {/* Step 2: Spin Wheel with Rewards Preview */}
         {step === 2 && (
           <div className="spin-card">
-            {/* ─── NEW: What You Can Win (visible before spinning) ─── */}
+            {/* ─── What You Can Win ─── */}
             <div className="rewards-preview">
-              <h3>🎁 What You Can Win</h3>
+              <h3><FaGift className="icon-inline" /> What You Can Win</h3>
               <div className="rewards-grid">
-                {SEGMENTS.map((item, idx) => (
-                  <div key={idx} className="reward-item">
-                    <span className="reward-icon">{item.icon}</span>
-                    <span className="reward-label">{item.label}</span>
-                  </div>
-                ))}
+                {SEGMENTS.map((item, idx) => {
+                  // Use appropriate icon for each segment
+                  let icon;
+                  if (item.label.includes('OFF')) icon = FaPercent;
+                  else if (item.label.includes('Delivery')) icon = FaTruck;
+                  else if (item.label.includes('Gift')) icon = FaGift;
+                  else icon = FaTag;
+                  return (
+                    <div key={idx} className="reward-item">
+                      <span className="reward-icon"><icon style={{ fontSize: '1.4rem', color: item.color }} /></span>
+                      <span className="reward-label">{item.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -496,18 +563,18 @@ function SpinWinDarazDiscountV1({ campaign }) {
               </button>
             </div>
             {error && <p className="form-error">{error}</p>}
-            <p className="spin-note">🎯 Click the SPIN button to try your luck!</p>
+            <p className="spin-note"><FaGem className="icon-inline" /> Click the SPIN button to try your luck!</p>
           </div>
         )}
 
         {/* Step 3: Result */}
         {step === 3 && result && (
           <div className="result-card">
-            <div className="result-icon">{result.icon}</div>
+            <div className="result-icon"><FaTrophy style={{ fontSize: '4rem', color: '#FF6B35' }} /></div>
             <h2>Congratulations!</h2>
             <p>You have won an exclusive discount for your next Daraz order.</p>
             <div className="prize-badge">
-              <span>{result.icon}</span>
+              <span><FaPercent style={{ fontSize: '2rem', color: '#FF6B35' }} /></span>
               <div>
                 <span className="prize-label">Your Discount</span>
                 <span className="prize-amount">{result.label}</span>
@@ -517,10 +584,12 @@ function SpinWinDarazDiscountV1({ campaign }) {
             <button className="claim-btn" onClick={handleClaim} disabled={loading}>
               {loading ? (
                 <>
-                  <span className="spinner"></span> Processing...
+                  <FaSpinner className="spinner" /> Processing...
                 </>
               ) : (
-                'Claim Voucher →'
+                <>
+                  Claim Voucher <FaArrowRight className="icon-inline" />
+                </>
               )}
             </button>
           </div>
@@ -530,7 +599,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
 
       {/* ─── HOW IT WORKS ─── */}
       <section className="how-to-play">
-        <h2 className="section-title">📋 How It Works</h2>
+        <h2 className="section-title"><FaMedal className="icon-inline" /> How It Works</h2>
         <div className="steps">
           <div className="step">
             <div className="step-number">1</div>
@@ -565,7 +634,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
 
       {/* ─── TERMS & CONDITIONS ─── */}
       <section id="terms" className="terms-section">
-        <h2 className="section-title">📜 Terms & Conditions</h2>
+        <h2 className="section-title"><FaShieldAlt className="icon-inline" /> Terms & Conditions</h2>
         <div className="terms-content">
           <ul>
             <li><strong>Eligibility:</strong> Open to all Daraz Nepal customers aged 18 years and above.</li>
@@ -587,7 +656,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
         <p className="footer-contact">Questions? support@spinwin.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -600,6 +669,11 @@ function SpinWinDarazDiscountV1({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: #f8f9fc;
+        }
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
         }
 
         /* ── Header ── */
@@ -617,7 +691,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
           display: flex; align-items: center; gap: 0.6rem;
           font-weight: 800; font-size: 1.2rem;
         }
-        .logo-icon { font-size: 1.6rem; }
+        .logo-icon { font-size: 1.6rem; color: #FF6B35; }
         .logo-text { color: #1a1a2e; }
         .logo-text span { color: #FF6B35; }
         .header-badge {
@@ -662,6 +736,11 @@ function SpinWinDarazDiscountV1({ campaign }) {
           font-weight: 700;
           color: #FF6B35;
           margin-bottom: 1rem;
+          transition: all 0.3s ease;
+        }
+        .hero-badge:hover {
+          background: rgba(255, 107, 53, 0.3);
+          transform: scale(1.02);
         }
         .hero h1 {
           font-size: clamp(2rem, 6vw, 3.2rem);
@@ -688,6 +767,11 @@ function SpinWinDarazDiscountV1({ campaign }) {
           border: 1px solid rgba(255,255,255,0.1);
           font-weight: 600;
           font-size: 0.9rem;
+          transition: all 0.3s ease;
+        }
+        .hero-stats div:hover {
+          background: rgba(255,255,255,0.15);
+          transform: translateY(-2px);
         }
         .hero-stats span { margin-right: 6px; }
 
@@ -701,6 +785,11 @@ function SpinWinDarazDiscountV1({ campaign }) {
           padding: 0.8rem 1.5rem;
           border-radius: 60px;
           border: 1px solid rgba(255,255,255,0.2);
+          animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
         }
         .result-display .result-icon { font-size: 2rem; }
         .result-display .result-label {
@@ -725,6 +814,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
           padding: 2.5rem 2rem;
           box-shadow: 0 20px 60px rgba(0,0,0,0.06);
           border: 1px solid #eef0f4;
+          transition: box-shadow 0.3s ease;
+        }
+        .register-card:hover {
+          box-shadow: 0 28px 80px rgba(0,0,0,0.08);
         }
         .register-card h2 {
           font-size: 1.8rem;
@@ -755,12 +848,13 @@ function SpinWinDarazDiscountV1({ campaign }) {
           border-radius: 12px;
           font-size: 0.95rem;
           background: #f9fafb;
-          transition: border-color 0.2s;
+          transition: border-color 0.2s, box-shadow 0.2s;
           outline: none;
         }
         .form-group input:focus {
           border-color: #FF6B35;
           background: #fff;
+          box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.08);
         }
         .checkbox-group {
           display: flex;
@@ -797,7 +891,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
           font-size: 1.05rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 16px rgba(255, 107, 53, 0.2);
           display: flex;
           align-items: center;
@@ -805,9 +899,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
           gap: 8px;
         }
         .join-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
+          transform: translateY(-3px);
           box-shadow: 0 8px 24px rgba(255, 107, 53, 0.3);
         }
+        .join-btn:active:not(:disabled) { transform: scale(0.98); }
         .join-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
@@ -827,9 +922,12 @@ function SpinWinDarazDiscountV1({ campaign }) {
           box-shadow: 0 20px 60px rgba(0,0,0,0.06);
           border: 1px solid #eef0f4;
           text-align: center;
+          transition: box-shadow 0.3s ease;
+        }
+        .spin-card:hover {
+          box-shadow: 0 28px 80px rgba(0,0,0,0.08);
         }
 
-        /* ─── NEW: Rewards Preview Section ─── */
         .rewards-preview {
           margin-bottom: 2rem;
           padding-bottom: 1.5rem;
@@ -854,10 +952,12 @@ function SpinWinDarazDiscountV1({ campaign }) {
           background: #f8f9fc;
           border-radius: 12px;
           border: 1px solid #eef0f4;
-          transition: transform 0.2s;
+          transition: all 0.3s ease;
         }
         .reward-item:hover {
-          transform: translateY(-2px);
+          transform: translateY(-4px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+          border-color: #FF6B35;
         }
         .reward-item .reward-icon {
           font-size: 1.6rem;
@@ -897,13 +997,15 @@ function SpinWinDarazDiscountV1({ campaign }) {
           font-weight: 800;
           cursor: pointer;
           box-shadow: 0 4px 20px rgba(255, 107, 53, 0.4);
-          transition: transform 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           text-transform: uppercase;
           letter-spacing: 1px;
         }
         .spin-btn:hover:not(:disabled) {
           transform: translate(-50%, -50%) scale(1.05);
+          box-shadow: 0 8px 28px rgba(255, 107, 53, 0.5);
         }
+        .spin-btn:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.95); }
         .spin-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
@@ -923,6 +1025,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
           text-align: center;
           box-shadow: 0 20px 60px rgba(0,0,0,0.06);
           border: 1px solid #eef0f4;
+          animation: fadeIn 0.5s ease;
         }
         .result-card .result-icon {
           font-size: 4rem;
@@ -949,6 +1052,11 @@ function SpinWinDarazDiscountV1({ campaign }) {
           padding: 0.6rem 1.5rem;
           margin: 0 auto 1.5rem;
           max-width: 280px;
+          transition: all 0.3s ease;
+        }
+        .prize-badge:hover {
+          transform: scale(1.02);
+          box-shadow: 0 4px 12px rgba(255, 107, 53, 0.15);
         }
         .prize-badge > span {
           font-size: 2rem;
@@ -984,7 +1092,7 @@ function SpinWinDarazDiscountV1({ campaign }) {
           font-size: 1.05rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
           display: flex;
           align-items: center;
@@ -992,9 +1100,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
           gap: 8px;
         }
         .claim-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
+          transform: translateY(-3px);
           box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
         }
+        .claim-btn:active:not(:disabled) { transform: scale(0.98); }
         .claim-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
@@ -1045,10 +1154,12 @@ function SpinWinDarazDiscountV1({ campaign }) {
           text-align: center;
           box-shadow: 0 2px 12px rgba(0,0,0,0.04);
           border: 1px solid #eef0f4;
-          transition: transform 0.2s;
+          transition: all 0.3s ease;
         }
         .step:hover {
-          transform: translateY(-4px);
+          transform: translateY(-6px);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+          border-color: #FF6B35;
         }
         .step-number {
           width: 48px; height: 48px;
@@ -1061,6 +1172,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
           font-size: 1.3rem;
           color: #fff;
           margin: 0 auto 0.8rem;
+          transition: transform 0.3s ease;
+        }
+        .step:hover .step-number {
+          transform: scale(1.05);
         }
         .step-content h3 {
           font-size: 1rem;
@@ -1087,6 +1202,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
           box-shadow: 0 2px 8px rgba(0,0,0,0.04);
           max-width: 900px;
           margin: 0 auto;
+          transition: border-color 0.3s ease;
+        }
+        .terms-content:hover {
+          border-color: #FF6B35;
         }
         .terms-content ul {
           list-style: none;
@@ -1098,6 +1217,10 @@ function SpinWinDarazDiscountV1({ campaign }) {
           color: #4b5563;
           border-bottom: 1px solid #f3f4f6;
           font-size: 0.9rem;
+          transition: color 0.3s ease;
+        }
+        .terms-content ul li:hover {
+          color: #1a1a2e;
         }
         .terms-content ul li::before {
           content: '▸';
@@ -1128,8 +1251,6 @@ function SpinWinDarazDiscountV1({ campaign }) {
           font-weight: 600;
           color: #e5e7eb;
         }
-
-        /* ── WebView Modal ── (already defined inline) ── */
 
         /* ── Responsive ── */
         @media (max-width: 640px) {
