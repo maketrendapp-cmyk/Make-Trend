@@ -3,13 +3,28 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaPoll,
+  FaDollarSign,
+  FaClock,
+  FaCheckCircle,
+  FaShieldAlt,
+  FaChartLine,
+  FaArrowRight,
+  FaArrowLeft,
+  FaCopy,
+  FaShareAlt,
+  FaWhatsapp,
+  FaFacebook,
+  FaTwitter,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean base URL) ──
 const defaultMeta = {
   title: 'Survey to Earn Cash – Get $10 Free!',
   description: 'Complete a short survey and earn $10 instantly. Share your opinion, help brands improve, and get paid.',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/survey-to-earn-cash?id={id}',
+  url: 'https://maketrend.app/survey-to-earn-cash',
 };
 
 // ── Survey Questions ──
@@ -46,16 +61,21 @@ function SurveyToEarnCash({ campaign }) {
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=survey, 2=form, 3=claimed
+  const [step, setStep] = useState(1); // 1=survey, 2=claimed success
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 23, minutes: 59, seconds: 59 });
+
+  // ── Clean URL if no id parameter is present ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -100,7 +120,7 @@ function SurveyToEarnCash({ campaign }) {
     if (currentQuestion < SURVEY_QUESTIONS.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      // Survey complete → move to form step
+      // Survey complete → move directly to congratulations success step
       setStep(2);
     }
   };
@@ -110,30 +130,6 @@ function SurveyToEarnCash({ campaign }) {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
     }
-  };
-
-  // ── Validate form ──
-  const validateForm = () => {
-    if (!name.trim()) return 'Please enter your full name.';
-    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) return 'Please enter a valid email address.';
-    if (!acceptedTerms) return 'You must accept the terms to continue.';
-    return null;
-  };
-
-  // ── Claim reward ──
-  const handleClaim = () => {
-    const err = validateForm();
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError('');
-    setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
-      setStep(3);
-    }, 1500);
   };
 
   // ── Continue to tasks ──
@@ -146,24 +142,48 @@ function SurveyToEarnCash({ campaign }) {
     }
   };
 
+  // ── Share handlers ──
+  const handleShare = (platform) => {
+    const shareUrl = id ? `${window.location.origin}/survey-to-earn-cash?id=${id}` : `${window.location.origin}/survey-to-earn-cash`;
+    const text = `💰 I just earned $10 on SurveyReward! Check it out:`;
+    switch (platform) {
+      case 'whatsapp':
+        window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + shareUrl)}`, '_blank');
+        break;
+      case 'facebook':
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+        break;
+      case 'twitter':
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+        break;
+      default:
+        navigator.clipboard?.writeText(shareUrl);
+        alert('Link copied to clipboard!');
+    }
+  };
+
   // ── WebView Modal ──
   const WebViewModal = () => {
     if (!showWebViewModal) return null;
     return (
       <div className="modal-overlay">
         <div className="modal-card">
-          <div className="modal-icon">🌐</div>
+          <div className="modal-icon-container">
+            <span className="modal-icon">🌐</span>
+          </div>
           <h2>Open in Browser</h2>
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
             <button
-              className="modal-btn"
+              className="modal-btn ghost"
               onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
+                const shareUrl = id ? `${window.location.origin}/survey-to-earn-cash?id=${id}` : `${window.location.origin}/survey-to-earn-cash`;
+                navigator.clipboard?.writeText(shareUrl);
+                alert('Link copied! Open Chrome or Safari to paste.');
                 setShowWebViewModal(false);
               }}
             >
-              📋 Copy Link
+              <FaCopy className="w-4 h-4" /> Copy Link
             </button>
             <button
               className="modal-btn primary"
@@ -176,14 +196,14 @@ function SurveyToEarnCash({ campaign }) {
                 }
               }}
             >
-              🚀 Open in Browser
+              <FaShareAlt className="w-4 h-4" /> Open in Browser
             </button>
           </div>
           <button
-            className="modal-btn ghost"
+            className="modal-btn text-only"
             onClick={() => setShowWebViewModal(false)}
           >
-            Continue Anyway
+            Continue anyway (Not Recommended)
           </button>
         </div>
       </div>
@@ -193,47 +213,53 @@ function SurveyToEarnCash({ campaign }) {
   // ── Main UI ──
   return (
     <div className="page-wrapper">
-
-      {/* ─── WEBVIEW MODAL ─── */}
       <WebViewModal />
 
       {/* ─── HEADER ─── */}
       <header className="site-header">
-        <div className="logo">
-          <span className="logo-icon">📊</span>
-          <span className="logo-text">Survey<span>Reward</span></span>
+        <div className="header-container">
+          <div className="logo">
+            <div className="logo-icon-bg"><FaPoll className="w-4 h-4 text-cyan-600" /></div>
+            <span className="logo-text">Survey<span>Reward</span></span>
+          </div>
+          <div className="header-badge">
+            <FaDollarSign className="w-3 h-3" /> $10 Reward
+          </div>
         </div>
-        <div className="header-badge">💰 $10 Reward</div>
       </header>
 
       {/* ─── HERO ─── */}
       <section className="hero">
-        <div className="hero-overlay"></div>
+        <div className="hero-glow shape-1"></div>
+        <div className="hero-glow shape-2"></div>
         <div className="hero-content">
           {step === 1 && (
             <>
-              <div className="hero-badge">📋 PAID SURVEY</div>
-              <h1>Share Your Opinion<br />Get <span>$10</span> Free</h1>
-              <p>Complete a short survey and earn $10 instantly. No hidden fees.</p>
+              <div className="hero-badge-wrap">
+                <div className="hero-badge">
+                  <span className="pulse-dot"></span> PAID OPINION SURVEY
+                </div>
+              </div>
+              <h1>{campaign?.title || 'Share Your Opinion & Get $10 Free'}</h1>
+              <p>{campaign?.description || 'Complete a short interactive survey and earn $10 instantly. Fast verification, zero fees.'}</p>
               <div className="hero-stats">
-                <div><span>⏱️</span> 3-5 Minutes</div>
-                <div><span>📋</span> 5 Questions</div>
-                <div><span>⏳</span> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
+                <div className="stat-pill"><FaClock className="w-3.5 h-3.5 text-cyan-500" /> 3-5 Minutes</div>
+                <div className="stat-pill"><FaPoll className="w-3.5 h-3.5 text-cyan-500" /> 5 Questions</div>
+                <div className="stat-pill timer-pill">
+                  ⏳ {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left
+                </div>
               </div>
             </>
           )}
           {step === 2 && (
             <>
-              <div className="hero-badge">✅ SURVEY COMPLETE</div>
-              <h1>Almost Done!</h1>
-              <p>Enter your details to claim your $10 reward.</p>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              <div className="hero-badge">🎉 REWARD READY</div>
-              <h1>You Earned <span>$10</span>!</h1>
-              <p>Your reward has been confirmed.</p>
+              <div className="hero-badge-wrap">
+                <div className="hero-badge">
+                  <span className="pulse-dot"></span> REWARD SECURED
+                </div>
+              </div>
+              <h1>Congratulations! <span>$10 Unlocked</span></h1>
+              <p>Your survey responses have been successfully verified.</p>
             </>
           )}
         </div>
@@ -252,7 +278,7 @@ function SurveyToEarnCash({ campaign }) {
                   style={{ width: `${((currentQuestion + 1) / SURVEY_QUESTIONS.length) * 100}%` }}
                 ></div>
               </div>
-              <span className="progress-text">{currentQuestion + 1} / {SURVEY_QUESTIONS.length}</span>
+              <span className="progress-text">Question {currentQuestion + 1} of {SURVEY_QUESTIONS.length}</span>
             </div>
 
             <div className="question-container">
@@ -265,8 +291,8 @@ function SurveyToEarnCash({ campaign }) {
                     onClick={() => selectAnswer(option)}
                   >
                     <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
-                    {option}
-                    {answers[currentQuestion] === option && <span className="check-mark">✓</span>}
+                    <span className="option-label">{option}</span>
+                    {answers[currentQuestion] === option && <FaCheckCircle className="check-mark w-4 h-4 text-cyan-500 ml-auto" />}
                   </button>
                 ))}
               </div>
@@ -280,88 +306,55 @@ function SurveyToEarnCash({ campaign }) {
                 onClick={prevQuestion}
                 disabled={currentQuestion === 0}
               >
-                ← Back
+                <FaArrowLeft className="w-3.5 h-3.5" /> Back
               </button>
               <button className="next-btn" onClick={nextQuestion}>
-                {currentQuestion === SURVEY_QUESTIONS.length - 1 ? 'Submit Survey →' : 'Next →'}
+                <span>{currentQuestion === SURVEY_QUESTIONS.length - 1 ? 'Complete Survey' : 'Next Question'}</span>
+                <FaArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2: Form */}
+        {/* Step 2: Congratulations Success Card */}
         {step === 2 && (
-          <div className="form-card">
-            <div className="reward-badge">💰 $10 Reward</div>
-            <h2>Enter Your Details</h2>
-            <p>Fill in your information to claim your $10 reward.</p>
-
-            <div className="form-group">
-              <label>Full Name <span className="required">*</span></label>
-              <input
-                type="text"
-                placeholder="e.g. John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Email Address <span className="required">*</span></label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div className="checkbox-group">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={acceptedTerms}
-                onChange={(e) => setAcceptedTerms(e.target.checked)}
-              />
-              <label htmlFor="terms">I agree to the <a href="#terms">Terms &amp; Conditions</a></label>
-            </div>
-
-            {error && <p className="form-error">{error}</p>}
-
-            <button className="claim-btn" onClick={handleClaim} disabled={loading}>
-              {loading ? (
-                <>
-                  <span className="spinner"></span> Processing...
-                </>
-              ) : (
-                'Claim $10 Now →'
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Step 3: Claimed Success */}
-        {step === 3 && (
           <div className="success-card">
-            <div className="success-icon">✅</div>
-            <h2>$10 Reward Claimed!</h2>
-            <p>Your reward has been confirmed and is being processed.</p>
+            <div className="success-icon-wrap">
+              <FaCheckCircle className="w-12 h-12 text-emerald-500" />
+            </div>
+            <h2>🎉 Survey Completed!</h2>
+            <p>You have successfully unlocked your <strong>$10 Cash Reward</strong>.</p>
+            
             <div className="reward-display">
-              <span className="reward-icon">💰</span>
-              <span className="reward-amount">$10</span>
+              <FaDollarSign className="w-6 h-6 text-cyan-600" />
+              <span className="reward-amount">$10.00</span>
             </div>
+
             <div className="success-info">
-              <p>Check your email for confirmation details.</p>
+              <p>Click below to finalize and secure your reward payout instantly.</p>
             </div>
+
             <button className="continue-btn" onClick={handleContinue} disabled={loading}>
               {loading ? (
                 <>
-                  <span className="spinner"></span> Redirecting...
+                  <span className="spinner"></span> 
+                  <span>Redirecting...</span>
                 </>
               ) : (
-                'Continue →'
+                <>
+                  <span>Continue to Claim →</span>
+                  <FaArrowRight className="w-4 h-4" />
+                </>
               )}
             </button>
+
+            <div className="share-row">
+              <span>Share this opportunity:</span>
+              <button onClick={() => handleShare('whatsapp')}><FaWhatsapp className="w-5 h-5 text-emerald-500 hover:scale-110 transition" /></button>
+              <button onClick={() => handleShare('facebook')}><FaFacebook className="w-5 h-5 text-blue-600 hover:scale-110 transition" /></button>
+              <button onClick={() => handleShare('twitter')}><FaTwitter className="w-5 h-5 text-sky-400 hover:scale-110 transition" /></button>
+              <button onClick={() => handleShare('copy')}><FaCopy className="w-5 h-5 text-slate-600 hover:scale-110 transition" /></button>
+            </div>
           </div>
         )}
 
@@ -369,54 +362,60 @@ function SurveyToEarnCash({ campaign }) {
 
       {/* ─── WHY PARTICIPATE ─── */}
       <section className="why-section">
-        <h2 className="section-title">Why Participate?</h2>
+        <div className="section-header">
+          <h2 className="section-title">Why Participate?</h2>
+          <p className="section-subtitle">Join thousands earning daily rewards</p>
+        </div>
         <div className="why-grid">
           <div className="why-card">
-            <span className="why-icon">💵</span>
+            <div className="why-icon-bg"><FaDollarSign className="w-5 h-5 text-cyan-600" /></div>
             <h3>Earn $10</h3>
-            <p>Get paid $10 for sharing your opinion.</p>
+            <p>Get paid for sharing your valuable opinion.</p>
           </div>
           <div className="why-card">
-            <span className="why-icon">⏱️</span>
+            <div className="why-icon-bg"><FaClock className="w-5 h-5 text-cyan-600" /></div>
             <h3>Quick Survey</h3>
-            <p>Only 5 questions – takes 3-5 minutes.</p>
+            <p>Only 5 rapid questions take under 3 minutes.</p>
           </div>
           <div className="why-card">
-            <span className="why-icon">🔒</span>
+            <div className="why-icon-bg"><FaShieldAlt className="w-5 h-5 text-cyan-600" /></div>
             <h3>Safe & Secure</h3>
-            <p>Your data is protected and private.</p>
+            <p>Your personal data is strictly protected.</p>
           </div>
           <div className="why-card">
-            <span className="why-icon">🎯</span>
+            <div className="why-icon-bg"><FaChartLine className="w-5 h-5 text-cyan-600" /></div>
             <h3>Impact Brands</h3>
-            <p>Help brands improve their products.</p>
+            <p>Help global companies shape better products.</p>
           </div>
         </div>
       </section>
 
       {/* ─── HOW IT WORKS ─── */}
       <section className="how-section">
-        <h2 className="section-title">📋 How It Works</h2>
+        <div className="section-header">
+          <h2 className="section-title">How It Works</h2>
+          <p className="section-subtitle">Three easy steps to your cash reward</p>
+        </div>
         <div className="steps">
           <div className="step">
             <div className="step-number">1</div>
             <div className="step-content">
               <h3>Take Survey</h3>
-              <p>Answer 5 simple questions.</p>
+              <p>Answer 5 straightforward questions.</p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">2</div>
             <div className="step-content">
-              <h3>Enter Details</h3>
-              <p>Provide your name and email.</p>
+              <h3>Unlock Payout</h3>
+              <p>Verify completion instantly.</p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">3</div>
             <div className="step-content">
               <h3>Get $10</h3>
-              <p>Claim your reward instantly.</p>
+              <p>Claim your reward right away.</p>
             </div>
           </div>
         </div>
@@ -424,669 +423,266 @@ function SurveyToEarnCash({ campaign }) {
 
       {/* ─── TERMS & CONDITIONS ─── */}
       <section id="terms" className="terms-section">
-        <h2 className="section-title">📜 Terms & Conditions</h2>
+        <div className="section-header">
+          <h2 className="section-title">Terms &amp; Conditions</h2>
+        </div>
         <div className="terms-content">
           <ul>
-            <li><strong>Eligibility:</strong> Open to all users aged 18 years and above.</li>
-            <li><strong>One Survey Per User:</strong> Each user can complete the survey once.</li>
-            <li><strong>Reward Distribution:</strong> $10 reward is credited within 24 hours.</li>
-            <li><strong>Honest Responses:</strong> All responses must be truthful and accurate.</li>
-            <li><strong>Fraud Prevention:</strong> Any fraudulent activity will result in disqualification.</li>
-            <li><strong>Changes:</strong> The organizers reserve the right to modify or terminate this offer at any time.</li>
+            <li><strong>Eligibility:</strong> Open to all participants aged 18 and above globally.</li>
+            <li><strong>One Entry Per User:</strong> Each individual can complete this reward survey once.</li>
+            <li><strong>Reward Processing:</strong> $10 credited safely to your account profile.</li>
+            <li><strong>Authenticity:</strong> Honest responses are required for valid payout.</li>
           </ul>
         </div>
       </section>
 
       {/* ─── FAQ ─── */}
       <section className="faq-section">
-        <h2 className="section-title">❓ FAQ</h2>
+        <div className="section-header">
+          <h2 className="section-title">Frequently Asked Questions</h2>
+        </div>
         <div className="faq-list">
           <div className="faq-item">
             <div className="faq-question">How long does the survey take?</div>
-            <div className="faq-answer">The survey takes 3-5 minutes to complete.</div>
+            <div className="faq-answer"><p>It takes only 3 to 5 minutes to complete all 5 questions.</p></div>
           </div>
           <div className="faq-item">
             <div className="faq-question">How do I receive the $10?</div>
-            <div className="faq-answer">You'll receive the $10 reward via email or payment method provided.</div>
+            <div className="faq-answer"><p>The payout is processed automatically upon finishing verification tasks.</p></div>
           </div>
           <div className="faq-item">
-            <div className="faq-question">Is my data safe?</div>
-            <div className="faq-answer">Yes, your data is protected and never shared with third parties.</div>
-          </div>
-          <div className="faq-item">
-            <div className="faq-question">Can I take the survey more than once?</div>
-            <div className="faq-answer">No, each user can only complete the survey once.</div>
+            <div className="faq-question">Is my information safe?</div>
+            <div className="faq-answer"><p>Yes, all communications are encrypted with industry-standard protocols.</p></div>
           </div>
         </div>
       </section>
 
       {/* ─── FOOTER ─── */}
       <footer className="site-footer">
-        <p>© 2026 Survey Reward. All rights reserved.</p>
-        <p className="footer-contact">Questions? support@surveyreward.com</p>
+        <div className="footer-content">
+          <p>© {new Date().getFullYear()} Survey Reward Platform. All rights reserved.</p>
+          <p className="footer-contact">Secure feedback research network.</p>
+        </div>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Segoe UI', system-ui, sans-serif;
-          background: #f0f4f8;
-          color: #1a1a2e;
-          line-height: 1.6;
+        :root {
+          --primary: #00B4D8;
+          --primary-dark: #0077B6;
+          --primary-light: #e0f2fe;
+          --bg-main: #f8fafc;
+          --text-main: #0f172a;
+          --text-muted: #64748b;
+          --success: #10b981;
+          --card-bg: #ffffff;
         }
-        .page-wrapper {
-          max-width: 100%;
-          overflow-x: hidden;
-          background: #f0f4f8;
-        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        body { background: var(--bg-main); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        .page-wrapper { max-width: 100%; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
 
         /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
-          background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(16px);
-          border-bottom: 1px solid rgba(0, 180, 216, 0.15);
-          padding: 0.7rem 1.5rem;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+          background: rgba(255,255,255,0.85); backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(0,0,0,0.05);
+          padding: 1rem 1.5rem;
         }
-        .logo {
-          display: flex; align-items: center; gap: 0.6rem;
-          font-weight: 800; font-size: 1.2rem;
-        }
-        .logo-icon { font-size: 1.4rem; color: #00B4D8; }
-        .logo-text { color: #1a1a2e; }
-        .logo-text span { color: #00B4D8; }
+        .header-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.5px; }
+        .logo-icon-bg { background: var(--primary-light); width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+        .logo-text { color: var(--text-main); }
+        .logo-text span { color: var(--primary); }
         .header-badge {
-          background: linear-gradient(135deg, #00B4D8, #0077B6);
-          color: #fff;
-          font-weight: 700;
-          font-size: 0.65rem;
-          padding: 0.3rem 1rem;
-          border-radius: 40px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          box-shadow: 0 2px 12px rgba(0, 180, 216, 0.2);
+          background: #ecfdf5; color: #059669; font-weight: 700; font-size: 0.7rem;
+          padding: 0.4rem 0.9rem; border-radius: 40px; display: flex; align-items: center; gap: 6px;
+          border: 1px solid #d1fae5;
         }
 
         /* ── Hero ── */
         .hero {
-          position: relative;
-          min-height: 40vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          padding: 2.5rem 1.5rem;
-          background: linear-gradient(135deg, #f0f4f8, #e0e8f0);
-          color: #1a1a2e;
+          position: relative; min-height: 45vh; display: flex; align-items: center; justify-content: center;
+          text-align: center; padding: 4rem 1.5rem 5rem; overflow: hidden;
+          background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
         }
-        .hero-overlay {
-          position: absolute; inset: 0;
-          background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2300B4D8' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-        .hero-content {
-          position: relative; z-index: 2;
-          max-width: 800px;
-        }
+        .hero-glow { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.4; z-index: 1; }
+        .shape-1 { width: 400px; height: 400px; background: #38bdf8; top: -100px; left: -100px; }
+        .shape-2 { width: 300px; height: 300px; background: #818cf8; bottom: -50px; right: -50px; }
+        .hero-content { position: relative; z-index: 2; max-width: 700px; }
+        
+        .hero-badge-wrap { display: flex; justify-content: center; margin-bottom: 1.2rem; }
         .hero-badge {
-          display: inline-block;
-          background: rgba(0, 180, 216, 0.12);
-          border: 1px solid rgba(0, 180, 216, 0.2);
-          padding: 0.3rem 1.5rem;
-          border-radius: 40px;
-          font-size: 0.65rem;
-          text-transform: uppercase;
-          font-weight: 700;
-          color: #00B4D8;
-          margin-bottom: 0.8rem;
-          letter-spacing: 1px;
+          background: #fff; border: 1px solid rgba(0, 180, 216, 0.2); padding: 0.4rem 1.1rem;
+          border-radius: 40px; font-size: 0.7rem; font-weight: 800; color: var(--primary-dark);
+          display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+          letter-spacing: 0.5px;
         }
-        .hero h1 {
-          font-size: clamp(2rem, 6vw, 3.2rem);
-          font-weight: 900;
-          line-height: 1.1;
-          margin-bottom: 0.3rem;
-          color: #1a1a2e;
-        }
-        .hero h1 span {
-          color: #00B4D8;
-        }
-        .hero p {
-          font-size: 1.05rem;
-          color: #555;
-          margin-bottom: 1.2rem;
-        }
-        .hero-stats {
-          display: flex;
-          justify-content: center;
-          gap: 1.5rem;
-          flex-wrap: wrap;
-        }
-        .hero-stats div {
-          background: rgba(255,255,255,0.06);
-          padding: 0.4rem 1.2rem;
-          border-radius: 40px;
-          border: 1px solid rgba(0,0,0,0.06);
-          font-weight: 600;
-          font-size: 0.85rem;
-          color: #555;
-        }
-        .hero-stats span { margin-right: 6px; }
+        .pulse-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; display: block; animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        
+        .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; line-height: 1.1; margin-bottom: 1rem; color: #0f172a; letter-spacing: -1px; }
+        .hero h1 span { color: var(--primary); }
+        .hero p { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; }
+        
+        .hero-stats { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+        .stat-pill { background: rgba(255,255,255,0.7); padding: 0.5rem 1.1rem; border-radius: 40px; border: 1px solid rgba(255,255,255,0.9); font-weight: 600; font-size: 0.85rem; color: var(--text-muted); backdrop-filter: blur(4px); display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .timer-pill { color: #0369a1; font-weight: 700; background: #e0f2fe; border-color: #bae6fd; }
 
         /* ── Main Content ── */
-        .main-content {
-          max-width: 560px;
-          margin: -1.5rem auto 2.5rem;
-          padding: 0 1.5rem;
-          position: relative;
-          z-index: 10;
-        }
+        .main-content { max-width: 600px; margin: -3.5rem auto 3rem; padding: 0 1.5rem; position: relative; z-index: 10; }
 
         /* ── Survey Card ── */
         .survey-card {
-          background: #fff;
-          border-radius: 32px;
-          padding: 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
-          border: 1px solid #eef2f6;
+          background: var(--card-bg); border-radius: 28px; padding: 2.5rem 2rem;
+          box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;
         }
-        .survey-progress {
-          display: flex;
-          align-items: center;
-          gap: 0.8rem;
-          margin-bottom: 1.5rem;
-        }
-        .progress-bar {
-          flex: 1;
-          height: 6px;
-          background: #e5e7eb;
-          border-radius: 99px;
-          overflow: hidden;
-        }
-        .progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #00B4D8, #0077B6);
-          border-radius: 99px;
-          transition: width 0.4s ease;
-        }
-        .progress-text {
-          font-size: 0.75rem;
-          font-weight: 700;
-          color: #00B4D8;
-        }
-        .question-container {
-          margin-bottom: 1.5rem;
-        }
-        .question-text {
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #1a1a2e;
-          margin-bottom: 1rem;
-        }
-        .options-grid {
-          display: flex;
-          flex-direction: column;
-          gap: 0.6rem;
-        }
+        .survey-progress { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.8rem; }
+        .progress-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); border-radius: 99px; transition: width 0.4s ease; }
+        .progress-text { font-size: 0.75rem; font-weight: 800; color: var(--primary); white-space: nowrap; }
+
+        .question-container { margin-bottom: 1.8rem; }
+        .question-text { font-size: 1.25rem; font-weight: 800; color: var(--text-main); margin-bottom: 1.2rem; letter-spacing: -0.3px; }
+        
+        .options-grid { display: flex; flex-direction: column; gap: 0.8rem; }
         .option-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.8rem;
-          padding: 0.8rem 1rem;
-          border: 2px solid #e5e7eb;
-          border-radius: 14px;
-          background: #f9fafb;
-          font-size: 0.9rem;
-          font-weight: 500;
-          color: #1a1a2e;
-          cursor: pointer;
-          transition: all 0.2s;
-          text-align: left;
+          display: flex; align-items: center; gap: 1rem; padding: 1rem 1.2rem; border: 2px solid #e2e8f0;
+          border-radius: 16px; background: #f8fafc; font-size: 0.95rem; font-weight: 600; color: var(--text-main);
+          cursor: pointer; transition: all 0.2s; text-align: left;
         }
-        .option-btn:hover {
-          border-color: #00B4D8;
-          background: #f0f9ff;
-        }
-        .option-btn.selected {
-          border-color: #00B4D8;
-          background: #f0f9ff;
-          box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.08);
-        }
-        .option-letter {
-          font-weight: 700;
-          color: #9ca3af;
-          min-width: 24px;
-        }
-        .option-btn.selected .option-letter {
-          color: #00B4D8;
-        }
-        .check-mark {
-          margin-left: auto;
-          color: #22C55E;
-          font-weight: 700;
-        }
+        .option-btn:hover { border-color: var(--primary); background: #f0f9ff; transform: translateY(-1px); }
+        .option-btn.selected { border-color: var(--primary); background: #f0f9ff; box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.1); }
+        .option-letter { width: 28px; height: 28px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; color: #475569; flex-shrink: 0; transition: 0.2s; }
+        .option-btn.selected .option-letter { background: var(--primary); color: #fff; }
+        .option-label { flex: 1; }
 
-        .survey-actions {
-          display: flex;
-          gap: 0.8rem;
-        }
+        .survey-actions { display: flex; gap: 1rem; margin-top: 2rem; }
         .prev-btn {
-          padding: 0.7rem 1.5rem;
-          background: #f3f4f6;
-          border: none;
-          border-radius: 60px;
-          font-weight: 700;
-          font-size: 0.9rem;
-          color: #374151;
-          cursor: pointer;
-          transition: background 0.2s;
+          padding: 0.8rem 1.5rem; background: #f1f5f9; border: none; border-radius: 50px; font-weight: 700;
+          font-size: 0.9rem; color: #475569; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 6px;
         }
-        .prev-btn:hover:not(:disabled) { background: #e5e7eb; }
+        .prev-btn:hover:not(:disabled) { background: #e2e8f0; }
         .prev-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        
         .next-btn {
-          flex: 1;
-          padding: 0.7rem 1rem;
-          background: linear-gradient(135deg, #00B4D8, #0077B6);
-          border: none;
-          border-radius: 60px;
-          font-weight: 700;
-          font-size: 0.9rem;
-          color: #fff;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          flex: 1; padding: 0.9rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+          border: none; border-radius: 50px; font-weight: 800; font-size: 1rem; color: #fff; cursor: pointer;
+          transition: all 0.2s; box-shadow: 0 4px 15px rgba(0, 180, 216, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px;
         }
-        .next-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0, 180, 216, 0.2); }
-        .form-error {
-          color: #ef4444;
-          font-size: 0.8rem;
-          margin: 0.5rem 0;
-        }
-
-        /* ── Form Card ── */
-        .form-card {
-          background: #fff;
-          border-radius: 32px;
-          padding: 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
-          border: 1px solid #eef2f6;
-        }
-        .reward-badge {
-          display: inline-block;
-          background: linear-gradient(135deg, #00B4D8, #0077B6);
-          color: #fff;
-          padding: 0.3rem 1.2rem;
-          border-radius: 40px;
-          font-weight: 700;
-          font-size: 0.8rem;
-          margin-bottom: 0.5rem;
-        }
-        .form-card h2 {
-          font-size: 1.6rem;
-          font-weight: 800;
-          color: #1a1a2e;
-        }
-        .form-card > p {
-          color: #6b7280;
-          margin-bottom: 1.5rem;
-        }
-
-        .form-group {
-          margin-bottom: 1rem;
-        }
-        .form-group label {
-          display: block;
-          font-weight: 600;
-          font-size: 0.8rem;
-          color: #374151;
-          margin-bottom: 0.2rem;
-        }
-        .form-group .required { color: #ef4444; }
-        .form-group input {
-          width: 100%;
-          padding: 0.7rem 1rem;
-          border: 2px solid #e5e7eb;
-          border-radius: 12px;
-          font-size: 0.9rem;
-          background: #f9fafb;
-          transition: border-color 0.2s;
-          outline: none;
-        }
-        .form-group input:focus {
-          border-color: #00B4D8;
-          background: #fff;
-          box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.08);
-        }
-
-        .checkbox-group {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          margin: 1rem 0;
-        }
-        .checkbox-group input {
-          width: 18px; height: 18px;
-          margin-top: 2px;
-          accent-color: #00B4D8;
-          flex-shrink: 0;
-        }
-        .checkbox-group label {
-          font-size: 0.8rem;
-          color: #4b5563;
-        }
-        .checkbox-group label a {
-          color: #00B4D8;
-          text-decoration: none;
-        }
-
-        .claim-btn {
-          width: 100%;
-          padding: 0.9rem;
-          background: linear-gradient(135deg, #22C55E, #16A34A);
-          border: none;
-          border-radius: 60px;
-          font-weight: 800;
-          font-size: 1rem;
-          color: #fff;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 20px rgba(34, 197, 94, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-        .claim-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(34, 197, 94, 0.3);
-        }
-        .claim-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .spinner {
-          display: inline-block;
-          width: 18px; height: 18px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .next-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 180, 216, 0.4); }
+        .form-error { color: #ef4444; font-size: 0.85rem; font-weight: 600; margin-top: 0.8rem; }
 
         /* ── Success Card ── */
         .success-card {
-          background: #fff;
-          border-radius: 32px;
-          padding: 2.5rem 2rem;
-          text-align: center;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
-          border: 1px solid #eef2f6;
+          background: var(--card-bg); border-radius: 28px; padding: 2.5rem 2rem; text-align: center;
+          box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;
         }
-        .success-icon { font-size: 3.5rem; margin-bottom: 0.3rem; }
-        .success-card h2 {
-          font-size: 1.6rem;
-          font-weight: 800;
-          color: #1a1a2e;
-        }
-        .success-card p { color: #6b7280; margin-bottom: 1.2rem; }
+        .success-icon-wrap { width: 72px; height: 72px; background: #ecfdf5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; border: 1px solid #d1fae5; }
+        .success-card h2 { font-size: 1.8rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.3rem; }
+        .success-card p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1rem; }
+        
         .reward-display {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.8rem;
-          background: #f0f9ff;
-          padding: 0.8rem 1.5rem;
-          border-radius: 60px;
-          margin: 0 auto 1.2rem;
-          max-width: 160px;
-          border: 1px solid rgba(0, 180, 216, 0.1);
+          display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: var(--primary-light);
+          padding: 1rem 2rem; border-radius: 60px; margin: 0 auto 1.5rem; max-width: 200px; border: 1px solid #bae6fd;
         }
-        .reward-icon { font-size: 1.8rem; }
-        .reward-amount { font-size: 1.6rem; font-weight: 900; color: #00B4D8; }
-        .success-info { margin-bottom: 1.5rem; }
-        .success-info p { color: #6b7280; font-size: 0.9rem; }
+        .reward-amount { font-size: 1.8rem; font-weight: 900; color: var(--primary-dark); }
+        .success-info { margin-bottom: 1.8rem; }
+        .success-info p { color: var(--text-muted); font-size: 0.9rem; }
 
         .continue-btn {
-          width: 100%;
-          padding: 0.9rem;
-          background: linear-gradient(135deg, #00B4D8, #0077B6);
-          border: none;
-          border-radius: 60px;
-          font-weight: 700;
-          font-size: 1rem;
-          color: #fff;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          box-shadow: 0 4px 16px rgba(0, 180, 216, 0.2);
+          width: 100%; padding: 1.1rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+          border: none; border-radius: 50px; font-weight: 800; font-size: 1.05rem; color: #fff; cursor: pointer;
+          transition: all 0.3s; box-shadow: 0 10px 25px -5px rgba(0, 180, 216, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px;
         }
-        .continue-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(0, 180, 216, 0.3);
-        }
+        .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 35px -5px rgba(0, 180, 216, 0.5); }
         .continue-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
+        .share-row {
+          display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.5rem;
+          font-size: 0.9rem; color: var(--text-muted); font-weight: 600;
+        }
+        .share-row button { background: none; border: none; cursor: pointer; transition: transform 0.2s; }
+        .share-row button:hover { transform: scale(1.15); }
+
+        /* ── Sections Common ── */
+        .section-header { text-align: center; margin-bottom: 2.5rem; }
+        .section-title { font-size: 1.8rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.5px; }
+        .section-subtitle { font-size: 1rem; color: var(--text-muted); margin-top: 0.3rem; }
+
         /* ── Why Participate ── */
-        .why-section {
-          padding: 3rem 1.5rem;
-          max-width: 1000px;
-          margin: 0 auto;
-        }
-        .section-title {
-          font-size: 1.8rem;
-          font-weight: 800;
-          text-align: center;
-          margin-bottom: 0.3rem;
-          color: #1a1a2e;
-        }
-        .section-title::after {
-          content: '';
-          display: block;
-          width: 60px;
-          height: 3px;
-          background: linear-gradient(90deg, #00B4D8, #0077B6);
-          margin: 0.5rem auto 0;
-          border-radius: 4px;
-        }
-        .why-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 1.2rem;
-          margin-top: 1.5rem;
-        }
-        .why-card {
-          background: #fff;
-          border-radius: 20px;
-          padding: 1.5rem 1rem;
-          text-align: center;
-          border: 1px solid #eef2f6;
-          transition: transform 0.2s;
-        }
-        .why-card:hover { transform: translateY(-4px); }
-        .why-icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
-        .why-card h3 { font-size: 1rem; font-weight: 700; color: #1a1a2e; }
-        .why-card p { font-size: 0.8rem; color: #888; }
+        .why-section { padding: 4rem 1.5rem; max-width: 1000px; margin: 0 auto; }
+        .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+        .why-card { background: #fff; border-radius: 20px; padding: 1.8rem 1.2rem; text-align: center; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); transition: all 0.3s; }
+        .why-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05); border-color: var(--primary-light); }
+        .why-icon-bg { width: 48px; height: 48px; background: var(--primary-light); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+        .why-card h3 { font-size: 1rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.3rem; }
+        .why-card p { font-size: 0.85rem; color: var(--text-muted); }
 
         /* ── How It Works ── */
-        .how-section {
-          padding: 3rem 1.5rem;
-          max-width: 900px;
-          margin: 0 auto;
-        }
-        .steps {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1.5rem;
-        }
-        .step {
-          background: #fff;
-          padding: 1.5rem;
-          border-radius: 20px;
-          text-align: center;
-          border: 1px solid #eef2f6;
-          transition: transform 0.2s;
-        }
-        .step:hover { transform: translateY(-4px); }
-        .step-number {
-          width: 44px; height: 44px;
-          background: linear-gradient(135deg, #00B4D8, #0077B6);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-          font-size: 1.2rem;
-          color: #fff;
-          margin: 0 auto 0.6rem;
-        }
-        .step-content h3 { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; }
-        .step-content p { font-size: 0.8rem; color: #888; }
+        .how-section { padding: 4rem 1.5rem; max-width: 900px; margin: 0 auto; }
+        .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
+        .step { background: #fff; padding: 2rem 1.5rem; border-radius: 24px; text-align: center; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); transition: all 0.3s; }
+        .step:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05); border-color: var(--primary-light); }
+        .step-number { width: 48px; height: 48px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; color: #fff; margin: 0 auto 1rem; box-shadow: 0 4px 10px rgba(0,180,216,0.3); }
+        .step-content h3 { font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.3rem; }
+        .step-content p { font-size: 0.9rem; color: var(--text-muted); }
 
         /* ── Terms Section ── */
-        .terms-section {
-          padding: 3rem 1.5rem;
-          max-width: 900px;
-          margin: 0 auto;
-        }
-        .terms-content {
-          background: #fff;
-          padding: 1.8rem;
-          border-radius: 20px;
-          border: 1px solid #eef2f6;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        }
-        .terms-content ul {
-          list-style: none;
-          padding: 0;
-        }
-        .terms-content ul li {
-          padding: 0.5rem 0 0.5rem 1.8rem;
-          position: relative;
-          color: #4b5563;
-          border-bottom: 1px solid #f3f4f6;
-          font-size: 0.85rem;
-        }
-        .terms-content ul li::before {
-          content: '▸';
-          position: absolute;
-          left: 0;
-          color: #00B4D8;
-          font-weight: 700;
-        }
+        .terms-section { padding: 4rem 1.5rem; max-width: 900px; margin: 0 auto; }
+        .terms-content { background: #fff; padding: 2rem; border-radius: 24px; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+        .terms-content ul { list-style: none; padding: 0; }
+        .terms-content ul li { padding: 0.7rem 0 0.7rem 1.8rem; position: relative; color: var(--text-muted); border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        .terms-content ul li::before { content: '✓'; position: absolute; left: 0; color: var(--success); font-weight: 900; }
         .terms-content ul li:last-child { border-bottom: none; }
-        .terms-content ul li strong { color: #1a1a2e; }
+        .terms-content ul li strong { color: var(--text-main); }
 
         /* ── FAQ ── */
-        .faq-section {
-          padding: 3rem 1.5rem;
-          max-width: 700px;
-          margin: 0 auto;
-        }
-        .faq-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.8rem;
-        }
-        .faq-item {
-          background: #fff;
-          border-radius: 16px;
-          padding: 1rem 1.2rem;
-          border: 1px solid #eef2f6;
-          transition: border-color 0.2s;
-        }
-        .faq-item:hover { border-color: #00B4D8; }
-        .faq-question { font-weight: 700; font-size: 0.9rem; color: #1a1a2e; }
-        .faq-answer p { font-size: 0.85rem; color: #6b7280; margin-top: 0.3rem; }
+        .faq-section { padding: 4rem 1.5rem 6rem; max-width: 750px; margin: 0 auto; }
+        .faq-list { display: flex; flex-direction: column; gap: 1rem; }
+        .faq-item { background: #fff; border-radius: 20px; padding: 1.5rem; border: 1px solid #f1f5f9; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.01); }
+        .faq-item:hover { border-color: var(--primary-light); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.03); }
+        .faq-question { font-weight: 800; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.4rem; }
+        .faq-answer p { font-size: 0.95rem; color: var(--text-muted); }
 
         /* ── Footer ── */
-        .site-footer {
-          background: #1a1a2e;
-          color: #9ca3af;
-          padding: 2rem 1.5rem;
-          text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.04);
-          margin-top: 1rem;
-        }
-        .site-footer p { font-size: 0.75rem; margin-bottom: 0.2rem; }
-        .footer-contact { font-weight: 600; color: #e5e7eb; }
+        .site-footer { background: #fff; border-top: 1px solid #e2e8f0; padding: 3rem 1.5rem; text-align: center; margin-top: auto; }
+        .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+        .site-footer p { font-size: 0.85rem; color: var(--text-muted); }
+        .footer-contact { font-weight: 600; color: #94a3b8; }
 
         /* ── Modal ── */
-        .modal-overlay {
-          position: fixed;
-          top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(16px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-        }
-        .modal-card {
-          background: #1a1c22;
-          border-radius: 36px;
-          padding: 2.5rem 2rem;
-          max-width: 400px;
-          width: 90%;
-          text-align: center;
-          border: 1px solid rgba(0, 180, 216, 0.15);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-        }
-        .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
-        .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
-        .modal-card p { color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem; }
-        .modal-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: center;
-        }
-        .modal-btn {
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.08);
-          padding: 0.6rem 1.2rem;
-          border-radius: 40px;
-          font-weight: 600;
-          font-size: 0.75rem;
-          color: #fff;
-          cursor: pointer;
-          transition: 0.2s;
-          flex: 1;
-          min-width: 100px;
-        }
-        .modal-btn:hover { background: rgba(255,255,255,0.12); }
-        .modal-btn.primary {
-          background: #00B4D8;
-          border: none;
-          color: #fff;
-        }
-        .modal-btn.primary:hover { background: #0077B6; }
-        .modal-btn.ghost {
-          background: transparent;
-          border: none;
-          color: #666;
-          font-size: 0.7rem;
-          margin-top: 0.3rem;
-        }
-        .modal-btn.ghost:hover { color: #fff; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; }
+        .modal-card { background: #fff; border-radius: 28px; padding: 2.5rem 2rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+        .modal-icon-container { width: 64px; height: 64px; background: #e0f2fe; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; }
+        .modal-icon { font-size: 2rem; }
+        .modal-card h2 { font-size: 1.5rem; font-weight: 900; color: var(--text-main); margin-bottom: 0.5rem; }
+        .modal-card p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5; }
+        .modal-actions { display: flex; flex-direction: column; gap: 10px; }
+        .modal-btn { padding: 1rem; border-radius: 14px; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; }
+        .modal-btn.primary { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(0, 180, 216, 0.3); }
+        .modal-btn.primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .modal-btn.ghost { background: var(--bg-main); color: var(--text-main); border: 1px solid #e2e8f0; }
+        .modal-btn.ghost:hover { background: #e2e8f0; }
+        .modal-btn.text-only { background: transparent; color: #94a3b8; font-size: 0.8rem; margin-top: 1rem; }
+        .modal-btn.text-only:hover { color: var(--text-main); }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
-          .why-grid { grid-template-columns: 1fr 1fr; }
-          .steps { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
-          .hero-stats { gap: 0.8rem; }
-          .hero-stats div { font-size: 0.75rem; padding: 0.3rem 1rem; }
-          .survey-actions { flex-wrap: wrap; }
-          .prev-btn { flex: 1; }
+          .why-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+          .steps { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; gap: 1.2rem; }
+          .hero { padding-top: 2rem; }
+          .hero h1 { font-size: 2.2rem; }
+          .hero-stats { gap: 0.6rem; }
+          .stat-pill { font-size: 0.75rem; padding: 0.4rem 0.9rem; }
         }
         @media (max-width: 480px) {
-          .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
-          .main-content { padding: 0 1rem; }
-          .survey-card { padding: 1.5rem; }
-          .form-card { padding: 1.5rem; }
-          .success-card { padding: 1.5rem; }
+          .header-badge { font-size: 0.65rem; padding: 0.3rem 0.6rem; }
+          .logo { font-size: 1.1rem; }
           .why-grid { grid-template-columns: 1fr; }
-          .hero h1 { font-size: 1.8rem; }
-          .question-text { font-size: 1rem; }
+          .survey-card { padding: 1.5rem; }
+          .success-card { padding: 1.5rem; }
+          .hero h1 { font-size: 1.9rem; }
         }
       `}} />
     </div>
