@@ -392,6 +392,10 @@ function IphoneWinner({ campaign }) {
           position: relative; z-index: 2;
           max-width: 600px;
           margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 0.5rem 0;
         }
         .badge-winner {
           display: inline-block;
@@ -410,8 +414,9 @@ function IphoneWinner({ campaign }) {
         .phone-display {
           position: relative;
           margin: 0 auto 1.5rem;
-          width: 220px;
-          height: 220px;
+          width: 200px;
+          height: 200px;
+          flex-shrink: 0;
         }
         .phone-glow {
           position: absolute;
@@ -443,26 +448,32 @@ function IphoneWinner({ campaign }) {
           letter-spacing: 0.5px;
         }
 
+        /* ── FIX: Proper spacing between text elements ── */
         .hero-content h1 {
           font-size: clamp(2.4rem, 7vw, 3.8rem);
           font-weight: 900;
-          line-height: 1.1;
-          margin-bottom: 0.3rem;
+          line-height: 1.15;
+          margin-bottom: 0.8rem;
+          margin-top: 0.2rem;
           background: linear-gradient(135deg, #fff 30%, #D4AF37 70%, #B8860B 100%);
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
+          text-align: center;
         }
         .sub-text {
           font-size: 1rem;
           color: #888;
-          margin-bottom: 0.2rem;
+          margin-bottom: 0.4rem;
+          text-align: center;
         }
         .prize-name {
-          font-size: 1.6rem;
+          font-size: 1.8rem;
           font-weight: 800;
           color: #D4AF37;
-          margin-bottom: 1.5rem;
+          margin-bottom: 1.8rem;
+          text-align: center;
+          letter-spacing: 0.5px;
         }
 
         .winner-details {
@@ -811,21 +822,24 @@ function IphoneWinner({ campaign }) {
 
         /* ── Responsive ── */
         @media (max-width: 640px) {
-          .phone-display { width: 160px; height: 160px; }
+          .phone-display { width: 140px; height: 140px; }
           .phone-image { border-radius: 20px; }
           .form-card { padding: 1.5rem; }
           .form-content h2 { font-size: 1.5rem; }
-          .hero-content h1 { font-size: 2rem; }
-          .prize-name { font-size: 1.3rem; }
+          .hero-content h1 { font-size: 2.2rem; }
+          .prize-name { font-size: 1.4rem; }
           .winner-details { padding: 0.8rem 1rem; }
           .claim-btn-primary { padding: 0.8rem 2rem; font-size: 0.95rem; }
         }
         @media (max-width: 480px) {
           .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
           .site-header { padding: 0.5rem 1rem; }
-          .phone-display { width: 140px; height: 140px; }
+          .phone-display { width: 120px; height: 120px; }
+          .hero-content h1 { font-size: 1.8rem; }
+          .prize-name { font-size: 1.2rem; }
           .form-phone-image { width: 40px; height: 40px; }
           .form-phone-preview span { font-size: 0.95rem; }
+          .hero-content { padding: 0.2rem 0; }
         }
       `}} />
     </div>
