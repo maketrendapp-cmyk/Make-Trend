@@ -3,36 +3,21 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
-import {
-  FaGift,
-  FaClock,
-  FaCheckCircle,
-  FaArrowRight,
-  FaCopy,
-  FaShareAlt,
-  FaWhatsapp,
-  FaFacebook,
-  FaTwitter,
-  FaStar,
-  FaGem,
-  FaTrophy,
-  FaSparkles,
-} from 'react-icons/fa';
 
-// ── Default Meta (Clean URL – no {id}) ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Daily Scratch & Win – Get $10 Free Every Day!',
   description: 'Scratch the card daily and win $10 instantly. Free to play – no hidden fees! Claim your reward now.',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/daily-scratch-win',
+  url: 'https://maketrend.app/daily-scratch-win', // ✅ No query string
 };
 
 // ── Rewards Data ──
 const DAILY_REWARDS = [
-  { day: 'Today', amount: '$10', icon: <FaGem className="w-5 h-5" />, image: 'https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg', status: 'active' },
-  { day: 'Day 2', amount: '$5', icon: <FaStar className="w-5 h-5" />, image: 'https://media.istockphoto.com/id/1414969873/photo/five-dollar-banknote-on-white-background.jpg?s=612x612&w=0&k=20&c=yvVw-CHAQgcpkonGfeMYZhqZY7Yvr2FdW1Cnx_i38CU=', status: 'locked' },
-  { day: 'Day 3', amount: '$15', icon: <FaSparkles className="w-5 h-5" />, image: 'https://www.jurist.org/news/wp-content/uploads/sites/4/2019/07/wage_1563500528.jpg', status: 'locked' },
-  { day: 'Day 7', amount: '$50', icon: <FaTrophy className="w-5 h-5" />, image: 'https://media.istockphoto.com/id/1470067468/photo/fifty-dollar-banknote-on-white-background.jpg?s=612x612&w=0&k=20&c=1xzGogOFhNhk6nESgMRGXh-L1NnvU35leFKvVyGS7Vw=', status: 'locked' },
+  { day: 'Today', amount: '$10', icon: '💰', image: 'https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg', status: 'active' },
+  { day: 'Day 2', amount: '$5', icon: '🎁', image: 'https://media.istockphoto.com/id/1414969873/photo/five-dollar-banknote-on-white-background.jpg?s=612x612&w=0&k=20&c=yvVw-CHAQgcpkonGfeMYZhqZY7Yvr2FdW1Cnx_i38CU=', status: 'locked' },
+  { day: 'Day 3', amount: '$15', icon: '⭐', image: 'https://www.jurist.org/news/wp-content/uploads/sites/4/2019/07/wage_1563500528.jpg', status: 'locked' },
+  { day: 'Day 7', amount: '$50', icon: '🏆', image: 'https://media.istockphoto.com/id/1470067468/photo/fifty-dollar-banknote-on-white-background.jpg?s=612x612&w=0&k=20&c=1xzGogOFhNhk6nESgMRGXh-L1NnvU35leFKvVyGS7Vw=', status: 'locked' },
 ];
 
 function DailyScratchWin({ campaign }) {
@@ -40,15 +25,30 @@ function DailyScratchWin({ campaign }) {
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=scratch, 2=claimed
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [isScratched, setIsScratched] = useState(false);
   const [moneyImage, setMoneyImage] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 23, minutes: 59, seconds: 59 });
 
+  // ── Form Errors (inline) ──
+  const [errors, setErrors] = useState({ name: '', email: '', phone: '', terms: '' });
+
   const canvasRef = useRef(null);
   const isDragging = useRef(false);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -59,14 +59,6 @@ function DailyScratchWin({ campaign }) {
                       (navigator.userAgent.indexOf('wv') > -1);
     if (isWebView) setShowWebViewModal(true);
   }, []);
-
-  // ── Clean URL if no id ──
-  useEffect(() => {
-    if (!router.isReady) return;
-    if (!id && router.asPath.includes('?')) {
-      router.replace(router.pathname, undefined, { shallow: true });
-    }
-  }, [router.isReady, id, router]);
 
   // ── Countdown timer ──
   useEffect(() => {
@@ -83,7 +75,7 @@ function DailyScratchWin({ campaign }) {
     return () => clearInterval(timer);
   }, []);
 
-  // ── Preload money image for canvas ──
+  // ── Preload money image ──
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -94,13 +86,12 @@ function DailyScratchWin({ campaign }) {
   // ── Scratch card canvas ──
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !moneyImage) return;
+    if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    // Set canvas size with proper scaling
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
@@ -115,56 +106,54 @@ function DailyScratchWin({ campaign }) {
       ctx.fillRect(0, 0, w, h);
     } else {
       const gradient = ctx.createLinearGradient(0, 0, w, h);
-      gradient.addColorStop(0, '#fef3c7');
-      gradient.addColorStop(0.5, '#fde68a');
-      gradient.addColorStop(1, '#f59e0b');
+      gradient.addColorStop(0, '#f5f3ff');
+      gradient.addColorStop(0.5, '#ede9fe');
+      gradient.addColorStop(1, '#ddd6fe');
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, w, h);
     }
 
-    // ── "$10" text ──
+    // ── "YOU WON $10!" text ──
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';
-    ctx.shadowBlur = 15;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 12;
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 44px "Segoe UI", system-ui, sans-serif';
-    ctx.fillText('$10', w / 2, h / 2 - 20);
-    ctx.font = 'bold 16px "Segoe UI", system-ui, sans-serif';
-    ctx.fillText('YOU WON!', w / 2, h / 2 + 35);
+    ctx.font = 'bold 20px "Inter", "Segoe UI", sans-serif';
+    ctx.fillText('🎉 YOU WON $10!', w / 2, h / 2 + 50);
     ctx.shadowBlur = 0;
 
-    // ── Scratch overlay ──
+    // ── Scratch overlay (metallic) ──
     const overlayGradient = ctx.createLinearGradient(0, 0, w, h);
-    overlayGradient.addColorStop(0, '#6b7280');
+    overlayGradient.addColorStop(0, '#4b5563');
     overlayGradient.addColorStop(0.3, '#9ca3af');
     overlayGradient.addColorStop(0.6, '#6b7280');
-    overlayGradient.addColorStop(0.8, '#4b5563');
-    overlayGradient.addColorStop(1, '#6b7280');
+    overlayGradient.addColorStop(0.8, '#374151');
+    overlayGradient.addColorStop(1, '#4b5563');
     ctx.fillStyle = overlayGradient;
     ctx.fillRect(0, 0, w, h);
 
     // ── Scratch me text ──
-    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
     ctx.shadowBlur = 15;
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px "Segoe UI", system-ui, sans-serif';
+    ctx.font = 'bold 28px "Inter", "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🖐️ Scratch Me', w / 2, h / 2);
+    ctx.fillText('🖐️ Scratch Me', w / 2, h / 2 - 10);
     ctx.shadowBlur = 0;
 
-    // ── Border ──
-    ctx.shadowColor = 'rgba(139, 92, 246, 0.2)';
+    // ── Border glow ──
+    ctx.shadowColor = 'rgba(139, 92, 246, 0.3)';
     ctx.shadowBlur = 20;
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
     ctx.lineWidth = 3;
     ctx.strokeRect(0, 0, w, h);
     ctx.shadowBlur = 0;
 
     // ── Scratch logic ──
     const scratch = (x, y) => {
-      const radius = 30;
+      const radius = 28;
       ctx.globalCompositeOperation = 'destination-out';
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -191,9 +180,9 @@ function DailyScratchWin({ campaign }) {
 
     const getPos = (e) => {
       const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX || e.touches?.[0]?.clientX || 0) - rect.left;
-      const y = (e.clientY || e.touches?.[0]?.clientY || 0) - rect.top;
-      return { x, y };
+      const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
+      const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
+      return { x: clientX - rect.left, y: clientY - rect.top };
     };
 
     const onStart = (e) => {
@@ -234,6 +223,58 @@ function DailyScratchWin({ campaign }) {
     };
   }, [moneyImage, isScratched]);
 
+  // ── Inline validation ──
+  const validateField = (field, value) => {
+    switch (field) {
+      case 'name':
+        return value.trim().length < 2 ? 'Please enter your full name.' : '';
+      case 'email':
+        return !/^\S+@\S+\.\S+$/.test(value) ? 'Please enter a valid email address.' : '';
+      case 'phone':
+        return !/^\d{10}$/.test(value.replace(/\s/g, '')) ? 'Enter a valid 10-digit phone number.' : '';
+      case 'terms':
+        return !value ? 'You must accept the terms to continue.' : '';
+      default:
+        return '';
+    }
+  };
+
+  const handleFieldChange = (field, value) => {
+    const err = validateField(field, value);
+    setErrors(prev => ({ ...prev, [field]: err }));
+    // Update state
+    switch (field) {
+      case 'name': setName(value); break;
+      case 'email': setEmail(value); break;
+      case 'phone': setPhone(value.replace(/\D/g, '').slice(0, 10)); break;
+      case 'terms': setAcceptedTerms(value); break;
+      default: break;
+    }
+  };
+
+  // ── Claim reward ──
+  const handleClaim = () => {
+    const nameErr = validateField('name', name);
+    const emailErr = validateField('email', email);
+    const phoneErr = validateField('phone', phone);
+    const termsErr = validateField('terms', acceptedTerms);
+
+    setErrors({
+      name: nameErr,
+      email: emailErr,
+      phone: phoneErr,
+      terms: termsErr,
+    });
+
+    if (nameErr || emailErr || phoneErr || termsErr) return;
+
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setStep(3);
+    }, 1500);
+  };
+
   // ── Continue to tasks ──
   const handleContinue = () => {
     setLoading(true);
@@ -241,26 +282,6 @@ function DailyScratchWin({ campaign }) {
       router.push('/create');
     } else {
       router.push(`/tasks?id=${id}`);
-    }
-  };
-
-  // ── Share handlers ──
-  const handleShare = (platform) => {
-    const url = id ? `${window.location.origin}/daily-scratch-win?id=${id}` : `${window.location.origin}/daily-scratch-win`;
-    const text = '🎉 I just won $10 on Daily Scratch & Win! Try your luck here:';
-    switch (platform) {
-      case 'whatsapp':
-        window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
-        break;
-      case 'facebook':
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-        break;
-      case 'twitter':
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
-        break;
-      default:
-        navigator.clipboard?.writeText(`${text} ${url}`);
-        alert('Link copied!');
     }
   };
 
@@ -274,53 +295,78 @@ function DailyScratchWin({ campaign }) {
           <h2>Open in Browser</h2>
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
-            <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}><FaCopy className="w-4 h-4" /> Copy Link</button>
-            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_system'); } }}><FaShareAlt className="w-4 h-4" /> Open in Browser</button>
+            <button
+              className="modal-btn"
+              onClick={() => {
+                navigator.clipboard?.writeText(window.location.href);
+                setShowWebViewModal(false);
+              }}
+            >
+              📋 Copy Link
+            </button>
+            <button
+              className="modal-btn primary"
+              onClick={() => {
+                const url = window.location.href;
+                if (navigator.userAgent.includes('Android')) {
+                  window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`;
+                } else {
+                  window.open(url, '_system');
+                }
+              }}
+            >
+              🚀 Open in Browser
+            </button>
           </div>
-          <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
+          <button
+            className="modal-btn ghost"
+            onClick={() => setShowWebViewModal(false)}
+          >
+            Continue Anyway
+          </button>
         </div>
       </div>
     );
   };
 
-  // ── Main UI ──
+  // ── Render ──
   return (
     <div className="page-wrapper">
 
-      {/* ─── WEBVIEW MODAL ─── */}
       <WebViewModal />
 
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon"><FaGift className="w-5 h-5" /></span>
+          <span className="logo-icon">🎰</span>
           <span className="logo-text">Daily<span>Scratch</span></span>
         </div>
-        <div className="header-badge">💰 $10 Daily</div>
+        <div className="header-badge">🔥 $10 Daily</div>
       </header>
 
       {/* ─── HERO ─── */}
       <section className="hero">
         <div className="hero-overlay"></div>
         <div className="hero-content">
-          {step === 1 && (
-            <>
-              <div className="hero-badge"><FaGift className="w-3.5 h-3.5" /> DAILY REWARD</div>
-              <h1>Scratch & Win <span>$10</span></h1>
-              <p>Scratch the card to reveal your daily reward.</p>
-              <div className="hero-stats">
-                <div><FaClock className="w-3.5 h-3.5" /> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')}</div>
-                <div><FaGift className="w-3.5 h-3.5" /> $10 Reward</div>
-              </div>
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <div className="hero-badge"><FaCheckCircle className="w-3.5 h-3.5" /> REWARD UNLOCKED</div>
-              <h1>You Won <span>$10</span>!</h1>
-              <p>Your reward has been confirmed. Continue to claim it.</p>
-            </>
-          )}
+          <div className="hero-badge">🎉 Daily Reward</div>
+          <h1>Scratch & Win <span className="highlight">$10</span></h1>
+          <p>Scratch the card below to reveal your daily reward.</p>
+          <div className="hero-stats">
+            <div className="stat-item">
+              <span>⏳</span>
+              <span className="stat-value">
+                {String(timeRemaining.hours).padStart(2, '0')}:
+                {String(timeRemaining.minutes).padStart(2, '0')}:
+                {String(timeRemaining.seconds).padStart(2, '0')}
+              </span>
+              <span className="stat-label">Left</span>
+            </div>
+            <div className="stat-item">
+              <span>🎁</span>
+              <span className="stat-value">$10</span>
+              <span className="stat-label">Reward</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -332,50 +378,119 @@ function DailyScratchWin({ campaign }) {
           <div className="scratch-card-wrapper">
             <div className="scratch-card">
               <canvas ref={canvasRef} className="scratch-canvas"></canvas>
+              {!isScratched && <div className="shimmer-overlay"></div>}
             </div>
             <p className="scratch-hint">🖐️ Use your finger or mouse to scratch the card</p>
           </div>
         )}
 
-        {/* Step 2: Claimed Success */}
+        {/* Step 2: Claim Form */}
         {step === 2 && (
-          <div className="success-card">
-            <div className="success-icon">🎉</div>
-            <h2>You Won $10!</h2>
-            <p>Your reward has been confirmed and is ready to claim.</p>
-
-            <div className="reward-display">
-              <div className="reward-image-wrapper">
-                <img
-                  src="https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg"
-                  alt="$10"
-                  className="reward-image"
-                />
+          <div className="claim-card">
+            <div className="reward-reveal">
+              <div className="reward-badge">
+                <div className="reward-image-wrapper">
+                  <img
+                    src="https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg"
+                    alt="$10 Reward"
+                    className="reward-image"
+                  />
+                </div>
+                <div>
+                  <span className="reward-amount">$10</span>
+                  <span className="reward-label">YOU WON!</span>
+                </div>
               </div>
-              <span className="reward-amount">$10</span>
+              <p>Enter your details below to claim your reward.</p>
             </div>
 
+            <div className="form-section">
+              <div className="form-group">
+                <label>Full Name <span className="required">*</span></label>
+                <input
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  value={name}
+                  onChange={(e) => handleFieldChange('name', e.target.value)}
+                  className={errors.name ? 'error' : ''}
+                />
+                {errors.name && <span className="field-error">{errors.name}</span>}
+              </div>
+
+              <div className="form-group">
+                <label>Email Address <span className="required">*</span></label>
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => handleFieldChange('email', e.target.value)}
+                  className={errors.email ? 'error' : ''}
+                />
+                {errors.email && <span className="field-error">{errors.email}</span>}
+              </div>
+
+              <div className="form-group">
+                <label>Phone Number <span className="required">*</span></label>
+                <input
+                  type="tel"
+                  placeholder="e.g. 98XXXXXXXX"
+                  value={phone}
+                  onChange={(e) => handleFieldChange('phone', e.target.value)}
+                  className={errors.phone ? 'error' : ''}
+                />
+                {errors.phone && <span className="field-error">{errors.phone}</span>}
+              </div>
+
+              <div className="checkbox-group">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  checked={acceptedTerms}
+                  onChange={(e) => handleFieldChange('terms', e.target.checked)}
+                />
+                <label htmlFor="terms">I agree to the <a href="#terms">Terms &amp; Conditions</a></label>
+                {errors.terms && <span className="field-error">{errors.terms}</span>}
+              </div>
+
+              <button className="claim-btn" onClick={handleClaim} disabled={loading}>
+                {loading ? (
+                  <>
+                    <span className="spinner"></span> Processing...
+                  </>
+                ) : (
+                  'Claim $10 Reward →'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Claimed Success */}
+        {step === 3 && (
+          <div className="success-card">
+            <div className="success-icon">✅</div>
+            <h2>Reward Claimed!</h2>
+            <p>Your $10 reward has been confirmed.</p>
+            <div className="claimed-reward">
+              <img
+                src="https://i.etsystatic.com/8474866/r/il/0d68e6/4559099123/il_fullxfull.4559099123_b0gl.jpg"
+                alt="$10"
+                className="claimed-image"
+              />
+              <span className="claimed-amount">$10</span>
+            </div>
             <div className="success-info">
-              <p>Complete the final steps to receive your reward.</p>
+              <p>Check your email for confirmation details.</p>
             </div>
-
-            <button className="continue-btn" onClick={handleContinue} disabled={loading}>
+            <button className="btn-primary" onClick={handleContinue} disabled={loading}>
               {loading ? (
                 <>
-                  <span className="spinner"></span> Processing...
+                  <span className="spinner"></span> Redirecting...
                 </>
               ) : (
-                'Continue to Claim →'
+                'Continue →'
               )}
             </button>
-
-            <div className="share-row">
-              <span>Share with friends:</span>
-              <button onClick={() => handleShare('whatsapp')}><FaWhatsapp className="w-5 h-5 text-emerald-500 hover:scale-110 transition" /></button>
-              <button onClick={() => handleShare('facebook')}><FaFacebook className="w-5 h-5 text-blue-600 hover:scale-110 transition" /></button>
-              <button onClick={() => handleShare('twitter')}><FaTwitter className="w-5 h-5 text-sky-400 hover:scale-110 transition" /></button>
-              <button onClick={() => handleShare('copy')}><FaCopy className="w-5 h-5 text-slate-600 hover:scale-110 transition" /></button>
-            </div>
           </div>
         )}
 
@@ -383,7 +498,7 @@ function DailyScratchWin({ campaign }) {
 
       {/* ─── HOW IT WORKS ─── */}
       <section className="how-section">
-        <h2 className="section-title">How It Works</h2>
+        <h2 className="section-title">📋 How It Works</h2>
         <div className="steps">
           <div className="step">
             <div className="step-number">1</div>
@@ -403,7 +518,7 @@ function DailyScratchWin({ campaign }) {
             <div className="step-number">3</div>
             <div className="step-content">
               <h3>Claim Your Reward</h3>
-              <p>Continue to complete the final steps.</p>
+              <p>Enter your details to receive your $10 reward.</p>
             </div>
           </div>
         </div>
@@ -411,16 +526,18 @@ function DailyScratchWin({ campaign }) {
 
       {/* ─── DAILY REWARDS ─── */}
       <section className="rewards-section">
-        <h2 className="section-title">Daily Rewards</h2>
+        <h2 className="section-title">🎁 Daily Rewards</h2>
         <p className="section-subtitle">Come back every day to claim your reward.</p>
         <div className="rewards-grid">
           {DAILY_REWARDS.map((reward, idx) => (
             <div key={idx} className={`reward-card ${reward.status}`}>
               <div className="reward-day">{reward.day}</div>
-              <div className="reward-icon-wrapper">{reward.icon}</div>
+              <div className="reward-image-wrapper">
+                <img src={reward.image} alt={reward.amount} className="reward-image-small" />
+              </div>
               <div className="reward-amount-large">{reward.amount}</div>
               <span className="reward-status">
-                {reward.status === 'active' ? '✅ Available' : '🔒 Coming Soon'}
+                {reward.status === 'active' ? '✅ Available Now' : '🔒 Coming Soon'}
               </span>
             </div>
           ))}
@@ -429,7 +546,7 @@ function DailyScratchWin({ campaign }) {
 
       {/* ─── TERMS ─── */}
       <section id="terms" className="terms-section">
-        <h2 className="section-title">Terms & Conditions</h2>
+        <h2 className="section-title">📜 Terms & Conditions</h2>
         <div className="terms-content">
           <ul>
             <li><strong>Eligibility:</strong> Open to all users aged 18 years and above.</li>
@@ -444,7 +561,7 @@ function DailyScratchWin({ campaign }) {
 
       {/* ─── FAQ ─── */}
       <section className="faq-section">
-        <h2 className="section-title">FAQ</h2>
+        <h2 className="section-title">❓ FAQ</h2>
         <div className="faq-list">
           <div className="faq-item">
             <div className="faq-question">How do I scratch the card?</div>
@@ -452,7 +569,7 @@ function DailyScratchWin({ campaign }) {
           </div>
           <div className="faq-item">
             <div className="faq-question">What happens after I scratch?</div>
-            <div className="faq-answer">You'll see if you won $10. Then continue to claim your reward.</div>
+            <div className="faq-answer">You'll see if you won $10. Then fill in your details to claim it.</div>
           </div>
           <div className="faq-item">
             <div className="faq-question">Can I claim more than once per day?</div>
@@ -471,136 +588,108 @@ function DailyScratchWin({ campaign }) {
         <p className="footer-contact">Questions? support@scratchwin.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
           font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
           background: #f8fafc;
-          color: #1e293b;
+          color: #1a1a2e;
           line-height: 1.6;
+          -webkit-font-smoothing: antialiased;
         }
-        .page-wrapper {
-          max-width: 100%;
-          overflow-x: hidden;
-          background: #f8fafc;
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-        }
+        .page-wrapper { max-width: 100%; overflow-x: hidden; background: #f8fafc; }
 
         /* ── Header ── */
         .site-header {
           position: sticky; top: 0; z-index: 100;
-          background: rgba(255,255,255,0.9);
+          background: rgba(255,255,255,0.92);
           backdrop-filter: blur(16px);
-          border-bottom: 1px solid rgba(139, 92, 246, 0.15);
-          padding: 0.75rem 1.5rem;
+          border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+          padding: 0.7rem 1.5rem;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
-        .logo {
-          display: flex; align-items: center; gap: 0.6rem;
-          font-weight: 800; font-size: 1.25rem;
-        }
-        .logo-icon {
-          width: 38px; height: 38px;
-          background: linear-gradient(135deg, #8B5CF6, #EC4899);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
-        }
-        .logo-text { color: #1e293b; }
+        .logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.2rem; }
+        .logo-icon { font-size: 1.4rem; }
+        .logo-text { color: #1a1a2e; }
         .logo-text span { color: #8B5CF6; }
         .header-badge {
-          display: flex; align-items: center; gap: 0.4rem;
           background: linear-gradient(135deg, #8B5CF6, #EC4899);
           color: #fff;
           font-weight: 700;
-          font-size: 0.7rem;
-          padding: 0.35rem 1rem;
+          font-size: 0.65rem;
+          padding: 0.3rem 1rem;
           border-radius: 40px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          box-shadow: 0 4px 15px rgba(139, 92, 246, 0.25);
+          box-shadow: 0 2px 12px rgba(139, 92, 246, 0.2);
         }
 
         /* ── Hero ── */
         .hero {
           position: relative;
-          min-height: 35vh;
+          min-height: 38vh;
           display: flex;
           align-items: center;
           justify-content: center;
           text-align: center;
-          padding: 3rem 1.5rem;
-          background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+          padding: 2.5rem 1.5rem;
+          background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
           color: #fff;
           overflow: hidden;
         }
         .hero-overlay {
           position: absolute; inset: 0;
-          background: radial-gradient(circle at 30% 40%, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+          background: radial-gradient(circle at 30% 40%, rgba(139, 92, 246, 0.12), transparent 70%);
         }
-        .hero-content {
-          position: relative; z-index: 2;
-          max-width: 800px;
-        }
+        .hero-content { position: relative; z-index: 2; max-width: 800px; }
         .hero-badge {
-          display: inline-flex;
-          align-items: center; gap: 0.4rem;
+          display: inline-block;
           background: rgba(139, 92, 246, 0.15);
           border: 1px solid rgba(139, 92, 246, 0.3);
-          padding: 0.35rem 1.25rem;
+          padding: 0.3rem 1.5rem;
           border-radius: 40px;
-          font-size: 0.7rem;
+          font-size: 0.65rem;
           text-transform: uppercase;
-          font-weight: 800;
+          font-weight: 700;
           color: #8B5CF6;
           margin-bottom: 0.8rem;
           letter-spacing: 1px;
         }
         .hero h1 {
-          font-size: clamp(2rem, 5vw, 3.2rem);
+          font-size: clamp(2rem, 6vw, 3.2rem);
           font-weight: 900;
-          line-height: 1.15;
-          margin-bottom: 0.4rem;
+          line-height: 1.1;
+          margin-bottom: 0.3rem;
         }
-        .hero h1 span {
-          color: #8B5CF6;
-        }
-        .hero p {
-          font-size: 1.05rem;
-          color: #cbd5e1;
-          margin-bottom: 1.2rem;
-        }
+        .hero h1 .highlight { color: #8B5CF6; }
+        .hero p { font-size: 1.05rem; color: #ccc; margin-bottom: 1.2rem; }
         .hero-stats {
           display: flex;
           justify-content: center;
           gap: 1.5rem;
           flex-wrap: wrap;
         }
-        .hero-stats div {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
+        .stat-item {
           background: rgba(255,255,255,0.06);
           backdrop-filter: blur(8px);
-          padding: 0.4rem 1.2rem;
+          padding: 0.5rem 1.2rem;
           border-radius: 40px;
           border: 1px solid rgba(255,255,255,0.06);
+          display: flex;
+          align-items: center;
+          gap: 6px;
           font-weight: 600;
           font-size: 0.85rem;
-          color: #e2e8f0;
         }
+        .stat-value { font-weight: 800; color: #fff; }
+        .stat-label { font-weight: 400; color: #aaa; font-size: 0.75rem; margin-left: 2px; }
 
         /* ── Main Content ── */
         .main-content {
-          max-width: 500px;
+          max-width: 520px;
           margin: -2rem auto 2.5rem;
           padding: 0 1.5rem;
           position: relative;
@@ -612,18 +701,19 @@ function DailyScratchWin({ campaign }) {
           background: #fff;
           border-radius: 32px;
           padding: 1.5rem;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.08);
-          border: 1px solid #e2e8f0;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+          border: 1px solid #eef2f6;
           text-align: center;
+          transition: transform 0.3s ease;
         }
         .scratch-card {
           position: relative;
           width: 100%;
-          max-width: 400px;
+          max-width: 420px;
           margin: 0 auto;
           border-radius: 20px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.15);
           aspect-ratio: 4/3;
           background: #f5f3ff;
           cursor: pointer;
@@ -635,11 +725,136 @@ function DailyScratchWin({ campaign }) {
           touch-action: none;
           cursor: pointer;
         }
+        .shimmer-overlay {
+          position: absolute;
+          top: 0; left: -100%;
+          width: 60%;
+          height: 100%;
+          background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+          animation: shimmer 3s infinite;
+          pointer-events: none;
+        }
+        @keyframes shimmer { 0% { left: -100%; } 100% { left: 200%; } }
         .scratch-hint {
           margin-top: 1rem;
-          color: #64748b;
+          color: #6b7280;
           font-size: 0.85rem;
+          font-weight: 500;
         }
+
+        /* ── Claim Card ── */
+        .claim-card {
+          background: #fff;
+          border-radius: 32px;
+          padding: 2rem;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+          border: 1px solid #eef2f6;
+          animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .reward-reveal {
+          text-align: center;
+          padding: 1.5rem;
+          background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+          border-radius: 20px;
+          margin-bottom: 1.5rem;
+        }
+        .reward-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 1rem;
+          background: #fff;
+          padding: 0.5rem 1.5rem;
+          border-radius: 60px;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+          margin-bottom: 0.5rem;
+        }
+        .reward-image-wrapper {
+          width: 50px; height: 50px;
+          border-radius: 12px; overflow: hidden; flex-shrink: 0;
+        }
+        .reward-image { width: 100%; height: 100%; object-fit: cover; }
+        .reward-amount { font-size: 1.8rem; font-weight: 900; color: #8B5CF6; margin-right: 0.5rem; }
+        .reward-label { font-size: 0.7rem; font-weight: 700; color: #22C55E; text-transform: uppercase; letter-spacing: 0.5px; }
+        .reward-reveal p { color: #6b7280; font-size: 0.9rem; }
+
+        .form-section { margin-top: 0.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-weight: 600; font-size: 0.8rem; color: #374151; margin-bottom: 0.2rem; }
+        .form-group .required { color: #ef4444; }
+        .form-group input {
+          width: 100%;
+          padding: 0.75rem 1rem;
+          border: 2px solid #e5e7eb;
+          border-radius: 12px;
+          font-size: 0.9rem;
+          background: #f9fafb;
+          transition: all 0.2s ease;
+          outline: none;
+          font-family: inherit;
+        }
+        .form-group input:focus {
+          border-color: #8B5CF6;
+          background: #fff;
+          box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.08);
+        }
+        .form-group input.error { border-color: #ef4444; background: #fef2f2; }
+        .field-error {
+          display: block;
+          font-size: 0.75rem;
+          color: #ef4444;
+          margin-top: 0.2rem;
+          font-weight: 500;
+        }
+        .checkbox-group {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          margin: 0.8rem 0;
+          position: relative;
+        }
+        .checkbox-group input[type="checkbox"] {
+          width: 18px; height: 18px;
+          accent-color: #8B5CF6;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+        .checkbox-group label { font-size: 0.85rem; color: #4b5563; }
+        .checkbox-group label a { color: #8B5CF6; text-decoration: none; font-weight: 600; }
+        .checkbox-group .field-error { flex-basis: 100%; margin-left: 26px; }
+
+        .claim-btn {
+          width: 100%;
+          padding: 0.9rem;
+          background: linear-gradient(135deg, #8B5CF6, #EC4899);
+          border: none;
+          border-radius: 60px;
+          font-weight: 800;
+          font-size: 1rem;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+          box-shadow: 0 4px 20px rgba(139, 92, 246, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 0.5rem;
+        }
+        .claim-btn:hover:not(:disabled) { transform: translateY(-3px) scale(1.01); box-shadow: 0 8px 30px rgba(139, 92, 246, 0.35); }
+        .claim-btn:active:not(:disabled) { transform: scale(0.98); }
+        .claim-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .spinner {
+          display: inline-block;
+          width: 20px; height: 20px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ── Success Card ── */
         .success-card {
@@ -647,117 +862,53 @@ function DailyScratchWin({ campaign }) {
           border-radius: 32px;
           padding: 2.5rem 2rem;
           text-align: center;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.08);
-          border: 1px solid #e2e8f0;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+          border: 1px solid #eef2f6;
+          animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .success-icon { font-size: 3.5rem; margin-bottom: 0.5rem; }
-        .success-card h2 {
-          font-size: 1.8rem;
-          font-weight: 900;
-          color: #1e293b;
-          margin-bottom: 0.3rem;
-        }
-        .success-card p {
-          color: #64748b;
-          margin-bottom: 1.5rem;
-          font-size: 1rem;
-        }
-
-        .reward-display {
+        .success-icon { font-size: 4rem; margin-bottom: 0.5rem; }
+        .success-card h2 { font-size: 1.8rem; font-weight: 800; color: #1a1a2e; }
+        .success-card p { color: #6b7280; margin-bottom: 1.2rem; }
+        .claimed-reward {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 1rem;
+          gap: 0.8rem;
           background: #f5f3ff;
-          padding: 0.8rem 1.5rem;
+          padding: 0.6rem 1.2rem;
           border-radius: 60px;
-          margin: 0 auto 1.5rem;
-          max-width: 200px;
-          border: 1px solid #e5e7eb;
+          margin: 0 auto 1.2rem;
+          max-width: 180px;
         }
-        .reward-image-wrapper {
-          width: 48px;
-          height: 48px;
-          border-radius: 12px;
-          overflow: hidden;
-          flex-shrink: 0;
-        }
-        .reward-image {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .reward-amount {
-          font-size: 1.6rem;
-          font-weight: 900;
-          color: #8B5CF6;
-        }
-
+        .claimed-image { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; }
+        .claimed-amount { font-size: 1.4rem; font-weight: 800; color: #8B5CF6; }
         .success-info { margin-bottom: 1.5rem; }
-        .success-info p { color: #64748b; font-size: 0.9rem; }
+        .success-info p { color: #6b7280; font-size: 0.9rem; }
 
-        .continue-btn {
+        .btn-primary {
           width: 100%;
-          padding: 1.1rem;
+          padding: 0.9rem;
           background: linear-gradient(135deg, #8B5CF6, #EC4899);
           border: none;
           border-radius: 60px;
-          font-weight: 800;
-          font-size: 1.05rem;
+          font-weight: 700;
+          font-size: 1rem;
           color: #fff;
           cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
+          transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+          box-shadow: 0 4px 16px rgba(139, 92, 246, 0.2);
         }
-        .continue-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 35px rgba(139, 92, 246, 0.45); }
-        .continue-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .share-row {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 1rem;
-          margin-top: 1.2rem;
-          font-size: 0.9rem;
-          color: #64748b;
-          font-weight: 600;
-          flex-wrap: wrap;
-        }
-        .share-row button {
-          background: none;
-          border: none;
-          cursor: pointer;
-          transition: transform 0.2s;
-        }
-        .share-row button:hover { transform: scale(1.1); }
-
-        .spinner {
-          display: inline-block;
-          width: 20px;
-          height: 20px;
-          border: 3px solid rgba(255,255,255,0.3);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* ── How It Works ── */
-        .how-section {
-          padding: 3rem 1.5rem;
-          max-width: 900px;
-          margin: 0 auto;
-        }
+        .how-section { padding: 3rem 1.5rem; max-width: 900px; margin: 0 auto; }
         .section-title {
           font-size: 1.8rem;
           font-weight: 800;
           text-align: center;
           margin-bottom: 0.3rem;
-          color: #1e293b;
+          color: #1a1a2e;
         }
         .section-title::after {
           content: '';
@@ -768,12 +919,7 @@ function DailyScratchWin({ campaign }) {
           margin: 0.5rem auto 0;
           border-radius: 4px;
         }
-        .section-subtitle {
-          text-align: center;
-          color: #64748b;
-          font-size: 0.95rem;
-          margin-bottom: 2rem;
-        }
+        .section-subtitle { text-align: center; color: #6b7280; font-size: 0.95rem; margin-bottom: 2rem; }
         .steps {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -784,32 +930,24 @@ function DailyScratchWin({ campaign }) {
           padding: 1.5rem;
           border-radius: 20px;
           text-align: center;
-          border: 1px solid #e2e8f0;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-          transition: transform 0.2s;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+          border: 1px solid #eef2f6;
+          transition: all 0.3s ease;
         }
-        .step:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
+        .step:hover { transform: translateY(-6px); box-shadow: 0 12px 24px rgba(0,0,0,0.06); }
         .step-number {
-          width: 48px; height: 48px;
+          width: 44px; height: 44px;
           background: linear-gradient(135deg, #8B5CF6, #EC4899);
           border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-          font-size: 1.2rem;
-          color: #fff;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 900; font-size: 1.2rem; color: #fff;
           margin: 0 auto 0.6rem;
         }
-        .step-content h3 { font-size: 1rem; font-weight: 700; color: #1e293b; }
-        .step-content p { font-size: 0.85rem; color: #64748b; }
+        .step-content h3 { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; }
+        .step-content p { font-size: 0.8rem; color: #6b7280; }
 
         /* ── Rewards Section ── */
-        .rewards-section {
-          padding: 3rem 1.5rem;
-          max-width: 900px;
-          margin: 0 auto;
-        }
+        .rewards-section { padding: 3rem 1.5rem; max-width: 900px; margin: 0 auto; }
         .rewards-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -820,72 +958,45 @@ function DailyScratchWin({ campaign }) {
           border-radius: 20px;
           padding: 1.5rem 1rem;
           text-align: center;
-          border: 2px solid #e2e8f0;
-          transition: all 0.3s;
+          border: 2px solid #e5e7eb;
+          transition: all 0.3s ease;
         }
         .reward-card.active {
           border-color: #8B5CF6;
           background: #f5f3ff;
           box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.08);
+          animation: pulse-active 2s infinite;
         }
-        .reward-card.locked { opacity: 0.5; }
-        .reward-day {
-          font-size: 0.65rem;
-          font-weight: 700;
-          color: #94a3b8;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .reward-icon-wrapper {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background: #f1f5f9;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        @keyframes pulse-active { 0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.15); } 50% { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0.05); } 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.15); } }
+        .reward-card.locked { opacity: 0.6; filter: grayscale(0.3); }
+        .reward-day { font-size: 0.65rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+        .reward-image-wrapper {
+          width: 60px; height: 60px;
           margin: 0.3rem auto;
-          font-size: 1.2rem;
-          color: #8B5CF6;
+          border-radius: 12px;
+          overflow: hidden;
         }
-        .reward-card.active .reward-icon-wrapper { background: #ede9fe; }
-        .reward-amount-large {
-          font-size: 1.2rem;
-          font-weight: 900;
-          color: #1e293b;
-        }
+        .reward-image-small { width: 100%; height: 100%; object-fit: cover; }
+        .reward-amount-large { font-size: 1.2rem; font-weight: 900; color: #1a1a2e; }
         .reward-card.active .reward-amount-large { color: #8B5CF6; }
-        .reward-status {
-          display: block;
-          font-size: 0.6rem;
-          font-weight: 700;
-          margin-top: 0.3rem;
-          color: #94a3b8;
-        }
+        .reward-status { display: block; font-size: 0.6rem; font-weight: 700; margin-top: 0.3rem; color: #9ca3af; }
         .reward-card.active .reward-status { color: #22C55E; }
 
         /* ── Terms ── */
-        .terms-section {
-          padding: 3rem 1.5rem;
-          max-width: 900px;
-          margin: 0 auto;
-        }
+        .terms-section { padding: 3rem 1.5rem; max-width: 900px; margin: 0 auto; }
         .terms-content {
           background: #fff;
           padding: 1.8rem;
           border-radius: 20px;
-          border: 1px solid #e2e8f0;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+          border: 1px solid #eef2f6;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
-        .terms-content ul {
-          list-style: none;
-          padding: 0;
-        }
+        .terms-content ul { list-style: none; padding: 0; }
         .terms-content ul li {
           padding: 0.5rem 0 0.5rem 1.8rem;
           position: relative;
-          color: #475569;
-          border-bottom: 1px solid #f1f5f9;
+          color: #4b5563;
+          border-bottom: 1px solid #f3f4f6;
           font-size: 0.85rem;
         }
         .terms-content ul li::before {
@@ -896,124 +1007,95 @@ function DailyScratchWin({ campaign }) {
           font-weight: 700;
         }
         .terms-content ul li:last-child { border-bottom: none; }
-        .terms-content ul li strong { color: #1e293b; }
+        .terms-content ul li strong { color: #1a1a2e; }
 
         /* ── FAQ ── */
-        .faq-section {
-          padding: 3rem 1.5rem;
-          max-width: 700px;
-          margin: 0 auto;
-        }
-        .faq-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.8rem;
-        }
+        .faq-section { padding: 3rem 1.5rem; max-width: 700px; margin: 0 auto; }
+        .faq-list { display: flex; flex-direction: column; gap: 0.8rem; }
         .faq-item {
           background: #fff;
           border-radius: 16px;
           padding: 1rem 1.2rem;
-          border: 1px solid #e2e8f0;
-          transition: all 0.2s;
+          border: 1px solid #eef2f6;
+          transition: all 0.2s ease;
         }
-        .faq-item:hover { border-color: #8B5CF6; }
-        .faq-question {
-          font-weight: 700;
-          font-size: 0.9rem;
-          color: #1e293b;
-        }
-        .faq-answer p {
-          font-size: 0.85rem;
-          color: #64748b;
-          margin-top: 0.3rem;
-        }
+        .faq-item:hover { border-color: #8B5CF6; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .faq-question { font-weight: 700; font-size: 0.9rem; color: #1a1a2e; }
+        .faq-answer { font-size: 0.85rem; color: #6b7280; margin-top: 0.3rem; }
 
         /* ── Footer ── */
         .site-footer {
-          background: #1e293b;
-          color: #94a3b8;
+          background: #1a1a2e;
+          color: #9ca3af;
           padding: 2rem 1.5rem;
           text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.05);
-          margin-top: auto;
+          border-top: 1px solid rgba(255,255,255,0.04);
+          margin-top: 1rem;
         }
         .site-footer p { font-size: 0.75rem; margin-bottom: 0.2rem; }
-        .footer-contact { font-weight: 600; color: #cbd5e1; }
+        .footer-contact { font-weight: 600; color: #e5e7eb; }
 
         /* ── Modal ── */
         .modal-overlay {
-          position: fixed;
-          top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(15, 23, 42, 0.85);
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,0.85);
           backdrop-filter: blur(16px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          display: flex; align-items: center; justify-content: center;
           z-index: 9999;
+          padding: 1rem;
         }
         .modal-card {
-          background: #1e293b;
-          border-radius: 32px;
+          background: #1a1c22;
+          border-radius: 36px;
           padding: 2.5rem 2rem;
           max-width: 400px;
-          width: 90%;
+          width: 100%;
           text-align: center;
-          border: 1px solid rgba(139, 92, 246, 0.2);
-          box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+          border: 1px solid rgba(139, 92, 246, 0.15);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .modal-icon { font-size: 3rem; margin-bottom: 0.4rem; }
-        .modal-card h2 { font-size: 1.4rem; font-weight: 900; color: #fff; margin-bottom: 0.4rem; }
-        .modal-card p { color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.8rem; }
-        .modal-actions {
-          display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
-        }
+        .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
+        .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
+        .modal-card p { color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
         .modal-btn {
-          display: flex; align-items: center; gap: 0.4rem;
           background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.1);
-          padding: 0.7rem 1.2rem;
+          border: 1px solid rgba(255,255,255,0.08);
+          padding: 0.6rem 1.2rem;
           border-radius: 40px;
-          font-weight: 700;
-          font-size: 0.8rem;
+          font-weight: 600;
+          font-size: 0.75rem;
           color: #fff;
           cursor: pointer;
           transition: 0.2s;
           flex: 1;
-          min-width: 110px;
+          min-width: 100px;
         }
         .modal-btn:hover { background: rgba(255,255,255,0.12); }
-        .modal-btn.primary {
-          background: linear-gradient(135deg, #8B5CF6, #EC4899);
-          border: none;
-          color: #fff;
-        }
-        .modal-btn.primary:hover { opacity: 0.9; }
-        .modal-btn.ghost {
-          background: transparent;
-          border: none;
-          color: #64748b;
-          font-size: 0.75rem;
-          margin-top: 0.4rem;
-        }
+        .modal-btn.primary { background: #8B5CF6; border: none; }
+        .modal-btn.primary:hover { background: #7C3AED; }
+        .modal-btn.ghost { background: transparent; border: none; color: #666; font-size: 0.7rem; margin-top: 0.3rem; }
         .modal-btn.ghost:hover { color: #fff; }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
-          .steps { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+          .steps { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; gap: 1.2rem; }
           .rewards-grid { grid-template-columns: repeat(2, 1fr); }
           .hero-stats { gap: 0.8rem; }
-          .hero-stats div { font-size: 0.75rem; padding: 0.3rem 1rem; }
+          .stat-item { font-size: 0.75rem; padding: 0.4rem 0.8rem; }
           .scratch-card { max-width: 340px; }
-          .success-card { padding: 1.8rem 1.2rem; }
+          .main-content { padding: 0 1rem; }
         }
         @media (max-width: 480px) {
           .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
-          .main-content { padding: 0 1rem; }
+          .claim-card { padding: 1.5rem; }
+          .success-card { padding: 1.8rem 1.2rem; }
           .scratch-card { max-width: 300px; }
           .hero h1 { font-size: 1.8rem; }
-          .rewards-grid { grid-template-columns: 1fr 1fr; }
-          .rewards-section { padding: 2rem 1rem; }
-          .share-row { gap: 0.6rem; }
+          .rewards-grid { grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+          .reward-badge { flex-wrap: wrap; justify-content: center; }
+          .modal-card { padding: 2rem 1.2rem; }
         }
       `}} />
     </div>
