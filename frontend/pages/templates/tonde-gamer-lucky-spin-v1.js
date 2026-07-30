@@ -3,6 +3,35 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaGift,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaIdCard,
+  FaGamepad,
+  FaUserAstronaut,
+  FaGem,
+  FaYoutube,
+  FaTiktok,
+  FaFacebookF,
+  FaVolumeUp,
+  FaVolumeMute,
+  FaGlobe,
+  FaArrowRight,
+  FaTrophy,
+  FaFire,
+  FaStar,
+  FaDice,
+  FaSpinner,
+} from 'react-icons/fa';
+
+// ── Default Meta (Clean URL) ──
+const defaultMeta = {
+  title: 'TONDE GAMER – Free Fire Lucky Spin Event',
+  description: 'Join TONDE GAMER’s exclusive Free Fire Lucky Spin event. Win exclusive in-game rewards!',
+  image: 'https://maketrend.vercel.app/og-tonde-spin.jpg',
+  url: 'https://maketrend.vercel.app/tonde-gamer-lucky-spin-v1', // ✅ Clean base URL
+};
 
 // ── Wheel data (10 segments) ──
 const WHEEL_ITEMS = [
@@ -51,9 +80,16 @@ function TondeGamerLuckySpinV1({ campaign }) {
   const [assetsLoaded, setAssetsLoaded] = useState(0);
   const [showEntry, setShowEntry] = useState(true);
 
-
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── Detect WebView ──
   useEffect(() => {
@@ -66,7 +102,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
       setShowWebViewModal(true);
     }
   }, []);
-
 
   // ── Load persistent data ──
   useEffect(() => {
@@ -122,12 +157,11 @@ function TondeGamerLuckySpinV1({ campaign }) {
     });
   }, []);
 
-  // ── Draw wheel (takes optional rotation) ──
+  // ── Draw wheel ──
   const drawWheel = useCallback((rotation = systemRotation) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Ensure proper canvas internal resolution
     if (canvas.width !== 500 || canvas.height !== 500) {
       canvas.width = 500;
       canvas.height = 500;
@@ -142,7 +176,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Outer glow
     for (let i = 0; i < total; i++) {
       const start = i * angleStep + rotation;
       const end = (i + 1) * angleStep + rotation;
@@ -176,8 +209,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
       ctx.stroke();
 
       const midAngle = start + angleStep / 2;
-
-      // ── Icon ──
       const iconRadius = 140;
       const iconX = center + Math.cos(midAngle) * iconRadius;
       const iconY = center + Math.sin(midAngle) * iconRadius;
@@ -199,7 +230,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         ctx.stroke();
         ctx.shadowBlur = 0;
       } else {
-        // Fallback icon (always visible)
         ctx.font = '42px "Segoe UI", sans-serif';
         ctx.fillStyle = '#FFE0A3';
         ctx.shadowBlur = 6;
@@ -208,7 +238,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
         ctx.shadowBlur = 0;
       }
 
-      // ── Text along arc ──
       const textRadius = 205;
       const textX = center + Math.cos(midAngle) * textRadius;
       const textY = center + Math.sin(midAngle) * textRadius;
@@ -229,7 +258,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
       ctx.restore();
     }
 
-    // Center ring
     ctx.beginPath();
     ctx.arc(center, center, innerR - 4, 0, Math.PI * 2);
     ctx.fillStyle = '#07020ecc';
@@ -244,10 +272,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ctx.shadowBlur = 0;
   }, [systemRotation, cachedImages]);
 
-  // ── Redraw whenever rotation, cachedImages, or canvas visibility changes ──
   useEffect(() => {
     if (!showEntry && !showWebViewModal) {
-      // Use requestAnimationFrame to ensure canvas element is mounted in DOM before drawing
       const frameId = requestAnimationFrame(() => {
         drawWheel(systemRotation);
       });
@@ -396,7 +422,6 @@ function TondeGamerLuckySpinV1({ campaign }) {
     ));
   };
 
-
   // ── Main render ──
   return (
     <div className="page-container">
@@ -405,14 +430,14 @@ function TondeGamerLuckySpinV1({ campaign }) {
       {showWebViewModal && (
         <div className="modal-overlay active">
           <div className="modal-card">
-            <h2><i className="fas fa-external-link-alt"></i> Open in Browser</h2>
+            <h2><FaGlobe className="icon-inline" /> Open in Browser</h2>
             <p>This page works best in a full browser.</p>
             <div className="modal-actions">
               <button className="modal-btn" onClick={() => {
                 navigator.clipboard?.writeText(window.location.href);
                 setShowWebViewModal(false);
               }}>
-                <i className="fas fa-copy"></i> Copy Link
+                <FaCopy className="icon-inline" /> Copy Link
               </button>
               <button className="modal-btn primary" onClick={() => {
                 const url = window.location.href;
@@ -422,7 +447,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
                   window.open(url, '_system');
                 }
               }}>
-                <i className="fas fa-external-link-alt"></i> Open in Browser
+                <FaExternalLinkAlt className="icon-inline" /> Open in Browser
               </button>
             </div>
             <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>
@@ -436,10 +461,10 @@ function TondeGamerLuckySpinV1({ campaign }) {
       {showEntry && !showWebViewModal && (
         <div className="entry-overlay">
           <div className="entry-card">
-            <h2>🎡 LUCKY SPIN 🎡</h2>
+            <h2><FaDice className="icon-inline" /> LUCKY SPIN</h2>
             <p>by <strong>TONDE GAMER</strong></p>
             <div className="input-group">
-              <label><i className="fas fa-id-card"></i> Free Fire UID (8-11 digits)</label>
+              <label><FaIdCard className="icon-inline" /> Free Fire UID (8-11 digits)</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -451,7 +476,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
               />
               {uidError && <div className="uid-error">{uidError}</div>}
             </div>
-            <button className="entry-btn" onClick={handleSubmitUid}>🔥 ENTER EVENT 🔥</button>
+            <button className="entry-btn" onClick={handleSubmitUid}><FaFire className="icon-inline" /> ENTER EVENT</button>
             <div className="warning-text">One spin per UID • Reward sent to your UID</div>
           </div>
         </div>
@@ -475,18 +500,18 @@ function TondeGamerLuckySpinV1({ campaign }) {
                   <span className="tag-verified">TG</span>
                 </div>
                 <div className="game-details">
-                  <span><i className="fas fa-gamepad"></i> Game: TONDE FF</span>
-                  <span><i className="fas fa-id-card"></i> UID: {uid}</span>
+                  <span><FaGamepad className="icon-inline" /> Game: TONDE FF</span>
+                  <span><FaIdCard className="icon-inline" /> UID: {uid}</span>
                 </div>
               </div>
             </div>
             <div className="right-header-group">
               <div className="user-uid-badge">
-                <i className="fas fa-user-astronaut"></i>
+                <FaUserAstronaut className="icon-inline" />
                 <span className="uid-value">{uid}</span>
               </div>
               <div className="diamond-area">
-                <i className="fas fa-gem"></i>
+                <FaGem className="icon-inline" />
                 <span className="wallet-balance">999,999</span>
               </div>
             </div>
@@ -495,9 +520,9 @@ function TondeGamerLuckySpinV1({ campaign }) {
           {/* Branding */}
           <div className="branding-banner">
             <div className="flame-wrapper">
-              <span className="flame-graphic">🔥</span>
+              <span className="flame-graphic"><FaFire /></span>
               <span className="text-sub-glow">TONDE GAMER'S EXCLUSIVE</span>
-              <span className="flame-graphic">🔥</span>
+              <span className="flame-graphic"><FaFire /></span>
             </div>
             <div className="text-main-glow">LUCKY SPIN</div>
           </div>
@@ -518,31 +543,31 @@ function TondeGamerLuckySpinV1({ campaign }) {
             </div>
             {spinCompleted && (
               <div className="already-spun-info">
-                🏆 Already claimed: {WHEEL_ITEMS[savedPrizeIndex]?.name || 'Prize'}
+                <FaTrophy className="icon-inline" /> Already claimed: {WHEEL_ITEMS[savedPrizeIndex]?.name || 'Prize'}
               </div>
             )}
             {forcePrizeIndex && !spinCompleted && savedPrizeIndex !== null && (
               <div className="already-spun-info">
-                ✨ Your reserved reward: {WHEEL_ITEMS[savedPrizeIndex]?.name}! Spin again to win it ✨
+                <FaStar className="icon-inline" /> Your reserved reward: {WHEEL_ITEMS[savedPrizeIndex]?.name}! Spin again to win it
               </div>
             )}
           </div>
 
           {/* Guide */}
           <div className="guide-panel">
-            <div className="guide-heading">⚡ HOW TO PARTICIPATE ⚡</div>
+            <div className="guide-heading"><FaFire className="icon-inline" /> HOW TO PARTICIPATE</div>
             <div className="guide-steps-row">
               <div className="guide-step-card"><span>1️⃣</span>Connect UID</div>
               <div className="guide-step-card"><span>2️⃣</span>Spin Wheel</div>
               <div className="guide-step-card"><span>3️⃣</span>Claim Reward</div>
             </div>
-            <div className="claim-limitation-badge">✨ Limited 1 Item Per Fan ✨</div>
+            <div className="claim-limitation-badge"><FaStar className="icon-inline" /> Limited 1 Item Per Fan</div>
           </div>
 
           {/* Showcase */}
           <div className="showcase-panel">
             <div className="showcase-inner">
-              <div className="showcase-title">🔥 LIMITED TIME REWARDS 🔥</div>
+              <div className="showcase-title"><FaFire className="icon-inline" /> LIMITED TIME REWARDS</div>
               <div className="showcase-subtitle">Available Prizes inside the Wheel</div>
               <div className="showcase-grid">
                 {renderShowcase()}
@@ -562,15 +587,15 @@ function TondeGamerLuckySpinV1({ campaign }) {
           {/* Footer */}
           <div className="footer-branding-zone">
             <div className="social-link-row">
-              <a href="https://youtube.com/@tondegamer?si=nVxdpoPnOWVTQdTy" target="_blank" rel="noopener noreferrer"><i className="fab fa-youtube"></i></a>
-              <a href="https://www.tiktok.com/@tondeofficial?_r=1&_t=ZS-96b58CWT7G1" target="_blank" rel="noopener noreferrer"><i className="fab fa-tiktok"></i></a>
-              <a href="https://www.facebook.com/tondegamer" target="_blank" rel="noopener noreferrer"><i className="fab fa-facebook-f"></i></a>
+              <a href="https://youtube.com/@tondegamer?si=nVxdpoPnOWVTQdTy" target="_blank" rel="noopener noreferrer"><FaYoutube /></a>
+              <a href="https://www.tiktok.com/@tondeofficial?_r=1&_t=ZS-96b58CWT7G1" target="_blank" rel="noopener noreferrer"><FaTiktok /></a>
+              <a href="https://www.facebook.com/tondegamer" target="_blank" rel="noopener noreferrer"><FaFacebookF /></a>
             </div>
             <div className="footer-legal-text">TONDE GAMER OFFICIAL</div>
             <div className="audio-control-row" onClick={() => {
               setSoundEnabled(!soundEnabled);
             }}>
-              <i className={`fas ${soundEnabled ? 'fa-volume-up' : 'fa-volume-mute'}`}></i>
+              {soundEnabled ? <FaVolumeUp className="icon-inline" /> : <FaVolumeMute className="icon-inline" />}
               <span>{soundEnabled ? 'SOUND ON' : 'SOUND OFF'}</span>
             </div>
           </div>
@@ -581,8 +606,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
       {showSuccessModal && winningPrize && (
         <div className="modal-overlay active">
           <div className="modal-card success">
-            <i className="fas fa-gift" style={{ fontSize: '2.5rem', color: '#ffaa00' }}></i>
-            <h2>🎉 YOU WON!</h2>
+            <FaGift style={{ fontSize: '2.5rem', color: '#ffaa00' }} />
+            <h2><FaTrophy className="icon-inline" /> YOU WON!</h2>
             <img
               src={winningPrize.imgURL}
               alt={winningPrize.name}
@@ -592,13 +617,13 @@ function TondeGamerLuckySpinV1({ campaign }) {
             <p><strong>{winningPrize.name}</strong></p>
             <p className="success-desc">Reward sent to UID: {uid}</p>
             <button className="modal-btn primary" onClick={handleClaim}>
-              <i className="fas fa-gift"></i> Claim → Tasks
+              <FaGift className="icon-inline" /> Claim → Tasks
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Styles ── */}
+      {/* ── Enhanced Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800;900&family=Orbitron:wght@600;800;900&display=swap');
 
@@ -625,6 +650,12 @@ function TondeGamerLuckySpinV1({ campaign }) {
           padding: 16px 0 24px;
         }
 
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
+        }
+
         .entry-overlay {
           position: fixed;
           top:0; left:0; width:100%; height:100%;
@@ -644,6 +675,10 @@ function TondeGamerLuckySpinV1({ campaign }) {
           max-width: 340px;
           text-align: center;
           box-shadow: 0 0 40px rgba(255,85,0,0.5);
+          transition: box-shadow 0.3s ease;
+        }
+        .entry-card:hover {
+          box-shadow: 0 0 60px rgba(255,85,0,0.6);
         }
         .entry-card h2 {
           font-family: 'Orbitron', monospace;
@@ -660,6 +695,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
         .input-group input {
           width:100%; background:#0c0822; border:1px solid #ffaa33; border-radius:60px;
           padding:12px 16px; font-size:0.9rem; color:#fff; outline:none;
+          transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-group input:focus { border-color:#ffcc55; box-shadow:0 0 0 3px rgba(255,170,0,0.2); }
         .uid-error { color:#ff8866; font-size:0.7rem; margin-top:5px; }
@@ -668,8 +704,10 @@ function TondeGamerLuckySpinV1({ campaign }) {
           border:none; width:100%; padding:12px; border-radius:60px;
           font-weight:800; font-family:'Orbitron',monospace; font-size:1rem;
           color:#0f071f; cursor:pointer; box-shadow:0 0 12px #ff7700;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .entry-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
+        .entry-btn:hover { filter: brightness(1.1); transform: scale(1.02); box-shadow:0 0 20px #ff7700; }
+        .entry-btn:active { transform: scale(0.97); }
         .warning-text { margin-top:14px; font-size:0.65rem; color:#ffaa66; }
 
         .profile-header {
@@ -684,7 +722,8 @@ function TondeGamerLuckySpinV1({ campaign }) {
           gap:10px;
         }
         .profile-left { display:flex; align-items:center; gap:12px; }
-        .profile-avatar { width:48px; height:48px; border-radius:50%; border:2px solid #ffaa00; object-fit:cover; }
+        .profile-avatar { width:48px; height:48px; border-radius:50%; border:2px solid #ffaa00; object-fit:cover; transition: transform 0.3s ease; }
+        .profile-avatar:hover { transform: scale(1.05); }
         .profile-identity { display:flex; flex-direction:column; gap:4px; }
         .profile-title-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
         .profile-name {
@@ -701,12 +740,16 @@ function TondeGamerLuckySpinV1({ campaign }) {
         .user-uid-badge {
           display:flex; align-items:center; gap:6px;
           background:#0a0520cc; padding:5px 12px; border-radius:40px; border:1px solid #ffaa66;
+          transition: border-color 0.3s;
         }
+        .user-uid-badge:hover { border-color: #ffaa00; }
         .uid-value { font-weight:800; font-size:0.75rem; font-family:monospace; color:#FFD966; }
         .diamond-area {
           display:flex; align-items:center; gap:5px;
           background:#0a0520; padding:5px 12px; border-radius:40px; border:1px solid rgba(0,221,255,0.5);
+          transition: border-color 0.3s;
         }
+        .diamond-area:hover { border-color: rgba(0,221,255,0.8); }
         .diamond-area i { color:#00ddff; font-size:0.9rem; }
         .wallet-balance { font-weight:800; font-size:0.85rem; }
 
@@ -742,6 +785,10 @@ function TondeGamerLuckySpinV1({ campaign }) {
           border-radius:50%;
           background:radial-gradient(circle, #ffaa33 0%, #ff5500 60%, #220e4d 100%);
           box-shadow: 0 0 0 8px rgba(255,170,0,0.7), 0 20px 35px rgba(0,0,0,0.8), 0 0 40px #ffaa33, inset 0 0 15px rgba(255,200,100,0.7);
+          transition: box-shadow 0.3s ease;
+        }
+        .wheel-outer-ring:hover {
+          box-shadow: 0 0 0 8px rgba(255,170,0,0.8), 0 20px 40px rgba(0,0,0,0.9), 0 0 50px #ffaa33, inset 0 0 20px rgba(255,200,100,0.8);
         }
         #wheelCanvas {
           width:100% !important;
@@ -776,10 +823,14 @@ function TondeGamerLuckySpinV1({ campaign }) {
           justify-content:center;
           cursor:pointer;
           z-index:40;
-          transition:0.05s linear;
+          transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow:0 10px 25px black, 0 0 30px #ffaa44, inset 0 1px 4px rgba(255,255,200,0.8);
         }
-        .spin-trigger-core:active { transform:translate(-50%, -50%) scale(0.96); }
+        .spin-trigger-core:hover:not(.disabled) {
+          transform:translate(-50%, -50%) scale(1.05);
+          box-shadow:0 15px 35px black, 0 0 40px #ffaa44, inset 0 1px 4px rgba(255,255,200,0.8);
+        }
+        .spin-trigger-core:active:not(.disabled) { transform:translate(-50%, -50%) scale(0.95); }
         .spin-trigger-core.disabled {
           filter:grayscale(0.6);
           cursor:not-allowed;
@@ -806,11 +857,42 @@ function TondeGamerLuckySpinV1({ campaign }) {
           padding:14px;
           text-align:center;
           margin:0 16px;
+          transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .guide-panel:hover {
+          border-color: rgba(255,170,0,0.7);
+          box-shadow: 0 4px 20px rgba(255,170,0,0.1);
         }
         .guide-heading { font-family:'Orbitron'; color:#ffaa00; font-size:1rem; margin-bottom:10px; }
         .guide-steps-row { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
-        .guide-step-card { background:rgba(255,255,255,0.04); padding:8px 4px; border-radius:18px; font-size:0.7rem; font-weight:600; flex:1; min-width:60px; }
-        .claim-limitation-badge { margin-top:10px; background:rgba(255,68,0,0.2); border:1px solid #ffaa44; border-radius:30px; padding:4px 16px; display:inline-block; font-size:0.7rem; }
+        .guide-step-card {
+          background:rgba(255,255,255,0.04);
+          padding:8px 4px;
+          border-radius:18px;
+          font-size:0.7rem;
+          font-weight:600;
+          flex:1;
+          min-width:60px;
+          transition: all 0.3s ease;
+        }
+        .guide-step-card:hover {
+          background:rgba(255,170,0,0.15);
+          transform: translateY(-2px);
+        }
+        .claim-limitation-badge {
+          margin-top:10px;
+          background:rgba(255,68,0,0.2);
+          border:1px solid #ffaa44;
+          border-radius:30px;
+          padding:4px 16px;
+          display:inline-block;
+          font-size:0.7rem;
+          transition: all 0.3s ease;
+        }
+        .claim-limitation-badge:hover {
+          background:rgba(255,68,0,0.3);
+          transform: scale(1.02);
+        }
 
         .showcase-panel {
           background:linear-gradient(180deg,#130a2a 0%,#080314 100%);
@@ -833,12 +915,16 @@ function TondeGamerLuckySpinV1({ campaign }) {
           padding:0;
           text-align:center;
           border:1px solid rgba(255,170,0,0.4);
-          transition:all 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           display:flex;
           flex-direction:column;
           overflow:hidden;
         }
-        .showcase-card:hover { transform:translateY(-4px); border-color:#ffaa00; box-shadow:0 0 12px rgba(255,170,0,0.3); }
+        .showcase-card:hover {
+          transform:translateY(-6px) scale(1.02);
+          border-color:#ffaa00;
+          box-shadow:0 0 20px rgba(255,170,0,0.3);
+        }
         .showcase-img {
           width:100%;
           aspect-ratio:1/1;
@@ -855,13 +941,24 @@ function TondeGamerLuckySpinV1({ campaign }) {
           background:linear-gradient(135deg, #0f0622, #1c0e3a);
           border:1px solid rgba(255,170,0,0.5);
           box-shadow:0 10px 25px rgba(0,0,0,0.4);
+          transition: box-shadow 0.3s ease;
+        }
+        .featured-banner:hover {
+          box-shadow: 0 15px 35px rgba(0,0,0,0.5);
         }
         .featured-banner img { width:100%; height:auto; display:block; object-fit:cover; }
 
         .footer-branding-zone { text-align:center; margin-top:6px; }
         .social-link-row { display:flex; justify-content:center; gap:32px; margin-bottom:10px; }
-        .social-link-row a { color:#ffaa00; font-size:1.8rem; transition:0.2s; }
-        .social-link-row a:hover { color:#ffcc44; transform:scale(1.1); }
+        .social-link-row a {
+          color:#ffaa00;
+          font-size:1.8rem;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .social-link-row a:hover {
+          color:#ffcc44;
+          transform:scale(1.15);
+        }
         .footer-legal-text { font-size:0.6rem; color:#ffaa66; }
         .audio-control-row {
           margin-top:10px;
@@ -873,6 +970,11 @@ function TondeGamerLuckySpinV1({ campaign }) {
           padding:4px 16px;
           border-radius:40px;
           align-items:center;
+          transition: all 0.3s ease;
+        }
+        .audio-control-row:hover {
+          background:#1a0e3a;
+          transform: scale(1.02);
         }
 
         .modal-overlay {
@@ -886,7 +988,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
           z-index:1100;
           opacity:0;
           visibility:hidden;
-          transition:0.2s;
+          transition: all 0.3s ease;
         }
         .modal-overlay.active { opacity:1; visibility:visible; }
         .modal-card {
@@ -898,7 +1000,7 @@ function TondeGamerLuckySpinV1({ campaign }) {
           max-width:300px;
           text-align:center;
           transform:scale(0.7);
-          transition:transform 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .modal-overlay.active .modal-card { transform:scale(1); }
         .modal-card h2 { font-family:'Orbitron'; margin-bottom:8px; color:#ffaa00; font-size:1.2rem; }
@@ -912,19 +1014,26 @@ function TondeGamerLuckySpinV1({ campaign }) {
           font-weight:700;
           color:#fff;
           cursor:pointer;
-          transition:0.2s;
+          transition: all 0.3s ease;
           display:inline-flex;
           align-items:center;
           gap:6px;
           font-size:0.8rem;
         }
-        .modal-btn:hover { background:rgba(255,255,255,0.2); }
+        .modal-btn:hover {
+          background:rgba(255,255,255,0.2);
+          transform: translateY(-2px);
+        }
         .modal-btn.primary {
           background:#ffcc00;
           color:#1a1a2e;
           border:none;
         }
-        .modal-btn.primary:hover { background:#ffa500; }
+        .modal-btn.primary:hover {
+          background:#ffa500;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 16px rgba(255,204,0,0.3);
+        }
         .modal-btn.ghost {
           background:transparent;
           border:none;
@@ -970,9 +1079,4 @@ export async function getServerSideProps({ query }) {
   return { props: { campaign } };
 }
 
-export default withCampaignMeta(TondeGamerLuckySpinV1, {
-  title: 'TONDE GAMER – Free Fire Lucky Spin Event',
-  description: 'Join TONDE GAMER’s exclusive Free Fire Lucky Spin event. Win exclusive in-game rewards!',
-  image: 'https://maketrend.vercel.app/og-tonde-spin.jpg',
-  url: 'https://maketrend.vercel.app/tonde-gamer-lucky-spin-v1?id={id}',
-});
+export default withCampaignMeta(TondeGamerLuckySpinV1, defaultMeta);
