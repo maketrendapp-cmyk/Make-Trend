@@ -1,16 +1,15 @@
-
 // pages/templates/download-your-files.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
 
-// ── Default Meta ──
+// ── Default Meta (Clean base URL) ──
 const defaultMeta = {
   title: 'Download Your Files – Complete Tasks to Unlock',
   description: 'Get your files by completing a few simple tasks. Safe, secure, and free. Start now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/download-your-files?id={id}',
+  url: 'https://maketrend.app/download-your-files',
 };
 
 function DownloadYourFiles({ campaign }) {
@@ -18,8 +17,15 @@ function DownloadYourFiles({ campaign }) {
   const { id } = router.query;
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
+
+  // ── Clean URL if no id parameter is present ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -31,7 +37,7 @@ function DownloadYourFiles({ campaign }) {
     if (isWebView) setShowWebViewModal(true);
   }, []);
 
-  // ── Handle download click ──
+  // ── Handle download click (Instant feedback) ──
   const handleDownload = () => {
     setLoading(true);
     if (!id) {
@@ -56,7 +62,8 @@ function DownloadYourFiles({ campaign }) {
             <button
               className="modal-btn ghost"
               onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
+                const shareUrl = id ? `${window.location.origin}/download-your-files?id=${id}` : `${window.location.origin}/download-your-files`;
+                navigator.clipboard?.writeText(shareUrl);
                 alert('Link copied! Open Chrome/Safari and paste it.');
                 setShowWebViewModal(false);
               }}
@@ -274,7 +281,7 @@ function DownloadYourFiles({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── ENHANCED STYLES ─── */}
+      {/* ─── STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --primary: #6366f1;
