@@ -1,5 +1,4 @@
-
-// pages/templates/amazon-freebie.js
+// pages/templates/amazon-iphone-freebie.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
@@ -21,12 +20,12 @@ import {
   FaBoxOpen,
 } from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Amazon Prime Deals – Get iPhone 15 Pro Max Free!',
   description: 'Invite friends, cut the price, and get iPhone 15 Pro Max or electronics for free on Amazon. Limited time offer!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/amazon-iphone-freebie?id={id}',
+  url: 'https://maketrend.app/amazon-iphone-freebie', // ✅ Clean base URL
 };
 
 // ── Static Winner Data (Amazon themed) ──
@@ -45,6 +44,14 @@ function AmazonFreebie({ campaign }) {
   const [loading, setLoading] = useState(false);
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [claimedCount, setClaimedCount] = useState(19240);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -358,7 +365,7 @@ function AmazonFreebie({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── AMAZON STYLING & CSS ─── */}
+      {/* ─── ENHANCED AMAZON STYLING ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --amz-dark: #131921;
@@ -428,7 +435,9 @@ function AmazonFreebie({ campaign }) {
         .main-card {
           background: var(--bg-surface); border-radius: 8px; padding: 2rem 1.5rem; border: 1px solid var(--border-color);
           box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
+        .main-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
 
         /* Product Header */
         .product-header { display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.5rem; padding-bottom: 1.2rem; border-bottom: 1px solid #e7e7e7; }
@@ -469,8 +478,8 @@ function AmazonFreebie({ campaign }) {
         .share-section { margin-bottom: 1.5rem; }
         .share-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.8rem; text-align: center; }
         .share-buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin-bottom: 0.8rem; }
-        .share-btn { display: flex; align-items: center; gap: 5px; padding: 0.5rem 0.9rem; border-radius: 6px; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .share-btn:hover { filter: brightness(0.95); }
+        .share-btn { display: flex; align-items: center; gap: 5px; padding: 0.5rem 0.9rem; border-radius: 6px; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .share-btn:hover { transform: translateY(-2px); filter: brightness(0.95); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .share-btn.whatsapp { background: #25D366; color: #fff; }
         .share-btn.facebook { background: #1877F2; color: #fff; }
         .share-btn.instagram { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff; }
@@ -478,17 +487,19 @@ function AmazonFreebie({ campaign }) {
         .share-btn.telegram { background: #0088CC; color: #fff; }
 
         .share-actions { display: flex; gap: 0.6rem; justify-content: center; }
-        .share-action { display: flex; align-items: center; gap: 4px; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); background: #f7fafa; font-size: 0.75rem; font-weight: 500; color: #334155; cursor: pointer; }
-        .share-action:hover { background: #e3e6e6; }
+        .share-action { display: flex; align-items: center; gap: 4px; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); background: #f7fafa; font-size: 0.75rem; font-weight: 500; color: #334155; cursor: pointer; transition: all 0.2s ease; }
+        .share-action:hover { background: #e3e6e6; transform: scale(1.02); }
 
         /* Continue Button (Amazon Yellow Button) */
         .continue-btn {
           width: 100%; padding: 1rem; background: #FFD814; color: #0f1111;
           border: 1px solid #FCD200; border-radius: 8px; font-weight: 700; font-size: 1.05rem; cursor: pointer;
-          transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          display: flex; align-items: center; justify-content: center; gap: 8px;
           box-shadow: 0 2px 5px rgba(213, 217, 217, 0.5);
         }
-        .continue-btn:hover:not(:disabled) { background: #F7CA00; }
+        .continue-btn:hover:not(:disabled) { background: #F7CA00; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(213, 217, 217, 0.6); }
+        .continue-btn:active:not(:disabled) { transform: scale(0.98); }
         .continue-btn.loading { opacity: 0.8; cursor: wait; }
         .spinner { width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.2); border-top-color: #0f1111; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -515,7 +526,8 @@ function AmazonFreebie({ campaign }) {
         /* ── How It Works ── */
         .how-section { padding: 2rem 1rem; max-width: 900px; margin: 0 auto; width: 100%; }
         .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
-        .step-card { background: var(--bg-surface); padding: 1.5rem 1rem; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .step-card { background: var(--bg-surface); padding: 1.5rem 1rem; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.3s ease; }
+        .step-card:hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,0.06); }
         .step-number-wrap { width: 36px; height: 36px; background: rgba(255, 153, 0, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.8rem; color: #B12704; font-weight: 700; font-size: 0.95rem; }
         .step-card h3 { font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem; }
         .step-card p { font-size: 0.8rem; color: var(--text-muted); }
@@ -523,7 +535,8 @@ function AmazonFreebie({ campaign }) {
         /* ── FAQ ── */
         .faq-section { padding: 2rem 1rem 4rem; max-width: 700px; margin: 0 auto; width: 100%; }
         .faq-list { display: flex; flex-direction: column; gap: 0.8rem; }
-        .faq-item { background: var(--bg-surface); border-radius: 8px; padding: 1rem 1.2rem; border: 1px solid var(--border-color); display: flex; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .faq-item { background: var(--bg-surface); border-radius: 8px; padding: 1rem 1.2rem; border: 1px solid var(--border-color); display: flex; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: border-color 0.2s; }
+        .faq-item:hover { border-color: #FF9900; }
         .faq-icon { width: 24px; height: 24px; flex-shrink: 0; background: #eaeded; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text-muted); font-size: 0.8rem; }
         .faq-question { font-weight: 600; font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.2rem; }
         .faq-answer { font-size: 0.8rem; color: var(--text-muted); }
@@ -537,18 +550,20 @@ function AmazonFreebie({ campaign }) {
 
         /* ── Modal ── */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; }
-        .modal-card { background: #fff; border-radius: 8px; padding: 2rem 1.5rem; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-card { background: #fff; border-radius: 8px; padding: 2rem 1.5rem; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .modal-icon-container { width: 50px; height: 50px; background: #fff8e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
         .modal-icon { font-size: 1.5rem; }
         .modal-card h2 { font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem; }
         .modal-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
         .modal-actions { display: flex; flex-direction: column; gap: 8px; }
-        .modal-btn { padding: 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; }
+        .modal-btn { padding: 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: background 0.2s; }
         .modal-btn.primary { background: #FFD814; color: #0f1111; border: 1px solid #FCD200; }
         .modal-btn.primary:hover { background: #F7CA00; }
         .modal-btn.ghost { background: #eaeded; color: var(--text-main); border: 1px solid var(--border-color); }
         .modal-btn.ghost:hover { background: #d5d9d9; }
         .modal-btn.text-only { background: transparent; color: var(--text-muted); font-size: 0.75rem; margin-top: 0.5rem; }
+        .modal-btn.text-only:hover { color: var(--text-main); }
 
         /* ── Responsive Mobile Optimization ── */
         @media (max-width: 768px) {
@@ -557,6 +572,16 @@ function AmazonFreebie({ campaign }) {
           .main-card { padding: 1.5rem 1rem; }
           .hero { padding-top: 2rem; padding-bottom: 3.5rem; }
           .hero h1 { font-size: 1.9rem; }
+          .product-header { flex-direction: column; align-items: center; text-align: center; gap: 0.8rem; }
+          .product-image { width: 100px; height: 100px; }
+          .share-buttons { justify-content: center; }
+          .share-actions { flex-wrap: wrap; justify-content: center; }
+        }
+        @media (max-width: 480px) {
+          .header-badge { font-size: 0.6rem; padding: 0.25rem 0.6rem; }
+          .main-card { padding: 1.2rem 0.8rem; }
+          .price-section { padding: 0.8rem; }
+          .timer-section { flex-wrap: wrap; gap: 0.3rem; }
         }
       `}} />
     </div>
