@@ -1,5 +1,4 @@
-
-// pages/templates/flipkart-freebie.js
+// pages/templates/flipkart-iphone-freebie.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
@@ -19,17 +18,20 @@ import {
   FaUserCircle,
   FaClock,
   FaBolt,
+  FaArrowRight,
+  FaGlobe,
+  FaQuestionCircle,
 } from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Flipkart Big Billion Days – Get iPhone 15 & Electronics Free!',
   description: 'Invite friends, cut the price, and get rewards or electronics for free on Flipkart. Limited time offer!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/flipkart-iphone-freebie?id={id}',
+  url: 'https://maketrend.app/flipkart-iphone-freebie', // ✅ Clean base URL
 };
 
-// ── Static Winner Data (Flipkart themed) ──
+// ── Static Winner Data ──
 const WINNERS = [
   { name: 'amit_99***', product: 'iPhone 15 Pro (128GB)' },
   { name: 'pooja_sh***', product: 'Sony WH-1000XM4 Headphones' },
@@ -45,6 +47,14 @@ function FlipkartFreebie({ campaign }) {
   const [loading, setLoading] = useState(false);
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [claimedCount, setClaimedCount] = useState(14850);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -74,7 +84,7 @@ function FlipkartFreebie({ campaign }) {
     }
   };
 
-  // ── Share button handlers (visual feedback) ──
+  // ── Share button handlers ──
   const handleShare = () => {
     // Visual feedback only
   };
@@ -86,7 +96,7 @@ function FlipkartFreebie({ campaign }) {
       <div className="modal-overlay">
         <div className="modal-card">
           <div className="modal-icon-container">
-            <span className="modal-icon">🌐</span>
+            <FaGlobe className="modal-icon" />
           </div>
           <h2>Open in Browser</h2>
           <p>For the best experience and to track your Flipkart price cuts correctly, please open this page in your default browser.</p>
@@ -266,7 +276,10 @@ function FlipkartFreebie({ campaign }) {
                 <span className="spinner"></span> Processing...
               </>
             ) : (
-              'Claim Your Reward Now →'
+              <>
+                Claim Your Reward Now
+                <FaArrowRight className="w-4 h-4" />
+              </>
             )}
           </button>
         </div>
@@ -324,21 +337,27 @@ function FlipkartFreebie({ campaign }) {
         </div>
         <div className="faq-list">
           <div className="faq-item">
-            <div className="faq-icon">?</div>
+            <div className="faq-icon">
+              <FaQuestionCircle className="w-4 h-4" />
+            </div>
             <div>
               <div className="faq-question">Is this Flipkart promotion real?</div>
               <div className="faq-answer">Yes! This is part of our seasonal festive and flash event campaigns rewarding active users.</div>
             </div>
           </div>
           <div className="faq-item">
-            <div className="faq-icon">?</div>
+            <div className="faq-icon">
+              <FaQuestionCircle className="w-4 h-4" />
+            </div>
             <div>
               <div className="faq-question">Are there any delivery charges?</div>
               <div className="faq-answer">No, standard home delivery is completely free once your price cut reaches zero.</div>
             </div>
           </div>
           <div className="faq-item">
-            <div className="faq-icon">?</div>
+            <div className="faq-icon">
+              <FaQuestionCircle className="w-4 h-4" />
+            </div>
             <div>
               <div className="faq-question">How many friends do I need to invite?</div>
               <div className="faq-answer">It varies depending on random price drops, but most users achieve it with just a few active shares!</div>
@@ -358,7 +377,7 @@ function FlipkartFreebie({ campaign }) {
         </div>
       </footer>
 
-      {/* ─── FLIPKART STYLING & CSS ─── */}
+      {/* ─── ENHANCED FLIPKART STYLING ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --fk-blue: #2874F0;
@@ -428,11 +447,14 @@ function FlipkartFreebie({ campaign }) {
         .main-card {
           background: var(--bg-surface); border-radius: 12px; padding: 2rem 1.5rem; border: 1px solid var(--border-color);
           box-shadow: 0 4px 12px 0 rgba(0,0,0,0.1);
+          transition: box-shadow 0.3s ease;
         }
+        .main-card:hover { box-shadow: 0 8px 24px 0 rgba(0,0,0,0.15); }
 
         /* Product Header */
         .product-header { display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.5rem; padding-bottom: 1.2rem; border-bottom: 1px solid #f0f0f0; }
-        .product-image { width: 80px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; border: 1px solid #eee; background: #fafafa; }
+        .product-image { width: 80px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; border: 1px solid #eee; background: #fafafa; transition: transform 0.3s ease; }
+        .product-image:hover { transform: scale(1.02); }
         .product-img { width: 100%; height: 100%; object-fit: contain; }
         .product-info h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; }
         .product-meta { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; }
@@ -469,26 +491,29 @@ function FlipkartFreebie({ campaign }) {
         .share-section { margin-bottom: 1.5rem; }
         .share-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.8rem; text-align: center; }
         .share-buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin-bottom: 0.8rem; }
-        .share-btn { display: flex; align-items: center; gap: 5px; padding: 0.5rem 0.9rem; border-radius: 6px; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .share-btn:hover { filter: brightness(0.95); }
+        .share-btn { display: flex; align-items: center; gap: 5px; padding: 0.5rem 0.9rem; border-radius: 6px; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .share-btn:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .share-btn:active { transform: scale(0.96); }
         .share-btn.whatsapp { background: #25D366; color: #fff; }
         .share-btn.facebook { background: #1877F2; color: #fff; }
         .share-btn.instagram { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff; }
         .share-btn.twitter { background: #111; color: #fff; }
         .share-btn.telegram { background: #0088CC; color: #fff; }
 
-        .share-actions { display: flex; gap: 0.6rem; justify-content: center; }
-        .share-action { display: flex; align-items: center; gap: 4px; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); background: #f8fafc; font-size: 0.75rem; font-weight: 500; color: #334155; cursor: pointer; }
-        .share-action:hover { background: #f1f5f9; }
+        .share-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+        .share-action { display: flex; align-items: center; gap: 4px; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); background: #f8fafc; font-size: 0.75rem; font-weight: 500; color: #334155; cursor: pointer; transition: all 0.2s ease; }
+        .share-action:hover { background: #f1f5f9; transform: translateY(-2px); }
 
         /* Continue Button (Flipkart Orange) */
         .continue-btn {
           width: 100%; padding: 1rem; background: var(--fk-orange); color: #fff;
           border: none; border-radius: 8px; font-weight: 700; font-size: 1.05rem; cursor: pointer;
-          transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          display: flex; align-items: center; justify-content: center; gap: 8px;
           box-shadow: 0 2px 4px 0 rgba(0,0,0,0.2); text-transform: uppercase; letter-spacing: 0.5px;
         }
-        .continue-btn:hover:not(:disabled) { background: #e55a14; }
+        .continue-btn:hover:not(:disabled) { background: #e55a14; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+        .continue-btn:active:not(:disabled) { transform: scale(0.98); }
         .continue-btn.loading { opacity: 0.8; cursor: wait; }
         .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -510,20 +535,25 @@ function FlipkartFreebie({ campaign }) {
         .win-info { display: flex; flex-direction: column; gap: 1px; }
         .win-name { font-weight: 600; font-size: 0.8rem; color: var(--text-main); }
         .win-product { font-size: 0.75rem; color: var(--text-muted); }
+        .text-white { color: #fff; }
 
         /* ── How It Works ── */
         .how-section { padding: 2rem 1rem; max-width: 900px; margin: 0 auto; width: 100%; }
         .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
-        .step-card { background: var(--bg-surface); padding: 1.5rem 1rem; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .step-number-wrap { width: 36px; height: 36px; background: rgba(40, 116, 240, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.8rem; color: var(--fk-blue); font-weight: 700; font-size: 0.95rem; }
+        .step-card { background: var(--bg-surface); padding: 1.5rem 1rem; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.3s ease; }
+        .step-card:hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,0.08); border-color: var(--fk-blue); }
+        .step-number-wrap { width: 36px; height: 36px; background: rgba(40, 116, 240, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.8rem; color: var(--fk-blue); font-weight: 700; font-size: 0.95rem; transition: all 0.3s ease; }
+        .step-card:hover .step-number-wrap { background: var(--fk-blue); color: #fff; }
         .step-card h3 { font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem; }
         .step-card p { font-size: 0.8rem; color: var(--text-muted); }
 
         /* ── FAQ ── */
         .faq-section { padding: 2rem 1rem 4rem; max-width: 700px; margin: 0 auto; width: 100%; }
         .faq-list { display: flex; flex-direction: column; gap: 0.8rem; }
-        .faq-item { background: var(--bg-surface); border-radius: 8px; padding: 1rem 1.2rem; border: 1px solid var(--border-color); display: flex; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .faq-icon { width: 24px; height: 24px; flex-shrink: 0; background: #f1f3f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text-muted); font-size: 0.8rem; }
+        .faq-item { background: var(--bg-surface); border-radius: 8px; padding: 1rem 1.2rem; border: 1px solid var(--border-color); display: flex; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.3s ease; }
+        .faq-item:hover { border-color: var(--fk-blue); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .faq-icon { width: 28px; height: 28px; flex-shrink: 0; background: #f1f3f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.9rem; transition: color 0.3s ease; }
+        .faq-item:hover .faq-icon { color: var(--fk-blue); }
         .faq-question { font-weight: 600; font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.2rem; }
         .faq-answer { font-size: 0.8rem; color: var(--text-muted); }
 
@@ -536,18 +566,20 @@ function FlipkartFreebie({ campaign }) {
 
         /* ── Modal ── */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem; }
-        .modal-card { background: #fff; border-radius: 12px; padding: 2rem 1.5rem; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-card { background: #fff; border-radius: 12px; padding: 2rem 1.5rem; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes modalIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .modal-icon-container { width: 50px; height: 50px; background: rgba(40, 116, 240, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
-        .modal-icon { font-size: 1.5rem; }
+        .modal-icon { font-size: 1.5rem; color: var(--fk-blue); }
         .modal-card h2 { font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem; }
         .modal-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
         .modal-actions { display: flex; flex-direction: column; gap: 8px; }
-        .modal-btn { padding: 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; }
+        .modal-btn { padding: 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: all 0.2s ease; }
         .modal-btn.primary { background: var(--fk-orange); color: #fff; }
-        .modal-btn.primary:hover { background: #e55a14; }
+        .modal-btn.primary:hover { background: #e55a14; transform: translateY(-2px); }
         .modal-btn.ghost { background: #f1f3f6; color: var(--text-main); border: 1px solid var(--border-color); }
         .modal-btn.ghost:hover { background: #e2e8f0; }
         .modal-btn.text-only { background: transparent; color: var(--text-muted); font-size: 0.75rem; margin-top: 0.5rem; }
+        .modal-btn.text-only:hover { color: var(--text-main); }
 
         /* ── Responsive Mobile Optimization ── */
         @media (max-width: 768px) {
@@ -556,6 +588,17 @@ function FlipkartFreebie({ campaign }) {
           .main-card { padding: 1.5rem 1rem; }
           .hero { padding-top: 2rem; padding-bottom: 3.5rem; }
           .hero h1 { font-size: 1.9rem; }
+          .product-header { flex-direction: column; align-items: center; text-align: center; gap: 0.8rem; }
+          .product-image { width: 100px; height: 100px; }
+          .share-buttons { justify-content: center; }
+          .share-actions { flex-wrap: wrap; justify-content: center; }
+        }
+        @media (max-width: 480px) {
+          .header-badge { font-size: 0.6rem; padding: 0.25rem 0.6rem; }
+          .main-card { padding: 1.2rem 0.8rem; }
+          .price-section { padding: 0.8rem; }
+          .timer-section { flex-wrap: wrap; gap: 0.3rem; }
+          .continue-btn { font-size: 1rem; padding: 0.9rem; }
         }
       `}} />
     </div>
