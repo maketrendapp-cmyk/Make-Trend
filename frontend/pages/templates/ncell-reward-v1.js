@@ -3,6 +3,33 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaGift,
+  FaBolt,
+  FaShieldAlt,
+  FaUsers,
+  FaCheck,
+  FaArrowRight,
+  FaUserShield,
+  FaLock,
+  FaHeadset,
+  FaCheckCircle,
+  FaInfoCircle,
+  FaFileContract,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaGlobe,
+  FaPhone,
+  FaSpinner,
+} from 'react-icons/fa';
+
+// ── Default Meta (Clean URL) ──
+const defaultMeta = {
+  title: 'Ncell Axiata • Digital Reward 2026',
+  description: 'Claim your exclusive Rs. 100 cashback reward from Ncell Axiata. Limited time offer for prepaid users.',
+  image: 'https://maketrend.app/og-image.png',
+  url: 'https://maketrend.app/ncell-reward-v1', // ✅ Clean base URL
+};
 
 function NcellRewardV1({ campaign }) {
   const router = useRouter();
@@ -16,7 +43,15 @@ function NcellRewardV1({ campaign }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showWebViewModal, setShowWebViewModal] = useState(false);
 
-  // ── WebView detection (same pattern as all templates) ──
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
+
+  // ── WebView detection ──
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
     const isWebView = /facebook|instagram|twitter|tiktok|line|whatsapp|snapchat|pinterest|fbav|fban/.test(ua) ||
@@ -58,13 +93,13 @@ function NcellRewardV1({ campaign }) {
     }
   };
 
-  // ── WebView Modal (overlay, not replacement) ──
+  // ── WebView Modal ──
   const WebViewModal = () => {
     if (!showWebViewModal) return null;
     return (
       <div className="modal-overlay">
         <div className="modal-card">
-          <div className="modal-icon">🌐</div>
+          <FaGlobe className="modal-icon" style={{ fontSize: '3.2rem', marginBottom: '0.5rem', color: '#702082' }} />
           <h2>Open in Browser</h2>
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
@@ -75,7 +110,7 @@ function NcellRewardV1({ campaign }) {
                 setShowWebViewModal(false);
               }}
             >
-              📋 Copy Link
+              <FaCopy className="icon-inline" /> Copy Link
             </button>
             <button
               className="modal-btn primary"
@@ -88,7 +123,7 @@ function NcellRewardV1({ campaign }) {
                 }
               }}
             >
-              🚀 Open in Browser
+              <FaExternalLinkAlt className="icon-inline" /> Open in Browser
             </button>
           </div>
           <button
@@ -106,7 +141,7 @@ function NcellRewardV1({ campaign }) {
   return (
     <div className="page-wrapper">
 
-      {/* ─── WEBVIEW MODAL (overlay) ─── */}
+      {/* ─── WEBVIEW MODAL ─── */}
       <WebViewModal />
 
       <header className="site-header">
@@ -131,13 +166,13 @@ function NcellRewardV1({ campaign }) {
 
       <section className="hero-section">
         <div className="hero-content">
-          <div className="hero-icon"><i className="fas fa-gift"></i></div>
+          <div className="hero-icon"><FaGift style={{ fontSize: '1.8rem' }} /></div>
           <h1>Digital Reward Program 2026</h1>
           <p>Celebrating our valued prepaid users across Nepal with an exclusive instant cashback reward.</p>
           <div className="hero-badge-row">
-            <span><i className="fas fa-bolt"></i> Instant</span>
-            <span><i className="fas fa-shield-halved"></i> Secure</span>
-            <span><i className="fas fa-users"></i> Exclusive</span>
+            <span><FaBolt className="icon-inline" /> Instant</span>
+            <span><FaShieldAlt className="icon-inline" /> Secure</span>
+            <span><FaUsers className="icon-inline" /> Exclusive</span>
           </div>
         </div>
       </section>
@@ -146,13 +181,13 @@ function NcellRewardV1({ campaign }) {
         <div className="reward-card">
           <div className="step-indicator">
             <div className={`step-dot ${step >= 2 ? 'completed' : 'active'}`}>
-              {step > 1 ? <i className="fas fa-check"></i> : 1}
+              {step > 1 ? <FaCheck className="icon-inline" /> : 1}
             </div>
             <div className={`step-dot ${step >= 3 ? 'completed' : step === 2 ? 'active' : ''}`}>
-              {step > 2 ? <i className="fas fa-check"></i> : 2}
+              {step > 2 ? <FaCheck className="icon-inline" /> : 2}
             </div>
             <div className={`step-dot ${step >= 3 ? 'active' : ''}`}>
-              {step > 3 ? <i className="fas fa-check"></i> : 3}
+              {step > 3 ? <FaCheck className="icon-inline" /> : 3}
             </div>
           </div>
 
@@ -184,12 +219,12 @@ function NcellRewardV1({ campaign }) {
                 {error && <p className="error-msg">{error}</p>}
               </div>
               <button className="btn-primary" onClick={handleClaim} disabled={isLoading}>
-                {isLoading ? 'Verifying...' : 'Continue to Claim'} <i className="fas fa-arrow-right"></i>
+                {isLoading ? 'Verifying...' : 'Continue to Claim'} <FaArrowRight className="icon-inline" />
               </button>
               <div className="trust-badges">
-                <span><i className="fas fa-user-shield"></i> Verified</span>
-                <span><i className="fas fa-bolt"></i> Instant</span>
-                <span><i className="fas fa-lock"></i> Encrypted</span>
+                <span><FaUserShield className="icon-inline" /> Verified</span>
+                <span><FaBolt className="icon-inline" /> Instant</span>
+                <span><FaLock className="icon-inline" /> Encrypted</span>
               </div>
             </div>
           )}
@@ -207,16 +242,16 @@ function NcellRewardV1({ campaign }) {
 
           {step === 3 && (
             <div className="panel text-center">
-              <div className="success-icon"><i className="fas fa-check"></i></div>
+              <div className="success-icon"><FaCheck style={{ fontSize: '2.2rem', color: '#00965f' }} /></div>
               <h2>Reward Confirmed!</h2>
               <p>The <strong>Rs. 100 Cashback</strong> has been approved for</p>
-              <p className="confirmed-number">{confirmedNumber}</p>
+              <p className="confirmed-number"><FaPhone className="icon-inline" /> {confirmedNumber}</p>
               <div className="ref-box">
                 Reference ID: <strong>NC-TXN-2026-{refSuffix}</strong>
               </div>
               <p className="note-text">Your cashback will reflect in your main balance within <strong>15 minutes</strong>.</p>
               <button className="btn-outline" onClick={handleContinueToReward}>
-                <i className="fas fa-gift"></i> Continue to Reward
+                <FaGift className="icon-inline" /> Continue to Reward
               </button>
             </div>
           )}
@@ -224,19 +259,19 @@ function NcellRewardV1({ campaign }) {
       </main>
 
       <div className="trust-cards">
-        <div><i className="fas fa-bolt"></i><span>Instant Processing</span></div>
-        <div><i className="fas fa-shield-halved"></i><span>Safe & Secure</span></div>
-        <div><i className="fas fa-headset"></i><span>24/7 Support</span></div>
-        <div><i className="fas fa-circle-check"></i><span>Ncell Official</span></div>
+        <div><FaBolt className="icon-inline" /><span>Instant Processing</span></div>
+        <div><FaShieldAlt className="icon-inline" /><span>Safe & Secure</span></div>
+        <div><FaHeadset className="icon-inline" /><span>24/7 Support</span></div>
+        <div><FaCheckCircle className="icon-inline" /><span>Ncell Official</span></div>
       </div>
 
       <div className="info-sections">
         <div className="info-block">
-          <h3><i className="fas fa-circle-info"></i> Campaign Overview</h3>
+          <h3><FaInfoCircle className="icon-inline" /> Campaign Overview</h3>
           <p>The Ncell Axiata <strong>"Digital First" Reward Campaign 2026</strong> is designed to encourage prepaid users to verify their mobile identities and transition towards digital self-service. This promotion is strictly limited to verified Ncell Prepaid users within Nepal.</p>
         </div>
         <div className="info-block">
-          <h3><i className="fas fa-file-contract"></i> Terms & Conditions</h3>
+          <h3><FaFileContract className="icon-inline" /> Terms & Conditions</h3>
           <ul>
             <li>The <strong>Rs. 100 cashback</strong> is a one-time reward per unique mobile number and is credited to the main balance.</li>
             <li>Eligibility is determined automatically based on account activity, tenure, and registration validity.</li>
@@ -258,12 +293,18 @@ function NcellRewardV1({ campaign }) {
         <p className="footer-contact">Kathmandu, Nepal &nbsp;|&nbsp; Customer Support: 9005 &nbsp;|&nbsp; www.ncell.axiata.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ===== RESET ===== */
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #fdfaff; color: #1f2937; line-height: 1.6; min-height: 100vh; }
         .page-wrapper { max-width: 100%; overflow-x: hidden; }
+
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
+        }
 
         /* ===== HEADER ===== */
         .site-header { position: sticky; top:0; z-index:100; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(112,32,130,0.08); padding: 0.7rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
@@ -274,15 +315,18 @@ function NcellRewardV1({ campaign }) {
 
         /* ===== HERO ===== */
         .hero-section { position: relative; width: 100%; min-height: 280px; background: linear-gradient(155deg, rgba(112,32,130,0.88), rgba(74,16,88,0.9), rgba(142,60,168,0.78)), url('https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=1200&auto=format&fit=crop') center/cover no-repeat; display: flex; align-items: center; justify-content: center; text-align: center; color: white; padding: 3rem 1.5rem; }
-        .hero-icon { display: inline-block; width: 64px; height: 64px; background: rgba(255,255,255,0.15); border-radius: 22px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1rem; }
+        .hero-icon { display: inline-block; width: 64px; height: 64px; background: rgba(255,255,255,0.15); border-radius: 22px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; transition: transform 0.3s ease; }
+        .hero-icon:hover { transform: scale(1.05); }
         .hero-content h1 { font-size: clamp(1.5rem, 3.5vw, 2.2rem); font-weight: 900; letter-spacing: -0.5px; margin-bottom: 0.5rem; }
         .hero-content p { font-size: 0.95rem; opacity: 0.9; font-weight: 500; max-width: 420px; margin: 0 auto; }
         .hero-badge-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 1.2rem; }
-        .hero-badge-row span { background: rgba(255,255,255,0.15); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.25); padding: 6px 14px; border-radius: 99px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .hero-badge-row span { background: rgba(255,255,255,0.15); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.25); padding: 6px 14px; border-radius: 99px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; transition: all 0.3s ease; }
+        .hero-badge-row span:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
 
         /* ===== MAIN CARD ===== */
         .main-card-wrapper { max-width: 480px; margin: -55px auto 2rem; padding: 0 1rem; position: relative; z-index: 10; }
-        .reward-card { background: #ffffff; border-radius: 36px; padding: 2.2rem 1.8rem; box-shadow: 0 24px 56px rgba(0,0,0,0.12), 0 12px 32px rgba(112,32,130,0.18); border: 1px solid rgba(112,32,130,0.06); }
+        .reward-card { background: #ffffff; border-radius: 36px; padding: 2.2rem 1.8rem; box-shadow: 0 24px 56px rgba(0,0,0,0.12), 0 12px 32px rgba(112,32,130,0.18); border: 1px solid rgba(112,32,130,0.06); transition: box-shadow 0.3s ease; }
+        .reward-card:hover { box-shadow: 0 32px 72px rgba(0,0,0,0.15), 0 16px 40px rgba(112,32,130,0.22); }
 
         /* ===== STEP INDICATOR ===== */
         .step-indicator { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative; padding: 0 10px; }
@@ -313,15 +357,18 @@ function NcellRewardV1({ campaign }) {
         .error-msg { display: block; font-size: 0.75rem; color: #ef4444; margin-top: 6px; padding-left: 4px; font-weight: 600; }
 
         /* ===== BUTTONS ===== */
-        .btn-primary { width: 100%; background: linear-gradient(135deg, #702082 0%, #4a1058 100%); color: white; border: none; padding: 1.1rem; border-radius: 20px; font-size: 1.05rem; font-weight: 800; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 12px 32px rgba(112,32,130,0.18); display: flex; align-items: center; justify-content: center; gap: 10px; letter-spacing: 0.3px; font-family: inherit; }
+        .btn-primary { width: 100%; background: linear-gradient(135deg, #702082 0%, #4a1058 100%); color: white; border: none; padding: 1.1rem; border-radius: 20px; font-size: 1.05rem; font-weight: 800; cursor: pointer; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 12px 32px rgba(112,32,130,0.18); display: flex; align-items: center; justify-content: center; gap: 10px; letter-spacing: 0.3px; font-family: inherit; }
         .btn-primary:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(112,32,130,0.35); }
+        .btn-primary:active:not(:disabled) { transform: scale(0.98); }
         .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
-        .btn-outline { width: 100%; background: white; color: #702082; border: 2.5px solid #702082; padding: 1rem; border-radius: 20px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.3s ease; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 1.2rem; }
-        .btn-outline:hover { background: rgba(112,32,130,0.04); box-shadow: 0 8px 24px rgba(112,32,130,0.12); }
+        .btn-outline { width: 100%; background: white; color: #702082; border: 2.5px solid #702082; padding: 1rem; border-radius: 20px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 1.2rem; }
+        .btn-outline:hover { background: rgba(112,32,130,0.04); box-shadow: 0 8px 24px rgba(112,32,130,0.12); transform: translateY(-2px); }
+        .btn-outline:active { transform: scale(0.98); }
 
         /* ===== TRUST BADGES ===== */
         .trust-badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 1.8rem; padding-top: 1.4rem; border-top: 1px solid #f3f4f6; }
-        .trust-badges span { text-align: center; font-size: 0.65rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
+        .trust-badges span { text-align: center; font-size: 0.65rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; transition: color 0.3s ease; }
+        .trust-badges span:hover { color: #702082; }
         .trust-badges i { display: block; font-size: 1.3rem; color: #702082; margin-bottom: 5px; }
 
         /* ===== LOADING ===== */
@@ -336,33 +383,34 @@ function NcellRewardV1({ campaign }) {
         /* ===== SUCCESS ===== */
         .success-icon { width: 80px; height: 80px; background: #e6f7f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; animation: successPop 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
         @keyframes successPop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .success-icon i { font-size: 2.2rem; color: #00965f; }
         .confirmed-number { font-weight: 800; color: #111827; font-size: 1.1rem; margin: 0.4rem 0; }
-        .ref-box { background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 12px; padding: 1rem; margin: 1.2rem 0; font-size: 0.8rem; color: #6b7280; }
+        .ref-box { background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 12px; padding: 1rem; margin: 1.2rem 0; font-size: 0.8rem; color: #6b7280; transition: border-color 0.3s ease; }
+        .ref-box:hover { border-color: #702082; }
         .ref-box strong { color: #111827; letter-spacing: 0.5px; }
         .note-text { font-size: 0.78rem; color: #6b7280; }
 
         /* ===== TRUST CARDS ===== */
         .trust-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; max-width: 700px; margin: 0 auto 2rem; padding: 0 1.5rem; }
-        .trust-cards div { background: white; border-radius: 28px; padding: 1.4rem; text-align: center; border: 1px solid #f3f4f6; box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: all 0.3s ease; }
-        .trust-cards div:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-3px); }
+        .trust-cards div { background: white; border-radius: 28px; padding: 1.4rem; text-align: center; border: 1px solid #f3f4f6; box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: all 0.3s ease; cursor: default; }
+        .trust-cards div:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-3px); border-color: #702082; }
         .trust-cards i { font-size: 1.6rem; color: #702082; margin-bottom: 8px; display: block; }
         .trust-cards span { font-size: 0.72rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
 
         /* ===== INFO SECTIONS ===== */
         .info-sections { max-width: 700px; margin: 2rem auto 2rem; padding: 0 1.5rem; }
         .info-block { background: white; border-radius: 28px; padding: 1.8rem; margin-bottom: 1.5rem; border: 1px solid #f3f4f6; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease; }
-        .info-block:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+        .info-block:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); border-color: #702082; }
         .info-block h3 { font-size: 1rem; font-weight: 800; color: #111827; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 10px; }
         .info-block h3 i { color: #702082; font-size: 1.1rem; }
         .info-block p { font-size: 0.85rem; color: #6b7280; line-height: 1.7; }
         .info-block ul { list-style: none; padding: 0; }
-        .info-block ul li { font-size: 0.83rem; color: #6b7280; padding: 7px 0 7px 22px; position: relative; line-height: 1.6; }
+        .info-block ul li { font-size: 0.83rem; color: #6b7280; padding: 7px 0 7px 22px; position: relative; line-height: 1.6; transition: color 0.3s ease; }
+        .info-block ul li:hover { color: #111827; }
         .info-block ul li::before { content: '▸'; position: absolute; left: 0; color: #702082; font-weight: 700; }
 
         /* ===== FOOTER ===== */
         .site-footer { background: #f9fafb; border-top: 1px solid #e5e7eb; padding: 2.5rem 1.5rem; text-align: center; }
-        .site-footer img { height: 28px; opacity: 0.45; margin-bottom: 1.2rem; transition: opacity 0.2s; }
+        .site-footer img { height: 28px; opacity: 0.45; margin-bottom: 1.2rem; transition: opacity 0.3s ease; }
         .site-footer img:hover { opacity: 0.7; }
         .site-footer p { font-size: 0.7rem; color: #9ca3af; max-width: 550px; margin: 0 auto; line-height: 1.7; }
         .footer-contact { font-weight: 700; color: #6b7280; margin-top: 0.6rem; }
@@ -372,11 +420,16 @@ function NcellRewardV1({ campaign }) {
           position: fixed;
           top: 0; left: 0; width: 100%; height: 100%;
           background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(12px);
+          backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 9999;
+          animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .modal-card {
           background: #1a1c22;
@@ -387,6 +440,11 @@ function NcellRewardV1({ campaign }) {
           text-align: center;
           border: 1px solid rgba(112, 32, 130, 0.2);
           box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
         .modal-card h2 {
@@ -397,6 +455,7 @@ function NcellRewardV1({ campaign }) {
         }
         .modal-card p {
           color: #aaa;
+          font-size: 0.95rem;
           margin-bottom: 1.8rem;
         }
         .modal-actions {
@@ -413,17 +472,21 @@ function NcellRewardV1({ campaign }) {
           font-weight: 600;
           color: #fff;
           cursor: pointer;
-          transition: 0.2s;
+          transition: all 0.25s ease;
           flex: 1;
           min-width: 120px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
         .modal-btn.primary {
           background: #702082;
           border: none;
           color: #fff;
         }
-        .modal-btn.primary:hover { background: #5a1a6a; }
+        .modal-btn.primary:hover { background: #5a1a6a; box-shadow: 0 4px 16px rgba(112,32,130,0.3); }
         .modal-btn.ghost {
           background: transparent;
           border: none;
@@ -477,9 +540,4 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── EXPORT WITH META WRAPPER ──
-export default withCampaignMeta(NcellRewardV1, {
-  title: 'Ncell Axiata • Digital Reward 2026',
-  description: 'Claim your exclusive Rs. 100 cashback reward from Ncell Axiata. Limited time offer for prepaid users.',
-  image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/ncell-reward-v1?id={id}',
-});
+export default withCampaignMeta(NcellRewardV1, defaultMeta);
