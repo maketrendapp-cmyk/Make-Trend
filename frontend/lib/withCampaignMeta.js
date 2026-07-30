@@ -9,7 +9,7 @@ export function withCampaignMeta(Component, defaultMeta) {
           title: campaign.title,
           description: campaign.description,
           image: campaign.image || defaultMeta.image,
-          url: defaultMeta.url.replace('{id}', campaign.id),
+          url: `${defaultMeta.url}?id=${campaign.id}`,
         }
       : defaultMeta;
 
