@@ -14,7 +14,6 @@ import {
   FaIdCard,
   FaInfoCircle,
   FaGlobe,
-  FaArrowRight,
 } from 'react-icons/fa';
 
 // ── Default Meta (Clean URL) ──
@@ -300,7 +299,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       {/* ── Toast ── */}
       {toast && <div className="toast">{toast}</div>}
 
-      {/* ── Enhanced Styles ── */}
+      {/* ── Styles (background image preserved) ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ── Global Reset ── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -344,21 +343,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           width: 100%;
         }
 
-        /* ── Card ── */
-        .redemption-card {
-          background: rgba(10, 15, 25, 0.88);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border-radius: 32px;
-          padding: 2rem;
-          border: 1px solid rgba(255, 204, 0, 0.15);
-          box-shadow: 0 30px 45px -12px rgba(0,0,0,0.6);
-          transition: transform 0.25s ease, box-shadow 0.3s ease;
-        }
-        .redemption-card:hover {
-          box-shadow: 0 40px 60px -12px rgba(0,0,0,0.8);
-        }
-
         .icon-inline {
           display: inline-block;
           margin-right: 6px;
@@ -369,6 +353,17 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+
+        /* ── Card ── */
+        .redemption-card {
+          background: rgba(10, 15, 25, 0.88);
+          backdrop-filter: blur(12px);
+          border-radius: 32px;
+          padding: 2rem;
+          border: 1px solid rgba(255, 204, 0, 0.15);
+          box-shadow: 0 30px 45px -12px rgba(0,0,0,0.6);
+          transition: transform 0.2s;
         }
 
         /* ── UID Display ── */
@@ -441,12 +436,11 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           letter-spacing: 2px;
           text-transform: uppercase;
           outline: none;
-          transition: all 0.25s ease;
+          transition: 0.3s;
         }
         .code-part:focus {
           border-color: #ffcc00;
-          box-shadow: 0 0 0 4px rgba(255,204,0,0.15);
-          background: rgba(0,0,0,0.8);
+          box-shadow: 0 0 0 3px rgba(255,204,0,0.2);
         }
         .code-dash {
           font-size: 1.5rem;
@@ -470,25 +464,23 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           font-size: 1.05rem;
           color: #1e1e2a;
           cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: all 0.25s;
           margin: 1.5rem 0 1rem;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 10px;
-          box-shadow: 0 6px 18px rgba(255,204,0,0.25);
+          box-shadow: 0 6px 18px rgba(255,204,0,0.3);
         }
         .redeem-btn:hover:not(:disabled) {
-          transform: translateY(-3px);
-          box-shadow: 0 12px 30px rgba(255,204,0,0.4);
+          transform: translateY(-2px);
+          box-shadow: 0 10px 25px rgba(255,204,0,0.5);
           background: linear-gradient(135deg, #ffb800, #ff8c00);
         }
-        .redeem-btn:active:not(:disabled) { transform: scale(0.98); }
         .redeem-btn:disabled {
-          opacity: 0.5;
+          opacity: 0.6;
           cursor: not-allowed;
           transform: none;
-          box-shadow: none;
         }
 
         /* ── Success ── */
@@ -510,7 +502,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           color: #1e1e2a;
           cursor: pointer;
           margin-top: 0.8rem;
-          transition: all 0.25s ease;
+          transition: 0.2s;
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -518,7 +510,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         .claim-btn:hover {
           background: #ffa500;
           transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(255,204,0,0.3);
         }
 
         /* ── Notice ── */
@@ -563,8 +554,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           width: 100%;
           height: 100%;
           background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          backdrop-filter: blur(12px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -579,19 +569,14 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           max-width: 400px;
           width: 90%;
           text-align: center;
-          border: 1px solid rgba(255,204,0,0.25);
+          border: 1px solid rgba(255,204,0,0.3);
           box-shadow: 0 30px 50px -20px black;
-          animation: fadeInUp 0.35s ease;
         }
         .modal-card h2 {
           color: #ffcc00;
           margin-bottom: 0.5rem;
           font-weight: 800;
           font-size: 1.4rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
         }
         .modal-card input {
           width: 100%;
@@ -604,28 +589,26 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           text-align: center;
           margin: 0.8rem 0;
           outline: none;
-          transition: all 0.2s ease;
+          transition: 0.2s;
         }
         .modal-card input:focus {
           border-color: #ffcc00;
-          box-shadow: 0 0 0 4px rgba(255,204,0,0.1);
         }
         .modal-btn {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.12);
+          background: rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.15);
           padding: 0.7rem 1.5rem;
           border-radius: 60px;
           font-weight: 700;
           color: #fff;
           cursor: pointer;
-          transition: all 0.25s ease;
+          transition: 0.2s;
           display: inline-flex;
           align-items: center;
           gap: 8px;
         }
         .modal-btn:hover {
-          background: rgba(255,255,255,0.16);
-          transform: translateY(-2px);
+          background: rgba(255,255,255,0.2);
         }
         .modal-btn.primary {
           background: #ffcc00;
@@ -634,8 +617,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         }
         .modal-btn.primary:hover {
           background: #ffa500;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 18px rgba(255,204,0,0.3);
         }
         .modal-btn.ghost {
           background: transparent;
@@ -666,7 +647,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           z-index: 3000;
           border: 1px solid rgba(255,204,0,0.2);
           animation: fadeInUp 0.3s ease;
-          backdrop-filter: blur(8px);
         }
 
         /* ── Animations ── */
