@@ -51,10 +51,10 @@ export default function CampaignCreated() {
         throw new Error('Failed to fetch campaign');
       }
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setCampaign(data.campaign);
       } else {
-        setError(data.error || 'Failed to load campaign');
+        setError(data?.error || 'Failed to load campaign');
       }
     } catch (err) {
       console.error('Error fetching campaign:', err);
@@ -65,7 +65,10 @@ export default function CampaignCreated() {
   };
 
   const handleCopyLink = () => {
-    const shareUrl = `${window.location.origin}/${campaign?.templateSlug || 'campaign'}/${campaign?.id}`;
+    if (!campaign) return;
+    const templateSlug = campaign.templateSlug || 'campaign';
+    const campaignId = campaign.id || id;
+    const shareUrl = `${window.location.origin}/${templateSlug}?id=${campaignId}`;
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setMessage('Copied!');
@@ -153,18 +156,16 @@ export default function CampaignCreated() {
   }
 
   // ── SUCCESS STATE ──
-  const {
-    title,
-    description,
-    reward,
-    shareCount,
-    tasks,
-    templateSlug,
-    id: campaignId,
-    image,
-  } = campaign;
+  const title = campaign?.title || 'Untitled Campaign';
+  const description = campaign?.description || '';
+  const reward = campaign?.reward || '';
+  const shareCount = campaign?.shareCount || 0;
+  const tasks = campaign?.tasks || [];
+  const templateSlug = campaign?.templateSlug || 'campaign';
+  const campaignId = campaign?.id || id;
+  const image = campaign?.image || '';
 
-  const fullUrl = `${window.location.origin}/${templateSlug || 'campaign'}/${campaignId}`;
+  const fullUrl = `${window.location.origin}/${templateSlug}?id=${campaignId}`;
 
   return (
     <>
@@ -220,7 +221,7 @@ export default function CampaignCreated() {
                 </div>
               </div>
 
-              {/* Classic Vertical Preview Image + Title/Desc Layout */}
+              {/* Vertical Preview Image + Title/Desc Layout */}
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
                   <FiList className="w-3 h-3" /> Preview
@@ -248,12 +249,12 @@ export default function CampaignCreated() {
                           <FiGift className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{reward}</span>
                         </span>
                       )}
-                      {features?.shareCount && (
+                      {shareCount > 0 && (
                         <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-200/50">
                           <FiShare2 className="w-3 h-3" /> {shareCount} Shares
                         </span>
                       )}
-                      {features?.tasks && tasks?.length > 0 && (
+                      {tasks?.length > 0 && (
                         <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-200/50">
                           <FiList className="w-3 h-3" /> {tasks.length} Tasks
                         </span>
@@ -266,7 +267,7 @@ export default function CampaignCreated() {
               {/* Action Buttons Grid */}
               <div className="pt-1 flex flex-col gap-2">
                 <button
-                  onClick={() => router.push(`/${templateSlug || 'campaign'}/${campaignId}`)}
+                  onClick={() => router.push(`/${templateSlug}?id=${campaignId}`)}
                   className="w-full flex items-center justify-center gap-1.5 px-4 py-3 bg-slate-900 text-white text-xs sm:text-sm font-bold rounded-xl hover:bg-slate-800 transition shadow-sm"
                 >
                   <FiExternalLink className="w-4 h-4" /> View Campaign Live
