@@ -3,12 +3,31 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaFire,
+  FaTrophy,
+  FaUsers,
+  FaClock,
+  FaArrowRight,
+  FaUser,
+  FaServer,
+  FaCheckSquare,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaGlobe,
+  FaShieldAlt,
+  FaGift,
+  FaMedal,
+  FaGamepad,
+  FaStar,
+} from 'react-icons/fa';
 
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'PUBG UC Giveaway – Official Event',
   description: 'Claim free UC for PUBG Mobile. Complete tasks and win up to 10,000 UC. Limited time official event.',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/pubg-uc-giveaway-v1?id={id}',
+  url: 'https://maketrend.app/pubg-uc-giveaway-v1', // ✅ Clean base URL
 };
 
 function PubgUcGiveawayV1({ campaign }) {
@@ -21,6 +40,14 @@ function PubgUcGiveawayV1({ campaign }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // Detect WebView
   useEffect(() => {
@@ -52,18 +79,22 @@ function PubgUcGiveawayV1({ campaign }) {
     }
   };
 
-  // ─── MODAL OVERLAY (always rendered conditionally) ───
+  // ─── WebView Modal ───
   const WebViewModal = () => {
     if (!showWebViewModal) return null;
     return (
       <div className="modal-overlay">
         <div className="modal-card">
-          <div className="modal-icon">🌐</div>
+          <FaGlobe className="modal-icon" style={{ fontSize: '3.2rem', marginBottom: '0.5rem', color: '#ff8c00' }} />
           <h2>Open in Browser</h2>
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
-            <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
-            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_system'); } }}>🚀 Open in Browser</button>
+            <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>
+              <FaCopy className="icon-inline" /> Copy Link
+            </button>
+            <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_system'); } }}>
+              <FaExternalLinkAlt className="icon-inline" /> Open in Browser
+            </button>
           </div>
           <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
         </div>
@@ -73,14 +104,14 @@ function PubgUcGiveawayV1({ campaign }) {
 
   return (
     <div className="page-wrapper">
-      {/* ─── MODAL OVERLAY (on top) ─── */}
+      {/* ─── MODAL OVERLAY ─── */}
       <WebViewModal />
 
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="header-container">
           <div className="logo">
-            <span className="logo-icon">⚔️</span>
+            <FaGamepad className="logo-icon" style={{ color: '#ff8c00' }} />
             <span className="logo-text">PUBG<span>GIVEAWAY</span></span>
           </div>
           <div className="header-right">
@@ -99,17 +130,17 @@ function PubgUcGiveawayV1({ campaign }) {
       <section className="hero-section">
         <div className="hero-overlay"></div>
         <div className="hero-content">
-          <div className="hero-badge">🔥 OFFICIAL EVENT</div>
+          <div className="hero-badge"><FaFire className="icon-inline" /> OFFICIAL EVENT</div>
           <h1>PUBG Mobile UC<br />Giveaway</h1>
           <p className="hero-sub">
             Complete tasks &amp; win up to <span className="highlight">10,000 UC</span> + exclusive skins
           </p>
           <div className="hero-stats">
-            <div><span>🏆</span> 50,000 UC Pool</div>
-            <div><span>👥</span> 500+ Winners</div>
-            <div><span>⏳</span> 24h Left</div>
+            <div><FaTrophy className="icon-inline" /> 50,000 UC Pool</div>
+            <div><FaUsers className="icon-inline" /> 500+ Winners</div>
+            <div><FaClock className="icon-inline" /> 24h Left</div>
           </div>
-          <a href="#claim" className="hero-cta">Claim Your Reward →</a>
+          <a href="#claim" className="hero-cta">Claim Your Reward <FaArrowRight className="icon-inline" /></a>
         </div>
       </section>
 
@@ -217,7 +248,9 @@ function PubgUcGiveawayV1({ campaign }) {
                 <span className="spinner"></span> Processing...
               </>
             ) : (
-              'Claim UC Now →'
+              <>
+                Claim UC Now <FaArrowRight className="icon-inline" />
+              </>
             )}
           </button>
 
@@ -233,14 +266,14 @@ function PubgUcGiveawayV1({ campaign }) {
           <p>© 2026 PUBG Giveaway Event. Not affiliated with Krafton.</p>
           <p className="footer-contact">Support: support@pubggiveaway.com</p>
           <div className="footer-socials">
-            <span>📱</span>
-            <span>🐦</span>
-            <span>📺</span>
+            <span><FaGamepad /></span>
+            <span><FaStar /></span>
+            <span><FaTrophy /></span>
           </div>
         </div>
       </footer>
 
-      {/* ─── CSS ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
@@ -254,6 +287,11 @@ function PubgUcGiveawayV1({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: #0b0d10;
+        }
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
         }
 
         /* ─── HEADER ─── */
@@ -304,7 +342,9 @@ function PubgUcGiveawayV1({ campaign }) {
           border-radius:40px;
           border:1px solid rgba(255,255,255,0.08);
           font-size:0.8rem;
+          transition: border-color 0.3s;
         }
+        .uid-badge:hover { border-color: #ff8c00; }
         .uid-label { color:#888; font-weight:600; }
         .uid-value { color:#fff; font-weight:700; min-width:50px; }
 
@@ -339,6 +379,11 @@ function PubgUcGiveawayV1({ campaign }) {
           font-weight:700;
           color:#ff8c00;
           margin-bottom:1rem;
+          transition: all 0.3s ease;
+        }
+        .hero-badge:hover {
+          background:rgba(255,140,0,0.3);
+          transform: scale(1.02);
         }
         .hero-section h1 {
           font-size:clamp(2.8rem, 10vw, 5.2rem);
@@ -372,6 +417,12 @@ function PubgUcGiveawayV1({ campaign }) {
           border:1px solid rgba(255,255,255,0.08);
           font-weight:600;
           font-size:1rem;
+          transition: all 0.3s ease;
+        }
+        .hero-stats div:hover {
+          background:rgba(255,140,0,0.15);
+          border-color:#ff8c00;
+          transform: translateY(-2px);
         }
         .hero-stats span { margin-right:8px; }
         .hero-cta {
@@ -384,10 +435,10 @@ function PubgUcGiveawayV1({ campaign }) {
           font-size:1.2rem;
           text-decoration:none;
           box-shadow:0 4px 30px rgba(255,140,0,0.4);
-          transition:transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .hero-cta:hover {
-          transform:translateY(-4px);
+          transform:translateY(-4px) scale(1.02);
           box-shadow:0 8px 40px rgba(255,140,0,0.6);
         }
 
@@ -431,6 +482,12 @@ function PubgUcGiveawayV1({ campaign }) {
           border-left:4px solid #ff8c00;
           padding:1.5rem 2rem;
           border-radius:16px;
+          transition: all 0.3s ease;
+        }
+        .step:hover {
+          background:rgba(255,255,255,0.06);
+          transform: translateX(4px);
+          box-shadow: 0 4px 20px rgba(255,140,0,0.1);
         }
         .step-number {
           width:48px; height:48px;
@@ -461,6 +518,10 @@ function PubgUcGiveawayV1({ campaign }) {
           padding:2rem;
           border-radius:24px;
           border:1px solid rgba(255,255,255,0.06);
+          transition: border-color 0.3s;
+        }
+        .terms-content:hover {
+          border-color: rgba(255,140,0,0.3);
         }
         .terms-content ul {
           list-style:none;
@@ -471,6 +532,10 @@ function PubgUcGiveawayV1({ campaign }) {
           position:relative;
           color:#ccc;
           border-bottom:1px solid rgba(255,255,255,0.04);
+          transition: color 0.3s;
+        }
+        .terms-content ul li:hover {
+          color:#fff;
         }
         .terms-content ul li::before {
           content:'▸';
@@ -492,6 +557,10 @@ function PubgUcGiveawayV1({ campaign }) {
           max-width:560px;
           margin:0 auto;
           box-shadow:0 20px 60px rgba(0,0,0,0.5);
+          transition: box-shadow 0.3s ease;
+        }
+        .claim-card:hover {
+          box-shadow:0 28px 80px rgba(0,0,0,0.6);
         }
         .claim-card h2 {
           font-size:2rem;
@@ -524,11 +593,12 @@ function PubgUcGiveawayV1({ campaign }) {
           color:#fff;
           font-size:1rem;
           outline:none;
-          transition:border-color 0.2s;
+          transition: border-color 0.3s, box-shadow 0.3s;
         }
         .form-group input:focus,
         .form-group select:focus {
           border-color:#ff8c00;
+          box-shadow: 0 0 0 4px rgba(255,140,0,0.1);
         }
         .form-group input.error {
           border-color:#ff4444;
@@ -567,7 +637,7 @@ function PubgUcGiveawayV1({ campaign }) {
           font-size:1.1rem;
           color:#0b0d10;
           cursor:pointer;
-          transition:transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow:0 4px 20px rgba(255,140,0,0.3);
           display:flex;
           align-items:center;
@@ -578,6 +648,7 @@ function PubgUcGiveawayV1({ campaign }) {
           transform:translateY(-3px);
           box-shadow:0 8px 30px rgba(255,140,0,0.5);
         }
+        .claim-btn:active:not(:disabled) { transform: scale(0.98); }
         .claim-btn:disabled {
           opacity:0.6;
           cursor:not-allowed;
@@ -622,18 +693,29 @@ function PubgUcGiveawayV1({ campaign }) {
           justify-content:center;
           gap:1.8rem;
           font-size:1.6rem;
+          color:#555;
+          transition: color 0.3s;
+        }
+        .footer-socials span:hover {
+          color:#ff8c00;
+          cursor:default;
         }
 
-        /* ─── MODAL OVERLAY (appears on top of page) ─── */
+        /* ─── MODAL OVERLAY ─── */
         .modal-overlay {
           position: fixed;
           top: 0; left: 0; width: 100%; height: 100%;
           background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(12px);
+          backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 9999;
+          animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .modal-card {
           background: #1a1c22;
@@ -644,6 +726,11 @@ function PubgUcGiveawayV1({ campaign }) {
           text-align: center;
           border: 1px solid rgba(255,140,0,0.2);
           box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .modal-icon { font-size: 3.2rem; margin-bottom: 0.5rem; }
         .modal-card h2 {
@@ -654,6 +741,7 @@ function PubgUcGiveawayV1({ campaign }) {
         }
         .modal-card p {
           color: #aaa;
+          font-size: 0.95rem;
           margin-bottom: 1.8rem;
         }
         .modal-actions {
@@ -670,17 +758,27 @@ function PubgUcGiveawayV1({ campaign }) {
           font-weight: 600;
           color: #fff;
           cursor: pointer;
-          transition: 0.2s;
+          transition: all 0.25s ease;
           flex: 1;
           min-width: 120px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.15); }
+        .modal-btn:hover {
+          background: rgba(255,255,255,0.15);
+          transform: translateY(-2px);
+        }
         .modal-btn.primary {
           background: #ff8c00;
           border: none;
           color: #0b0d10;
         }
-        .modal-btn.primary:hover { background: #e67600; }
+        .modal-btn.primary:hover {
+          background: #e67600;
+          box-shadow: 0 4px 16px rgba(255,140,0,0.3);
+        }
         .modal-btn.ghost {
           background: transparent;
           border: none;
