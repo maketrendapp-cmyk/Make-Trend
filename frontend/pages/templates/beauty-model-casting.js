@@ -4,12 +4,12 @@ import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Model Casting – Get Selected for Movies & Videos',
   description: 'Submit your portfolio and get discovered by top casting directors. Selected candidates will be contacted for movies, music videos, and campaigns.',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/beauty-model-casting?id={id}',
+  url: 'https://maketrend.app/beauty-model-casting', // ✅ Clean base URL
 };
 
 // ── Categories ──
@@ -48,6 +48,14 @@ function BeautyModelCasting({ campaign }) {
     'Emma submitted her beauty shot',
     'Rahul uploaded his professional portfolio',
   ];
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -574,7 +582,7 @@ function BeautyModelCasting({ campaign }) {
         <p className="footer-contact">Questions? support@modelcasting.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -699,7 +707,10 @@ function BeautyModelCasting({ campaign }) {
           padding: 2rem;
           box-shadow: 0 20px 60px rgba(0,0,0,0.06);
           border: 1px solid #eef2f6;
+          transition: box-shadow 0.3s ease;
         }
+        .upload-card:hover { box-shadow: 0 25px 70px rgba(0,0,0,0.08); }
+
         .form-header {
           text-align: center;
           margin-bottom: 1.5rem;
@@ -740,7 +751,7 @@ function BeautyModelCasting({ campaign }) {
           border-radius: 12px;
           font-size: 0.9rem;
           background: #f9fafb;
-          transition: border-color 0.2s;
+          transition: all 0.2s ease;
           outline: none;
           font-family: inherit;
           appearance: none;
@@ -763,7 +774,7 @@ function BeautyModelCasting({ campaign }) {
           padding: 1.8rem 1.5rem;
           text-align: center;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.3s ease;
           min-height: 160px;
           display: flex;
           flex-direction: column;
@@ -820,7 +831,7 @@ function BeautyModelCasting({ campaign }) {
           border: none;
           cursor: pointer;
           font-size: 0.8rem;
-          transition: transform 0.2s;
+          transition: transform 0.2s ease;
         }
         .remove-file:hover { transform: scale(1.1); }
 
@@ -834,7 +845,7 @@ function BeautyModelCasting({ campaign }) {
           font-size: 1rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(139, 92, 246, 0.2);
           display: flex;
           align-items: center;
@@ -842,9 +853,10 @@ function BeautyModelCasting({ campaign }) {
           gap: 8px;
         }
         .submit-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(139, 92, 246, 0.3);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(139, 92, 246, 0.35);
         }
+        .submit-btn:active:not(:disabled) { transform: scale(0.98); }
         .submit-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
@@ -964,7 +976,7 @@ function BeautyModelCasting({ campaign }) {
           font-size: 1rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(34, 197, 94, 0.2);
           display: flex;
           align-items: center;
@@ -972,9 +984,10 @@ function BeautyModelCasting({ campaign }) {
           gap: 8px;
         }
         .appeal-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(34, 197, 94, 0.3);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(34, 197, 94, 0.35);
         }
+        .appeal-btn:active:not(:disabled) { transform: scale(0.98); }
         .appeal-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* ── Redirect Card ── */
@@ -1060,9 +1073,9 @@ function BeautyModelCasting({ campaign }) {
           text-align: center;
           box-shadow: 0 2px 12px rgba(0,0,0,0.04);
           border: 1px solid #eef2f6;
-          transition: transform 0.2s;
+          transition: all 0.3s ease;
         }
-        .step:hover { transform: translateY(-4px); }
+        .step:hover { transform: translateY(-6px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
         .step-number {
           width: 44px; height: 44px;
           background: linear-gradient(135deg, #8B5CF6, #EC4899);
@@ -1095,11 +1108,12 @@ function BeautyModelCasting({ campaign }) {
           border-radius: 20px;
           text-align: center;
           border: 1px solid #eef2f6;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s ease;
         }
         .criteria-card:hover {
-          transform: translateY(-4px);
+          transform: translateY(-6px);
           box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+          border-color: #8B5CF6;
         }
         .criteria-icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
         .criteria-card h3 { font-size: 1rem; font-weight: 700; color: #1a1a2e; }
@@ -1155,11 +1169,11 @@ function BeautyModelCasting({ campaign }) {
           border-radius: 16px;
           padding: 1rem 1.2rem;
           border: 1px solid #eef2f6;
-          transition: border-color 0.2s;
+          transition: all 0.2s ease;
         }
-        .faq-item:hover { border-color: #8B5CF6; }
+        .faq-item:hover { border-color: #8B5CF6; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
         .faq-question { font-weight: 700; font-size: 0.9rem; color: #1a1a2e; }
-        .faq-answer p { font-size: 0.85rem; color: #6b7280; margin-top: 0.3rem; }
+        .faq-answer { font-size: 0.85rem; color: #6b7280; margin-top: 0.3rem; }
 
         /* ── Footer ── */
         .site-footer {
@@ -1193,6 +1207,7 @@ function BeautyModelCasting({ campaign }) {
           text-align: center;
           border: 1px solid rgba(139, 92, 246, 0.15);
           box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          animation: fadeIn 0.3s ease;
         }
         .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
         .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
