@@ -3,13 +3,35 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaPlay,
+  FaFire,
+  FaBullseye,
+  FaUsers,
+  FaClock,
+  FaTrophy,
+  FaCheckCircle,
+  FaLock,
+  FaVideo,
+  FaTv,
+  FaRocket,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaArrowRight,
+  FaGlobe,
+  FaShieldAlt,
+  FaChartLine,
+  FaUserCircle,
+  FaStar,
+  FaGift,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Get 1K Subscribers – YouTube Growth Challenge',
   description: 'Reach your first 1,000 subscribers with our proven growth system. Join thousands of creators who hit the milestone.',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/get-1k-subscribers?id={id}',
+  url: 'https://maketrend.app/get-1k-subscribers', // ✅ Clean base URL
 };
 
 function Get1KSubscribers({ campaign }) {
@@ -27,6 +49,14 @@ function Get1KSubscribers({ campaign }) {
   const [showWebViewModal, setShowWebViewModal] = useState(false);
   const [liveSubCount, setLiveSubCount] = useState(987);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 23, minutes: 59, seconds: 59 });
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -105,7 +135,7 @@ function Get1KSubscribers({ campaign }) {
     return (
       <div className="modal-overlay">
         <div className="modal-card">
-          <div className="modal-icon">🌐</div>
+          <FaGlobe className="modal-icon" style={{ fontSize: '3rem', marginBottom: '0.3rem', color: '#FF0000' }} />
           <h2>Open in Browser</h2>
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
@@ -116,7 +146,7 @@ function Get1KSubscribers({ campaign }) {
                 setShowWebViewModal(false);
               }}
             >
-              📋 Copy Link
+              <FaCopy className="icon-inline" /> Copy Link
             </button>
             <button
               className="modal-btn primary"
@@ -129,7 +159,7 @@ function Get1KSubscribers({ campaign }) {
                 }
               }}
             >
-              🚀 Open in Browser
+              <FaExternalLinkAlt className="icon-inline" /> Open in Browser
             </button>
           </div>
           <button
@@ -153,23 +183,23 @@ function Get1KSubscribers({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">▶</span>
+          <FaPlay className="logo-icon" />
           <span className="logo-text">Tube<span>Growth</span></span>
         </div>
-        <div className="header-badge">🔥 1K Challenge</div>
+        <div className="header-badge"><FaFire className="icon-inline" /> 1K Challenge</div>
       </header>
 
       {/* ─── HERO ─── */}
       <section className="hero">
         <div className="hero-overlay"></div>
         <div className="hero-content">
-          <div className="hero-badge">🎯 SUBSCRIBER CHALLENGE</div>
+          <div className="hero-badge"><FaBullseye className="icon-inline" /> SUBSCRIBER CHALLENGE</div>
           <h1>Get Your First <span>1,000</span> Subscribers</h1>
           <p>Join thousands of creators who hit the milestone. Start your growth journey today.</p>
           <div className="hero-stats">
-            <div><span>👥</span> {liveSubCount.toLocaleString()} Active Creators</div>
-            <div><span>⏳</span> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
-            <div><span>🏆</span> 5,000+ Graduates</div>
+            <div><FaUsers className="icon-inline" /> {liveSubCount.toLocaleString()} Active Creators</div>
+            <div><FaClock className="icon-inline" /> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
+            <div><FaTrophy className="icon-inline" /> 5,000+ Graduates</div>
           </div>
         </div>
       </section>
@@ -245,14 +275,16 @@ function Get1KSubscribers({ campaign }) {
                   <span className="spinner"></span> Processing...
                 </>
               ) : (
-                'Start Growth →'
+                <>
+                  <FaArrowRight className="icon-inline" /> Start Growth
+                </>
               )}
             </button>
 
             <div className="trust-badges">
-              <span><span className="badge-icon">✅</span> Verified</span>
-              <span><span className="badge-icon">🔒</span> Secure</span>
-              <span><span className="badge-icon">📹</span> YouTube Official</span>
+              <span><FaCheckCircle className="badge-icon" style={{ color: '#22C55E' }} /> Verified</span>
+              <span><FaLock className="badge-icon" style={{ color: '#FF0000' }} /> Secure</span>
+              <span><FaVideo className="badge-icon" style={{ color: '#FF0000' }} /> YouTube Official</span>
             </div>
           </div>
         )}
@@ -260,12 +292,12 @@ function Get1KSubscribers({ campaign }) {
         {/* Step 2: Success */}
         {step === 2 && (
           <div className="success-card">
-            <div className="success-icon">✅</div>
+            <FaCheckCircle className="success-icon" style={{ color: '#22C55E' }} />
             <h2>You're On The List!</h2>
             <p>Your channel is being analyzed. You'll receive your personalized growth plan shortly.</p>
             <div className="channel-preview">
               <div className="channel-info">
-                <span className="channel-icon">📺</span>
+                <FaTv className="channel-icon" style={{ color: '#FF0000' }} />
                 <div>
                   <span className="channel-name">{name || 'Your Channel'}</span>
                   <span className="channel-url">{channelUrl || 'youtube.com/yourchannel'}</span>
@@ -295,7 +327,9 @@ function Get1KSubscribers({ campaign }) {
                   <span className="spinner"></span> Redirecting...
                 </>
               ) : (
-                'Continue →'
+                <>
+                  Continue <FaArrowRight className="icon-inline" />
+                </>
               )}
             </button>
           </div>
@@ -308,22 +342,22 @@ function Get1KSubscribers({ campaign }) {
         <h2 className="section-title">Why Creators Love This</h2>
         <div className="features-grid">
           <div className="feature-card">
-            <span className="feature-icon">🚀</span>
+            <FaRocket className="feature-icon" style={{ color: '#FF0000' }} />
             <h3>Proven System</h3>
             <p>Step-by-step framework that has helped 5,000+ creators reach 1K.</p>
           </div>
           <div className="feature-card">
-            <span className="feature-icon">📊</span>
+            <FaChartLine className="feature-icon" style={{ color: '#FF0000' }} />
             <h3>Real Analytics</h3>
             <p>Track your growth with real-time subscriber monitoring.</p>
           </div>
           <div className="feature-card">
-            <span className="feature-icon">🎯</span>
+            <FaBullseye className="feature-icon" style={{ color: '#FF0000' }} />
             <h3>Personalized Plan</h3>
             <p>Get a customized growth plan based on your channel.</p>
           </div>
           <div className="feature-card">
-            <span className="feature-icon">🆓</span>
+            <FaGift className="feature-icon" style={{ color: '#FF0000' }} />
             <h3>Free Forever</h3>
             <p>No hidden fees. Join thousands of successful creators.</p>
           </div>
@@ -335,10 +369,16 @@ function Get1KSubscribers({ campaign }) {
         <h2 className="section-title">Real Creators, Real Results</h2>
         <div className="testimonials-grid">
           <div className="testimonial-card">
-            <div className="testimonial-rating">⭐⭐⭐⭐⭐</div>
+            <div className="testimonial-rating">
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+            </div>
             <p>"I went from 200 to 1,200 subscribers in 30 days. This system really works!"</p>
             <div className="testimonial-author">
-              <span className="author-avatar">📹</span>
+              <FaUserCircle className="author-avatar" style={{ fontSize: '1.4rem', color: '#FF0000' }} />
               <div>
                 <span className="author-name">Sarah K.</span>
                 <span className="author-channel">Tech Girl</span>
@@ -346,10 +386,16 @@ function Get1KSubscribers({ campaign }) {
             </div>
           </div>
           <div className="testimonial-card">
-            <div className="testimonial-rating">⭐⭐⭐⭐⭐</div>
+            <div className="testimonial-rating">
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+            </div>
             <p>"Finally hit 1K after struggling for months. This is the best investment I've made."</p>
             <div className="testimonial-author">
-              <span className="author-avatar">📹</span>
+              <FaUserCircle className="author-avatar" style={{ fontSize: '1.4rem', color: '#FF0000' }} />
               <div>
                 <span className="author-name">Mike R.</span>
                 <span className="author-channel">Gamer Zone</span>
@@ -357,10 +403,16 @@ function Get1KSubscribers({ campaign }) {
             </div>
           </div>
           <div className="testimonial-card">
-            <div className="testimonial-rating">⭐⭐⭐⭐⭐</div>
+            <div className="testimonial-rating">
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+              <FaStar style={{ color: '#f5a623' }} />
+            </div>
             <p>"Simple steps, clear guidance. I recommend this to every new YouTuber."</p>
             <div className="testimonial-author">
-              <span className="author-avatar">📹</span>
+              <FaUserCircle className="author-avatar" style={{ fontSize: '1.4rem', color: '#FF0000' }} />
               <div>
                 <span className="author-name">Emily W.</span>
                 <span className="author-channel">Beauty Vlog</span>
@@ -372,7 +424,7 @@ function Get1KSubscribers({ campaign }) {
 
       {/* ─── HOW IT WORKS ─── */}
       <section className="how-section">
-        <h2 className="section-title">📋 How It Works</h2>
+        <h2 className="section-title">How It Works</h2>
         <div className="steps">
           <div className="step">
             <div className="step-number">1</div>
@@ -400,7 +452,7 @@ function Get1KSubscribers({ campaign }) {
 
       {/* ─── TERMS & CONDITIONS ─── */}
       <section id="terms" className="terms-section">
-        <h2 className="section-title">📜 Terms & Conditions</h2>
+        <h2 className="section-title">Terms & Conditions</h2>
         <div className="terms-content">
           <ul>
             <li><strong>Eligibility:</strong> Open to all YouTube creators worldwide.</li>
@@ -414,7 +466,7 @@ function Get1KSubscribers({ campaign }) {
 
       {/* ─── FAQ ─── */}
       <section className="faq-section">
-        <h2 className="section-title">❓ FAQ</h2>
+        <h2 className="section-title">FAQ</h2>
         <div className="faq-list">
           <div className="faq-item">
             <div className="faq-question">Is this really free?</div>
@@ -441,7 +493,7 @@ function Get1KSubscribers({ campaign }) {
         <p className="footer-contact">Questions? support@tubegrowth.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -454,6 +506,12 @@ function Get1KSubscribers({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: #0a0a0a;
+        }
+
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
         }
 
         /* ── Header ── */
@@ -546,6 +604,11 @@ function Get1KSubscribers({ campaign }) {
           font-weight: 600;
           font-size: 0.85rem;
           color: #aaa;
+          transition: all 0.25s ease;
+        }
+        .hero-stats div:hover {
+          background: rgba(255,255,255,0.08);
+          transform: translateY(-2px);
         }
         .hero-stats span { margin-right: 6px; }
 
@@ -612,6 +675,10 @@ function Get1KSubscribers({ campaign }) {
           padding: 2rem;
           border: 1px solid rgba(255,255,255,0.06);
           box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+          transition: box-shadow 0.3s ease;
+        }
+        .register-card:hover {
+          box-shadow: 0 32px 80px rgba(0,0,0,0.4);
         }
         .register-card h2 {
           font-size: 1.6rem;
@@ -643,13 +710,14 @@ function Get1KSubscribers({ campaign }) {
           font-size: 0.9rem;
           background: rgba(255,255,255,0.03);
           color: #fff;
-          transition: border-color 0.2s;
+          transition: all 0.25s ease;
           outline: none;
         }
         .form-group input::placeholder { color: #555; }
         .form-group input:focus {
           border-color: #FF0000;
           box-shadow: 0 0 0 4px rgba(255, 0, 0, 0.08);
+          background: rgba(255,255,255,0.06);
         }
 
         .checkbox-group {
@@ -688,7 +756,7 @@ function Get1KSubscribers({ campaign }) {
           font-size: 1rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(255, 0, 0, 0.2);
           display: flex;
           align-items: center;
@@ -696,9 +764,10 @@ function Get1KSubscribers({ campaign }) {
           gap: 8px;
         }
         .submit-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(255, 0, 0, 0.3);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(255, 0, 0, 0.35);
         }
+        .submit-btn:active:not(:disabled) { transform: scale(0.98); }
         .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .spinner {
@@ -724,7 +793,7 @@ function Get1KSubscribers({ campaign }) {
           align-items: center;
           gap: 0.4rem;
         }
-        .badge-icon { font-size: 0.8rem; }
+        .badge-icon { font-size: 0.9rem; }
 
         /* ── Success Card ── */
         .success-card {
@@ -734,6 +803,11 @@ function Get1KSubscribers({ campaign }) {
           border: 1px solid rgba(34, 197, 94, 0.15);
           box-shadow: 0 24px 64px rgba(0,0,0,0.3);
           text-align: center;
+          animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .success-icon { font-size: 3.5rem; margin-bottom: 0.3rem; }
         .success-card h2 {
@@ -811,7 +885,7 @@ function Get1KSubscribers({ campaign }) {
           font-size: 1rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(34, 197, 94, 0.2);
           display: flex;
           align-items: center;
@@ -820,9 +894,10 @@ function Get1KSubscribers({ campaign }) {
           margin-top: 1.2rem;
         }
         .continue-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(34, 197, 94, 0.3);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(34, 197, 94, 0.35);
         }
+        .continue-btn:active:not(:disabled) { transform: scale(0.98); }
         .continue-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* ── Features Section ── */
@@ -859,9 +934,13 @@ function Get1KSubscribers({ campaign }) {
           padding: 1.5rem 1rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.05);
-          transition: transform 0.2s;
+          transition: all 0.3s ease;
         }
-        .feature-card:hover { transform: translateY(-4px); }
+        .feature-card:hover {
+          transform: translateY(-6px);
+          background: rgba(255,255,255,0.06);
+          border-color: rgba(255, 0, 0, 0.2);
+        }
         .feature-icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
         .feature-card h3 {
           font-size: 1rem;
@@ -890,13 +969,17 @@ function Get1KSubscribers({ campaign }) {
           border-radius: 20px;
           padding: 1.5rem;
           border: 1px solid rgba(255,255,255,0.05);
-          transition: transform 0.2s;
+          transition: all 0.3s ease;
         }
-        .testimonial-card:hover { transform: translateY(-4px); }
+        .testimonial-card:hover {
+          transform: translateY(-4px);
+          background: rgba(255,255,255,0.06);
+        }
         .testimonial-rating {
-          color: #f5a623;
           font-size: 0.8rem;
           margin-bottom: 0.3rem;
+          display: flex;
+          gap: 2px;
         }
         .testimonial-card p {
           font-size: 0.85rem;
@@ -938,9 +1021,12 @@ function Get1KSubscribers({ campaign }) {
           border-radius: 20px;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.05);
-          transition: transform 0.2s;
+          transition: all 0.3s ease;
         }
-        .step:hover { transform: translateY(-4px); }
+        .step:hover {
+          transform: translateY(-6px);
+          background: rgba(255,255,255,0.06);
+        }
         .step-number {
           width: 44px; height: 44px;
           background: linear-gradient(135deg, #FF0000, #CC0000);
@@ -1005,11 +1091,14 @@ function Get1KSubscribers({ campaign }) {
           border-radius: 16px;
           padding: 1rem 1.2rem;
           border: 1px solid rgba(255,255,255,0.05);
-          transition: border-color 0.2s;
+          transition: all 0.3s ease;
         }
-        .faq-item:hover { border-color: rgba(255, 0, 0, 0.2); }
+        .faq-item:hover {
+          border-color: rgba(255, 0, 0, 0.2);
+          background: rgba(255,255,255,0.06);
+        }
         .faq-question { font-weight: 700; font-size: 0.9rem; color: #fff; }
-        .faq-answer p { font-size: 0.85rem; color: #888; margin-top: 0.3rem; }
+        .faq-answer { font-size: 0.85rem; color: #888; margin-top: 0.3rem; }
 
         /* ── Footer ── */
         .site-footer {
@@ -1033,6 +1122,7 @@ function Get1KSubscribers({ campaign }) {
           align-items: center;
           justify-content: center;
           z-index: 9999;
+          animation: fadeIn 0.3s ease;
         }
         .modal-card {
           background: #1a1c22;
@@ -1043,6 +1133,11 @@ function Get1KSubscribers({ campaign }) {
           text-align: center;
           border: 1px solid rgba(255, 0, 0, 0.15);
           box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
         .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
@@ -1062,16 +1157,20 @@ function Get1KSubscribers({ campaign }) {
           font-size: 0.75rem;
           color: #fff;
           cursor: pointer;
-          transition: 0.2s;
+          transition: all 0.25s ease;
           flex: 1;
           min-width: 100px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.12); }
+        .modal-btn:hover { background: rgba(255,255,255,0.12); transform: translateY(-2px); }
         .modal-btn.primary {
           background: #FF0000;
           border: none;
         }
-        .modal-btn.primary:hover { background: #CC0000; }
+        .modal-btn.primary:hover { background: #CC0000; box-shadow: 0 4px 16px rgba(255,0,0,0.3); }
         .modal-btn.ghost {
           background: transparent;
           border: none;
