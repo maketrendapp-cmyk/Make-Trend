@@ -3,13 +3,36 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaTrophy,
+  FaGift,
+  FaFire,
+  FaMobileAlt,
+  FaLaptop,
+  FaMoneyBillWave,
+  FaClock,
+  FaSpinner,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaShieldAlt,
+  FaCheckCircle,
+  FaArrowRight,
+  FaTv,
+  FaGamepad,
+  FaTablet,
+  FaApple,
+  FaGlobe,
+  FaStar,
+  FaMedal,
+  FaGem,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Premium Lucky Draw – Win Smartphones, Laptops & Cash!',
   description: 'Spin the wheel and win amazing prizes like iPhone, MacBook, TV, and real cash. Enter now – it’s free!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/lucky-draw-premium-prizes-v1?id={id}',
+  url: 'https://maketrend.app/lucky-draw-premium-prizes-v1', // ✅ Clean base URL
 };
 
 // ── Prize Data (with working image URLs) ──
@@ -77,6 +100,14 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
   const audioCtx = useRef(null);
   const imageCache = useRef([]);
 
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
+
   // ── WebView detection ──
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -118,7 +149,6 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         }
       };
       img.onerror = () => {
-        // fallback: use a placeholder (we'll just draw text)
         imageCache.current[index] = null;
         loaded++;
         if (loaded === PRIZES.length) {
@@ -143,7 +173,6 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // ── Draw segments ──
       PRIZES.forEach((prize, i) => {
         const startAngle = i * segmentAngle + rotationAngle;
         const endAngle = startAngle + segmentAngle;
@@ -163,7 +192,6 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // ── Draw image inside segment ──
         const img = imageCache.current[i];
         if (img) {
           const imgSize = radius * 0.5;
@@ -173,7 +201,6 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
           ctx.save();
           ctx.beginPath();
-          // Clip to a circle
           const clipX = centerX + Math.cos(midAngle) * (radius * 0.6);
           const clipY = centerY + Math.sin(midAngle) * (radius * 0.6);
           ctx.arc(clipX, clipY, imgSize / 2, 0, Math.PI * 2);
@@ -182,14 +209,12 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
           ctx.restore();
 
-          // Small border
           ctx.beginPath();
           ctx.arc(clipX, clipY, imgSize / 2 + 1, 0, Math.PI * 2);
           ctx.strokeStyle = 'rgba(255,255,255,0.5)';
           ctx.lineWidth = 2;
           ctx.stroke();
         } else {
-          // fallback text
           ctx.save();
           ctx.translate(centerX, centerY);
           ctx.rotate(startAngle + segmentAngle / 2);
@@ -339,18 +364,22 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
     }
   };
 
-  // ── WebView Modal (fixed with inline styles + _blank) ──
+  // ── WebView Modal (with icons) ──
   if (showWebViewModal) {
     return (
       <>
         <div className="modal-overlay">
           <div className="modal-card">
-            <div className="modal-icon">🌐</div>
+            <FaGlobe className="modal-icon" style={{ fontSize: '3.6rem', marginBottom: '0.5rem', color: '#f5a623' }} />
             <h2>Open in Browser</h2>
             <p>For the best experience, open this page in your default browser.</p>
             <div className="modal-actions">
-              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
-              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>🚀 Open in Browser</button>
+              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>
+                <FaCopy className="icon-inline" /> Copy Link
+              </button>
+              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>
+                <FaExternalLinkAlt className="icon-inline" /> Open in Browser
+              </button>
             </div>
             <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
           </div>
@@ -379,11 +408,13 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
             text-align: center;
             border: 2px solid rgba(245, 166, 35, 0.25);
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+            animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
           }
-          .modal-card .modal-icon {
-            font-size: 3.6rem;
-            margin-bottom: 0.5rem;
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
           }
+          .modal-card .modal-icon { font-size: 3.6rem; margin-bottom: 0.5rem; }
           .modal-card h2 {
             font-size: 1.6rem;
             font-weight: 800;
@@ -413,9 +444,14 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
             transition: 0.2s;
             flex: 1;
             min-width: 120px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
           }
           .modal-btn:hover {
             background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
           }
           .modal-btn.primary {
             background: #f5a623;
@@ -424,6 +460,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           }
           .modal-btn.primary:hover {
             background: #e0991a;
+            box-shadow: 0 4px 16px rgba(245, 166, 35, 0.3);
           }
           .modal-btn.ghost {
             background: transparent;
@@ -435,6 +472,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           .modal-btn.ghost:hover {
             color: #fff;
           }
+          .icon-inline { display: inline-block; margin-right: 4px; vertical-align: middle; }
         `}} />
       </>
     );
@@ -447,10 +485,10 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">🏆</span>
+          <FaTrophy className="logo-icon" />
           <span className="logo-text">Lucky<span>Draw</span></span>
         </div>
-        <div className="header-badge">✨ Win Premium Prizes</div>
+        <div className="header-badge"><FaGem className="icon-inline" /> Win Premium Prizes</div>
       </header>
 
       {/* ─── HERO ─── */}
@@ -459,20 +497,20 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         <div className="hero-content">
           {step === 1 && (
             <>
-              <div className="hero-badge">🔥 Limited Entries</div>
+              <div className="hero-badge"><FaFire className="icon-inline" /> Limited Entries</div>
               <h1>Spin & Win<br />Premium Prizes</h1>
               <p>iPhone, MacBook, TV, Gaming PC, Cash & more – one lucky winner every hour!</p>
               <div className="hero-stats">
-                <div><span>📱</span> iPhone 15 Pro</div>
-                <div><span>💻</span> MacBook Air</div>
-                <div><span>💰</span> $500 Cash</div>
-                <div><span>⏳</span> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
+                <div><FaMobileAlt className="icon-inline" /> iPhone 15 Pro</div>
+                <div><FaLaptop className="icon-inline" /> MacBook Air</div>
+                <div><FaMoneyBillWave className="icon-inline" /> $500 Cash</div>
+                <div><FaClock className="icon-inline" /> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
               </div>
             </>
           )}
           {step === 2 && result && (
             <>
-              <div className="hero-badge">🎉 You Won!</div>
+              <div className="hero-badge"><FaGift className="icon-inline" /> You Won!</div>
               <h1>Congratulations!</h1>
               <p>You’ve won <strong>{result.label}</strong>! Enter your details to claim it.</p>
               <div className="result-display">
@@ -491,7 +529,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         {step === 1 && (
           <div className="spin-card">
             <div className="rewards-preview">
-              <h3>🎁 Prizes You Can Win</h3>
+              <h3><FaGift className="icon-inline" /> Prizes You Can Win</h3>
               <div className="rewards-grid">
                 {PRIZES.map((item, idx) => (
                   <div key={idx} className="reward-item">
@@ -508,7 +546,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
                 {isSpinning ? 'Spinning...' : !imagesLoaded ? 'Loading...' : 'SPIN'}
               </button>
             </div>
-            <p className="spin-note">🎯 Click the SPIN button to try your luck!</p>
+            <p className="spin-note"><FaGamepad className="icon-inline" /> Click the SPIN button to try your luck!</p>
           </div>
         )}
 
@@ -543,14 +581,16 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
             <button className="claim-btn" onClick={handleClaim} disabled={loading}>
               {loading ? (
                 <>
-                  <span className="spinner"></span> Submitting...
+                  <FaSpinner className="spinner" /> Submitting...
                 </>
               ) : (
-                'Claim Prize →'
+                <>
+                  Claim Prize <FaArrowRight className="icon-inline" />
+                </>
               )}
             </button>
 
-            <p className="form-footnote">🔒 Your information is secure and will not be shared.</p>
+            <p className="form-footnote"><FaShieldAlt className="icon-inline" /> Your information is secure and will not be shared.</p>
           </div>
         )}
 
@@ -558,7 +598,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
       {/* ─── HOW TO WIN ─── */}
       <section className="how-to-win">
-        <h2 className="section-title">🏅 How to Win</h2>
+        <h2 className="section-title"><FaMedal className="icon-inline" /> How to Win</h2>
         <div className="steps">
           <div className="step">
             <div className="step-number">1</div>
@@ -600,7 +640,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
 
       {/* ─── TERMS & CONDITIONS ─── */}
       <section id="terms" className="terms-section">
-        <h2 className="section-title">📜 Terms & Conditions</h2>
+        <h2 className="section-title"><FaShieldAlt className="icon-inline" /> Terms & Conditions</h2>
         <div className="terms-content">
           <ul>
             <li><strong>Eligibility:</strong> Open to all participants aged 18 years and above.</li>
@@ -623,7 +663,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
         <p className="footer-contact">Questions? support@luckydraw.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -636,6 +676,12 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: linear-gradient(180deg, #f0f2f5 0%, #e8ecf1 100%);
+        }
+
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
         }
 
         /* ── Header ── */
@@ -653,7 +699,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           display: flex; align-items: center; gap: 0.6rem;
           font-weight: 800; font-size: 1.3rem;
         }
-        .logo-icon { font-size: 1.6rem; }
+        .logo-icon { font-size: 1.6rem; color: #f5a623; }
         .logo-text { color: #1a1a2e; }
         .logo-text span { color: #f5a623; }
         .header-badge {
@@ -729,6 +775,11 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           border: 1px solid rgba(255,255,255,0.08);
           font-weight: 600;
           font-size: 0.9rem;
+          transition: all 0.25s ease;
+        }
+        .hero-stats div:hover {
+          background: rgba(255,255,255,0.12);
+          transform: translateY(-2px);
         }
         .hero-stats span { margin-right: 6px; }
 
@@ -742,6 +793,11 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           padding: 0.8rem 2rem;
           border-radius: 60px;
           border: 1px solid rgba(255,255,255,0.15);
+          animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
         }
         .result-display .result-image {
           width: 64px;
@@ -773,7 +829,9 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           box-shadow: 0 24px 64px rgba(0,0,0,0.06);
           border: 1px solid rgba(0,0,0,0.04);
           text-align: center;
+          transition: box-shadow 0.3s ease;
         }
+        .spin-card:hover { box-shadow: 0 32px 80px rgba(0,0,0,0.08); }
 
         .rewards-preview {
           margin-bottom: 2rem;
@@ -799,7 +857,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           background: #f8fafc;
           border-radius: 16px;
           border: 1px solid #eef2f6;
-          transition: all 0.2s;
+          transition: all 0.3s ease;
         }
         .reward-item:hover {
           transform: translateY(-4px);
@@ -848,7 +906,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           font-weight: 800;
           cursor: pointer;
           box-shadow: 0 4px 24px rgba(245, 166, 35, 0.5);
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           text-transform: uppercase;
           letter-spacing: 1px;
           text-shadow: 0 1px 4px rgba(0,0,0,0.2);
@@ -857,6 +915,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           transform: translate(-50%, -50%) scale(1.06);
           box-shadow: 0 6px 32px rgba(245, 166, 35, 0.6);
         }
+        .spin-btn:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.95); }
         .spin-btn:disabled {
           opacity: 0.7;
           cursor: not-allowed;
@@ -875,7 +934,9 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           padding: 2.5rem 2rem;
           box-shadow: 0 24px 64px rgba(0,0,0,0.06);
           border: 1px solid rgba(0,0,0,0.04);
+          transition: box-shadow 0.3s ease;
         }
+        .claim-card:hover { box-shadow: 0 32px 80px rgba(0,0,0,0.08); }
         .claim-card h2 {
           font-size: 1.8rem;
           font-weight: 800;
@@ -906,7 +967,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           border-radius: 14px;
           font-size: 0.95rem;
           background: #f9fafb;
-          transition: border-color 0.2s, box-shadow 0.2s;
+          transition: all 0.25s ease;
           outline: none;
         }
         .form-group input:focus {
@@ -929,7 +990,7 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           font-size: 1.05rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
           display: flex;
           align-items: center;
@@ -937,13 +998,11 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           gap: 8px;
         }
         .claim-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
+          transform: translateY(-3px);
           box-shadow: 0 8px 32px rgba(16, 185, 129, 0.35);
         }
-        .claim-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
+        .claim-btn:active:not(:disabled) { transform: scale(0.98); }
+        .claim-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .spinner {
           display: inline-block;
           width: 20px; height: 20px;
@@ -996,11 +1055,12 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           text-align: center;
           box-shadow: 0 2px 16px rgba(0,0,0,0.04);
           border: 1px solid #eef2f6;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s ease;
         }
         .step:hover {
           transform: translateY(-6px);
           box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+          border-color: #f5a623;
         }
         .step-number {
           width: 52px; height: 52px;
@@ -1081,8 +1141,6 @@ function LuckyDrawPremiumPrizesV1({ campaign }) {
           font-weight: 600;
           color: #e5e7eb;
         }
-
-        /* ── WebView Modal ── (already defined inline) ── */
 
         /* ── Responsive ── */
         @media (max-width: 640px) {
