@@ -1,15 +1,39 @@
-// pages/templates/photography-contest-v1.js
+// pages/templates/photography-contest.js
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaCamera,
+  FaTrophy,
+  FaClock,
+  FaStar,
+  FaImage,
+  FaEnvelope,
+  FaRocket,
+  FaUpload,
+  FaVoteYea,
+  FaBan,
+  FaCalendar,
+  FaLock,
+  FaCircle,
+  FaGlobe,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaArrowRight,
+  FaCheckCircle,
+  FaSpinner,
+  FaShieldAlt,
+  FaGift,
+  FaUsers,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Photography Contest – Show Your Vision & Win!',
   description: 'Submit your best photograph and win amazing prizes including DSLR Camera, Lens, and Cash! Open to all skill levels.',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/photography-contest?id={id}',
+  url: 'https://maketrend.app/photography-contest', // ✅ Clean base URL
 };
 
 // ── Prize Data ──
@@ -52,12 +76,12 @@ const LIVE_UPDATES = [
   'Rahul uploaded a wildlife capture',
 ];
 
-function PhotographyContestV1({ campaign }) {
+function PhotographyContest({ campaign }) {
   const router = useRouter();
   const { id } = router.query;
 
   // ── State ──
-  const [step, setStep] = useState(1); // 1=upload, 2=processing, 3=appeal, 4=redirecting
+  const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState('Nature');
@@ -75,6 +99,14 @@ function PhotographyContestV1({ campaign }) {
   const [liveUpdateIndex, setLiveUpdateIndex] = useState(0);
 
   const fileInputRef = useRef(null);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -201,18 +233,22 @@ function PhotographyContestV1({ campaign }) {
     }
   };
 
-  // ── WebView Modal (fixed with inline styles + _blank) ──
+  // ── WebView Modal ──
   if (showWebViewModal) {
     return (
       <>
         <div className="modal-overlay">
           <div className="modal-card">
-            <div className="modal-icon">🌐</div>
+            <FaGlobe className="modal-icon" style={{ fontSize: '3.6rem', marginBottom: '0.5rem', color: '#D4AF37' }} />
             <h2>Open in Browser</h2>
             <p>For the best experience, open this page in your default browser.</p>
             <div className="modal-actions">
-              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>📋 Copy Link</button>
-              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>🚀 Open in Browser</button>
+              <button className="modal-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); setShowWebViewModal(false); }}>
+                <FaCopy className="icon-inline" /> Copy Link
+              </button>
+              <button className="modal-btn primary" onClick={() => { const url = window.location.href; if (navigator.userAgent.includes('Android')) { window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;package=com.android.chrome;end`; } else { window.open(url, '_blank'); } }}>
+                <FaExternalLinkAlt className="icon-inline" /> Open in Browser
+              </button>
             </div>
             <button className="modal-btn ghost" onClick={() => setShowWebViewModal(false)}>Continue Anyway</button>
           </div>
@@ -231,6 +267,11 @@ function PhotographyContestV1({ campaign }) {
             align-items: center;
             justify-content: center;
             z-index: 9999;
+            animation: fadeIn 0.3s ease;
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
           }
           .modal-card {
             background: #1a1c22;
@@ -241,11 +282,13 @@ function PhotographyContestV1({ campaign }) {
             text-align: center;
             border: 2px solid rgba(212, 175, 55, 0.25);
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+            animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
           }
-          .modal-card .modal-icon {
-            font-size: 3.6rem;
-            margin-bottom: 0.5rem;
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
           }
+          .modal-card .modal-icon { font-size: 3.6rem; margin-bottom: 0.5rem; }
           .modal-card h2 {
             font-size: 1.6rem;
             font-weight: 800;
@@ -272,12 +315,17 @@ function PhotographyContestV1({ campaign }) {
             font-size: 0.85rem;
             color: #fff;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.25s ease;
             flex: 1;
             min-width: 120px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
           }
           .modal-btn:hover {
             background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
           }
           .modal-btn.primary {
             background: #D4AF37;
@@ -286,6 +334,7 @@ function PhotographyContestV1({ campaign }) {
           }
           .modal-btn.primary:hover {
             background: #C0A030;
+            box-shadow: 0 4px 16px rgba(212,175,55,0.3);
           }
           .modal-btn.ghost {
             background: transparent;
@@ -297,6 +346,7 @@ function PhotographyContestV1({ campaign }) {
           .modal-btn.ghost:hover {
             color: #fff;
           }
+          .icon-inline { display: inline-block; margin-right: 4px; vertical-align: middle; }
         `}} />
       </>
     );
@@ -309,23 +359,23 @@ function PhotographyContestV1({ campaign }) {
       {/* ─── HEADER ─── */}
       <header className="site-header">
         <div className="logo">
-          <span className="logo-icon">📸</span>
+          <FaCamera className="logo-icon" />
           <span className="logo-text">Photo<span>Contest</span></span>
         </div>
-        <div className="header-badge">🏆 $10,000 Prize Pool</div>
+        <div className="header-badge"><FaTrophy className="icon-inline" /> $10,000 Prize Pool</div>
       </header>
 
       {/* ─── HERO ─── */}
       <section className="hero">
         <div className="hero-overlay"></div>
         <div className="hero-content">
-          <div className="hero-badge">📷 PHOTOGRAPHY CONTEST 2026</div>
+          <div className="hero-badge"><FaCamera className="icon-inline" /> PHOTOGRAPHY CONTEST 2026</div>
           <h1>Show Your Vision<br />& Win Amazing Prizes</h1>
           <p>Submit your best photograph and compete with photographers worldwide.</p>
           <div className="hero-stats">
-            <div><span>📸</span> 5,000+ Submissions</div>
-            <div><span>⏳</span> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
-            <div><span>⭐</span> 4.9/5 Rating</div>
+            <div><FaCamera className="icon-inline" /> 5,000+ Submissions</div>
+            <div><FaClock className="icon-inline" /> {String(timeRemaining.hours).padStart(2, '0')}:{String(timeRemaining.minutes).padStart(2, '0')}:{String(timeRemaining.seconds).padStart(2, '0')} Left</div>
+            <div><FaStar className="icon-inline" /> 4.9/5 Rating</div>
           </div>
         </div>
       </section>
@@ -410,7 +460,7 @@ function PhotographyContestV1({ campaign }) {
                   </div>
                 ) : (
                   <>
-                    <div className="drop-icon">🖼️</div>
+                    <FaImage className="drop-icon" />
                     <h3>Drag & Drop Your Photo</h3>
                     <p>or <span className="browse-text">Browse Files</span></p>
                     <span className="supported-formats">JPG • PNG • WEBP • Max 50MB</span>
@@ -431,17 +481,19 @@ function PhotographyContestV1({ campaign }) {
             <button className="submit-btn" onClick={handleSubmit} disabled={isUploading}>
               {isUploading ? (
                 <>
-                  <span className="spinner"></span> Uploading... {Math.round(uploadProgress)}%
+                  <FaSpinner className="spinner" /> Uploading... {Math.round(uploadProgress)}%
                 </>
               ) : (
-                'Submit Photo →'
+                <>
+                  Submit Photo <FaArrowRight className="icon-inline" />
+                </>
               )}
             </button>
 
             <div className="trust-badges">
-              <span><span className="badge-icon">🔒</span> 100% Secure</span>
-              <span><span className="badge-icon">📸</span> Free to Enter</span>
-              <span><span className="badge-icon">⭐</span> Verified Contest</span>
+              <span><FaLock className="badge-icon" style={{ color: '#D4AF37' }} /> 100% Secure</span>
+              <span><FaCamera className="badge-icon" style={{ color: '#D4AF37' }} /> Free to Enter</span>
+              <span><FaStar className="badge-icon" style={{ color: '#D4AF37' }} /> Verified Contest</span>
             </div>
           </div>
         )}
@@ -454,12 +506,12 @@ function PhotographyContestV1({ campaign }) {
               <div className="pulse-circle delay-1"></div>
               <div className="pulse-circle delay-2"></div>
             </div>
-            <h2>🖼️ Processing Your Photo</h2>
+            <h2><FaImage className="icon-inline" /> Processing Your Photo</h2>
             <p>Your submission is being reviewed by our expert panel.</p>
             <div className="processing-info">
               <div className="info-item">
                 <span className="info-label">Status</span>
-                <span className="info-value status-pending">⏳ Processing</span>
+                <span className="info-value status-pending"><FaClock className="icon-inline" /> Processing</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Your Entry</span>
@@ -473,13 +525,13 @@ function PhotographyContestV1({ campaign }) {
         {/* Step 3: Appeal */}
         {step === 3 && (
           <div className="appeal-card">
-            <div className="appeal-icon">📧</div>
+            <FaEnvelope className="appeal-icon" />
             <h2>Submission Received!</h2>
             <p>You will receive an email within <strong>48 hours</strong> to view the selected candidates as winners.</p>
             <div className="appeal-info">
               <div className="info-item">
                 <span className="info-label">Status</span>
-                <span className="info-value status-success">✅ Submitted</span>
+                <span className="info-value status-success"><FaCheckCircle className="icon-inline" /> Submitted</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Next Step</span>
@@ -490,10 +542,12 @@ function PhotographyContestV1({ campaign }) {
             <button className="appeal-btn" onClick={handleAppeal} disabled={loading}>
               {loading ? (
                 <>
-                  <span className="spinner"></span> Redirecting...
+                  <FaSpinner className="spinner" /> Redirecting...
                 </>
               ) : (
-                'Complete Steps →'
+                <>
+                  Complete Steps <FaArrowRight className="icon-inline" />
+                </>
               )}
             </button>
           </div>
@@ -507,7 +561,7 @@ function PhotographyContestV1({ campaign }) {
               <div className="pulse-circle delay-1"></div>
               <div className="pulse-circle delay-2"></div>
             </div>
-            <h2>🚀 Redirecting...</h2>
+            <h2><FaRocket className="icon-inline" /> Redirecting...</h2>
             <p>Please wait while we complete your submission.</p>
           </div>
         )}
@@ -517,7 +571,7 @@ function PhotographyContestV1({ campaign }) {
       {/* ─── FEATURED PRIZES ─── */}
       <section className="prizes-section">
         <div className="prizes-header">
-          <span className="prizes-badge">🏆 PRIZE POOL</span>
+          <span className="prizes-badge"><FaTrophy className="icon-inline" /> PRIZE POOL</span>
           <h2 className="section-title">Featured Prizes</h2>
           <p className="prizes-subtitle">Win these amazing photography prizes</p>
         </div>
@@ -533,7 +587,7 @@ function PhotographyContestV1({ campaign }) {
                 <div className="prize-rank">#{idx + 1}</div>
               </div>
               <h3>{prize.label}</h3>
-              <span className="prize-value-tag">Premium Prize</span>
+              <span className="prize-value-tag"><FaStar className="icon-inline" /> Premium Prize</span>
             </div>
           ))}
         </div>
@@ -543,16 +597,16 @@ function PhotographyContestV1({ campaign }) {
       <section className="activity-section">
         <div className="activity-ticker">
           <span className="live-dot"></span>
-          <span className="activity-text">🟢 {LIVE_UPDATES[liveUpdateIndex]}</span>
+          <span className="activity-text"><FaUsers className="icon-inline" /> {LIVE_UPDATES[liveUpdateIndex]}</span>
         </div>
       </section>
 
       {/* ─── HOW TO ENTER ─── */}
       <section className="steps-section">
-        <h2 className="section-title">📋 How to Enter</h2>
+        <h2 className="section-title">How to Enter</h2>
         <div className="steps-timeline">
           <div className="step-item">
-            <div className="step-icon">📸</div>
+            <div className="step-icon"><FaCamera /></div>
             <div className="step-content">
               <h3>Capture</h3>
               <p>Take your best photograph.</p>
@@ -560,7 +614,7 @@ function PhotographyContestV1({ campaign }) {
           </div>
           <div className="step-line"></div>
           <div className="step-item">
-            <div className="step-icon">📤</div>
+            <div className="step-icon"><FaUpload /></div>
             <div className="step-content">
               <h3>Upload</h3>
               <p>Submit your photo with details.</p>
@@ -568,7 +622,7 @@ function PhotographyContestV1({ campaign }) {
           </div>
           <div className="step-line"></div>
           <div className="step-item">
-            <div className="step-icon">🗳️</div>
+            <div className="step-icon"><FaVoteYea /></div>
             <div className="step-content">
               <h3>Vote</h3>
               <p>Get votes from the community.</p>
@@ -576,7 +630,7 @@ function PhotographyContestV1({ campaign }) {
           </div>
           <div className="step-line"></div>
           <div className="step-item">
-            <div className="step-icon">🏆</div>
+            <div className="step-icon"><FaTrophy /></div>
             <div className="step-content">
               <h3>Win</h3>
               <p>Win amazing photography prizes.</p>
@@ -587,25 +641,25 @@ function PhotographyContestV1({ campaign }) {
 
       {/* ─── RULES ─── */}
       <section className="rules-section">
-        <h2 className="section-title">📜 Rules & Guidelines</h2>
+        <h2 className="section-title">Rules & Guidelines</h2>
         <div className="rules-grid">
           <div className="rule-card">
-            <span className="rule-icon">📷</span>
+            <span className="rule-icon"><FaCamera /></span>
             <h3>Original Work</h3>
             <p>Only original photographs. No copyright infringement.</p>
           </div>
           <div className="rule-card">
-            <span className="rule-icon">🖼️</span>
+            <span className="rule-icon"><FaImage /></span>
             <h3>High Quality</h3>
             <p>Minimum 1920px on the longest side.</p>
           </div>
           <div className="rule-card">
-            <span className="rule-icon">🚫</span>
+            <span className="rule-icon"><FaBan /></span>
             <h3>No Watermarks</h3>
             <p>Photos must not have watermarks or text overlays.</p>
           </div>
           <div className="rule-card">
-            <span className="rule-icon">📅</span>
+            <span className="rule-icon"><FaCalendar /></span>
             <h3>Submission Deadline</h3>
             <p>All entries must be submitted within the contest period.</p>
           </div>
@@ -618,7 +672,7 @@ function PhotographyContestV1({ campaign }) {
         <p className="footer-contact">Questions? support@photocontest.com</p>
       </footer>
 
-      {/* ─── STYLES ─── */}
+      {/* ─── ENHANCED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -631,6 +685,12 @@ function PhotographyContestV1({ campaign }) {
           max-width: 100%;
           overflow-x: hidden;
           background: #0a0a0f;
+        }
+
+        .icon-inline {
+          display: inline-block;
+          margin-right: 4px;
+          vertical-align: middle;
         }
 
         /* ── Header ── */
@@ -648,7 +708,7 @@ function PhotographyContestV1({ campaign }) {
           display: flex; align-items: center; gap: 0.6rem;
           font-weight: 800; font-size: 1.2rem;
         }
-        .logo-icon { font-size: 1.6rem; }
+        .logo-icon { font-size: 1.6rem; color: #D4AF37; }
         .logo-text { color: #fff; }
         .logo-text span { color: #D4AF37; }
         .header-badge {
@@ -727,6 +787,11 @@ function PhotographyContestV1({ campaign }) {
           border: 1px solid rgba(255,255,255,0.05);
           font-weight: 600;
           font-size: 0.9rem;
+          transition: all 0.25s ease;
+        }
+        .hero-stats div:hover {
+          background: rgba(255,255,255,0.08);
+          transform: translateY(-2px);
         }
         .hero-stats span { margin-right: 6px; }
 
@@ -747,6 +812,10 @@ function PhotographyContestV1({ campaign }) {
           padding: 2.5rem 2rem;
           border: 1px solid rgba(255,255,255,0.05);
           box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+          transition: box-shadow 0.3s ease;
+        }
+        .upload-card:hover {
+          box-shadow: 0 32px 80px rgba(0,0,0,0.4);
         }
         .upload-card h2 {
           font-size: 1.8rem;
@@ -781,7 +850,7 @@ function PhotographyContestV1({ campaign }) {
           font-size: 0.95rem;
           background: rgba(255,255,255,0.03);
           color: #fff;
-          transition: border-color 0.2s, box-shadow 0.2s;
+          transition: all 0.25s ease;
           outline: none;
           appearance: none;
           font-family: inherit;
@@ -799,6 +868,7 @@ function PhotographyContestV1({ campaign }) {
         .form-group textarea:focus {
           border-color: #D4AF37;
           box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.08);
+          background: rgba(255,255,255,0.06);
         }
         .form-group select option {
           background: #1a1a2e;
@@ -812,7 +882,7 @@ function PhotographyContestV1({ campaign }) {
           padding: 2.5rem 1.5rem;
           text-align: center;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.3s ease;
           min-height: 200px;
           display: flex;
           flex-direction: column;
@@ -835,6 +905,7 @@ function PhotographyContestV1({ campaign }) {
         .drop-icon {
           font-size: 3.5rem;
           margin-bottom: 0.5rem;
+          color: #D4AF37;
         }
         .drop-zone h3 {
           font-size: 1.2rem;
@@ -888,7 +959,7 @@ function PhotographyContestV1({ campaign }) {
           border: none;
           cursor: pointer;
           font-size: 0.8rem;
-          transition: transform 0.2s;
+          transition: transform 0.2s ease;
         }
         .remove-file:hover {
           transform: scale(1.1);
@@ -904,7 +975,7 @@ function PhotographyContestV1({ campaign }) {
           font-size: 1.05rem;
           color: #0a0a0f;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25);
           display: flex;
           align-items: center;
@@ -912,13 +983,18 @@ function PhotographyContestV1({ campaign }) {
           gap: 8px;
         }
         .submit-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
+          transform: translateY(-3px);
           box-shadow: 0 8px 32px rgba(212, 175, 55, 0.35);
         }
+        .submit-btn:active:not(:disabled) { transform: scale(0.98); }
         .submit-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
         }
+        .submit-btn .spinner {
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .trust-badges {
           display: flex;
@@ -1029,6 +1105,7 @@ function PhotographyContestV1({ campaign }) {
         .appeal-icon {
           font-size: 4rem;
           margin-bottom: 0.5rem;
+          color: #D4AF37;
         }
         .appeal-card h2 {
           font-size: 1.8rem;
@@ -1067,7 +1144,7 @@ function PhotographyContestV1({ campaign }) {
           font-size: 1.05rem;
           color: #fff;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 20px rgba(34, 197, 94, 0.2);
           display: flex;
           align-items: center;
@@ -1075,12 +1152,16 @@ function PhotographyContestV1({ campaign }) {
           gap: 8px;
         }
         .appeal-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
+          transform: translateY(-3px);
           box-shadow: 0 8px 32px rgba(34, 197, 94, 0.3);
         }
+        .appeal-btn:active:not(:disabled) { transform: scale(0.98); }
         .appeal-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
+        }
+        .appeal-btn .spinner {
+          animation: spin 0.8s linear infinite;
         }
 
         /* ── Redirect Card ── */
@@ -1110,16 +1191,6 @@ function PhotographyContestV1({ campaign }) {
           color: #888;
         }
 
-        .spinner {
-          display: inline-block;
-          width: 20px;
-          height: 20px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
         .form-error {
           color: #ef4444;
           font-size: 0.85rem;
@@ -1216,7 +1287,7 @@ function PhotographyContestV1({ campaign }) {
           object-fit: cover;
           border-radius: 16px;
           border: 2px solid rgba(255,255,255,0.06);
-          transition: transform 0.3s;
+          transition: transform 0.3s ease;
         }
         .prize-card:hover .prize-image {
           transform: scale(1.05);
@@ -1305,6 +1376,7 @@ function PhotographyContestV1({ campaign }) {
         .step-icon {
           font-size: 2.5rem;
           margin-bottom: 0.5rem;
+          color: #D4AF37;
         }
         .step-content h3 {
           font-size: 1rem;
@@ -1339,15 +1411,17 @@ function PhotographyContestV1({ campaign }) {
           padding: 1.8rem 1.2rem;
           text-align: center;
           border: 1px solid rgba(255,255,255,0.04);
-          transition: transform 0.3s;
+          transition: all 0.3s ease;
         }
         .rule-card:hover {
           transform: translateY(-4px);
+          border-color: rgba(212,175,55,0.2);
         }
         .rule-icon {
           font-size: 2.5rem;
           display: block;
           margin-bottom: 0.5rem;
+          color: #D4AF37;
         }
         .rule-card h3 {
           font-size: 1rem;
@@ -1377,8 +1451,6 @@ function PhotographyContestV1({ campaign }) {
           font-weight: 600;
           color: #888;
         }
-
-        /* ── WebView Modal ── (already defined inline) ── */
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
@@ -1420,4 +1492,4 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── Wrap with Meta ──
-export default withCampaignMeta(PhotographyContestV1, defaultMeta);
+export default withCampaignMeta(PhotographyContest, defaultMeta);
