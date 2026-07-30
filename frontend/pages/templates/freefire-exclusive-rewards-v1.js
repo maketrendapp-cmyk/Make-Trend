@@ -3,6 +3,27 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaGamepad,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaSpinner,
+  FaCheckCircle,
+  FaGift,
+  FaTicketAlt,
+  FaIdCard,
+  FaInfoCircle,
+  FaGlobe,
+  FaArrowRight,
+} from 'react-icons/fa';
+
+// ── Default Meta (Clean URL) ──
+const defaultMeta = {
+  title: 'Free Fire Exclusive Rewards',
+  description: 'Redeem exclusive rewards and codes for Garena Free Fire.',
+  image: 'https://maketrend.vercel.app/og-freefire-rewards.jpg',
+  url: 'https://maketrend.vercel.app/freefire-exclusive-rewards-v1', // ✅ Clean base URL
+};
 
 function FreefireExclusiveRewardsV1({ campaign }) {
   const router = useRouter();
@@ -20,6 +41,14 @@ function FreefireExclusiveRewardsV1({ campaign }) {
   const [toast, setToast] = useState('');
   const [isWebView, setIsWebView] = useState(false);
 
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
+
   // ── Detect WebView ──
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -29,10 +58,8 @@ function FreefireExclusiveRewardsV1({ campaign }) {
                       (navigator.userAgent.indexOf('wv') > -1);
     setIsWebView(isWebView);
     if (isWebView) {
-      // Show WebView modal instead of auto‑redirect
       setShowWebViewModal(true);
     } else {
-      // If not in WebView, show UID modal directly
       setShowUidModal(true);
     }
   }, []);
@@ -114,7 +141,6 @@ function FreefireExclusiveRewardsV1({ campaign }) {
     setIsRedeemed(true);
     setIsLoading(true);
     setTimeout(() => {
-      // If no campaign id, go to /create (SPA), otherwise go to tasks
       if (!id) {
         router.push('/create');
       } else {
@@ -142,16 +168,16 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       {showWebViewModal && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h2><i className="fas fa-external-link-alt"></i> Open in Browser</h2>
+            <h2><FaGlobe className="icon-inline" /> Open in Browser</h2>
             <p style={{ color: '#ccc', fontSize: '0.9rem', margin: '1rem 0' }}>
               This page works best in a full browser. Please open it in your default browser to continue.
             </p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
               <button className="modal-btn" onClick={handleCopyLink}>
-                <i className="fas fa-copy"></i> Copy Link
+                <FaCopy className="icon-inline" /> Copy Link
               </button>
               <button className="modal-btn primary" onClick={handleOpenInBrowser}>
-                <i className="fas fa-external-link-alt"></i> Open in Browser
+                <FaExternalLinkAlt className="icon-inline" /> Open in Browser
               </button>
             </div>
             <button
@@ -169,7 +195,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       {showUidModal && !showWebViewModal && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h2><i className="fas fa-gamepad"></i> Enter Game UID</h2>
+            <h2><FaGamepad className="icon-inline" /> Enter Game UID</h2>
             <p style={{ color: '#ccc', fontSize: '0.8rem' }}>Only numeric digits allowed</p>
             <input
               type="text"
@@ -190,12 +216,12 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       <div className="container">
         <div className="redemption-card">
           <div className="uid-display-bar">
-            <span className="uid-label"><i className="fas fa-id-card"></i> Game UID</span>
+            <span className="uid-label"><FaIdCard className="icon-inline" /> Game UID</span>
             <span className="uid-value">{uid || '—'}</span>
           </div>
 
           <div className="code-section">
-            <div className="code-title"><i className="fas fa-ticket-alt"></i> Enter Redemption Code</div>
+            <div className="code-title"><FaTicketAlt className="icon-inline" /> Enter Redemption Code</div>
             <div className="code-input-group">
               <input
                 type="text"
@@ -235,29 +261,29 @@ function FreefireExclusiveRewardsV1({ campaign }) {
             disabled={isRedeemed || isLoading}
           >
             {isLoading ? (
-              <><i className="fas fa-spinner fa-spin"></i> Processing...</>
+              <><FaSpinner className="fa-spin icon-inline" /> Processing...</>
             ) : isRedeemed ? (
-              <><i className="fas fa-check-circle"></i> Redeemed!</>
+              <><FaCheckCircle className="icon-inline" /> Redeemed!</>
             ) : (
-              <><i className="fas fa-gift"></i> Redeem</>
+              <><FaGift className="icon-inline" /> Redeem</>
             )}
           </button>
 
           {isRedeemed && (
             <div className="redeem-success">
-              <i className="fas fa-check-circle" style={{ color: '#10b981', fontSize: '1.5rem' }}></i>
+              <FaCheckCircle style={{ color: '#10b981', fontSize: '1.5rem' }} />
               <p style={{ marginTop: '8px' }}>
                 🎉 Congratulations! Your code has been successfully redeemed.<br />
                 Reward is ready for claiming.
               </p>
               <button className="claim-btn" onClick={() => !id ? router.push('/create') : router.push(`/tasks?id=${id}`)}>
-                <i className="fas fa-gift"></i> Claim Reward
+                <FaGift className="icon-inline" /> Claim Reward
               </button>
             </div>
           )}
 
           <div className="notice-box">
-            <div className="notice-title"><i className="fas fa-info-circle"></i> Important Notice:</div>
+            <div className="notice-title"><FaInfoCircle className="icon-inline" /> Important Notice:</div>
             <p>1. Redemption code has 12 characters, consisting of capital letters and numbers.</p>
             <p>2. Item rewards are shown in [vault] tab in game lobby; Golds or diamonds will add in account wallet automatically.</p>
             <p>3. Please note redemption expiration date. Any expired codes cannot be redeemed.</p>
@@ -274,7 +300,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
       {/* ── Toast ── */}
       {toast && <div className="toast">{toast}</div>}
 
-      {/* ── Styles ── */}
+      {/* ── Enhanced Styles ── */}
       <style dangerouslySetInnerHTML={{ __html: `
         /* ── Global Reset ── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -321,12 +347,28 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         /* ── Card ── */
         .redemption-card {
           background: rgba(10, 15, 25, 0.88);
-          backdrop-filter: blur(12px);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           border-radius: 32px;
           padding: 2rem;
           border: 1px solid rgba(255, 204, 0, 0.15);
           box-shadow: 0 30px 45px -12px rgba(0,0,0,0.6);
-          transition: transform 0.2s;
+          transition: transform 0.25s ease, box-shadow 0.3s ease;
+        }
+        .redemption-card:hover {
+          box-shadow: 0 40px 60px -12px rgba(0,0,0,0.8);
+        }
+
+        .icon-inline {
+          display: inline-block;
+          margin-right: 6px;
+          vertical-align: middle;
+        }
+        .fa-spin {
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
 
         /* ── UID Display ── */
@@ -399,11 +441,12 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           letter-spacing: 2px;
           text-transform: uppercase;
           outline: none;
-          transition: 0.3s;
+          transition: all 0.25s ease;
         }
         .code-part:focus {
           border-color: #ffcc00;
-          box-shadow: 0 0 0 3px rgba(255,204,0,0.2);
+          box-shadow: 0 0 0 4px rgba(255,204,0,0.15);
+          background: rgba(0,0,0,0.8);
         }
         .code-dash {
           font-size: 1.5rem;
@@ -427,23 +470,25 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           font-size: 1.05rem;
           color: #1e1e2a;
           cursor: pointer;
-          transition: all 0.25s;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           margin: 1.5rem 0 1rem;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 10px;
-          box-shadow: 0 6px 18px rgba(255,204,0,0.3);
+          box-shadow: 0 6px 18px rgba(255,204,0,0.25);
         }
         .redeem-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 25px rgba(255,204,0,0.5);
+          transform: translateY(-3px);
+          box-shadow: 0 12px 30px rgba(255,204,0,0.4);
           background: linear-gradient(135deg, #ffb800, #ff8c00);
         }
+        .redeem-btn:active:not(:disabled) { transform: scale(0.98); }
         .redeem-btn:disabled {
-          opacity: 0.6;
+          opacity: 0.5;
           cursor: not-allowed;
           transform: none;
+          box-shadow: none;
         }
 
         /* ── Success ── */
@@ -465,7 +510,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           color: #1e1e2a;
           cursor: pointer;
           margin-top: 0.8rem;
-          transition: 0.2s;
+          transition: all 0.25s ease;
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -473,6 +518,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         .claim-btn:hover {
           background: #ffa500;
           transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(255,204,0,0.3);
         }
 
         /* ── Notice ── */
@@ -517,7 +563,8 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           width: 100%;
           height: 100%;
           background: rgba(0,0,0,0.85);
-          backdrop-filter: blur(12px);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -532,14 +579,19 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           max-width: 400px;
           width: 90%;
           text-align: center;
-          border: 1px solid rgba(255,204,0,0.3);
+          border: 1px solid rgba(255,204,0,0.25);
           box-shadow: 0 30px 50px -20px black;
+          animation: fadeInUp 0.35s ease;
         }
         .modal-card h2 {
           color: #ffcc00;
           margin-bottom: 0.5rem;
           font-weight: 800;
           font-size: 1.4rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
         }
         .modal-card input {
           width: 100%;
@@ -552,26 +604,28 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           text-align: center;
           margin: 0.8rem 0;
           outline: none;
-          transition: 0.2s;
+          transition: all 0.2s ease;
         }
         .modal-card input:focus {
           border-color: #ffcc00;
+          box-shadow: 0 0 0 4px rgba(255,204,0,0.1);
         }
         .modal-btn {
-          background: rgba(255,255,255,0.1);
-          border: 1px solid rgba(255,255,255,0.15);
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.12);
           padding: 0.7rem 1.5rem;
           border-radius: 60px;
           font-weight: 700;
           color: #fff;
           cursor: pointer;
-          transition: 0.2s;
+          transition: all 0.25s ease;
           display: inline-flex;
           align-items: center;
           gap: 8px;
         }
         .modal-btn:hover {
-          background: rgba(255,255,255,0.2);
+          background: rgba(255,255,255,0.16);
+          transform: translateY(-2px);
         }
         .modal-btn.primary {
           background: #ffcc00;
@@ -580,6 +634,8 @@ function FreefireExclusiveRewardsV1({ campaign }) {
         }
         .modal-btn.primary:hover {
           background: #ffa500;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 18px rgba(255,204,0,0.3);
         }
         .modal-btn.ghost {
           background: transparent;
@@ -610,6 +666,7 @@ function FreefireExclusiveRewardsV1({ campaign }) {
           z-index: 3000;
           border: 1px solid rgba(255,204,0,0.2);
           animation: fadeInUp 0.3s ease;
+          backdrop-filter: blur(8px);
         }
 
         /* ── Animations ── */
@@ -664,9 +721,4 @@ export async function getServerSideProps({ query }) {
 }
 
 // ── WRAP WITH META ──
-export default withCampaignMeta(FreefireExclusiveRewardsV1, {
-  title: 'Free Fire Exclusive Rewards',
-  description: 'Redeem exclusive rewards and codes for Garena Free Fire.',
-  image: 'https://maketrend.vercel.app/og-freefire-rewards.jpg',
-  url: 'https://maketrend.vercel.app/freefire-exclusive-rewards-v1?id={id}',
-});
+export default withCampaignMeta(FreefireExclusiveRewardsV1, defaultMeta);
