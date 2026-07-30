@@ -28,7 +28,7 @@ const defaultMeta = {
   title: 'Congratulations! You Won iPhone 15 Pro Max',
   description: 'You have been selected as the winner of iPhone 15 Pro Max. Claim your prize now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/iphone-winner', // ✅ Clean base URL
+  url: 'https://maketrend.app/iphone-winner',
 };
 
 function IphoneWinner({ campaign }) {
@@ -311,7 +311,7 @@ function IphoneWinner({ campaign }) {
         <p className="footer-contact">Questions? support@prizeclaim.com</p>
       </footer>
 
-      {/* ─── ENHANCED STYLES ─── */}
+      {/* ─── FIXED STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -365,7 +365,7 @@ function IphoneWinner({ campaign }) {
         /* ── Step 1: Congratulations ── */
         .congrats-hero {
           position: relative;
-          min-height: 90vh;
+          min-height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -389,13 +389,15 @@ function IphoneWinner({ campaign }) {
           100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; }
         }
         .hero-content {
-          position: relative; z-index: 2;
+          position: relative;
+          z-index: 2;
           max-width: 600px;
+          width: 100%;
           margin: 0 auto;
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 0.5rem 0;
+          padding: 1.5rem 0.5rem;
         }
         .badge-winner {
           display: inline-block;
@@ -413,7 +415,7 @@ function IphoneWinner({ campaign }) {
 
         .phone-display {
           position: relative;
-          margin: 0 auto 1.5rem;
+          margin: 0 auto 1.8rem;
           width: 200px;
           height: 200px;
           flex-shrink: 0;
@@ -448,13 +450,13 @@ function IphoneWinner({ campaign }) {
           letter-spacing: 0.5px;
         }
 
-        /* ── FIX: Proper spacing between text elements ── */
+        /* ── FIX: Increased spacing between text elements ── */
         .hero-content h1 {
           font-size: clamp(2.4rem, 7vw, 3.8rem);
           font-weight: 900;
-          line-height: 1.15;
-          margin-bottom: 0.8rem;
-          margin-top: 0.2rem;
+          line-height: 1.2;
+          margin-bottom: 1.2rem;
+          margin-top: 0.5rem;
           background: linear-gradient(135deg, #fff 30%, #D4AF37 70%, #B8860B 100%);
           -webkit-background-clip: text;
           background-clip: text;
@@ -462,16 +464,16 @@ function IphoneWinner({ campaign }) {
           text-align: center;
         }
         .sub-text {
-          font-size: 1rem;
-          color: #888;
-          margin-bottom: 0.4rem;
+          font-size: 1.05rem;
+          color: #aaa;
+          margin-bottom: 0.6rem;
           text-align: center;
         }
         .prize-name {
-          font-size: 1.8rem;
+          font-size: 2rem;
           font-weight: 800;
           color: #D4AF37;
-          margin-bottom: 1.8rem;
+          margin-bottom: 2rem;
           text-align: center;
           letter-spacing: 0.5px;
         }
@@ -480,15 +482,14 @@ function IphoneWinner({ campaign }) {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.6rem;
           background: rgba(255,255,255,0.04);
-          padding: 1rem 1.5rem;
+          padding: 1.2rem 1.5rem;
           border-radius: 16px;
-          margin-bottom: 2rem;
+          margin-bottom: 2.2rem;
           border: 1px solid rgba(255,255,255,0.05);
           max-width: 350px;
-          margin-left: auto;
-          margin-right: auto;
+          width: 100%;
           transition: background 0.3s ease;
         }
         .winner-details:hover {
@@ -507,7 +508,7 @@ function IphoneWinner({ campaign }) {
           display: inline-block;
           background: linear-gradient(135deg, #D4AF37, #B8860B);
           border: none;
-          padding: 0.9rem 2.8rem;
+          padding: 1rem 3rem;
           border-radius: 60px;
           font-weight: 800;
           font-size: 1.05rem;
@@ -515,7 +516,7 @@ function IphoneWinner({ campaign }) {
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           box-shadow: 0 4px 30px rgba(212, 175, 55, 0.3);
-          margin-bottom: 0.8rem;
+          margin-bottom: 1rem;
         }
         .claim-btn-primary:hover {
           transform: translateY(-3px);
@@ -673,7 +674,8 @@ function IphoneWinner({ campaign }) {
 
         .spinner {
           display: inline-block;
-          width: 18px; height: 18px;
+          width: 18px;
+          height: 18px;
           border: 2px solid rgba(10,10,10,0.2);
           border-top-color: #0a0a0a;
           border-radius: 50%;
@@ -822,14 +824,15 @@ function IphoneWinner({ campaign }) {
 
         /* ── Responsive ── */
         @media (max-width: 640px) {
-          .phone-display { width: 140px; height: 140px; }
+          .phone-display { width: 150px; height: 150px; }
           .phone-image { border-radius: 20px; }
           .form-card { padding: 1.5rem; }
           .form-content h2 { font-size: 1.5rem; }
           .hero-content h1 { font-size: 2.2rem; }
-          .prize-name { font-size: 1.4rem; }
+          .prize-name { font-size: 1.5rem; }
           .winner-details { padding: 0.8rem 1rem; }
           .claim-btn-primary { padding: 0.8rem 2rem; font-size: 0.95rem; }
+          .hero-content { padding: 1rem 0.5rem; }
         }
         @media (max-width: 480px) {
           .header-badge { font-size: 0.55rem; padding: 0.2rem 0.8rem; }
@@ -839,7 +842,8 @@ function IphoneWinner({ campaign }) {
           .prize-name { font-size: 1.2rem; }
           .form-phone-image { width: 40px; height: 40px; }
           .form-phone-preview span { font-size: 0.95rem; }
-          .hero-content { padding: 0.2rem 0; }
+          .hero-content { padding: 0.8rem 0.5rem; }
+          .sub-text { font-size: 0.9rem; }
         }
       `}} />
     </div>
