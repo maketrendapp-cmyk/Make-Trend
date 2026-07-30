@@ -197,7 +197,7 @@ function IphoneWinner({ campaign }) {
                 alt="iPhone 15 Pro Max"
                 className="phone-image"
               />
-              <div className="phone-label"><FaPhone className="icon-inline" /> iPhone 15 Pro Max</div>
+              <div className="phone-label"><FaPhone className="icon-inline" /> iPhone 15 Pro</div>
             </div>
 
             <h1>Congratulations!</h1>
