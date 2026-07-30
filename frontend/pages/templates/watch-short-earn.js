@@ -1,16 +1,37 @@
-
 // pages/templates/watch-short-earn.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withCampaignMeta } from '../../lib/withCampaignMeta';
 import { fetchCampaign } from '../../lib/fetchCampaign';
+import {
+  FaPlay,
+  FaGem,
+  FaBolt,
+  FaMoneyBillWave,
+  FaShieldAlt,
+  FaClock,
+  FaLock,
+  FaMobileAlt,
+  FaCheckCircle,
+  FaVideo,
+  FaArrowRight,
+  FaCopy,
+  FaExternalLinkAlt,
+  FaGlobe,
+  FaSpinner,
+  FaStar,
+  FaUser,
+  FaTrophy,
+  FaGift,
+  FaQuestionCircle,
+} from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL) ──
 const defaultMeta = {
   title: 'Watch Short & Earn – Get Paid to Watch Videos',
   description: 'Watch short videos and earn rewards instantly. Complete tasks to unlock your earnings. Start now!',
   image: 'https://maketrend.app/og-image.png',
-  url: 'https://maketrend.app/watch-short-earn?id={id}',
+  url: 'https://maketrend.app/watch-short-earn', // ✅ Clean base URL
 };
 
 function WatchShortEarn({ campaign }) {
@@ -19,6 +40,14 @@ function WatchShortEarn({ campaign }) {
 
   const [loading, setLoading] = useState(false);
   const [showWebViewModal, setShowWebViewModal] = useState(false);
+
+  // ── ✅ CLEAN URL: remove query params if no id ──
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!id && router.asPath.includes('?')) {
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.isReady, id, router]);
 
   // ── WebView detection ──
   useEffect(() => {
@@ -47,7 +76,7 @@ function WatchShortEarn({ campaign }) {
       <div className="modal-overlay">
         <div className="modal-card">
           <div className="modal-icon-container">
-            <span className="modal-icon">🌐</span>
+            <FaGlobe className="modal-icon" />
           </div>
           <h2>Open in Browser</h2>
           <p>For the best experience and to ensure your rewards track correctly, please open this page in your default browser.</p>
@@ -60,8 +89,7 @@ function WatchShortEarn({ campaign }) {
                 setShowWebViewModal(false);
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              Copy Link
+              <FaCopy className="icon-inline" /> Copy Link
             </button>
             <button
               className="modal-btn primary"
@@ -74,8 +102,7 @@ function WatchShortEarn({ campaign }) {
                 }
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-              Open Browser
+              <FaExternalLinkAlt className="icon-inline" /> Open Browser
             </button>
           </div>
           <button
@@ -100,12 +127,12 @@ function WatchShortEarn({ campaign }) {
         <div className="header-container">
           <div className="logo">
             <div className="logo-icon-bg">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <FaPlay className="w-4 h-4" />
             </div>
             <span className="logo-text">Watch<span>Earn</span></span>
           </div>
           <div className="header-badge">
-            <span className="pulse-dot"></span> $10 Reward
+            <span className="pulse-dot"></span> <FaMoneyBillWave className="icon-inline" /> $10 Reward
           </div>
         </div>
       </header>
@@ -116,14 +143,14 @@ function WatchShortEarn({ campaign }) {
         <div className="hero-glow shape-2"></div>
         <div className="hero-content">
           <div className="hero-badge-wrap">
-            <div className="hero-badge">🎬 WATCH & EARN SYSTEM</div>
+            <div className="hero-badge"><FaVideo className="icon-inline" /> WATCH & EARN SYSTEM</div>
           </div>
           <h1>Watch Short Videos<br />Earn <span className="text-gradient">$10</span> Instantly</h1>
           <p>Complete a quick video view, finish the verification tasks, and claim your guaranteed reward directly to your account.</p>
           <div className="hero-stats">
-            <div className="stat-pill"><span className="stat-icon">⏱️</span> 30 Secs</div>
-            <div className="stat-pill"><span className="stat-icon">💎</span> $10 Reward</div>
-            <div className="stat-pill"><span className="stat-icon">⚡</span> Instant Payout</div>
+            <div className="stat-pill"><FaClock className="icon-inline" /> 30 Secs</div>
+            <div className="stat-pill"><FaGem className="icon-inline" /> $10 Reward</div>
+            <div className="stat-pill"><FaBolt className="icon-inline" /> Instant Payout</div>
           </div>
         </div>
       </section>
@@ -135,11 +162,11 @@ function WatchShortEarn({ campaign }) {
           {/* Reward Display */}
           <div className="reward-display">
             <div className="reward-circle">
-              <span className="reward-icon">💵</span>
+              <FaMoneyBillWave className="reward-icon" />
             </div>
             <div className="reward-info">
               <span className="reward-amount">$10.00</span>
-              <span className="reward-label">Guaranteed Reward</span>
+              <span className="reward-label"><FaCheckCircle className="icon-inline" /> Guaranteed Reward</span>
             </div>
           </div>
 
@@ -148,7 +175,7 @@ function WatchShortEarn({ campaign }) {
             <div className="video-player-mock">
               <div className="player-glow"></div>
               <div className="play-button">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <FaPlay className="w-6 h-6" />
               </div>
               <div className="player-overlay">
                 <div className="player-text">Ready to watch</div>
@@ -163,7 +190,7 @@ function WatchShortEarn({ campaign }) {
           {/* Features */}
           <div className="features-row">
             <div className="feature-item">
-              <span className="feature-icon">⏱️</span>
+              <FaClock className="feature-icon" />
               <div className="feature-text">
                 <span className="feature-title">Duration</span>
                 <span className="feature-sub">30 Seconds</span>
@@ -171,7 +198,7 @@ function WatchShortEarn({ campaign }) {
             </div>
             <div className="feature-divider"></div>
             <div className="feature-item">
-              <span className="feature-icon">🛡️</span>
+              <FaShieldAlt className="feature-icon" />
               <div className="feature-text">
                 <span className="feature-title">Status</span>
                 <span className="feature-sub text-cyan">Verified</span>
@@ -179,7 +206,7 @@ function WatchShortEarn({ campaign }) {
             </div>
             <div className="feature-divider"></div>
             <div className="feature-item">
-              <span className="feature-icon">💰</span>
+              <FaMoneyBillWave className="feature-icon" />
               <div className="feature-text">
                 <span className="feature-title">Payout</span>
                 <span className="feature-sub text-purple">$10.00</span>
@@ -195,19 +222,19 @@ function WatchShortEarn({ campaign }) {
           >
             {loading ? (
               <>
-                <span className="spinner"></span> 
+                <FaSpinner className="spinner" /> 
                 <span>Initializing...</span>
               </>
             ) : (
               <>
                 <span>Start Watching & Earn $10</span>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                <FaArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
 
           <p className="secure-note">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            <FaLock className="w-3.5 h-3.5" />
             Connection is encrypted and secure
           </p>
         </div>
@@ -222,17 +249,17 @@ function WatchShortEarn({ campaign }) {
         <div className="steps">
           <div className="step-card">
             <div className="step-number-wrap">1</div>
-            <h3>Watch Video</h3>
+            <h3><FaVideo className="icon-inline" /> Watch Video</h3>
             <p>Click start and watch a high-quality sponsored short video for 30 seconds.</p>
           </div>
           <div className="step-card">
             <div className="step-number-wrap">2</div>
-            <h3>Complete Tasks</h3>
+            <h3><FaCheckCircle className="icon-inline" /> Complete Tasks</h3>
             <p>Finish a quick human verification step to prove you are a real viewer.</p>
           </div>
           <div className="step-card">
             <div className="step-number-wrap">3</div>
-            <h3>Get Paid</h3>
+            <h3><FaMoneyBillWave className="icon-inline" /> Get Paid</h3>
             <p>Claim your $10 reward instantly directly to your preferred payout method.</p>
           </div>
         </div>
@@ -245,22 +272,22 @@ function WatchShortEarn({ campaign }) {
         </div>
         <div className="why-grid">
           <div className="why-card">
-            <div className="why-icon-wrap"><span className="why-icon">💵</span></div>
+            <div className="why-icon-wrap"><FaMoneyBillWave className="why-icon" /></div>
             <h3>Real Money</h3>
             <p>Get paid actual cash, not useless points or tokens.</p>
           </div>
           <div className="why-card">
-            <div className="why-icon-wrap"><span className="why-icon">⚡</span></div>
+            <div className="why-icon-wrap"><FaBolt className="why-icon" /></div>
             <h3>Lightning Fast</h3>
             <p>The whole process takes less than 2 minutes.</p>
           </div>
           <div className="why-card">
-            <div className="why-icon-wrap"><span className="why-icon">🛡️</span></div>
+            <div className="why-icon-wrap"><FaShieldAlt className="why-icon" /></div>
             <h3>100% Secure</h3>
             <p>Your personal data is encrypted and never shared.</p>
           </div>
           <div className="why-card">
-            <div className="why-icon-wrap"><span className="why-icon">📱</span></div>
+            <div className="why-icon-wrap"><FaMobileAlt className="why-icon" /></div>
             <h3>Any Device</h3>
             <p>Works flawlessly on phones, tablets, and PCs.</p>
           </div>
@@ -275,52 +302,52 @@ function WatchShortEarn({ campaign }) {
         <div className="testimonials-grid">
           <div className="testimonial-card">
             <div className="testimonial-rating">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
             </div>
             <p>"Honestly thought it was fake but I got my $10 instantly after watching the ad. Amazing!"</p>
             <div className="testimonial-author">
-              <div className="author-avatar">S</div>
+              <div className="author-avatar"><FaUser /></div>
               <div className="author-details">
                 <span className="author-name">Sarah Jenkins</span>
-                <span className="author-status text-cyan">Verified User</span>
+                <span className="author-status text-cyan"><FaCheckCircle className="icon-inline" /> Verified User</span>
               </div>
             </div>
           </div>
           <div className="testimonial-card">
             <div className="testimonial-rating">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
             </div>
             <p>"I've done this three times today. Easiest money I've ever made on my lunch break."</p>
             <div className="testimonial-author">
-              <div className="author-avatar bg-purple">M</div>
+              <div className="author-avatar bg-purple"><FaUser /></div>
               <div className="author-details">
                 <span className="author-name">Mike R.</span>
-                <span className="author-status text-cyan">Verified User</span>
+                <span className="author-status text-cyan"><FaCheckCircle className="icon-inline" /> Verified User</span>
               </div>
             </div>
           </div>
           <div className="testimonial-card">
             <div className="testimonial-rating">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
+              <FaStar className="star" />
             </div>
             <p>"Super smooth UI, no glitches. Got the notification of my payment exactly when it said I would."</p>
             <div className="testimonial-author">
-              <div className="author-avatar bg-cyan">E</div>
+              <div className="author-avatar bg-cyan"><FaUser /></div>
               <div className="author-details">
                 <span className="author-name">Emily W.</span>
-                <span className="author-status text-cyan">Verified User</span>
+                <span className="author-status text-cyan"><FaCheckCircle className="icon-inline" /> Verified User</span>
               </div>
             </div>
           </div>
@@ -334,22 +361,25 @@ function WatchShortEarn({ campaign }) {
         </div>
         <div className="faq-list">
           <div className="faq-item">
-            <div className="faq-icon">?</div>
+            <div className="faq-icon"><FaQuestionCircle /></div>
             <div>
               <div className="faq-question">How long is the video?</div>
               <div className="faq-answer">The video is strictly 30 seconds long. You must watch it until the end to get credited.</div>
             </div>
           </div>
           <div className="faq-item">
-            <div className="faq-icon">?</div>
+            <div className="faq-icon"><FaQuestionCircle /></div>
             <div>
               <div className="faq-question">How do I receive my $10?</div>
               <div className="faq-answer">After verification, you'll be prompted to enter your preferred payout method (PayPal, CashApp, or Gift Card).</div>
             </div>
           </div>
           <div className="faq-item">
-            <div className="faq-question">Are there hidden fees?</div>
-            <div className="faq-answer">Absolutely none. Our advertisers pay us for your attention, and we pass the majority of that directly to you.</div>
+            <div className="faq-icon"><FaQuestionCircle /></div>
+            <div>
+              <div className="faq-question">Are there hidden fees?</div>
+              <div className="faq-answer">Absolutely none. Our advertisers pay us for your attention, and we pass the majority of that directly to you.</div>
+            </div>
           </div>
         </div>
       </section>
@@ -358,8 +388,7 @@ function WatchShortEarn({ campaign }) {
       <footer className="site-footer">
         <div className="footer-content">
           <div className="logo footer-logo">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            Watch<span>Earn</span>
+            <FaPlay className="w-3.5 h-3.5" /> Watch<span>Earn</span>
           </div>
           <p>© {new Date().getFullYear()} WatchEarn Ecosystem. All rights reserved.</p>
           <p className="footer-contact">Secure & Verified System.</p>
@@ -388,6 +417,7 @@ function WatchShortEarn({ campaign }) {
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
         body { background: var(--bg-base); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
         .page-wrapper { max-width: 100%; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
+        .icon-inline { display: inline-block; margin-right: 4px; vertical-align: middle; }
 
         /* ── Header ── */
         .site-header {
@@ -429,15 +459,18 @@ function WatchShortEarn({ campaign }) {
         .hero p { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; }
         
         .hero-stats { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
-        .stat-pill { background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 40px; border: 1px solid var(--border-color); font-weight: 600; font-size: 0.85rem; color: #d1d5db; display: flex; align-items: center; gap: 6px; }
+        .stat-pill { background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 40px; border: 1px solid var(--border-color); font-weight: 600; font-size: 0.85rem; color: #d1d5db; display: flex; align-items: center; gap: 6px; transition: all 0.3s ease; }
+        .stat-pill:hover { background: rgba(255,255,255,0.08); transform: translateY(-2px); }
 
-        /* ── Main Card (Balanced for PC) ── */
+        /* ── Main Card ── */
         .main-section { padding: 0 1.5rem; max-width: 760px; margin: -3.5rem auto 3rem; position: relative; z-index: 10; }
         .main-card {
           background: var(--bg-surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
           border-radius: 28px; padding: 2.5rem 2rem; border: 1px solid var(--border-color);
           box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+          transition: box-shadow 0.3s ease;
         }
+        .main-card:hover { box-shadow: 0 35px 70px -12px rgba(0,0,0,0.6); }
 
         /* Reward Display */
         .reward-display { display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin-bottom: 2rem; }
@@ -448,7 +481,7 @@ function WatchShortEarn({ campaign }) {
           box-shadow: 0 8px 32px rgba(139, 92, 246, 0.4); animation: float 4s ease-in-out infinite;
         }
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        .reward-icon { font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .reward-icon { font-size: 2.2rem; color: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
         .reward-info { display: flex; flex-direction: column; }
         .reward-amount { font-size: 2.5rem; font-weight: 900; line-height: 1; letter-spacing: -1px; background: linear-gradient(to bottom, #fff, #cbd5e1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .reward-label { font-size: 0.85rem; font-weight: 600; color: var(--brand-primary-light); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
@@ -480,7 +513,7 @@ function WatchShortEarn({ campaign }) {
           padding: 1rem; border-radius: 16px; border: 1px solid var(--border-color); margin-bottom: 2rem;
         }
         .feature-item { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: center; }
-        .feature-icon { font-size: 1.2rem; }
+        .feature-icon { font-size: 1.2rem; color: var(--brand-primary-light); }
         .feature-text { display: flex; flex-direction: column; text-align: left; }
         .feature-title { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         .feature-sub { font-size: 0.85rem; font-weight: 700; color: #fff; }
@@ -518,8 +551,8 @@ function WatchShortEarn({ campaign }) {
         /* ── How It Works ── */
         .how-section { padding: 4rem 1.5rem; max-width: 1000px; margin: 0 auto; }
         .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
-        .step-card { background: var(--bg-surface-solid); padding: 2rem 1.5rem; border-radius: 24px; text-align: center; border: 1px solid var(--border-color); transition: all 0.3s; }
-        .step-card:hover { transform: translateY(-5px); border-color: var(--brand-primary-light); background: rgba(31, 41, 55, 0.8); }
+        .step-card { background: var(--bg-surface-solid); padding: 2rem 1.5rem; border-radius: 24px; text-align: center; border: 1px solid var(--border-color); transition: all 0.3s ease; }
+        .step-card:hover { transform: translateY(-5px); border-color: var(--brand-primary-light); background: rgba(31, 41, 55, 0.8); box-shadow: 0 8px 30px rgba(139, 92, 246, 0.1); }
         .step-number-wrap { width: 48px; height: 48px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; color: var(--brand-primary-light); font-weight: 900; font-size: 1.2rem; transform: rotate(-5deg); transition: 0.3s; }
         .step-card:hover .step-number-wrap { transform: rotate(0) scale(1.1); background: var(--brand-primary); color: #fff; }
         .step-card h3 { font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
@@ -528,40 +561,43 @@ function WatchShortEarn({ campaign }) {
         /* ── Why Grid ── */
         .why-section { padding: 4rem 1.5rem; max-width: 1000px; margin: 0 auto; }
         .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
-        .why-card { background: var(--bg-surface-solid); border-radius: 20px; padding: 1.5rem; text-align: center; border: 1px solid var(--border-color); transition: transform 0.2s; }
-        .why-card:hover { transform: translateY(-4px); border-color: rgba(6, 182, 212, 0.4); }
-        .why-icon-wrap { width: 50px; height: 50px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
-        .why-icon { font-size: 1.5rem; }
+        .why-card { background: var(--bg-surface-solid); border-radius: 20px; padding: 1.5rem; text-align: center; border: 1px solid var(--border-color); transition: all 0.3s ease; }
+        .why-card:hover { transform: translateY(-4px); border-color: rgba(6, 182, 212, 0.4); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .why-icon-wrap { width: 50px; height: 50px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; transition: 0.3s; }
+        .why-card:hover .why-icon-wrap { background: rgba(139, 92, 246, 0.15); }
+        .why-icon { font-size: 1.5rem; color: var(--brand-primary-light); }
         .why-card h3 { font-size: 1rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
         .why-card p { font-size: 0.85rem; color: var(--text-muted); }
 
         /* ── Testimonials ── */
         .testimonials-section { padding: 4rem 1.5rem; max-width: 1000px; margin: 0 auto; }
         .testimonials-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-        .testimonial-card { background: var(--bg-surface-solid); border-radius: 20px; padding: 2rem 1.5rem; border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; }
+        .testimonial-card { background: var(--bg-surface-solid); border-radius: 20px; padding: 2rem 1.5rem; border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; transition: all 0.3s ease; }
+        .testimonial-card:hover { border-color: var(--brand-primary-light); transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
         .testimonial-rating { display: flex; gap: 2px; margin-bottom: 1rem; }
+        .testimonial-rating .star { color: #F59E0B; font-size: 0.9rem; }
         .testimonial-card p { font-size: 0.95rem; color: #e5e7eb; font-style: italic; margin-bottom: 1.5rem; }
         .testimonial-author { display: flex; align-items: center; gap: 12px; }
-        .author-avatar { width: 40px; height: 40px; background: var(--brand-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; }
+        .author-avatar { width: 40px; height: 40px; background: var(--brand-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: #fff; }
         .bg-purple { background: var(--brand-primary-dark); }
         .bg-cyan { background: var(--brand-secondary-dark); }
         .author-details { display: flex; flex-direction: column; }
         .author-name { font-weight: 700; font-size: 0.9rem; color: #fff; }
-        .author-status { font-size: 0.75rem; font-weight: 600; }
+        .author-status { font-size: 0.75rem; font-weight: 600; color: var(--brand-secondary-light); }
 
         /* ── FAQ ── */
         .faq-section { padding: 4rem 1.5rem 6rem; max-width: 800px; margin: 0 auto; }
         .faq-list { display: flex; flex-direction: column; gap: 1rem; }
-        .faq-item { background: var(--bg-surface-solid); border-radius: 16px; padding: 1.5rem; border: 1px solid var(--border-color); display: flex; gap: 1.2rem; transition: all 0.2s; }
-        .faq-item:hover { border-color: var(--brand-primary-light); }
-        .faq-icon { width: 32px; height: 32px; flex-shrink: 0; background: rgba(139, 92, 246, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--brand-primary-light); }
+        .faq-item { background: var(--bg-surface-solid); border-radius: 16px; padding: 1.5rem; border: 1px solid var(--border-color); display: flex; gap: 1.2rem; transition: all 0.3s ease; }
+        .faq-item:hover { border-color: var(--brand-primary-light); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+        .faq-icon { width: 32px; height: 32px; flex-shrink: 0; background: rgba(139, 92, 246, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--brand-primary-light); font-size: 0.9rem; }
         .faq-question { font-weight: 800; font-size: 1.05rem; color: #fff; margin-bottom: 0.4rem; }
         .faq-answer { font-size: 0.95rem; color: var(--text-muted); }
 
         /* ── Footer ── */
         .site-footer { background: #000; border-top: 1px solid var(--border-color); padding: 3rem 1.5rem; text-align: center; margin-top: auto; }
         .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
-        .footer-logo { font-size: 1.1rem; opacity: 0.5; margin-bottom: 0.5rem; justify-content: center; }
+        .footer-logo { font-size: 1.1rem; opacity: 0.5; margin-bottom: 0.5rem; justify-content: center; color: #fff; }
         .site-footer p { font-size: 0.85rem; color: var(--text-muted); }
         .footer-contact { font-weight: 600; color: #6b7280; }
 
@@ -570,19 +606,19 @@ function WatchShortEarn({ campaign }) {
         .modal-card { background: var(--bg-surface-solid); border-radius: 28px; padding: 2.5rem 2rem; max-width: 420px; width: 100%; text-align: center; border: 1px solid var(--border-highlight); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); animation: modalIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes modalIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .modal-icon-container { width: 64px; height: 64px; background: rgba(139, 92, 246, 0.1); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; border: 1px solid rgba(139, 92, 246, 0.2); }
-        .modal-icon { font-size: 2rem; }
+        .modal-icon { font-size: 2rem; color: var(--brand-primary-light); }
         .modal-card h2 { font-size: 1.5rem; font-weight: 900; color: #fff; margin-bottom: 0.5rem; letter-spacing: -0.5px; }
         .modal-card p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5; }
         .modal-actions { display: flex; flex-direction: column; gap: 10px; }
-        .modal-btn { padding: 1rem; border-radius: 14px; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; }
+        .modal-btn { padding: 1rem; border-radius: 14px; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; }
         .modal-btn.primary { background: var(--brand-primary); color: #fff; }
-        .modal-btn.primary:hover { background: var(--brand-primary-dark); transform: translateY(-2px); }
+        .modal-btn.primary:hover { background: var(--brand-primary-dark); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3); }
         .modal-btn.ghost { background: transparent; color: #fff; border: 1px solid var(--border-color); }
         .modal-btn.ghost:hover { background: rgba(255,255,255,0.05); }
         .modal-btn.text-only { background: transparent; color: #6b7280; font-size: 0.8rem; margin-top: 1rem; }
         .modal-btn.text-only:hover { color: #fff; }
 
-        /* ── Responsive Mobile Optimization ── */
+        /* ── Responsive ── */
         @media (max-width: 768px) {
           .steps { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; gap: 1.2rem; }
           .why-grid { grid-template-columns: 1fr 1fr; }
@@ -598,16 +634,9 @@ function WatchShortEarn({ campaign }) {
         @media (max-width: 480px) {
           .header-badge { font-size: 0.65rem; padding: 0.3rem 0.6rem; }
           .logo { font-size: 1.1rem; }
-          
-          /* FIX: Wider on mobile */
           .main-section { padding: 0 0.8rem; margin-top: -2rem; }
-          
-          /* FIX: Shorter padding vertically */
           .main-card { border-radius: 24px; padding: 1.25rem; }
-          
           .why-grid { grid-template-columns: 1fr; }
-          
-          /* FIX: Horizontal Features Row instead of stacked to save vertical height */
           .features-row { 
             flex-direction: row; 
             gap: 0; 
@@ -625,8 +654,6 @@ function WatchShortEarn({ campaign }) {
           .feature-title { font-size: 0.6rem; }
           .feature-sub { font-size: 0.75rem; }
           .feature-divider { display: block; height: 24px; align-self: center; margin: 0 0.5rem; }
-          
-          /* FIX: Horizontal Reward Display */
           .reward-display { 
             flex-direction: row; 
             text-align: left; 
@@ -637,9 +664,7 @@ function WatchShortEarn({ campaign }) {
           .reward-amount { font-size: 2rem; }
           .reward-circle { width: 56px; height: 56px; }
           .reward-icon { font-size: 1.6rem; }
-          
           .video-preview-container { margin-bottom: 1.25rem; }
-          
           .continue-btn { font-size: 1rem; padding: 1rem; }
           .faq-item { padding: 1.2rem; flex-direction: column; gap: 0.8rem; }
         }
