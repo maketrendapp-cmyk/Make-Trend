@@ -19,7 +19,7 @@ import {
   FaClock,
 } from 'react-icons/fa';
 
-// ── Default Meta ──
+// ── Default Meta (Clean URL without any placeholder) ──
 const defaultMeta = {
   title: 'Birthday Gift – Claim Your Free Premium Reward!',
   description: 'Choose a free premium gift to claim. Choose from iPhone, MacBook, Watch, TV, and more!',
