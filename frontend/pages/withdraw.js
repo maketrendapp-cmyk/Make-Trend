@@ -212,7 +212,7 @@ export default function Withdraw() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-4 sm:p-6">
         <div className="max-w-5xl mx-auto">
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/profile')}
             className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm mb-4 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
           >
             <FaArrowLeft /> Back to Dashboard
