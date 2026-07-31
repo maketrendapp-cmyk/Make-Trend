@@ -26,7 +26,7 @@ async function apiRequest(endpoint, options = {}, token = null) {
   if (!res.ok) throw new Error(data.error || 'API error');
   
   requestCache.set(cacheKey, data);
-  setTimeout(() => requestCache.delete(cacheKey), 5000); // 5s TTL
+  setTimeout(() => requestCache.delete(cacheKey), 5000);
 
   return data;
 }
@@ -36,7 +36,7 @@ async function getToken() {
   await auth.authStateReady();
   const user = auth.currentUser;
   if (!user) return null;
-  return await user.getIdToken(false); // false = use cached token if still valid
+  return await user.getIdToken(false);
 }
 
 // ── Queries ──
@@ -82,7 +82,6 @@ export function useTemplates(filters = {}, initialData = null) {
     },
     initialData: initialData || undefined,
     staleTime: 5 * 60 * 1000,
-    // Only fetch if filters are applied OR no initial data
     enabled: hasFilters || !initialData || (Array.isArray(initialData) && initialData.length === 0),
   });
 }
@@ -100,7 +99,6 @@ export function useFeaturedTemplates(filters = {}, initialData = null) {
     },
     initialData: initialData || undefined,
     staleTime: 5 * 60 * 1000,
-    // Only fetch if filters are applied OR no initial data
     enabled: hasFilters || !initialData || (Array.isArray(initialData) && initialData.length === 0),
   });
 }
@@ -171,14 +169,17 @@ export function useMtCoins(enabled = false) {
   });
 }
 
-export function useWithdrawalMethods() {
+export function useWithdrawalMethods(enabled = false) {
   return useQuery({
     queryKey: ['withdrawalMethods'],
     queryFn: async () => {
-      const data = await apiRequest('/withdrawal-methods');
+      const token = await getToken();
+      if (!token) return [];
+      const data = await apiRequest('/withdrawal-methods', {}, token);
       return data.methods || [];
     },
-    staleTime: 3600 * 1000, // 1 hour
+    enabled,
+    staleTime: 3600 * 1000,
   });
 }
 
@@ -196,8 +197,6 @@ export function useWithdrawals(enabled = false) {
   });
 }
 
-// ── Mutations ──
-
 export function useCreateWithdrawal() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -211,7 +210,6 @@ export function useCreateWithdrawal() {
       return data;
     },
     onSuccess: () => {
-      // Invalidate all relevant queries after successful withdrawal
       queryClient.invalidateQueries(['mtCoins']);
       queryClient.invalidateQueries(['withdrawals']);
       queryClient.invalidateQueries(['stats']);
@@ -235,7 +233,6 @@ export function useInvalidateQueries() {
     invalidateFeaturedTemplates: () => queryClient.invalidateQueries(['featuredTemplates']),
     invalidateSupportTickets: () => queryClient.invalidateQueries(['supportTickets']),
     invalidateComments: () => queryClient.invalidateQueries(['comments']),
-    // ── NEW: Invalidation for withdrawal data ──
     invalidateMtCoins: () => queryClient.invalidateQueries(['mtCoins']),
     invalidateWithdrawals: () => queryClient.invalidateQueries(['withdrawals']),
     invalidateWithdrawalMethods: () => queryClient.invalidateQueries(['withdrawalMethods']),
