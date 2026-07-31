@@ -821,6 +821,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     // ── Process referral reward (increment count, grant PRO on every 5) ──
     if (cleanReferredBy) {
+      console.log(`🔍 Referral processing: code="${cleanReferredBy}" from device "${req.body.deviceId || 'none'}"`);
       try {
         const referrerSnapshot = await db.collection('users')
           .where('referralCode', '==', cleanReferredBy)
@@ -829,36 +830,49 @@ app.post('/api/auth/register', async (req, res) => {
         if (!referrerSnapshot.empty) {
           const referrerUid = referrerSnapshot.docs[0].id;
           const referrerData = referrerSnapshot.docs[0].data();
+          console.log(`✅ Referrer found: uid=${referrerUid}, deviceId="${referrerData.deviceId || 'none'}"`);
 
           // ── Check if the referrer is using the same device (self-referral prevention) ──
           const referrerDeviceId = referrerData.deviceId || '';
           const newUserDeviceId = req.body.deviceId || '';
+          // Only treat as same device if BOTH IDs are present and equal
           const isSameDevice = referrerDeviceId && newUserDeviceId &&
                                referrerDeviceId === newUserDeviceId;
 
           if (isSameDevice) {
-            console.warn(`⚠️ Self‑referral attempt from device ${newUserDeviceId} for referrer ${referrerUid}`);
-            // Still invalidate the cache so future attempts are fresh
+            console.warn(`⚠️ Self‑referral blocked: same device "${newUserDeviceId}" for referrer ${referrerUid}`);
             await invalidateKey(`referrals:${referrerUid}`);
           } else {
+            // ── Atomically increment referrals count ──
             const currentReferrals = referrerData.referrals || 0;
             const newReferrals = currentReferrals + 1;
+            console.log(`📊 Updating referrals: ${currentReferrals} → ${newReferrals}`);
 
             await db.collection('users').doc(referrerUid).update({
               referrals: newReferrals,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
+            console.log(`✅ Referral count updated to ${newReferrals} for user ${referrerUid}`);
 
+            // ── Grant PRO for every 5 referrals ──
             if (newReferrals % 5 === 0) {
               await grantProFor24Hours(referrerUid);
               console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
             }
 
+            // ── Invalidate caches ──
             await invalidateKey(`referrals:${referrerUid}`);
+            await invalidateKey(`user:profile:${referrerUid}`);
+            console.log(`🗑️ Caches invalidated for referrer ${referrerUid}`);
           }
+        } else {
+          console.warn(`❌ Referrer not found for code: "${cleanReferredBy}"`);
         }
       } catch (err) {
-        console.warn('Failed to process referral reward:', err);
+        console.error('🔥 Referral processing error:', err.message);
+        // Log the full error stack for debugging
+        console.error(err.stack);
+        // Do NOT throw – we don't want to fail the registration, just log the error
       }
     }
 
@@ -929,6 +943,7 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
 
     // ── Process referral reward (increment count, grant PRO on every 5) ──
     if (cleanReferredBy) {
+      console.log(`🔍 Referral processing: code="${cleanReferredBy}" from device "${req.body.deviceId || 'none'}"`);
       try {
         const referrerSnapshot = await db.collection('users')
           .where('referralCode', '==', cleanReferredBy)
@@ -937,35 +952,60 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
         if (!referrerSnapshot.empty) {
           const referrerUid = referrerSnapshot.docs[0].id;
           const referrerData = referrerSnapshot.docs[0].data();
-
-          // ── Check if the referrer is using the same device (self-referral prevention) ──
-          const referrerDeviceId = referrerData.deviceId || '';
           const newUserDeviceId = req.body.deviceId || '';
-          const isSameDevice = referrerDeviceId && newUserDeviceId &&
-                               referrerDeviceId === newUserDeviceId;
+          console.log(`✅ Referrer found: uid=${referrerUid}, deviceId="${referrerData.deviceId || 'none'}"`);
 
-          if (isSameDevice) {
-            console.warn(`⚠️ Self‑referral attempt from device ${newUserDeviceId} for referrer ${referrerUid}`);
+          // ── Check 1: Self‑referral (referrer's own device) ──
+          const referrerDeviceId = referrerData.deviceId || '';
+          const isSelfReferral = referrerDeviceId && newUserDeviceId &&
+                                 referrerDeviceId === newUserDeviceId;
+
+          if (isSelfReferral) {
+            console.warn(`⚠️ Self‑referral blocked: same device "${newUserDeviceId}" for referrer ${referrerUid}`);
             await invalidateKey(`referrals:${referrerUid}`);
           } else {
-            const currentReferrals = referrerData.referrals || 0;
-            const newReferrals = currentReferrals + 1;
+            // ── Check 2: Has this device already used this referral code? ──
+            // Prevent multiple accounts from the same device from earning multiple bonuses.
+            const existingReferralQuery = await db.collection('users')
+              .where('referredBy', '==', cleanReferredBy)
+              .where('deviceId', '==', newUserDeviceId)
+              .limit(1)
+              .get();
 
-            await db.collection('users').doc(referrerUid).update({
-              referrals: newReferrals,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+            if (!existingReferralQuery.empty) {
+              console.warn(`⚠️ Duplicate device referral blocked: device "${newUserDeviceId}" already used for code "${cleanReferredBy}"`);
+              await invalidateKey(`referrals:${referrerUid}`);
+            } else {
+              // ── All checks passed: increment referral count ──
+              const currentReferrals = referrerData.referrals || 0;
+              const newReferrals = currentReferrals + 1;
+              console.log(`📊 Updating referrals: ${currentReferrals} → ${newReferrals}`);
 
-            if (newReferrals % 5 === 0) {
-              await grantProFor24Hours(referrerUid);
-              console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+              await db.collection('users').doc(referrerUid).update({
+                referrals: newReferrals,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              console.log(`✅ Referral count updated to ${newReferrals} for user ${referrerUid}`);
+
+              // ── Grant PRO for every 5 referrals ──
+              if (newReferrals % 5 === 0) {
+                await grantProFor24Hours(referrerUid);
+                console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+              }
+
+              // ── Invalidate caches ──
+              await invalidateKey(`referrals:${referrerUid}`);
+              await invalidateKey(`user:profile:${referrerUid}`);
+              console.log(`🗑️ Caches invalidated for referrer ${referrerUid}`);
             }
-
-            await invalidateKey(`referrals:${referrerUid}`);
           }
+        } else {
+          console.warn(`❌ Referrer not found for code: "${cleanReferredBy}"`);
         }
       } catch (err) {
-        console.warn('Failed to process referral reward:', err);
+        console.error('🔥 Referral processing error:', err.message);
+        console.error(err.stack);
+        // Do NOT throw – we don't want to fail the registration
       }
     }
 
