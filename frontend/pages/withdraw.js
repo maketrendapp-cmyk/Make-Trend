@@ -31,9 +31,6 @@ import {
   FaGift,
   FaShareAlt,
   FaUnlock,
-  FaUsers,
-  FaChartLine,
-  FaDollarSign,
   FaCoins,
   FaLightbulb,
 } from 'react-icons/fa';
@@ -42,14 +39,12 @@ export default function Withdraw() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
-  // ── React Query hooks ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const { data: mtCoinsData, isLoading: coinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
   const { data: methods = [], isLoading: methodsLoading } = useWithdrawalMethods(isAuthenticated);
   const { data: withdrawals = [], isLoading: withdrawalsLoading, refetch: refetchWithdrawals } = useWithdrawals(isAuthenticated);
   const { mutate: createWithdrawal, isLoading: isSubmitting } = useCreateWithdrawal();
 
-  // ── Local state ──
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [formData, setFormData] = useState({});
   const [error, setError] = useState('');
@@ -58,7 +53,6 @@ export default function Withdraw() {
   const WITHDRAWAL_AMOUNT = 2500;
   const USD_AMOUNT = 15;
 
-  // ── Auto‑refetch when user becomes available ──
   useEffect(() => {
     if (user) {
       refetchMtCoins();
@@ -66,14 +60,12 @@ export default function Withdraw() {
     }
   }, [user]);
 
-  // ── Auth guard ──
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login?redirect=/withdraw');
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // ── Loading state ──
   const isLoading = profileLoading || coinsLoading || withdrawalsLoading || methodsLoading;
   if (isLoading) {
     return (
@@ -102,7 +94,6 @@ export default function Withdraw() {
     );
   }
 
-  // ── If no profile ──
   if (!profile) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -120,7 +111,6 @@ export default function Withdraw() {
   };
   const canWithdraw = (mtCoins.available || 0) >= WITHDRAWAL_AMOUNT;
 
-  // ── Handlers ──
   const handleWithdraw = () => {
     if (!selectedMethod) {
       setError('Please select a payment method.');
@@ -164,7 +154,6 @@ export default function Withdraw() {
     );
   };
 
-  // ── UI helpers ──
   const getStatusBadge = (status) => {
     const styles = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -214,7 +203,6 @@ export default function Withdraw() {
     return names[methodId] || methodId;
   };
 
-  // ─── Render ───
   return (
     <>
       <Meta title="Withdraw – MT Coins" />
@@ -227,9 +215,10 @@ export default function Withdraw() {
             <FaArrowLeft /> Back to Dashboard
           </button>
 
-          {/* ─── Profile Header ─── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-6">
-            <div className="flex items-center gap-4">
+          {/* ─── Profile Header ─── (FIXED: no overlap) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 sm:p-6 mb-6">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              {/* Avatar */}
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-2xl text-white flex-shrink-0">
                 {profile?.avatar ? (
                   <img
@@ -241,15 +230,20 @@ export default function Withdraw() {
                   profile?.fullname?.charAt(0)?.toUpperCase() || <FaUser />
                 )}
               </div>
-              <div className="flex-1 min-w-0">
+
+              {/* Name & Email - takes remaining space, truncates email if needed */}
+              <div className="flex-1 min-w-0 text-center sm:text-left">
                 <h1 className="text-xl font-bold text-slate-900 truncate">{profile?.fullname}</h1>
-                <p className="text-slate-500 text-sm flex items-center gap-2">
-                  <FaEnvelope className="text-slate-400" /> {profile?.email}
+                <p className="text-slate-500 text-sm flex items-center justify-center sm:justify-start gap-2 truncate">
+                  <FaEnvelope className="text-slate-400 flex-shrink-0" />
+                  <span className="truncate">{profile?.email}</span>
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-2 rounded-xl border border-purple-200 text-center">
-                <p className="text-xs text-purple-600 font-medium">MT Coins</p>
-                <p className="text-xl font-bold text-purple-700">
+
+              {/* MT Coins Box - compact, fixed min-width to prevent overlap */}
+              <div className="flex-shrink-0 bg-gradient-to-r from-purple-50 to-indigo-50 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl border border-purple-200 text-center min-w-[90px] sm:min-w-[110px]">
+                <p className="text-[10px] sm:text-xs text-purple-600 font-medium">MT Coins</p>
+                <p className="text-lg sm:text-xl font-bold text-purple-700">
                   {mtCoins.available?.toLocaleString() || 0}
                 </p>
               </div>
@@ -263,73 +257,70 @@ export default function Withdraw() {
               <p className="text-xl font-bold text-slate-800">
                 {mtCoins.stats?.views?.toLocaleString() || 0}
               </p>
-              <p className="text-xs text-slate-400 font-medium">Views</p>
+              <p className="text-xs text-slate-400 font-medium">Campaign Views</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
               <FaShareAlt className="w-5 h-5 text-blue-600 mx-auto mb-1" />
               <p className="text-xl font-bold text-slate-800">
                 {mtCoins.stats?.shares?.toLocaleString() || 0}
               </p>
-              <p className="text-xs text-slate-400 font-medium">Shares</p>
+              <p className="text-xs text-slate-400 font-medium">Campaign Shares</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
               <FaUnlock className="w-5 h-5 text-amber-600 mx-auto mb-1" />
               <p className="text-xl font-bold text-slate-800">
                 {mtCoins.stats?.unlocks?.toLocaleString() || 0}
               </p>
-              <p className="text-xs text-slate-400 font-medium">Unlocks</p>
+              <p className="text-xs text-slate-400 font-medium">Campaign Unlocks</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
               <FaCheckCircle className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
               <p className="text-xl font-bold text-slate-800">
                 {mtCoins.stats?.completions?.toLocaleString() || 0}
               </p>
-              <p className="text-xs text-slate-400 font-medium">Completions</p>
+              <p className="text-xs text-slate-400 font-medium">Campaign Completions</p>
             </div>
           </div>
 
-          {/* ─── How It Works Banner ─── */}
+          {/* ─── How It Works Banner ─── (clarified: Campaign actions) */}
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 p-5 mb-6">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <FaLightbulb className="text-indigo-600 text-lg" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-indigo-900">Understanding MT Coins</h3>
+                <h3 className="text-sm font-bold text-indigo-900">How MT Coins Are Earned</h3>
                 <p className="text-sm text-indigo-700 mt-1">
-                  You earn <strong>1 MT Coin</strong> when you complete one of each:
+                  You earn <strong>1 MT Coin</strong> when you complete one of each campaign action:
                 </p>
-                <div className="flex flex-wrap gap-4 mt-2">
-                  <div className="flex items-center gap-1.5">
-                    <FaEye className="text-indigo-500 text-xs" />
-                    <span className="text-xs text-indigo-800 font-medium">1 View</span>
-                  </div>
-                  <span className="text-indigo-300">+</span>
-                  <div className="flex items-center gap-1.5">
-                    <FaShareAlt className="text-indigo-500 text-xs" />
-                    <span className="text-xs text-indigo-800 font-medium">1 Share</span>
-                  </div>
-                  <span className="text-indigo-300">+</span>
-                  <div className="flex items-center gap-1.5">
-                    <FaUnlock className="text-indigo-500 text-xs" />
-                    <span className="text-xs text-indigo-800 font-medium">1 Unlock</span>
-                  </div>
-                  <span className="text-indigo-300">+</span>
-                  <div className="flex items-center gap-1.5">
-                    <FaCheckCircle className="text-indigo-500 text-xs" />
-                    <span className="text-xs text-indigo-800 font-medium">1 Completion</span>
-                  </div>
-                  <span className="text-indigo-300">=</span>
-                  <div className="flex items-center gap-1.5 bg-indigo-200 px-2 py-0.5 rounded-full">
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="inline-flex items-center gap-1.5 bg-white/80 px-2.5 py-1 rounded-full text-xs font-medium text-indigo-800 border border-indigo-200">
+                    <FaEye className="text-indigo-500 text-[10px]" />
+                    1 Campaign View
+                  </span>
+                  <span className="text-indigo-300 text-xs">+</span>
+                  <span className="inline-flex items-center gap-1.5 bg-white/80 px-2.5 py-1 rounded-full text-xs font-medium text-indigo-800 border border-indigo-200">
+                    <FaShareAlt className="text-indigo-500 text-[10px]" />
+                    1 Campaign Share
+                  </span>
+                  <span className="text-indigo-300 text-xs">+</span>
+                  <span className="inline-flex items-center gap-1.5 bg-white/80 px-2.5 py-1 rounded-full text-xs font-medium text-indigo-800 border border-indigo-200">
+                    <FaUnlock className="text-indigo-500 text-[10px]" />
+                    1 Campaign Unlock
+                  </span>
+                  <span className="text-indigo-300 text-xs">+</span>
+                  <span className="inline-flex items-center gap-1.5 bg-white/80 px-2.5 py-1 rounded-full text-xs font-medium text-indigo-800 border border-indigo-200">
+                    <FaCheckCircle className="text-indigo-500 text-[10px]" />
+                    1 Campaign Completion
+                  </span>
+                  <span className="text-indigo-300 text-xs">=</span>
+                  <span className="inline-flex items-center gap-1.5 bg-indigo-200 px-2.5 py-1 rounded-full">
                     <FaCoins className="text-indigo-700 text-xs" />
                     <span className="text-xs font-bold text-indigo-800">1 MT Coin</span>
-                  </div>
+                  </span>
                 </div>
                 <p className="text-xs text-indigo-600 mt-2">
-                  <strong>2,500 MT Coins</strong> = <strong>$15.00</strong>
-                </p>
-                <p className="text-xs text-indigo-500 mt-1">
-                  Each withdrawal is exactly <strong>$15 (2,500 MT Coins)</strong>
+                  <strong>2,500 MT Coins</strong> = <strong>$15.00</strong> • Each withdrawal is exactly <strong>$15</strong>
                 </p>
               </div>
             </div>
@@ -353,13 +344,10 @@ export default function Withdraw() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left: Amount & Methods */}
               <div>
                 <div className="bg-purple-50 rounded-xl p-4 border border-purple-200 mb-4">
                   <p className="text-sm text-purple-700 font-semibold">Withdrawal Amount</p>
-                  <p className="text-2xl font-bold text-purple-800">
-                    <FaDollarSign className="inline text-purple-500" /> 15.00
-                  </p>
+                  <p className="text-2xl font-bold text-purple-800">$15.00</p>
                   <p className="text-xs text-purple-600">= 2,500 MT Coins (exact amount)</p>
                   <p className="text-xs text-purple-600 mt-1">
                     Your balance:{' '}
@@ -399,7 +387,6 @@ export default function Withdraw() {
                 </div>
               </div>
 
-              {/* Right: Form Fields */}
               <div>
                 {selectedMethod && (
                   <div className="animate-fadeIn">
@@ -542,7 +529,7 @@ export default function Withdraw() {
             )}
           </div>
 
-          {/* ─── How to Earn MT Coins ─── Professional version ── */}
+          {/* ─── How to Earn MT Coins ─── (clarified: Campaign actions) */}
           <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-5">
             <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2 mb-3">
               <FaCoins className="text-blue-600" /> How to Earn MT Coins
@@ -552,36 +539,36 @@ export default function Withdraw() {
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaEye className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">1 View</p>
-                <p className="text-[10px] text-slate-400">Watch a video</p>
+                <p className="text-xs font-bold text-slate-700">Campaign View</p>
+                <p className="text-[10px] text-slate-400">View a campaign</p>
               </div>
               <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaShareAlt className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">1 Share</p>
-                <p className="text-[10px] text-slate-400">Share with friends</p>
+                <p className="text-xs font-bold text-slate-700">Campaign Share</p>
+                <p className="text-[10px] text-slate-400">Share with others</p>
               </div>
               <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaUnlock className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">1 Unlock</p>
-                <p className="text-[10px] text-slate-400">Unlock content</p>
+                <p className="text-xs font-bold text-slate-700">Campaign Unlock</p>
+                <p className="text-[10px] text-slate-400">Unlock the reward</p>
               </div>
               <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaCheckCircle className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">1 Completion</p>
-                <p className="text-[10px] text-slate-400">Complete tasks</p>
+                <p className="text-xs font-bold text-slate-700">Campaign Completion</p>
+                <p className="text-[10px] text-slate-400">Complete all tasks</p>
               </div>
             </div>
 
             <div className="mt-3 p-2.5 bg-blue-200/50 rounded-lg text-center border border-blue-300/50">
               <p className="text-sm font-bold text-blue-800">
                 <FaCoins className="inline text-blue-700 mr-1.5" />
-                All Four Actions = <span className="text-indigo-700">1 MT Coin</span>
+                All Four Campaign Actions = <span className="text-indigo-700">1 MT Coin</span>
               </p>
               <p className="text-[11px] text-blue-700 mt-0.5">
                 2,500 MT Coins = <strong>$15.00</strong>
