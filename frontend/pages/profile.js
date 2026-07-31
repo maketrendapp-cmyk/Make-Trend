@@ -3,13 +3,13 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useProfile, useStats, useInvalidateQueries } from '../lib/queries';
+import { useProfile, useStats, useMtCoins, useInvalidateQueries } from '../lib/queries';
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
   FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy
 } from 'react-icons/fi';
-import { FaCrown } from 'react-icons/fa';
+import { FaCrown, FaWallet } from 'react-icons/fa';
 import Meta from '../components/Meta';
 
 export default function Profile() {
@@ -17,13 +17,14 @@ export default function Profile() {
   const { user, isAuthenticated, logout } = useAuth();
 
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
+  const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
+  const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
   const { invalidateProfile, invalidateStats } = useInvalidateQueries();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
-  const isLoading = profileLoading || statsLoading || (user && !profile);
+  const isLoading = profileLoading || statsLoading || mtCoinsLoading || (user && !profile);
 
   const copyReferralCode = () => {
     const code = profile?.referralCode || '';
@@ -65,6 +66,8 @@ const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
     referralCode: profile?.referralCode || '',
   };
 
+  const mtCoins = mtCoinsData || { available: 0 };
+
   const statsItems = [
     { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
     { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
@@ -77,6 +80,7 @@ const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
     { icon: FiHelpCircle, label: 'Support', href: '/support' },
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
+    { icon: FaWallet, label: 'Withdraw', href: '/withdraw' }, // ✅ Added Withdraw
   ];
 
   const exploreOptions = [
@@ -211,6 +215,26 @@ const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
                   <p className="text-sm text-gray-500">{stat.label}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── MT Coins Row (simple) ── */}
+          {user && (
+            <div className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-6 py-4 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  MT
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Available MT Coins</p>
+                  <p className="text-2xl font-bold text-gray-900">{mtCoins.available?.toLocaleString() || 0}</p>
+                </div>
+              </div>
+              <Link href="/withdraw">
+                <button className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition shadow-sm hover:shadow-md text-sm flex items-center gap-2">
+                  <FaWallet className="w-4 h-4" /> Withdraw
+                </button>
+              </Link>
             </div>
           )}
 
