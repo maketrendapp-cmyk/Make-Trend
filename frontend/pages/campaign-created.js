@@ -87,17 +87,19 @@ export default function CampaignCreated() {
       <>
         <Meta title="Loading..." />
         <div className="min-h-screen w-screen bg-gradient-to-br from-slate-50 to-purple-50/30 p-0">
-          <div className="w-full max-w-2xl mx-auto pt-2 px-4">
-            <div className="flex justify-center mb-3 animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-slate-200 rounded-xl" />
-                <div>
-                  <div className="h-4 bg-slate-200 rounded w-32" />
-                  <div className="h-3 bg-slate-200 rounded w-20 mt-1" />
-                </div>
+          {/* Skeleton Banner */}
+          <div className="w-full bg-gradient-to-r from-purple-600/50 via-indigo-600/50 to-purple-700/50 px-4 sm:px-6 py-5 animate-pulse">
+            <div className="max-w-2xl mx-auto flex items-center justify-center gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl" />
+              <div>
+                <div className="h-5 bg-white/30 rounded w-40" />
+                <div className="h-4 bg-white/30 rounded w-28 mt-1" />
               </div>
             </div>
+          </div>
 
+          {/* Skeleton Card */}
+          <div className="w-full max-w-2xl mx-auto pt-4 px-4">
             <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg overflow-hidden animate-pulse">
               <div className="w-full aspect-video bg-slate-200" />
               <div className="p-4 space-y-3">
@@ -213,24 +215,32 @@ export default function CampaignCreated() {
   return (
     <>
       <Meta title="🎉 Campaign Created!" />
-      <div className="min-h-screen w-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-0">
-        <div className="w-full max-w-2xl mx-auto pt-2 px-4">
 
-          {/* ── Success Banner ── CENTERED ── */}
-          <div className="flex justify-center mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 flex-shrink-0">
-                <FaCheckCircle className="text-white text-lg" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Campaign Published</h1>
-                <p className="text-slate-500 text-xs flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block animate-pulse" />
-                  Your campaign is now live
-                </p>
-              </div>
+      {/* ── FULL WIDTH BANNER ── Touches both sides ── */}
+      <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 shadow-lg shadow-purple-200/50">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex items-center justify-center gap-4">
+            {/* Icon with glass effect */}
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg shadow-purple-900/30 border border-white/20 flex-shrink-0">
+              <FaCheckCircle className="text-white text-2xl sm:text-3xl" />
+            </div>
+            {/* Text */}
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight drop-shadow-sm">
+                Campaign Published
+              </h1>
+              <p className="text-purple-100 text-sm sm:text-base flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full inline-block animate-pulse" />
+                Your campaign is now live
+              </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── Main Content ── */}
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-0">
+        <div className="w-full max-w-2xl mx-auto pt-4 px-4 pb-6">
 
           {/* ── Main Card ── */}
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-200/30 overflow-hidden">
@@ -373,7 +383,7 @@ export default function CampaignCreated() {
           </div>
 
           {/* ── Footer ── */}
-          <p className="text-center text-xs text-slate-400 mt-3 pb-2">
+          <p className="text-center text-xs text-slate-400 mt-4 pb-2">
             <FaInfinity className="inline mr-1.5 text-[10px]" /> Your campaign is live – start sharing now
           </p>
         </div>
