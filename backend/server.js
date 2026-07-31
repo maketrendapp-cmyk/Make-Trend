@@ -2601,6 +2601,7 @@ app.get('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
 });
 
 // ── Request a withdrawal ──
+// ── Request a withdrawal ──
 app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -2616,8 +2617,13 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
     }
 
     const numCoins = Number(mtCoins);
-    if (!Number.isInteger(numCoins) || numCoins < 100) {
-      return res.status(400).json({ success: false, error: 'Minimum withdrawal is 100 MT Coins' });
+    
+    // ── ✅ EXACTLY 2500 MT Coins = $15 ──
+    if (!Number.isInteger(numCoins) || numCoins !== 2500) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Withdrawal must be exactly 2,500 MT Coins ($15)' 
+      });
     }
 
     // ── Check if user has enough coins ──
@@ -2632,8 +2638,8 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Insufficient MT Coins balance' });
     }
 
-    // ── Calculate amount in USD ──
-    const amountUSD = (numCoins / 2500) * 15;
+    // ── Fixed amount ──
+    const amountUSD = 15.00;
 
     // ── Validate method and required fields ──
     const validMethods = ['esewa', 'khalti', 'bank', 'wise', 'crypto', 'paypal', 'wire'];
@@ -2678,11 +2684,10 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
     const withdrawalData = {
       userId: uid,
       mtCoins: numCoins,
-      amount: parseFloat(amountUSD.toFixed(2)),
+      amount: amountUSD,
       method,
       details: {
         ...details,
-        // Sanitize sensitive data
         phone: details.phone || '',
         email: details.email || '',
         bankName: details.bankName || '',
@@ -2714,7 +2719,7 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
       success: true,
       withdrawalId: docRef.id,
       mtCoins: numCoins,
-      amount: parseFloat(amountUSD.toFixed(2)),
+      amount: amountUSD,
       message: 'Withdrawal request submitted successfully',
     });
   } catch (error) {
