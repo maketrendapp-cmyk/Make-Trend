@@ -47,9 +47,12 @@ export default function Withdraw() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [selectedMethod, setSelectedMethod] = useState(null);
-  const [amount, setAmount] = useState(0);
   const [formData, setFormData] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── Fixed amount ──
+  const WITHDRAWAL_AMOUNT = 2500; // MT Coins
+  const USD_AMOUNT = 15;
 
   // ── Fetch data ──
   useEffect(() => {
@@ -115,14 +118,9 @@ export default function Withdraw() {
       return;
     }
 
-    const mtCoinsToWithdraw = Number(amount);
-    if (!mtCoinsToWithdraw || mtCoinsToWithdraw < 100) {
-      setError('Minimum withdrawal is 100 MT Coins.');
-      return;
-    }
-
-    if (mtCoinsToWithdraw > (mtCoins?.available || 0)) {
-      setError('Insufficient MT Coins balance.');
+    // ── Check if user has enough coins ──
+    if ((mtCoins?.available || 0) < WITHDRAWAL_AMOUNT) {
+      setError(`Insufficient MT Coins. You need ${WITHDRAWAL_AMOUNT} MT Coins ($15) to withdraw.`);
       return;
     }
 
@@ -145,7 +143,7 @@ export default function Withdraw() {
       const token = await user.getIdToken();
 
       const payload = {
-        mtCoins: mtCoinsToWithdraw,
+        mtCoins: WITHDRAWAL_AMOUNT,
         method: selectedMethod,
         details: formData,
       };
@@ -168,7 +166,6 @@ export default function Withdraw() {
           fetchData();
           setSelectedMethod(null);
           setFormData({});
-          setAmount(0);
         }, 2000);
       } else {
         setError(data.error || 'Failed to process withdrawal.');
@@ -275,6 +272,8 @@ export default function Withdraw() {
     );
   }
 
+  const canWithdraw = (mtCoins?.available || 0) >= WITHDRAWAL_AMOUNT;
+
   return (
     <>
       <Meta title="Withdraw – MT Coins" />
@@ -344,7 +343,10 @@ export default function Withdraw() {
                 </p>
                 <p className="text-xs text-amber-600 mt-1">
                   Available: <strong>{mtCoins?.available?.toLocaleString() || 0}</strong> MT Coins 
-                  ≈ <strong>${mtCoins?.usdValue?.toFixed(2) || '0.00'}</strong>
+                  ≈ <strong>${((mtCoins?.available || 0) / 2500 * 15).toFixed(2)}</strong>
+                </p>
+                <p className="text-xs text-amber-600 mt-1">
+                  Each withdrawal is exactly <strong>$15 (2,500 MT Coins)</strong>
                 </p>
               </div>
             </div>
@@ -371,24 +373,17 @@ export default function Withdraw() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* ─── Left: Amount & Methods ─── */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Amount (MT Coins)
-                </label>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
-                  placeholder="Min 100"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
-                  min="100"
-                  max={mtCoins?.available || 0}
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Max: {mtCoins?.available?.toLocaleString() || 0} MT Coins
-                  {amount >= 100 && ` ≈ $${((amount / 2500) * 15).toFixed(2)}`}
-                </p>
+                <div className="bg-purple-50 rounded-xl p-4 border border-purple-200 mb-4">
+                  <p className="text-sm text-purple-700 font-semibold">Withdrawal Amount</p>
+                  <p className="text-2xl font-bold text-purple-800">$15.00</p>
+                  <p className="text-xs text-purple-600">= 2,500 MT Coins (exact amount)</p>
+                  <p className="text-xs text-purple-600 mt-1">
+                    Your balance: <strong>{mtCoins?.available?.toLocaleString() || 0}</strong> MT Coins
+                    {canWithdraw ? ' ✅' : ' ❌ Insufficient'}
+                  </p>
+                </div>
 
-                <label className="block text-sm font-medium text-slate-700 mt-4 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Payment Method
                 </label>
                 <div className="space-y-2">
@@ -456,15 +451,24 @@ export default function Withdraw() {
 
                     <button
                       onClick={handleWithdraw}
-                      disabled={isSubmitting || !selectedMethod || !amount || amount < 100}
-                      className="w-full mt-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+                      disabled={isSubmitting || !selectedMethod || !canWithdraw}
+                      className={`w-full mt-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl transition-all duration-200 ${
+                        isSubmitting || !selectedMethod || !canWithdraw
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'hover:shadow-lg hover:-translate-y-0.5'
+                      }`}
                     >
                       {isSubmitting ? (
                         <><FaSpinner className="animate-spin inline mr-2" /> Processing...</>
                       ) : (
-                        <><FaArrowRight className="inline mr-2" /> Withdraw Now</>
+                        <><FaArrowRight className="inline mr-2" /> Withdraw $15</>
                       )}
                     </button>
+                    {!canWithdraw && (
+                      <p className="text-xs text-red-500 mt-2">
+                        You need {WITHDRAWAL_AMOUNT} MT Coins to withdraw $15. Keep earning!
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -553,7 +557,7 @@ export default function Withdraw() {
               </div>
             </div>
             <p className="text-center text-xs text-blue-600 mt-3 font-medium">
-              💰 2,500 MT Coins = $15 • Minimum withdrawal: 100 MT Coins
+              💰 2,500 MT Coins = $15 • Each withdrawal is exactly <strong>$15</strong> (2,500 MT Coins)
             </p>
           </div>
         </div>
