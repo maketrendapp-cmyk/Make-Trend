@@ -31,8 +31,9 @@ import {
   FiYoutube,
   FiFacebook,
   FiCalendar,
+  FiDollarSign,
 } from 'react-icons/fi';
-import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin } from 'react-icons/fa';
+import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin, FaCoins } from 'react-icons/fa';
 import { useAuth } from '../components/AuthScreen';
 import { useComments, useInvalidateQueries } from '../lib/queries';
 
@@ -188,6 +189,7 @@ export default function About() {
   const testimonialsFade = useFadeUp(0.1);
   const faqFade = useFadeUp(0.1);
   const ctaFade = useFadeUp(0.1);
+  const earnFade = useFadeUp(0.1); // new
 
   // ── Stats counters ──
   const stats = [
@@ -516,7 +518,7 @@ export default function About() {
           </div>
         </section>
 
-        {/* ── What is Make Trend? (NEW SECTION) ── */}
+        {/* ── What is Make Trend? ── */}
         <section
           ref={whatIsFade.ref}
           className={`py-12 bg-gray-50 transition-all duration-700 ${
@@ -742,6 +744,76 @@ export default function About() {
                   <p className="text-sm text-gray-500 mt-1">{usp.description}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── NEW: Earn Real Money with Make Trend ─── */}
+        <section
+          ref={earnFade.ref}
+          className={`py-12 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 transition-all duration-700 ${
+            earnFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-white rounded-3xl shadow-xl border border-amber-200/50 p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="flex-shrink-0 w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white text-3xl shadow-lg">
+                  <FiDollarSign />
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
+                    Earn Real Money with <span className="text-amber-600">Make Trend</span>
+                  </h2>
+                  <p className="text-gray-600 text-sm md:text-base leading-relaxed mt-2">
+                    Create your campaign, set tasks, share count, and final redirect URL. Grow your social accounts 
+                    by adding tasks like <strong>“Subscribe to my channel,” “Follow me,” “Like my video,”</strong> and more. 
+                    Every view, share, unlock, and completion your campaign receives earns you MT Coins – 
+                    which you can withdraw as real cash, anytime.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                    <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+                      <FaCoins className="text-amber-600" /> MT Coins
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                      <FiUsers /> Referral Program
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span className="inline-flex items-center gap-1.5 bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                      <FaCrown /> Pro Perks
+                    </span>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Link href="/create">
+                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-full hover:shadow-lg transition shadow-sm text-sm cursor-pointer">
+                        Start Earning <FiArrowRight className="w-4 h-4" />
+                      </span>
+                    </Link>
+                    <Link href="/withdraw">
+                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-amber-600 font-semibold rounded-full border border-amber-200 hover:bg-amber-50 transition text-sm cursor-pointer">
+                        Withdraw
+                      </span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick perks grid */}
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-amber-100 pt-5">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FaRocket className="text-amber-500 flex-shrink-0" />
+                  <span>Double benefit: grow audience & earn cash</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FiUsers className="text-amber-500 flex-shrink-0" />
+                  <span>Refer friends → unlock Pro features</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FiClock className="text-amber-500 flex-shrink-0" />
+                  <span>Withdraw 24/7</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
