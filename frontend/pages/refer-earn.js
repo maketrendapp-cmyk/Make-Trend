@@ -1,5 +1,5 @@
 // pages/refer-earn.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { useProfile } from '../lib/queries';
@@ -17,6 +17,7 @@ import {
   FiAward,
   FiClock,
   FiCheckCircle,
+  FiRefreshCw,
 } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 
@@ -26,10 +27,11 @@ if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 export default function ReferEarn() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+  const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useProfile(isAuthenticated);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [referralData, setReferralData] = useState({
-    referralCode: profile?.referralCode || '', // ✅ start with profile code
+    referralCode: '',
     totalReferrals: 0,
     referredUsers: [],
     referrer: null,
@@ -53,35 +55,63 @@ export default function ReferEarn() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    const fetchReferrals = async () => {
-      try {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-          setLoading(false);
-          return;
-        }
-        const token = await firebaseUser.getIdToken();
-        const res = await fetch(`${BACKEND_URL}/api/auth/referrals`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (data.success) {
-          setReferralData({
-            referralCode: data.referralCode || profile?.referralCode || '', // ✅ fallback
-            totalReferrals: data.totalReferrals || 0,
-            referredUsers: data.referredUsers || [],
-            referrer: data.referrer || null,
-          });
-        }
-      } catch (err) {
-        console.error('Fetch referrals error:', err);
-      } finally {
+  // ── Fetch referrals function ──
+  const fetchReferrals = useCallback(async () => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
         setLoading(false);
+        return;
+      }
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${BACKEND_URL}/api/auth/referrals`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReferralData({
+          referralCode: data.referralCode || profile?.referralCode || '',
+          totalReferrals: data.totalReferrals || 0,
+          referredUsers: data.referredUsers || [],
+          referrer: data.referrer || null,
+        });
+      }
+    } catch (err) {
+      console.error('Fetch referrals error:', err);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [profile?.referralCode]);
+
+  // ── Fetch on mount and whenever user changes ──
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchReferrals();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, user, fetchReferrals]);
+
+  // ── Refetch when tab becomes visible (user returns from registration) ──
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated && user) {
+        setIsRefreshing(true);
+        fetchReferrals();
       }
     };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated, user, fetchReferrals]);
+
+  // ── Manual refresh ──
+  const handleRefresh = () => {
+    setIsRefreshing(true);
     fetchReferrals();
-  }, []);
+  };
 
   const copyReferralCode = () => {
     const code = referralData.referralCode || profile?.referralCode;
@@ -129,7 +159,7 @@ export default function ReferEarn() {
               <div className="h-4 w-48 bg-gray-200 rounded" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              {[1,2,3].map(i => (
+              {[1, 2, 3].map(i => (
                 <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
                   <div className="w-12 h-12 bg-gray-200 rounded-full mx-auto mb-3" />
                   <div className="h-8 w-16 bg-gray-200 rounded mx-auto mb-2" />
@@ -150,7 +180,7 @@ export default function ReferEarn() {
             <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6">
               <div className="h-6 w-56 bg-gray-200 rounded mb-4" />
               <div className="space-y-3">
-                {[1,2,3].map(i => (
+                {[1, 2, 3].map(i => (
                   <div key={i} className="flex items-center gap-4 p-3 border-b border-gray-100">
                     <div className="w-10 h-10 bg-gray-200 rounded-full" />
                     <div className="flex-1">
@@ -212,7 +242,7 @@ export default function ReferEarn() {
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-4xl mx-auto">
 
-          {/* ── Header ── */}
+          {/* ── Header with Refresh Button ── */}
           <div className={`bg-white rounded-3xl shadow-sm border border-gray-200 p-6 mb-6 transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -222,11 +252,21 @@ export default function ReferEarn() {
                 </h1>
                 <p className="text-gray-500 text-sm mt-0.5">Invite friends and unlock PRO access</p>
               </div>
-              <Link href="/profile">
-                <button className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-800 text-sm font-medium transition-colors">
-                  Back to Profile <FiChevronRight className="w-4 h-4" />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-purple-600 hover:text-purple-800 transition-colors disabled:opacity-50"
+                >
+                  <FiRefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
-              </Link>
+                <Link href="/profile">
+                  <button className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-800 text-sm font-medium transition-colors">
+                    Back to Profile <FiChevronRight className="w-4 h-4" />
+                  </button>
+                </Link>
+              </div>
             </div>
             <div className="flex items-center gap-2 mt-3 text-sm text-gray-600">
               <FiUser className="w-4 h-4 text-purple-600" />
