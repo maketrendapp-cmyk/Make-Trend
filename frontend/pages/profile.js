@@ -1,5 +1,5 @@
 // pages/profile.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
@@ -16,22 +16,10 @@ export default function Profile() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
 
-  // ── Debug logs ──
-  useEffect(() => {
-    console.log('🔍 Auth state:', { user, isAuthenticated });
-  }, [user, isAuthenticated]);
-
+  // ── Same pattern as useStats ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
-  const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
-  const { invalidateProfile, invalidateStats } = useInvalidateQueries();
-
-  // ── Log mtCoins data ──
-  useEffect(() => {
-    if (mtCoinsData) {
-      console.log('💰 MT Coins data:', mtCoinsData);
-    }
-  }, [mtCoinsData]);
+  const { data: mtCoins, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
@@ -78,8 +66,6 @@ export default function Profile() {
     referralCode: profile?.referralCode || '',
   };
 
-  const mtCoins = mtCoinsData || { available: 0 };
-
   const statsItems = [
     { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
     { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
@@ -87,6 +73,7 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: displayUser.referrals ?? 0 },
   ];
 
+  // ── Quick Actions ── added Withdraw
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -140,7 +127,7 @@ export default function Profile() {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* ── Profile Header ── */}
+          {/* ── Profile Header (unchanged) ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <div className="relative">
@@ -215,8 +202,8 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* ── Stats Grid ── */}
-          {isAuthenticated && (
+          {/* ── Stats Grid (existing) ── */}
+          {user && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
               {statsItems.map((stat, index) => (
                 <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
@@ -230,29 +217,24 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── MT Coins Row ── */}
-          {isAuthenticated && (
-            <div className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-6 py-4 mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  MT
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Available MT Coins</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {mtCoins?.available?.toLocaleString() ?? '0'}
-                  </p>
-                </div>
+          {/* ── NEW: MT Coins & Withdraw (identical pattern to stats) ── */}
+          {user && (
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-6 py-4 mb-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Available MT Coins</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {mtCoins?.available?.toLocaleString() ?? '0'}
+                </p>
               </div>
               <Link href="/withdraw">
-                <button className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition shadow-sm hover:shadow-md text-sm flex items-center gap-2">
+                <button className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition shadow-sm hover:shadow-md flex items-center gap-2">
                   <FaWallet className="w-4 h-4" /> Withdraw
                 </button>
               </Link>
             </div>
           )}
 
-          {/* ── Quick Actions ── */}
+          {/* ── Quick Actions (with Withdraw added) ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -267,8 +249,8 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* ── Refer & Affiliates ── */}
-          {isAuthenticated && (
+          {/* ── Rest of the page unchanged ── */}
+          {user && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Refer & Affiliates</h2>
               <div className="flex items-center justify-between flex-wrap gap-3">
@@ -305,7 +287,6 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── Explore ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Explore</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
@@ -320,7 +301,6 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* ── Legal ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Legal Framework</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
