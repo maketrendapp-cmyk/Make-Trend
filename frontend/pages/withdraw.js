@@ -539,29 +539,29 @@ export default function Withdraw() {
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaEye className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">Campaign View</p>
-                <p className="text-[10px] text-slate-400">View a campaign</p>
+                <p className="text-xs font-bold text-slate-700">View</p>
+                <p className="text-[10px] text-slate-400">Campaign Viewed</p>
               </div>
               <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaShareAlt className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">Campaign Share</p>
-                <p className="text-[10px] text-slate-400">Share with others</p>
+                <p className="text-xs font-bold text-slate-700">Share</p>
+                <p className="text-[10px] text-slate-400">Campaign Shared</p>
               </div>
               <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaUnlock className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">Campaign Unlock</p>
-                <p className="text-[10px] text-slate-400">Unlock the reward</p>
+                <p className="text-xs font-bold text-slate-700">Unlock</p>
+                <p className="text-[10px] text-slate-400">Campaign Tasks Unlocked</p>
               </div>
               <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
                   <FaCheckCircle className="text-blue-600 text-sm" />
                 </div>
-                <p className="text-xs font-bold text-slate-700">Campaign Completion</p>
-                <p className="text-[10px] text-slate-400">Complete all tasks</p>
+                <p className="text-xs font-bold text-slate-700">Completion</p>
+                <p className="text-[10px] text-slate-400">Campaign Finished</p>
               </div>
             </div>
 
