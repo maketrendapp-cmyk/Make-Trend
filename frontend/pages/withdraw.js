@@ -1,5 +1,5 @@
 // pages/withdraw.js
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import { useAuth } from '../components/AuthScreen';
@@ -35,10 +35,10 @@ export default function Withdraw() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
-  // ── React Query hooks ──
+  // ── React Query hooks (same pattern as profile.js) ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-  const { data: mtCoinsData, isLoading: coinsLoading } = useMtCoins(isAuthenticated);
-  const { data: methods = [], isLoading: methodsLoading } = useWithdrawalMethods();
+  const { data: mtCoinsData, isLoading: coinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
+  const { data: methods = [], isLoading: methodsLoading } = useWithdrawalMethods(isAuthenticated);
   const { data: withdrawals = [], isLoading: withdrawalsLoading, refetch: refetchWithdrawals } = useWithdrawals(isAuthenticated);
   const { mutate: createWithdrawal, isLoading: isSubmitting } = useCreateWithdrawal();
 
@@ -48,61 +48,67 @@ export default function Withdraw() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  // ── Fixed amount ──
-  const WITHDRAWAL_AMOUNT = 2500; // MT Coins
+  const WITHDRAWAL_AMOUNT = 2500;
   const USD_AMOUNT = 15;
 
-  // ── Check authentication ──
+  // ── Auto‑refetch when user becomes available ──
+  useEffect(() => {
+    if (user) {
+      refetchMtCoins();
+      refetchWithdrawals();
+    }
+  }, [user]);
+
+  // ── Auth guard ──
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login?redirect=/withdraw');
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // ── Loading state ──
-  const isLoading = profileLoading || coinsLoading || methodsLoading || withdrawalsLoading;
+  // ── Skeleton loading (matches profile page) ──
+  const isLoading = profileLoading || coinsLoading || withdrawalsLoading || methodsLoading;
   if (isLoading) {
     return (
       <>
         <Meta title="Withdraw – MT Coins" />
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-          <div className="text-center">
-            <FaSpinner className="animate-spin text-4xl text-purple-600 mx-auto" />
-            <p className="mt-4 text-slate-500">Loading your dashboard...</p>
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 animate-pulse">
+            <div className="bg-white rounded-2xl p-6 mb-6">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="w-24 h-24 rounded-full bg-gray-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-6 bg-gray-200 rounded w-48" />
+                  <div className="h-4 bg-gray-200 rounded w-32" />
+                  <div className="h-4 bg-gray-200 rounded w-40" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />)}
+            </div>
           </div>
         </div>
       </>
     );
   }
 
-  // ── Error states ──
+  // ── If no profile ──
   if (!profile) {
     return (
-      <>
-        <Meta title="Withdraw – MT Coins" />
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-          <div className="text-center text-red-500">
-            <p>Failed to load profile. Please refresh.</p>
-          </div>
-        </div>
-      </>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">Please log in to view this page.</div>
+      </div>
     );
   }
 
   const mtCoins = mtCoinsData || { earned: 0, spent: 0, available: 0, usdValue: 0, stats: { views: 0, shares: 0, completions: 0, unlocks: 0 } };
   const canWithdraw = (mtCoins.available || 0) >= WITHDRAWAL_AMOUNT;
 
-  // ── Handle withdrawal submission ──
+  // ── Handlers ──
   const handleWithdraw = () => {
-    if (!selectedMethod) {
-      setError('Please select a payment method.');
-      return;
-    }
-
-    if (!canWithdraw) {
-      setError(`Insufficient MT Coins. You need ${WITHDRAWAL_AMOUNT} MT Coins ($15) to withdraw.`);
-      return;
-    }
+    if (!selectedMethod) { setError('Please select a payment method.'); return; }
+    if (!canWithdraw) { setError(`Insufficient MT Coins. You need ${WITHDRAWAL_AMOUNT} MT Coins ($15) to withdraw.`); return; }
 
     const methodObj = methods.find(m => m.id === selectedMethod);
     if (methodObj) {
@@ -123,8 +129,7 @@ export default function Withdraw() {
       details: formData,
     }, {
       onSuccess: (data) => {
-        setMessage(`✅ Withdrawal of ${data.mtCoins} MT Coins ($${data.amount}) requested successfully!`);
-        // Reset form
+        setMessage(`✅ Withdrawal of ${data.mtCoins} MT Coins ($${data.amount}) requested!`);
         setSelectedMethod(null);
         setFormData({});
         refetchWithdrawals();
@@ -135,7 +140,7 @@ export default function Withdraw() {
     });
   };
 
-  // ── Get status badge ──
+  // ── UI helpers ──
   const getStatusBadge = (status) => {
     const styles = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -157,7 +162,6 @@ export default function Withdraw() {
     };
   };
 
-  // ── Get method icon ──
   const getMethodIcon = (methodId) => {
     const icons = {
       esewa: <FaPhone />,
@@ -184,17 +188,13 @@ export default function Withdraw() {
     return names[methodId] || methodId;
   };
 
+  // ─── Render ───
   return (
     <>
       <Meta title="Withdraw – MT Coins" />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-4 sm:p-6">
         <div className="max-w-5xl mx-auto">
-
-          {/* ─── Back Button ─── */}
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm mb-4 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
-          >
+          <button onClick={() => router.push('/dashboard')} className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm mb-4 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition">
             <FaArrowLeft /> Back to Dashboard
           </button>
 
@@ -262,17 +262,8 @@ export default function Withdraw() {
             </div>
           </div>
 
-          {/* ─── Messages ─── */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">
-              {error}
-            </div>
-          )}
-          {message && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">
-              {message}
-            </div>
-          )}
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">{error}</div>}
+          {message && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">{message}</div>}
 
           {/* ─── Withdrawal Form ─── */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-6">
@@ -281,7 +272,7 @@ export default function Withdraw() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* ─── Left: Amount & Methods ─── */}
+              {/* Left: Amount & Methods */}
               <div>
                 <div className="bg-purple-50 rounded-xl p-4 border border-purple-200 mb-4">
                   <p className="text-sm text-purple-700 font-semibold">Withdrawal Amount</p>
@@ -293,9 +284,7 @@ export default function Withdraw() {
                   </p>
                 </div>
 
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Payment Method
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Payment Method</label>
                 <div className="space-y-2">
                   {methods.map((method) => (
                     <button
@@ -324,7 +313,7 @@ export default function Withdraw() {
                 </div>
               </div>
 
-              {/* ─── Right: Form Fields ─── */}
+              {/* Right: Form Fields */}
               <div>
                 {selectedMethod && (
                   <div className="animate-fadeIn">
