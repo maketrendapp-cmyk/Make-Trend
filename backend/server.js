@@ -2803,8 +2803,8 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalUnlocks += data.unlockCount || 0;
     });
 
-    // ── MT Coins = views + completions + shares + unlocks ──
-    const earnedMtCoins = totalViews + totalCompletions + totalShares + totalUnlocks;
+// ── MT Coins = minimum of all four (all must be ≥1 to earn 1 coin) ──
+const earnedMtCoins = Math.min(totalViews, totalShares, totalUnlocks, totalCompletions);
 
     // ── Get user document for spent coins ──
     const userDoc = await db.collection('users').doc(uid).get();
