@@ -11,6 +11,10 @@ import {
   FiMail,
   FiSend,
   FiUser,
+  FiShield,
+  FiDollarSign,
+  FiUsers,
+  FiGrid,
 } from 'react-icons/fi';
 
 export default function Terms() {
@@ -132,6 +136,22 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
+              {/* 1.1 What is MakeTrend? (NEW) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-120">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">1.1</span> What is MakeTrend?
+                </h2>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend is a smart campaign-building platform designed for creators, marketers, gaming communities, and online businesses who want to create engaging share-based campaigns without starting from scratch. Instead of building everything manually, users can choose from ready-made templates, customize the campaign details, set a share target, add tasks, and define a final redirect link. It turns a simple idea into an interactive campaign that people can actually participate in and share.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  For creators, MakeTrend saves time and makes promotion much easier. A creator can launch a campaign in minutes using templates like Thunder Game, Quiz Challenge, Spin & Win, Lucky Draw, or other custom styles. This means they do not need advanced design skills or coding knowledge. They can focus on the message, the reward, and the goal of the campaign while the platform handles the structure and user flow. The real benefit is not just a page that looks good, but a system that encourages people to engage, share, and help the campaign spread further.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend can be used for many different purposes – gaming events, audience growth, product promotion, community engagement, and more. It is flexible enough for entertainment, marketing, social growth, and promotional campaigns.
+                </p>
+              </div>
+
               {/* 2. Acceptance of Terms */}
               <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-150">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -143,24 +163,162 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
-              {/* 3. User Accounts */}
+              {/* 3. Templates, Demonstrations & Simulated Experiences (NEW - mirrors Privacy) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-170">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">3.</span> Templates, Demonstrations &amp; Simulated Experiences
+                </h2>
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+                  <FiGrid className="text-purple-400" />
+                  <span>Applies to all templates and interactive pages on MakeTrend</span>
+                </div>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend is a platform for creating and customizing interactive web templates. Some templates available on MakeTrend may be designed to visually represent experiences such as promotional campaigns, giveaways, rewards, contests, surveys, registration forms, verification screens, gaming-related offers, or other interactive webpages.
+                </p>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  These templates are provided primarily for design, demonstration, customization, and campaign-building purposes. The appearance and behavior of a template should not automatically be interpreted as proof that the promotion, reward, prize, offer, verification process, transaction, or service shown on the page is real or currently available.
+                </p>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  Some templates may use simulated interactions, sample information, generated results, placeholder content, or visual effects to demonstrate how a particular webpage could look and behave. Unless a template or campaign explicitly states otherwise, these demonstrations do not provide real rewards, cashback, prizes, purchases, transactions, account verification, or other real-world services.
+                </p>
+
+                <h3 className="mt-4 font-semibold text-gray-800 text-sm">Information Entered Into Templates</h3>
+                <p className="mt-1 text-gray-600 text-sm leading-relaxed">
+                  Some templates may contain fields requesting information such as a name, email address, phone number, username, or other information. Depending on the particular template and its configuration, this information may be used temporarily to display or operate the on-page interface.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend does not intend for information entered into a standard template demonstration to be treated as a stored customer record. Unless clearly stated otherwise for a specific MakeTrend feature or campaign, information entered into a template demonstration is not stored or retained by MakeTrend.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  Users should therefore avoid assuming that submitting information to a template demonstration creates an account, registers them for a real promotion, verifies their identity, qualifies them for a reward, or submits an actual application or claim.
+                </p>
+
+                <h3 className="mt-4 font-semibold text-gray-800 text-sm">Third-Party Brands and Content</h3>
+                <p className="mt-1 text-gray-600 text-sm leading-relaxed">
+                  A template may contain the names, logos, images, trademarks, or visual styles associated with third-party companies, products, games, or services. Such references may be included for demonstration, design, educational, or customization purposes and do not necessarily indicate that the template is officially connected with, sponsored by, endorsed by, or authorized by the referenced organization.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend does not represent a template as an official third-party promotion or service unless an official relationship or authorization is explicitly stated.
+                </p>
+
+                <h3 className="mt-4 font-semibold text-gray-800 text-sm">Important Notice</h3>
+                <p className="mt-1 text-gray-600 text-sm leading-relaxed">
+                  If a page is presented as a template or demonstration, visitors should consider the page's stated purpose and any accompanying notices before relying on its content. A visual representation of a reward, offer, verification, transaction, contest result, or promotional campaign does not by itself mean that the represented benefit or service is actually being provided.
+                </p>
+              </div>
+
+              {/* 4. MT Coins & Withdrawals (NEW) */}
               <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-200">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">3.</span> User Accounts & Responsibilities
+                  <span className="text-purple-600">4.</span> MT Coins &amp; Withdrawals
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ml-2">Earnings</span>
+                </h2>
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+                  <FiDollarSign className="text-amber-500" />
+                  <span>Applies to all earnings and withdrawal requests</span>
+                </div>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend rewards users with <strong>MT Coins</strong> for campaign engagement. MT Coins are earned when your campaigns receive views, shares, unlocks, and completions – one MT Coin is awarded when all four actions are completed.
+                </p>
+
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  Users may request withdrawals of accumulated MT Coins subject to:
+                </p>
+                <ul className="mt-2 space-y-1.5 text-gray-600 text-sm list-disc pl-5">
+                  <li>Meeting the minimum withdrawal threshold (currently 2,500 MT Coins = $15.00).</li>
+                  <li>Providing accurate and complete payment details for the selected withdrawal method.</li>
+                  <li>Compliance with all applicable laws and anti‑fraud measures.</li>
+                  <li>No pending disputes or violations of these Terms.</li>
+                </ul>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  <strong>Important:</strong> MT Coins have no cash value outside the MakeTrend platform. They are promotional rewards earned through user engagement. Withdrawals are processed after verification and are subject to a review period. MakeTrend reserves the right to:
+                </p>
+                <ul className="mt-2 space-y-1.5 text-gray-600 text-sm list-disc pl-5">
+                  <li>Suspend or cancel withdrawals if fraud, abuse, or violations are detected.</li>
+                  <li>Adjust the withdrawal threshold or rules at any time (with reasonable notice).</li>
+                  <li>Require identity verification for large or suspicious withdrawals.</li>
+                </ul>
+
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                  <FiAlertCircle className="inline mr-1.5" />
+                  <strong>No guaranteed earnings:</strong> MT Coin earnings depend on campaign performance. MakeTrend does not guarantee any specific amount of earnings.
+                </div>
+              </div>
+
+              {/* 5. Referral Program (NEW) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-220">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">5.</span> Referral Program
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full ml-2">Invite & Earn</span>
+                </h2>
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+                  <FiUsers className="text-blue-500" />
+                  <span>Applies to all referral activities</span>
+                </div>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend offers a referral program where users can invite others to join the platform. Referral rewards are granted as follows:
+                </p>
+                <ul className="mt-2 space-y-1.5 text-gray-600 text-sm list-disc pl-5">
+                  <li>When a referred user creates an account and completes their profile, the referrer earns one referral credit.</li>
+                  <li>For every <strong>5</strong> successful referrals, the referrer receives <strong>24 hours of PRO access</strong> at no cost.</li>
+                  <li>Referral credits are tracked automatically and are non‑transferable.</li>
+                </ul>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  <strong>Self‑referral is prohibited.</strong> Creating multiple accounts or using the same device to refer yourself will result in forfeiture of rewards and potential account suspension.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend reserves the right to modify or terminate the referral program at any time with reasonable notice.
+                </p>
+              </div>
+
+              {/* 6. User Accounts & Responsibilities (revised) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-250">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">6.</span> User Accounts &amp; Responsibilities
                 </h2>
                 <ul className="mt-2 space-y-2 text-gray-600 text-sm list-disc pl-5">
-                  <li>You must be at least 13 years old to use Make Trend.</li>
+                  <li>You must be <strong>at least 13 years old</strong> to create an account.</li>
+                  <li>You must be <strong>at least 18 years old</strong> to request withdrawals or participate in financial features.</li>
                   <li>You are responsible for maintaining the confidentiality of your account credentials.</li>
                   <li>You are solely responsible for all content you post, including campaigns, tasks, and descriptions.</li>
                   <li>You must not share your account with others or use another user's account without permission.</li>
-                  <li>You agree to provide accurate and up‑to‑date information during registration.</li>
+                  <li>You agree to provide accurate and up‑to‑date information during registration and withdrawal requests.</li>
+                  <li>You are responsible for all activity that occurs under your account.</li>
                 </ul>
               </div>
 
-              {/* 4. Prohibited Uses */}
-              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-250">
+              {/* 7. User Content & Responsibility (NEW) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-280">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">4.</span> Prohibited Uses
+                  <span className="text-purple-600">7.</span> User Content &amp; Responsibility
+                </h2>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  You retain ownership of all content you create on MakeTrend, including campaigns, tasks, descriptions, and customisations. However, by publishing content on the platform, you grant MakeTrend a non‑exclusive, worldwide, royalty‑free license to display, promote, and distribute your content in connection with our services.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  You are <strong>solely responsible</strong> for:
+                </p>
+                <ul className="mt-2 space-y-1.5 text-gray-600 text-sm list-disc pl-5">
+                  <li>Ensuring your content does not violate any third‑party rights (copyright, trademark, privacy).</li>
+                  <li>Ensuring your content is not defamatory, obscene, or otherwise unlawful.</li>
+                  <li>Ensuring your tasks and redirects do not direct users to harmful or deceptive content.</li>
+                  <li>Any claims, disputes, or damages arising from your content.</li>
+                </ul>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend reserves the right to remove any content that violates these terms or is otherwise harmful to the platform or its users.
+                </p>
+              </div>
+
+              {/* 8. Prohibited Uses (revised) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-300">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">8.</span> Prohibited Uses
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   You agree not to use Make Trend for any unlawful or prohibited purpose, including but not limited to:
@@ -170,15 +328,21 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                   <li>Distributing spam, viruses, or malicious software.</li>
                   <li>Impersonating any person or entity.</li>
                   <li>Posting content that is defamatory, obscene, or harassing.</li>
-                  <li>Attempting to manipulate shares, unlocks, or engagement metrics artificially.</li>
+                  <li><strong>Attempting to manipulate shares, unlocks, or engagement metrics artificially</strong> (e.g., bots, fake accounts, automated scripts).</li>
                   <li>Using the platform for any illegal or unethical purposes.</li>
+                  <li>Creating campaigns that promote violence, illegal activities, or hate speech.</li>
+                  <li>Phishing, scamming, or attempting to collect user data fraudulently.</li>
+                  <li>Reverse‑engineering, decompiling, or attempting to extract the platform's source code.</li>
                 </ul>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  Violation of these terms may result in immediate account suspension, forfeiture of earnings, and legal action where applicable.
+                </p>
               </div>
 
-              {/* 5. Intellectual Property */}
-              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-300">
+              {/* 9. Intellectual Property */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-350">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">5.</span> Intellectual Property
+                  <span className="text-purple-600">9.</span> Intellectual Property
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   All content on Make Trend, including templates, logos, designs, and code, is the property of Make Trend or its licensors.
@@ -188,21 +352,26 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
-              {/* 6. Termination */}
-              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-350">
+              {/* 10. Indemnification (NEW) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-380">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">6.</span> Termination
+                  <span className="text-purple-600">10.</span> Indemnification
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
-                  We reserve the right to suspend or terminate your account at any time, without notice, for conduct that we believe violates
-                  these terms or is harmful to the platform or its users. You may also delete your account at any time via your profile settings.
+                  You agree to indemnify, defend, and hold harmless MakeTrend, its owners, employees, and affiliates from and against any and all claims, liabilities, damages, losses, costs, or expenses (including reasonable legal fees) arising out of or related to:
                 </p>
+                <ul className="mt-2 space-y-1.5 text-gray-600 text-sm list-disc pl-5">
+                  <li>Your use of the platform.</li>
+                  <li>Your violation of these Terms.</li>
+                  <li>Your infringement of any third‑party rights.</li>
+                  <li>Your content, campaigns, or tasks.</li>
+                </ul>
               </div>
 
-              {/* 7. Disclaimer of Warranties */}
+              {/* 11. Disclaimer of Warranties */}
               <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-400">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">7.</span> Disclaimer of Warranties
+                  <span className="text-purple-600">11.</span> Disclaimer of Warranties
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   Make Trend is provided "as is" and "as available." We do not warrant that the service will be uninterrupted, error‑free,
@@ -210,21 +379,67 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
-              {/* 8. Limitation of Liability */}
+              {/* 12. Limitation of Liability */}
               <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-450">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">8.</span> Limitation of Liability
+                  <span className="text-purple-600">12.</span> Limitation of Liability
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   To the maximum extent permitted by law, Make Trend and its owners, employees, and affiliates shall not be liable for any
                   direct, indirect, incidental, consequential, or punitive damages arising out of your use of the platform.
                 </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  In no event shall our total liability exceed the amount paid by you to MakeTrend (if any) in the six months preceding the claim.
+                </p>
               </div>
 
-              {/* 9. Governing Law */}
+              {/* 13. Refund & Cancellation Policy (NEW) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-480">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">13.</span> Refund &amp; Cancellation Policy
+                </h2>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend is a free‑to‑use platform. No payments are required to create campaigns or earn MT Coins. As such:
+                </p>
+                <ul className="mt-2 space-y-1.5 text-gray-600 text-sm list-disc pl-5">
+                  <li>There are <strong>no fees or subscriptions</strong> charged by MakeTrend, so refunds do not apply.</li>
+                  <li>Withdrawals of MT Coins are subject to the terms in Section 4 and are processed after verification.</li>
+                  <li>Once a withdrawal is approved, funds are sent to the provided payment details and cannot be reversed.</li>
+                  <li>If an error occurs, please contact support for investigation.</li>
+                </ul>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  Users may delete their account at any time via profile settings. Deleted accounts forfeit any unused MT Coins.
+                </p>
+              </div>
+
+              {/* 14. Termination */}
               <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-500">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">9.</span> Governing Law
+                  <span className="text-purple-600">14.</span> Termination
+                </h2>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  We reserve the right to suspend or terminate your account at any time, without notice, for conduct that we believe violates
+                  these terms or is harmful to the platform or its users. You may also delete your account at any time via your profile settings.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  Upon termination, your access to the platform will be revoked, and any pending withdrawal requests may be cancelled.
+                </p>
+              </div>
+
+              {/* 15. Force Majeure (NEW) */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-530">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">15.</span> Force Majeure
+                </h2>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend shall not be liable for any delay or failure to perform its obligations where such delay or failure arises from circumstances beyond our reasonable control, including but not limited to natural disasters, pandemics, war, terrorism, strikes, or government actions.
+                </p>
+              </div>
+
+              {/* 16. Governing Law */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-550">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">16.</span> Governing Law
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   These terms shall be governed by and construed in accordance with the laws of India, without regard to its conflict of law provisions.
@@ -232,10 +447,10 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
-              {/* 10. Changes to Terms */}
-              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-550">
+              {/* 17. Changes to Terms */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-600">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">10.</span> Changes to These Terms
+                  <span className="text-purple-600">17.</span> Changes to These Terms
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   We may update these terms from time to time. We will notify you of any significant changes by posting the new terms on this page
@@ -243,10 +458,10 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
-              {/* 11. Contact with Email Button */}
-              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-600">
+              {/* 18. Contact with Email Button */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-650">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">11.</span> Contact Us
+                  <span className="text-purple-600">18.</span> Contact Us
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   If you have any questions about these terms, please reach out to us:
@@ -271,6 +486,12 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 <p>
                   This document is a legal agreement between you and Make Trend.
                   By using the platform, you accept these terms in full.
+                </p>
+                <p className="mt-1">
+                  <span className="inline-flex items-center gap-1">
+                    <FiShield className="text-purple-400" />
+                    Last updated: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </span>
                 </p>
               </div>
 
