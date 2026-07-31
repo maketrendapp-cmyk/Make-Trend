@@ -93,7 +93,7 @@ export default function ReferEarn() {
     }
   }, [isAuthenticated, user, fetchReferrals]);
 
-  // ── Refetch when tab becomes visible (user returns from registration) ──
+  // ── Refetch when tab becomes visible ──
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isAuthenticated && user) {
@@ -133,18 +133,31 @@ export default function ReferEarn() {
       });
   };
 
+  // ── Safe date formatter ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      if (timestamp.toDate) date = timestamp.toDate();
-      else if (timestamp.seconds) date = new Date(timestamp.seconds * 1000);
-      else date = new Date(timestamp);
+      // Firestore Timestamp with seconds and nanoseconds
+      if (timestamp.seconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+      } else if (timestamp.toDate) {
+        date = timestamp.toDate();
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else {
+        date = new Date(timestamp);
+      }
       if (isNaN(date.getTime())) return 'N/A';
       return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch {
       return 'N/A';
     }
+  };
+
+  // ── Get user avatar ──
+  const getUserAvatar = (ref) => {
+    return ref.avatar || ref.photoURL || null;
   };
 
   // ── Skeleton Loader ──
@@ -242,7 +255,7 @@ export default function ReferEarn() {
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-4xl mx-auto">
 
-          {/* ── Header with Refresh Button ── */}
+          {/* ── Header with Refresh ── */}
           <div className={`bg-white rounded-3xl shadow-sm border border-gray-200 p-6 mb-6 transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -274,7 +287,7 @@ export default function ReferEarn() {
             </div>
           </div>
 
-          {/* ── Stats Cards ── */}
+          {/* ── Stats Cards ── improved ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -288,11 +301,11 @@ export default function ReferEarn() {
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <FiUserPlus className="w-6 h-6 text-green-600" />
               </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {referralData.referrer ? '✅' : '—'}
+              <p className="text-xl font-bold text-gray-900 truncate">
+                {referralData.referrer?.username || referralData.referrer?.fullname || '—'}
               </p>
               <p className="text-sm text-gray-500 font-medium">
-                {referralData.referrer ? `Referred by ${referralData.referrer.username || 'someone'}` : 'No referrer'}
+                {referralData.referrer ? 'Referred by' : 'No referrer'}
               </p>
             </div>
 
@@ -300,11 +313,11 @@ export default function ReferEarn() {
               <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <FaCrown className="w-6 h-6 text-yellow-600" />
               </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {isPro ? '👑' : '—'}
+              <p className="text-2xl font-bold text-gray-900">
+                {isPro ? '👑 PRO' : 'FREE'}
               </p>
               <p className="text-sm text-gray-500 font-medium">
-                {isPro ? 'PRO Active' : 'Free Plan'}
+                {isPro ? 'Active' : 'Free Plan'}
               </p>
               {isPro && proExpiry && (
                 <p className="text-xs text-gray-400 mt-1 flex items-center justify-center gap-1">
@@ -399,7 +412,7 @@ export default function ReferEarn() {
             )}
           </div>
 
-          {/* ── Referred Users List ── */}
+          {/* ── Referred Users List ── FIXED ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <FiUsers className="w-5 h-5 text-purple-600" />
@@ -430,8 +443,8 @@ export default function ReferEarn() {
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-gray-600 text-sm font-medium overflow-hidden">
-                              {ref.avatar ? (
-                                <img src={ref.avatar} alt={ref.fullname} className="w-full h-full object-cover" />
+                              {getUserAvatar(ref) ? (
+                                <img src={getUserAvatar(ref)} alt={ref.fullname || ref.username} className="w-full h-full object-cover" />
                               ) : (
                                 ref.fullname?.charAt(0) || ref.username?.charAt(0) || '?'
                               )}
