@@ -143,6 +143,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                   <li><strong>Campaign Data:</strong> Campaigns you create, tasks, shares, unlocks, and engagement metrics.</li>
                   <li><strong>Usage Data:</strong> How you interact with the platform (pages visited, features used, time spent).</li>
                   <li><strong>Device & Technical Data:</strong> IP address, browser type, device identifiers, operating system.</li>
+                  <li><strong>Withdrawal & Payment Data:</strong> Payment method, account details (e.g., bank, eSewa, PayPal), amount, and transaction history.</li>
                   <li><strong>Cookies & Tracking:</strong> We use cookies to enhance your experience and analyse usage.</li>
                 </ul>
               </div>
@@ -159,6 +160,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                   <li>To communicate with you (updates, support, announcements).</li>
                   <li>To analyse platform performance and user behaviour.</li>
                   <li>To detect and prevent fraud, abuse, or illegal activity.</li>
+                  <li>To process withdrawal requests and comply with financial regulations.</li>
                   <li>To comply with legal obligations.</li>
                 </ul>
               </div>
@@ -256,10 +258,53 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
-              {/* 11. Changes to This Policy */}
+              {/* ─── NEW SECTION: Templates, Demonstrations & Simulated Experiences ─── */}
               <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-600">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">11.</span> Changes to This Privacy Policy
+                  <span className="text-purple-600">11.</span> Templates, Demonstrations &amp; Simulated Experiences
+                </h2>
+
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend is a platform for creating and customizing interactive web templates. Some templates available on MakeTrend may be designed to visually represent experiences such as promotional campaigns, giveaways, rewards, contests, surveys, registration forms, verification screens, gaming-related offers, or other interactive webpages.
+                </p>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  These templates are provided primarily for design, demonstration, customization, and campaign-building purposes. The appearance and behavior of a template should not automatically be interpreted as proof that the promotion, reward, prize, offer, verification process, transaction, or service shown on the page is real or currently available.
+                </p>
+
+                <p className="mt-3 text-gray-600 text-sm leading-relaxed">
+                  Some templates may use simulated interactions, sample information, generated results, placeholder content, or visual effects to demonstrate how a particular webpage could look and behave. Unless a template or campaign explicitly states otherwise, these demonstrations do not provide real rewards, cashback, prizes, purchases, transactions, account verification, or other real-world services.
+                </p>
+
+                <h3 className="mt-4 font-semibold text-gray-800 text-sm">Information Entered Into Templates</h3>
+                <p className="mt-1 text-gray-600 text-sm leading-relaxed">
+                  Some templates may contain fields requesting information such as a name, email address, phone number, username, or other information. Depending on the particular template and its configuration, this information may be used temporarily to display or operate the on-page interface.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend does not intend for information entered into a standard template demonstration to be treated as a stored customer record. Unless clearly stated otherwise for a specific MakeTrend feature or campaign, information entered into a template demonstration is not stored or retained by MakeTrend.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  Users should therefore avoid assuming that submitting information to a template demonstration creates an account, registers them for a real promotion, verifies their identity, qualifies them for a reward, or submits an actual application or claim.
+                </p>
+
+                <h3 className="mt-4 font-semibold text-gray-800 text-sm">Third-Party Brands and Content</h3>
+                <p className="mt-1 text-gray-600 text-sm leading-relaxed">
+                  A template may contain the names, logos, images, trademarks, or visual styles associated with third-party companies, products, games, or services. Such references may be included for demonstration, design, educational, or customization purposes and do not necessarily indicate that the template is officially connected with, sponsored by, endorsed by, or authorized by the referenced organization.
+                </p>
+                <p className="mt-2 text-gray-600 text-sm leading-relaxed">
+                  MakeTrend does not represent a template as an official third-party promotion or service unless an official relationship or authorization is explicitly stated.
+                </p>
+
+                <h3 className="mt-4 font-semibold text-gray-800 text-sm">Important Notice</h3>
+                <p className="mt-1 text-gray-600 text-sm leading-relaxed">
+                  If a page is presented as a template or demonstration, visitors should consider the page's stated purpose and any accompanying notices before relying on its content. A visual representation of a reward, offer, verification, transaction, contest result, or promotional campaign does not by itself mean that the represented benefit or service is actually being provided.
+                </p>
+              </div>
+
+              {/* 12. Changes to This Policy */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-650">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">12.</span> Changes to This Privacy Policy
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page
@@ -267,10 +312,10 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
                 </p>
               </div>
 
-              {/* 12. Contact with Email Button & Address */}
-              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-650">
+              {/* 13. Contact with Email Button & Address */}
+              <div className="fade-up opacity-0 translate-y-8 transition-all duration-700 delay-700">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-purple-600">12.</span> Contact Us
+                  <span className="text-purple-600">13.</span> Contact Us
                 </h2>
                 <p className="mt-2 text-gray-600 text-sm leading-relaxed">
                   If you have any questions, concerns, or requests regarding this Privacy Policy, please reach out:
