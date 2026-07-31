@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
+import { getDeviceId } from '../utils/deviceId';
 import {
   FaRocket,
   FaCheckCircle,
@@ -47,7 +48,13 @@ export default function CampaignCreated() {
 
   const fetchCampaign = async () => {
     try {
-      const res = await fetch(`${API_BASE}/campaigns/${id}`);
+      const deviceId = getDeviceId();
+      const res = await fetch(`${API_BASE}/campaigns/${id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': deviceId, // ← Send device ID for tracking
+        },
+      });
       if (!res.ok) {
         if (res.status === 404) {
           setError('Campaign not found');
