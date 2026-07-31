@@ -29,13 +29,20 @@ import {
   FaPaypal,
   FaBuilding,
   FaGift,
+  FaShareAlt,
+  FaUnlock,
+  FaUsers,
+  FaChartLine,
+  FaDollarSign,
+  FaCoins,
+  FaLightbulb,
 } from 'react-icons/fa';
 
 export default function Withdraw() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
-  // ── React Query hooks (same pattern as profile.js) ──
+  // ── React Query hooks ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const { data: mtCoinsData, isLoading: coinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
   const { data: methods = [], isLoading: methodsLoading } = useWithdrawalMethods(isAuthenticated);
@@ -66,7 +73,7 @@ export default function Withdraw() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // ── Skeleton loading (matches profile page) ──
+  // ── Loading state ──
   const isLoading = profileLoading || coinsLoading || withdrawalsLoading || methodsLoading;
   if (isLoading) {
     return (
@@ -85,7 +92,9 @@ export default function Withdraw() {
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />)}
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />
+              ))}
             </div>
           </div>
         </div>
@@ -102,15 +111,27 @@ export default function Withdraw() {
     );
   }
 
-  const mtCoins = mtCoinsData || { earned: 0, spent: 0, available: 0, usdValue: 0, stats: { views: 0, shares: 0, completions: 0, unlocks: 0 } };
+  const mtCoins = mtCoinsData || {
+    earned: 0,
+    spent: 0,
+    available: 0,
+    usdValue: 0,
+    stats: { views: 0, shares: 0, completions: 0, unlocks: 0 },
+  };
   const canWithdraw = (mtCoins.available || 0) >= WITHDRAWAL_AMOUNT;
 
   // ── Handlers ──
   const handleWithdraw = () => {
-    if (!selectedMethod) { setError('Please select a payment method.'); return; }
-    if (!canWithdraw) { setError(`Insufficient MT Coins. You need ${WITHDRAWAL_AMOUNT} MT Coins ($15) to withdraw.`); return; }
+    if (!selectedMethod) {
+      setError('Please select a payment method.');
+      return;
+    }
+    if (!canWithdraw) {
+      setError(`Insufficient MT Coins. You need ${WITHDRAWAL_AMOUNT} MT Coins ($15) to withdraw.`);
+      return;
+    }
 
-    const methodObj = methods.find(m => m.id === selectedMethod);
+    const methodObj = methods.find((m) => m.id === selectedMethod);
     if (methodObj) {
       for (const field of methodObj.fields) {
         if (field.required && !formData[field.key]) {
@@ -123,21 +144,24 @@ export default function Withdraw() {
     setError('');
     setMessage('');
 
-    createWithdrawal({
-      mtCoins: WITHDRAWAL_AMOUNT,
-      method: selectedMethod,
-      details: formData,
-    }, {
-      onSuccess: (data) => {
-        setMessage(`✅ Withdrawal of ${data.mtCoins} MT Coins ($${data.amount}) requested!`);
-        setSelectedMethod(null);
-        setFormData({});
-        refetchWithdrawals();
+    createWithdrawal(
+      {
+        mtCoins: WITHDRAWAL_AMOUNT,
+        method: selectedMethod,
+        details: formData,
       },
-      onError: (err) => {
-        setError(err.message || 'Failed to submit withdrawal.');
-      },
-    });
+      {
+        onSuccess: (data) => {
+          setMessage(`✅ Withdrawal of ${data.mtCoins} MT Coins ($${data.amount}) requested!`);
+          setSelectedMethod(null);
+          setFormData({});
+          refetchWithdrawals();
+        },
+        onError: (err) => {
+          setError(err.message || 'Failed to submit withdrawal.');
+        },
+      }
+    );
   };
 
   // ── UI helpers ──
@@ -157,7 +181,9 @@ export default function Withdraw() {
       failed: <FaTimes className="text-red-500" />,
     };
     return {
-      className: `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.pending}`,
+      className: `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+        styles[status] || styles.pending
+      }`,
       icon: icons[status] || icons.pending,
     };
   };
@@ -194,7 +220,10 @@ export default function Withdraw() {
       <Meta title="Withdraw – MT Coins" />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-4 sm:p-6">
         <div className="max-w-5xl mx-auto">
-          <button onClick={() => router.push('/dashboard')} className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm mb-4 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm mb-4 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+          >
             <FaArrowLeft /> Back to Dashboard
           </button>
 
@@ -203,7 +232,11 @@ export default function Withdraw() {
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-2xl text-white flex-shrink-0">
                 {profile?.avatar ? (
-                  <img src={profile.avatar} alt={profile.fullname} className="w-full h-full rounded-full object-cover" />
+                  <img
+                    src={profile.avatar}
+                    alt={profile.fullname}
+                    className="w-full h-full rounded-full object-cover"
+                  />
                 ) : (
                   profile?.fullname?.charAt(0)?.toUpperCase() || <FaUser />
                 )}
@@ -216,7 +249,9 @@ export default function Withdraw() {
               </div>
               <div className="bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-2 rounded-xl border border-purple-200 text-center">
                 <p className="text-xs text-purple-600 font-medium">MT Coins</p>
-                <p className="text-xl font-bold text-purple-700">{mtCoins.available?.toLocaleString() || 0}</p>
+                <p className="text-xl font-bold text-purple-700">
+                  {mtCoins.available?.toLocaleString() || 0}
+                </p>
               </div>
             </div>
           </div>
@@ -224,46 +259,92 @@ export default function Withdraw() {
           {/* ─── Stats Grid ─── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
+              <FaEye className="w-5 h-5 text-purple-600 mx-auto mb-1" />
+              <p className="text-xl font-bold text-slate-800">
+                {mtCoins.stats?.views?.toLocaleString() || 0}
+              </p>
               <p className="text-xs text-slate-400 font-medium">Views</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.views?.toLocaleString() || 0}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
+              <FaShareAlt className="w-5 h-5 text-blue-600 mx-auto mb-1" />
+              <p className="text-xl font-bold text-slate-800">
+                {mtCoins.stats?.shares?.toLocaleString() || 0}
+              </p>
               <p className="text-xs text-slate-400 font-medium">Shares</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.shares?.toLocaleString() || 0}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
-              <p className="text-xs text-slate-400 font-medium">Completions</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.completions?.toLocaleString() || 0}</p>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
+              <FaUnlock className="w-5 h-5 text-amber-600 mx-auto mb-1" />
+              <p className="text-xl font-bold text-slate-800">
+                {mtCoins.stats?.unlocks?.toLocaleString() || 0}
+              </p>
               <p className="text-xs text-slate-400 font-medium">Unlocks</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.unlocks?.toLocaleString() || 0}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
+              <FaCheckCircle className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+              <p className="text-xl font-bold text-slate-800">
+                {mtCoins.stats?.completions?.toLocaleString() || 0}
+              </p>
+              <p className="text-xs text-slate-400 font-medium">Completions</p>
             </div>
           </div>
 
-          {/* ─── Conversion Info ─── */}
-          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-200 p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <FaInfoCircle className="text-amber-500 text-lg mt-0.5 flex-shrink-0" />
+          {/* ─── How It Works Banner ─── */}
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 p-5 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <FaLightbulb className="text-indigo-600 text-lg" />
+              </div>
               <div>
-                <p className="text-sm font-semibold text-amber-800">How It Works</p>
-                <p className="text-sm text-amber-700">
-                  <strong>1 MT Coin</strong> = 1 View + 1 Share + 1 Completion + 1 Unlock. 
-                  <strong className="block mt-1">2,500 MT Coins = $15</strong>
+                <h3 className="text-sm font-bold text-indigo-900">Understanding MT Coins</h3>
+                <p className="text-sm text-indigo-700 mt-1">
+                  You earn <strong>1 MT Coin</strong> when you complete one of each:
                 </p>
-                <p className="text-xs text-amber-600 mt-1">
-                  Available: <strong>{mtCoins.available?.toLocaleString() || 0}</strong> MT Coins 
-                  ≈ <strong>${((mtCoins.available || 0) / 2500 * 15).toFixed(2)}</strong>
+                <div className="flex flex-wrap gap-4 mt-2">
+                  <div className="flex items-center gap-1.5">
+                    <FaEye className="text-indigo-500 text-xs" />
+                    <span className="text-xs text-indigo-800 font-medium">1 View</span>
+                  </div>
+                  <span className="text-indigo-300">+</span>
+                  <div className="flex items-center gap-1.5">
+                    <FaShareAlt className="text-indigo-500 text-xs" />
+                    <span className="text-xs text-indigo-800 font-medium">1 Share</span>
+                  </div>
+                  <span className="text-indigo-300">+</span>
+                  <div className="flex items-center gap-1.5">
+                    <FaUnlock className="text-indigo-500 text-xs" />
+                    <span className="text-xs text-indigo-800 font-medium">1 Unlock</span>
+                  </div>
+                  <span className="text-indigo-300">+</span>
+                  <div className="flex items-center gap-1.5">
+                    <FaCheckCircle className="text-indigo-500 text-xs" />
+                    <span className="text-xs text-indigo-800 font-medium">1 Completion</span>
+                  </div>
+                  <span className="text-indigo-300">=</span>
+                  <div className="flex items-center gap-1.5 bg-indigo-200 px-2 py-0.5 rounded-full">
+                    <FaCoins className="text-indigo-700 text-xs" />
+                    <span className="text-xs font-bold text-indigo-800">1 MT Coin</span>
+                  </div>
+                </div>
+                <p className="text-xs text-indigo-600 mt-2">
+                  <strong>2,500 MT Coins</strong> = <strong>$15.00</strong>
                 </p>
-                <p className="text-xs text-amber-600 mt-1">
+                <p className="text-xs text-indigo-500 mt-1">
                   Each withdrawal is exactly <strong>$15 (2,500 MT Coins)</strong>
                 </p>
               </div>
             </div>
           </div>
 
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">{error}</div>}
-          {message && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">{message}</div>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">
+              {error}
+            </div>
+          )}
+          {message && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4 text-sm">
+              {message}
+            </div>
+          )}
 
           {/* ─── Withdrawal Form ─── */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-6">
@@ -276,15 +357,20 @@ export default function Withdraw() {
               <div>
                 <div className="bg-purple-50 rounded-xl p-4 border border-purple-200 mb-4">
                   <p className="text-sm text-purple-700 font-semibold">Withdrawal Amount</p>
-                  <p className="text-2xl font-bold text-purple-800">$15.00</p>
+                  <p className="text-2xl font-bold text-purple-800">
+                    <FaDollarSign className="inline text-purple-500" /> 15.00
+                  </p>
                   <p className="text-xs text-purple-600">= 2,500 MT Coins (exact amount)</p>
                   <p className="text-xs text-purple-600 mt-1">
-                    Your balance: <strong>{mtCoins.available?.toLocaleString() || 0}</strong> MT Coins
+                    Your balance:{' '}
+                    <strong>{mtCoins.available?.toLocaleString() || 0}</strong> MT Coins
                     {canWithdraw ? ' ✅' : ' ❌ Insufficient'}
                   </p>
                 </div>
 
-                <label className="block text-sm font-medium text-slate-700 mb-1">Payment Method</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Payment Method
+                </label>
                 <div className="space-y-2">
                   {methods.map((method) => (
                     <button
@@ -318,35 +404,44 @@ export default function Withdraw() {
                 {selectedMethod && (
                   <div className="animate-fadeIn">
                     <h3 className="font-semibold text-sm text-slate-700 mb-3">
-                      {methods.find(m => m.id === selectedMethod)?.name} Details
+                      {methods.find((m) => m.id === selectedMethod)?.name} Details
                     </h3>
-                    {methods.find(m => m.id === selectedMethod)?.fields.map((field) => (
-                      <div key={field.key} className="mb-3">
-                        <label className="block text-xs font-medium text-slate-600 mb-1">
-                          {field.label} {field.required && <span className="text-red-500">*</span>}
-                        </label>
-                        {field.type === 'select' ? (
-                          <select
-                            value={formData[field.key] || ''}
-                            onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
-                          >
-                            <option value="">Select...</option>
-                            {field.options?.map(opt => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type={field.type || 'text'}
-                            placeholder={field.placeholder}
-                            value={formData[field.key] || ''}
-                            onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
-                          />
-                        )}
-                      </div>
-                    ))}
+                    {methods
+                      .find((m) => m.id === selectedMethod)
+                      ?.fields.map((field) => (
+                        <div key={field.key} className="mb-3">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
+                            {field.label}{' '}
+                            {field.required && <span className="text-red-500">*</span>}
+                          </label>
+                          {field.type === 'select' ? (
+                            <select
+                              value={formData[field.key] || ''}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [field.key]: e.target.value })
+                              }
+                              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                            >
+                              <option value="">Select...</option>
+                              {field.options?.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type={field.type || 'text'}
+                              placeholder={field.placeholder}
+                              value={formData[field.key] || ''}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [field.key]: e.target.value })
+                              }
+                              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                            />
+                          )}
+                        </div>
+                      ))}
 
                     <button
                       onClick={handleWithdraw}
@@ -358,9 +453,13 @@ export default function Withdraw() {
                       }`}
                     >
                       {isSubmitting ? (
-                        <><FaSpinner className="animate-spin inline mr-2" /> Processing...</>
+                        <>
+                          <FaSpinner className="animate-spin inline mr-2" /> Processing...
+                        </>
                       ) : (
-                        <><FaArrowRight className="inline mr-2" /> Withdraw $15</>
+                        <>
+                          <FaArrowRight className="inline mr-2" /> Withdraw $15
+                        </>
                       )}
                     </button>
                     {!canWithdraw && (
@@ -390,20 +489,35 @@ export default function Withdraw() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-2 text-xs font-semibold text-slate-400 uppercase">Date</th>
-                      <th className="text-left py-3 px-2 text-xs font-semibold text-slate-400 uppercase">Method</th>
-                      <th className="text-right py-3 px-2 text-xs font-semibold text-slate-400 uppercase">MT Coins</th>
-                      <th className="text-right py-3 px-2 text-xs font-semibold text-slate-400 uppercase">Amount</th>
-                      <th className="text-center py-3 px-2 text-xs font-semibold text-slate-400 uppercase">Status</th>
+                      <th className="text-left py-3 px-2 text-xs font-semibold text-slate-400 uppercase">
+                        Date
+                      </th>
+                      <th className="text-left py-3 px-2 text-xs font-semibold text-slate-400 uppercase">
+                        Method
+                      </th>
+                      <th className="text-right py-3 px-2 text-xs font-semibold text-slate-400 uppercase">
+                        MT Coins
+                      </th>
+                      <th className="text-right py-3 px-2 text-xs font-semibold text-slate-400 uppercase">
+                        Amount
+                      </th>
+                      <th className="text-center py-3 px-2 text-xs font-semibold text-slate-400 uppercase">
+                        Status
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {withdrawals.map((w) => {
                       const status = getStatusBadge(w.status);
                       return (
-                        <tr key={w.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                        <tr
+                          key={w.id}
+                          className="border-b border-slate-100 hover:bg-slate-50 transition"
+                        >
                           <td className="py-3 px-2 text-xs text-slate-500">
-                            {w.createdAt ? new Date(w.createdAt.seconds * 1000).toLocaleDateString() : '—'}
+                            {w.createdAt
+                              ? new Date(w.createdAt.seconds * 1000).toLocaleDateString()
+                              : '—'}
                           </td>
                           <td className="py-3 px-2 text-xs text-slate-700 flex items-center gap-1.5">
                             {getMethodIcon(w.method)} {getMethodName(w.method)}
@@ -428,46 +542,69 @@ export default function Withdraw() {
             )}
           </div>
 
-          {/* ─── How to Earn ─── */}
-          <div className="mt-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-4">
-            <h3 className="text-sm font-semibold text-blue-800 flex items-center gap-2 mb-2">
-              <FaGift className="text-blue-500" /> How to Earn MT Coins
+          {/* ─── How to Earn MT Coins ─── Professional version ── */}
+          <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-5">
+            <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2 mb-3">
+              <FaCoins className="text-blue-600" /> How to Earn MT Coins
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="bg-white/60 rounded-lg p-3 text-center">
-                <p className="text-2xl">👁️</p>
-                <p className="text-xs font-medium text-slate-700">1 View</p>
-                <p className="text-xs text-slate-500">= 1 MT Coin</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                  <FaEye className="text-blue-600 text-sm" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">1 View</p>
+                <p className="text-[10px] text-slate-400">Watch a video</p>
               </div>
-              <div className="bg-white/60 rounded-lg p-3 text-center">
-                <p className="text-2xl">📤</p>
-                <p className="text-xs font-medium text-slate-700">1 Share</p>
-                <p className="text-xs text-slate-500">= 1 MT Coin</p>
+              <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                  <FaShareAlt className="text-blue-600 text-sm" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">1 Share</p>
+                <p className="text-[10px] text-slate-400">Share with friends</p>
               </div>
-              <div className="bg-white/60 rounded-lg p-3 text-center">
-                <p className="text-2xl">✅</p>
-                <p className="text-xs font-medium text-slate-700">1 Completion</p>
-                <p className="text-xs text-slate-500">= 1 MT Coin</p>
+              <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                  <FaUnlock className="text-blue-600 text-sm" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">1 Unlock</p>
+                <p className="text-[10px] text-slate-400">Unlock content</p>
               </div>
-              <div className="bg-white/60 rounded-lg p-3 text-center">
-                <p className="text-2xl">🔓</p>
-                <p className="text-xs font-medium text-slate-700">1 Unlock</p>
-                <p className="text-xs text-slate-500">= 1 MT Coin</p>
+              <div className="bg-white/70 rounded-lg p-3 text-center border border-blue-100">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                  <FaCheckCircle className="text-blue-600 text-sm" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">1 Completion</p>
+                <p className="text-[10px] text-slate-400">Complete tasks</p>
               </div>
             </div>
-            <p className="text-center text-xs text-blue-600 mt-3 font-medium">
-              💰 2,500 MT Coins = $15 • Each withdrawal is exactly <strong>$15</strong> (2,500 MT Coins)
-            </p>
+
+            <div className="mt-3 p-2.5 bg-blue-200/50 rounded-lg text-center border border-blue-300/50">
+              <p className="text-sm font-bold text-blue-800">
+                <FaCoins className="inline text-blue-700 mr-1.5" />
+                All Four Actions = <span className="text-indigo-700">1 MT Coin</span>
+              </p>
+              <p className="text-[11px] text-blue-700 mt-0.5">
+                2,500 MT Coins = <strong>$15.00</strong>
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       <style jsx>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
       `}</style>
     </>
   );
