@@ -2548,6 +2548,396 @@ app.post('/api/upload', verifyToken, checkBanned, upload.single('image'), async 
 });
 
 // ============================================================
+// 19. WITHDRAWAL ENDPOINTS
+// ============================================================
+
+// ── Get user's withdrawal history ──
+app.get('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'withdrawals-get', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const cacheKey = `withdrawals:user:${uid}`;
+    let result;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+    } catch (error) {
+      console.warn(`⚠️ Withdrawals cache miss: ${error.message}`);
+    }
+
+    const snapshot = await db.collection('withdrawals')
+      .where('userId', '==', uid)
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+      .get();
+
+    const withdrawals = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      withdrawals.push({
+        id: doc.id,
+        amount: data.amount || 0,
+        mtCoins: data.mtCoins || 0,
+        method: data.method || '',
+        details: data.details || {},
+        status: data.status || 'pending',
+        createdAt: data.createdAt || null,
+        updatedAt: data.updatedAt || null,
+      });
+    });
+
+    result = { success: true, withdrawals };
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Get withdrawals error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch withdrawals' });
+  }
+});
+
+// ── Request a withdrawal ──
+app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'withdrawal-request', 2, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many withdrawal requests. Please wait.' });
+    }
+
+    const { mtCoins, method, details } = req.body;
+
+    // ── Validation ──
+    if (!mtCoins || !method || !details) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const numCoins = Number(mtCoins);
+    if (!Number.isInteger(numCoins) || numCoins < 100) {
+      return res.status(400).json({ success: false, error: 'Minimum withdrawal is 100 MT Coins' });
+    }
+
+    // ── Check if user has enough coins ──
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = userDoc.data();
+    const availableCoins = userData.mtCoins || 0;
+
+    if (numCoins > availableCoins) {
+      return res.status(400).json({ success: false, error: 'Insufficient MT Coins balance' });
+    }
+
+    // ── Calculate amount in USD ──
+    const amountUSD = (numCoins / 2500) * 15;
+
+    // ── Validate method and required fields ──
+    const validMethods = ['esewa', 'khalti', 'bank', 'wise', 'crypto', 'paypal', 'wire'];
+    if (!validMethods.includes(method)) {
+      return res.status(400).json({ success: false, error: 'Invalid payment method' });
+    }
+
+    // ── Validate details based on method ──
+    switch (method) {
+      case 'esewa':
+        if (!details.phone) return res.status(400).json({ success: false, error: 'eSewa phone number required' });
+        break;
+      case 'khalti':
+        if (!details.phone) return res.status(400).json({ success: false, error: 'Khalti phone number required' });
+        break;
+      case 'bank':
+        if (!details.bankName || !details.accountNumber || !details.accountName) {
+          return res.status(400).json({ success: false, error: 'Bank details required' });
+        }
+        break;
+      case 'wise':
+        if (!details.email) return res.status(400).json({ success: false, error: 'Wise email required' });
+        break;
+      case 'crypto':
+        if (!details.address || !details.currency) {
+          return res.status(400).json({ success: false, error: 'Crypto address and currency required' });
+        }
+        break;
+      case 'paypal':
+        if (!details.email) return res.status(400).json({ success: false, error: 'PayPal email required' });
+        break;
+      case 'wire':
+        if (!details.bankName || !details.accountNumber || !details.swiftCode || !details.accountName) {
+          return res.status(400).json({ success: false, error: 'Wire transfer details required' });
+        }
+        break;
+      default:
+        return res.status(400).json({ success: false, error: 'Invalid payment method' });
+    }
+
+    // ── Create withdrawal request ──
+    const withdrawalData = {
+      userId: uid,
+      mtCoins: numCoins,
+      amount: parseFloat(amountUSD.toFixed(2)),
+      method,
+      details: {
+        ...details,
+        // Sanitize sensitive data
+        phone: details.phone || '',
+        email: details.email || '',
+        bankName: details.bankName || '',
+        accountNumber: details.accountNumber || '',
+        accountName: details.accountName || '',
+        swiftCode: details.swiftCode || '',
+        address: details.address || '',
+        currency: details.currency || '',
+      },
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('withdrawals').add(withdrawalData);
+
+    // ── Deduct MT Coins from user ──
+    await db.collection('users').doc(uid).update({
+      mtCoins: admin.firestore.FieldValue.increment(-numCoins),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // ── Invalidate caches ──
+    await invalidateKey(`withdrawals:user:${uid}`);
+    await invalidateKey(`user:profile:${uid}`);
+    await invalidateKey(`stats:user:${uid}`);
+
+    res.status(201).json({
+      success: true,
+      withdrawalId: docRef.id,
+      mtCoins: numCoins,
+      amount: parseFloat(amountUSD.toFixed(2)),
+      message: 'Withdrawal request submitted successfully',
+    });
+  } catch (error) {
+    console.error('❌ Withdrawal error:', error);
+    res.status(500).json({ success: false, error: 'Failed to process withdrawal' });
+  }
+});
+
+// ── Admin: Update withdrawal status ──
+app.put('/api/withdrawals/:id/status', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['pending', 'open', 'processing', 'successful', 'failed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
+    }
+
+    const docRef = db.collection('withdrawals').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Withdrawal not found' });
+    }
+
+    await docRef.update({
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // ── Invalidate user's withdrawal cache ──
+    const data = doc.data();
+    if (data.userId) {
+      await invalidateKey(`withdrawals:user:${data.userId}`);
+    }
+
+    res.json({ success: true, message: `Withdrawal status updated to ${status}` });
+  } catch (error) {
+    console.error('❌ Update withdrawal status error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update withdrawal status' });
+  }
+});
+
+// ── Get user's MT Coin balance ──
+app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const cacheKey = `mtcoins:user:${uid}`;
+    let result;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+    } catch (error) {
+      console.warn(`⚠️ MT Coins cache miss: ${error.message}`);
+    }
+
+    // ── Calculate MT Coins from stats ──
+    const statsSnapshot = await db.collection('campaigns')
+      .where('userId', '==', uid)
+      .select('views', 'completions', 'shares', 'unlockCount', 'status')
+      .get();
+
+    let totalViews = 0;
+    let totalCompletions = 0;
+    let totalShares = 0;
+    let totalUnlocks = 0;
+
+    statsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.status === 'deleted') return;
+      totalViews += data.views || 0;
+      totalCompletions += data.completions || 0;
+      totalShares += data.shares || 0;
+      totalUnlocks += data.unlockCount || 0;
+    });
+
+    // ── MT Coins = views + completions + shares + unlocks ──
+    const earnedMtCoins = totalViews + totalCompletions + totalShares + totalUnlocks;
+
+    // ── Get user document for spent coins ──
+    const userDoc = await db.collection('users').doc(uid).get();
+    let spentMtCoins = 0;
+    if (userDoc.exists) {
+      spentMtCoins = userDoc.data().mtCoinsSpent || 0;
+    }
+
+    const availableMtCoins = earnedMtCoins - spentMtCoins;
+
+    // ── Calculate USD value ──
+    const usdValue = (availableMtCoins / 2500) * 15;
+
+    result = {
+      success: true,
+      mtCoins: {
+        earned: earnedMtCoins,
+        spent: spentMtCoins,
+        available: availableMtCoins,
+        usdValue: parseFloat(usdValue.toFixed(2)),
+        stats: {
+          views: totalViews,
+          completions: totalCompletions,
+          shares: totalShares,
+          unlocks: totalUnlocks,
+        },
+      },
+    };
+
+    // ── Update user's available MT Coins in their document ──
+    if (userDoc.exists) {
+      await db.collection('users').doc(uid).update({
+        mtCoins: availableMtCoins,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ MT Coins error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch MT Coins' });
+  }
+});
+
+// ── Get available withdrawal methods ──
+app.get('/api/withdrawal-methods', async (req, res) => {
+  try {
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'methods-get', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const cacheKey = 'withdrawal-methods';
+    let result;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+    } catch (error) {
+      console.warn(`⚠️ Methods cache miss: ${error.message}`);
+    }
+
+    const methods = [
+      {
+        id: 'esewa',
+        name: 'eSewa / Khalti',
+        icon: '📱',
+        description: 'Nepal mobile wallet',
+        fields: [
+          { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '98XXXXXXXX', required: true },
+        ],
+      },
+      {
+        id: 'bank',
+        name: 'Bank Transfer',
+        icon: '🏦',
+        description: 'Local bank transfer (Nepal)',
+        fields: [
+          { key: 'bankName', label: 'Bank Name', type: 'text', placeholder: 'e.g. NMB Bank', required: true },
+          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+          { key: 'accountNumber', label: 'Account Number', type: 'text', placeholder: 'e.g. 1234567890', required: true },
+        ],
+      },
+      {
+        id: 'wise',
+        name: 'Wise',
+        icon: '💳',
+        description: 'Receive via Wise account',
+        fields: [
+          { key: 'email', label: 'Wise Email', type: 'email', placeholder: 'you@wise.com', required: true },
+        ],
+      },
+      {
+        id: 'crypto',
+        name: 'Crypto (BTC / USDT)',
+        icon: '₿',
+        description: 'Receive in BTC or USDT',
+        fields: [
+          { key: 'currency', label: 'Currency', type: 'select', options: ['BTC', 'USDT'], required: true },
+          { key: 'address', label: 'Wallet Address', type: 'text', placeholder: '0x...', required: true },
+        ],
+      },
+      {
+        id: 'paypal',
+        name: 'PayPal',
+        icon: '💸',
+        description: 'Receive via PayPal',
+        fields: [
+          { key: 'email', label: 'PayPal Email', type: 'email', placeholder: 'you@paypal.com', required: true },
+        ],
+      },
+      {
+        id: 'wire',
+        name: 'International Wire Transfer',
+        icon: '🌍',
+        description: 'IBAN/SWIFT wire transfer',
+        fields: [
+          { key: 'bankName', label: 'Bank Name', type: 'text', placeholder: 'e.g. HSBC', required: true },
+          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+          { key: 'accountNumber', label: 'Account Number / IBAN', type: 'text', placeholder: 'e.g. IBAN', required: true },
+          { key: 'swiftCode', label: 'SWIFT Code', type: 'text', placeholder: 'e.g. HSBCGB2L', required: true },
+        ],
+      },
+    ];
+
+    result = { success: true, methods };
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Get methods error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch withdrawal methods' });
+  }
+});
+
+
+// ============================================================
 // 18. GLOBAL ERROR HANDLER
 // ============================================================
 app.use((err, req, res, next) => {
