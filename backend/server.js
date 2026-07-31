@@ -565,7 +565,7 @@ async function checkRateLimit(identifier, action, limit, windowSeconds) {
     return current <= limit;
   } catch (error) {
     console.error(`Rate limit error (${action}):`, error);
-    return true; // allow on error
+    return false; // ❌ Block on error to prevent abuse
   }
 }
 
@@ -2601,7 +2601,6 @@ app.get('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
 });
 
 // ── Request a withdrawal ──
-// ── Request a withdrawal ──
 app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -2617,29 +2616,9 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
     }
 
     const numCoins = Number(mtCoins);
-    
-    // ── ✅ EXACTLY 2500 MT Coins = $15 ──
     if (!Number.isInteger(numCoins) || numCoins !== 2500) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Withdrawal must be exactly 2,500 MT Coins ($15)' 
-      });
+      return res.status(400).json({ success: false, error: 'Withdrawal must be exactly 2,500 MT Coins ($15)' });
     }
-
-    // ── Check if user has enough coins ──
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    const userData = userDoc.data();
-    const availableCoins = userData.mtCoins || 0;
-
-    if (numCoins > availableCoins) {
-      return res.status(400).json({ success: false, error: 'Insufficient MT Coins balance' });
-    }
-
-    // ── Fixed amount ──
-    const amountUSD = 15.00;
 
     // ── Validate method and required fields ──
     const validMethods = ['esewa', 'khalti', 'bank', 'wise', 'crypto', 'paypal', 'wire'];
@@ -2680,50 +2659,77 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
         return res.status(400).json({ success: false, error: 'Invalid payment method' });
     }
 
-    // ── Create withdrawal request ──
-    const withdrawalData = {
-      userId: uid,
-      mtCoins: numCoins,
-      amount: amountUSD,
-      method,
-      details: {
-        ...details,
-        phone: details.phone || '',
-        email: details.email || '',
-        bankName: details.bankName || '',
-        accountNumber: details.accountNumber || '',
-        accountName: details.accountName || '',
-        swiftCode: details.swiftCode || '',
-        address: details.address || '',
-        currency: details.currency || '',
-      },
-      status: 'pending',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    // ── ✅ ATOMIC TRANSACTION ──
+    let withdrawalId;
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection('users').doc(uid);
+      const userDoc = await transaction.get(userRef);
+      
+      if (!userDoc.exists) {
+        throw new Error('User not found');
+      }
 
-    const docRef = await db.collection('withdrawals').add(withdrawalData);
+      const data = userDoc.data();
+      
+      // ── ✅ CORRECT balance calculation ──
+      const earned = data.mtCoinsEarned || 0;
+      const spent = data.mtCoinsSpent || 0;
+      const available = earned - spent;
 
-    // ── Deduct MT Coins from user ──
-    await db.collection('users').doc(uid).update({
-      mtCoins: admin.firestore.FieldValue.increment(-numCoins),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      if (numCoins > available) {
+        throw new Error('Insufficient MT Coins balance');
+      }
+
+      // ── Deduct by incrementing spent ──
+      transaction.update(userRef, {
+        mtCoinsSpent: admin.firestore.FieldValue.increment(numCoins),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // ── Create withdrawal record ──
+      const withdrawalRef = db.collection('withdrawals').doc();
+      const withdrawalData = {
+        userId: uid,
+        mtCoins: numCoins,
+        amount: 15.00,
+        method,
+        details: {
+          ...details,
+          phone: details.phone || '',
+          email: details.email || '',
+          bankName: details.bankName || '',
+          accountNumber: details.accountNumber || '',
+          accountName: details.accountName || '',
+          swiftCode: details.swiftCode || '',
+          address: details.address || '',
+          currency: details.currency || '',
+        },
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      transaction.set(withdrawalRef, withdrawalData);
+      withdrawalId = withdrawalRef.id;
     });
 
     // ── Invalidate caches ──
     await invalidateKey(`withdrawals:user:${uid}`);
     await invalidateKey(`user:profile:${uid}`);
     await invalidateKey(`stats:user:${uid}`);
+    await invalidateKey(`mtcoins:user:${uid}`); // ✅ ADDED
 
     res.status(201).json({
       success: true,
-      withdrawalId: docRef.id,
+      withdrawalId,
       mtCoins: numCoins,
-      amount: amountUSD,
+      amount: 15.00,
       message: 'Withdrawal request submitted successfully',
     });
   } catch (error) {
     console.error('❌ Withdrawal error:', error);
+    if (error.message === 'Insufficient MT Coins balance') {
+      return res.status(400).json({ success: false, error: error.message });
+    }
     res.status(500).json({ success: false, error: 'Failed to process withdrawal' });
   }
 });
@@ -2773,7 +2779,8 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     const cacheKey = `mtcoins:user:${uid}`;
-    let result;
+
+    // ── Try cache ──
     try {
       const cached = await redisGet(cacheKey);
       if (cached) {
@@ -2783,7 +2790,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       console.warn(`⚠️ MT Coins cache miss: ${error.message}`);
     }
 
-    // ── Calculate MT Coins from stats ──
+    // ── 1. Calculate earned from campaign stats ──
     const statsSnapshot = await db.collection('campaigns')
       .where('userId', '==', uid)
       .select('views', 'completions', 'shares', 'unlockCount', 'status')
@@ -2803,27 +2810,70 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalUnlocks += data.unlockCount || 0;
     });
 
-// ── MT Coins = minimum of all four (all must be ≥1 to earn 1 coin) ──
-const earnedMtCoins = Math.min(totalViews, totalShares, totalUnlocks, totalCompletions);
+    // ── ✅ CORRECT: MT Coins = minimum of all four ──
+    // 1 MT Coin = 1 View + 1 Share + 1 Unlock + 1 Completion
+    // All four must be present to earn 1 coin
+    const earnedFromStats = Math.min(
+      totalViews,
+      totalShares,
+      totalUnlocks,
+      totalCompletions
+    );
 
-    // ── Get user document for spent coins ──
+    // ── 2. Get user document ──
     const userDoc = await db.collection('users').doc(uid).get();
-    let spentMtCoins = 0;
-    if (userDoc.exists) {
-      spentMtCoins = userDoc.data().mtCoinsSpent || 0;
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const availableMtCoins = earnedMtCoins - spentMtCoins;
+    const data = userDoc.data();
+    let mtCoinsEarned = data.mtCoinsEarned || 0;
+    let mtCoinsSpent = data.mtCoinsSpent || 0;
 
-    // ── Calculate USD value ──
-    const usdValue = (availableMtCoins / 2500) * 15;
+    // ── 3. MIGRATION: Initialize if missing ──
+    if (data.mtCoinsEarned === undefined && data.mtCoinsSpent === undefined) {
+      // Sum all successful withdrawals
+      const withdrawSnapshot = await db.collection('withdrawals')
+        .where('userId', '==', uid)
+        .where('status', '==', 'successful')
+        .get();
+      
+      let totalWithdrawn = 0;
+      withdrawSnapshot.forEach(doc => {
+        totalWithdrawn += doc.data().mtCoins || 0;
+      });
 
-    result = {
+      const currentAvailable = data.mtCoins || 0;
+      mtCoinsSpent = totalWithdrawn;
+      mtCoinsEarned = Math.max(earnedFromStats, totalWithdrawn + currentAvailable);
+
+      await db.collection('users').doc(uid).update({
+        mtCoinsEarned,
+        mtCoinsSpent,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      // ── 4. Normal update: only increase earned ──
+      if (earnedFromStats > mtCoinsEarned) {
+        mtCoinsEarned = earnedFromStats;
+        await db.collection('users').doc(uid).update({
+          mtCoinsEarned,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    // ── 5. Compute available ──
+    const available = mtCoinsEarned - mtCoinsSpent;
+    const usdValue = (available / 2500) * 15;
+
+    // ── 6. Response ──
+    const result = {
       success: true,
       mtCoins: {
-        earned: earnedMtCoins,
-        spent: spentMtCoins,
-        available: availableMtCoins,
+        earned: mtCoinsEarned,
+        spent: mtCoinsSpent,
+        available: available,
         usdValue: parseFloat(usdValue.toFixed(2)),
         stats: {
           views: totalViews,
@@ -2833,14 +2883,6 @@ const earnedMtCoins = Math.min(totalViews, totalShares, totalUnlocks, totalCompl
         },
       },
     };
-
-    // ── Update user's available MT Coins in their document ──
-    if (userDoc.exists) {
-      await db.collection('users').doc(uid).update({
-        mtCoins: availableMtCoins,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
 
     await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
     res.json(result);
@@ -2943,6 +2985,49 @@ app.get('/api/withdrawal-methods', verifyToken, checkBanned, async (req, res) =>
 });
 
 
+// ── Refund a failed withdrawal (admin only) ──
+app.post('/api/withdrawals/:id/refund', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+    const docRef = db.collection('withdrawals').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ success: false, error: 'Withdrawal not found' });
+    const data = doc.data();
+    if (data.status !== 'failed') {
+      return res.status(400).json({ success: false, error: 'Only failed withdrawals can be refunded' });
+    }
+    if (data.refunded) {
+      return res.status(400).json({ success: false, error: 'Already refunded' });
+    }
+
+    const userId = data.userId;
+    const mtCoins = data.mtCoins || 0;
+
+    await db.collection('users').doc(userId).update({
+      mtCoinsSpent: admin.firestore.FieldValue.increment(-mtCoins),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await docRef.update({
+      refunded: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await invalidateKey(`mtcoins:user:${userId}`);
+    await invalidateKey(`stats:user:${userId}`);
+
+    res.json({ success: true, message: `Refunded ${mtCoins} MT Coins to user ${userId}` });
+  } catch (error) {
+    console.error('❌ Refund error:', error);
+    res.status(500).json({ success: false, error: 'Failed to process refund' });
+  }
+});
+
 // ============================================================
 // 18. GLOBAL ERROR HANDLER
 // ============================================================
@@ -2959,6 +3044,8 @@ app.use((err, req, res, next) => {
     error: 'Internal server error. Please try again later.',
   });
 });
+
+
 
 // ============================================================
 // 19. START SERVER
