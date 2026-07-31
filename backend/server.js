@@ -20,19 +20,32 @@ const sharp = require('sharp');
 // ============================================================
 // 0. REDIS CLIENT (with timeout guard)
 // ============================================================
+// ── Redis client with robust retry and longer timeouts ──
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  connectTimeout: 1000,
-  maxRetriesPerRequest: 1,
+  connectTimeout: 5000,        // 5 seconds to connect
+  commandTimeout: 3000,        // 3 seconds for commands
+  maxRetriesPerRequest: 3,     // retry failed requests up to 3 times
+  retryStrategy: (times) => {
+    // Exponential backoff: 50ms, 100ms, 200ms, 400ms, ... up to 30s
+    const delay = Math.min(times * 50, 30000);
+    console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
+    return delay;
+  },
+  keepAlive: 30000,            // keep connection alive
 });
-redis.on('error', (err) => console.error('❌ Redis error:', err));
-redis.on('connect', () => console.log('✅ Redis connected'));
-redis.on('error', (err) => console.error('❌ Redis error:', err));
 
-// ── Redis get with 500ms timeout ──
+redis.on('error', (err) => {
+  console.warn('⚠️ Redis error (will retry):', err.message);
+});
+redis.on('connect', () => console.log('✅ Redis connected'));
+redis.on('ready', () => console.log('✅ Redis ready'));
+redis.on('reconnecting', () => console.log('🔄 Redis reconnecting...'));
+
+// ── Redis get with 1s timeout (increased from 500ms) ──
 async function redisGet(key) {
   return Promise.race([
     redis.get(key),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 500))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 1000))
   ]);
 }
 
@@ -1624,8 +1637,9 @@ app.get('/api/campaigns/:id', async (req, res) => {
         }
         const deviceId = req.headers['x-device-id'] || null;
 
-        // ── Use transaction to prevent race condition and get new view count ──
+        // ── Use transaction to prevent race condition ──
         let newViews = 0;
+        let campaignUserId = null;
         await db.runTransaction(async (transaction) => {
           const docRef = db.collection('campaigns').doc(id);
           const doc = await transaction.get(docRef);
@@ -1633,13 +1647,20 @@ app.get('/api/campaigns/:id', async (req, res) => {
           const data = doc.data();
           if (data.status === 'deleted') return;
 
+          campaignUserId = data.userId || null;
+
           const docId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : `ip_${ip}`);
           const actionDocRef = docRef.collection('views').doc(docId);
           const actionDoc = await transaction.get(actionDocRef);
           if (actionDoc.exists) return;
 
+          // ✅ All reads done – now we can write
+          const currentViews = data.views || 0;
+          newViews = currentViews + 1;
+
           transaction.update(docRef, {
-            views: admin.firestore.FieldValue.increment(1),
+            views: newViews,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
           transaction.set(actionDocRef, {
             userId: userId || null,
@@ -1647,35 +1668,32 @@ app.get('/api/campaigns/:id', async (req, res) => {
             ip: ip || 'unknown',
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
           });
-          // Get the updated view count
-          const updatedDoc = await transaction.get(docRef);
-          newViews = updatedDoc.data().views || 0;
         });
 
-        // ── Update the campaign cache with the new view count ──
-        const cacheKey = `campaigns:id:${id}`;
-        let cached = null;
-        try {
-          const cachedStr = await redis.get(cacheKey);
-          if (cachedStr) {
-            cached = JSON.parse(cachedStr);
+        if (newViews > 0) {
+          // ── Update the campaign cache with the new view count ──
+          const cacheKey = `campaigns:id:${id}`;
+          let cached = null;
+          try {
+            const cachedStr = await redis.get(cacheKey);
+            if (cachedStr) {
+              cached = JSON.parse(cachedStr);
+            }
+          } catch (e) { /* ignore */ }
+
+          if (cached && cached.campaign) {
+            cached.campaign.views = newViews;
+            const ttl = await redis.ttl(cacheKey);
+            const ttlToUse = ttl > 0 ? ttl : 300;
+            await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
+            console.log(`🔄 Updated campaign cache for ${id} (views: ${newViews})`);
           }
-        } catch (e) { /* ignore */ }
 
-        if (cached && cached.campaign) {
-          cached.campaign.views = newViews;
-          const ttl = await redis.ttl(cacheKey);
-          const ttlToUse = ttl > 0 ? ttl : 300;
-          await redis.set(cacheKey, JSON.stringify(cached));
-          console.log(`🔄 Updated campaign cache for ${id} (views: ${newViews})`);
-        }
-
-        // ── Also update the user's list cache with new views ──
-        const campaignDoc = await db.collection('campaigns').doc(id).get();
-        const data = campaignDoc.data();
-        if (data && data.userId) {
-          await updateCampaignInUserListCache(data.userId, id, { views: newViews });
-          await invalidateKey(`stats:user:${data.userId}`);
+          // ── Also update the user's list cache with new views ──
+          if (campaignUserId) {
+            await updateCampaignInUserListCache(campaignUserId, id, { views: newViews });
+            await invalidateKey(`stats:user:${campaignUserId}`);
+          }
         }
       } catch (err) {
         console.warn('View tracking failed:', err.message);
