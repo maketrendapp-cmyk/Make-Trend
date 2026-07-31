@@ -18,7 +18,6 @@ import {
   FiClock,
   FiCheckCircle,
   FiRefreshCw,
-  FiMail,
   FiCalendar,
 } from 'react-icons/fi';
 import { FaCrown, FaGift } from 'react-icons/fa';
@@ -29,7 +28,7 @@ if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 export default function ReferEarn() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useProfile(isAuthenticated);
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [referralData, setReferralData] = useState({
@@ -131,18 +130,20 @@ export default function ReferEarn() {
       });
   };
 
-  // ── Safe date formatting for Firestore timestamps ──
+  // ── Robust date formatter for Firestore Timestamps ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      if (timestamp.seconds !== undefined) {
-        // Firestore Timestamp
-        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
-      } else if (timestamp.toDate) {
+      // Firestore Timestamp object: { seconds, nanoseconds }
+      if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000 + timestamp.nanoseconds / 1e6);
+      } else if (timestamp.toDate && typeof timestamp.toDate === 'function') {
         date = timestamp.toDate();
       } else if (typeof timestamp === 'string') {
         date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
       } else {
         date = new Date(timestamp);
       }
@@ -251,7 +252,7 @@ export default function ReferEarn() {
             </div>
           </div>
 
-          {/* ── Stats Cards ── (compact, professional) ── */}
+          {/* ── Stats Cards (horizontal, compact) ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
