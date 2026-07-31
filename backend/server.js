@@ -515,12 +515,42 @@ async function grantProFor24Hours(uid) {
   console.log(`👑 PRO granted for 24h to ${uid}`);
 }
 
+// ── Get client IP ──
 function getClientIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
          req.headers['x-real-ip'] ||
          req.ip ||
          req.connection?.remoteAddress ||
          'unknown';
+}
+
+// ── Validate device ID (mandatory, proper fingerprint format) ──
+function validateDeviceId(deviceId) {
+  if (!deviceId || typeof deviceId !== 'string') return false;
+  const trimmed = deviceId.trim();
+  if (trimmed.length < 5) return false;
+  // Reject common placeholders
+  const invalid = ['null', 'undefined', 'none', 'n/a', 'unknown', 'not-provided'];
+  if (invalid.includes(trimmed.toLowerCase())) return false;
+  return true;
+}
+
+// ── Extract device ID from request (body or headers) ──
+function extractDeviceId(req) {
+  return req.body?.deviceId || req.headers['x-device-id'] || null;
+}
+
+// ── Middleware to require device ID ──
+function requireDeviceId(req, res, next) {
+  const deviceId = extractDeviceId(req);
+  if (!validateDeviceId(deviceId)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Valid device ID is required. Please refresh your browser and try again.'
+    });
+  }
+  req.deviceId = deviceId;
+  next();
 }
 
 // ── Validate image URL (prevent malicious/invalid URLs) ──
@@ -732,6 +762,14 @@ app.get('/api/auth/check-email', async (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { uid, username, fullname, email, avatar, referralCode: referredByCode, deviceId } = req.body;
+
+    // ── Require valid device ID ──
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required. Please refresh your browser and try again.'
+      });
+    }
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -840,6 +878,14 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
       return res.status(429).json({ success: false, error: 'Too many attempts. Please wait.' });
     }
     const { email, fullname, username, avatar, referralCode: referredByCode, deviceId } = req.body;
+
+    // ── Require valid device ID ──
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required. Please refresh your browser and try again.'
+      });
+    }
     const cleanUsername = sanitizeUsername(username);
     const cleanFullname = sanitizeFullName(fullname);
     const cleanEmail = email?.trim().toLowerCase();
@@ -1637,6 +1683,12 @@ app.get('/api/campaigns/:id', async (req, res) => {
         }
         const deviceId = req.headers['x-device-id'] || null;
 
+        // ── Require valid device ID for view tracking ──
+        if (!validateDeviceId(deviceId)) {
+          console.warn(`⚠️ View tracking skipped: invalid deviceId for campaign ${id}`);
+          return;
+        }
+
         // ── Use transaction to prevent race condition ──
         let newViews = 0;
         let campaignUserId = null;
@@ -1944,6 +1996,15 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many share requests. Please wait.' });
     }
 
+    // ── Require valid device ID ──
+    const deviceId = req.body.deviceId || null;
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required. Please refresh your browser and try again.'
+      });
+    }
+
     // ── Determine acting user (verify token) ──
     let userId = null;
     const authHeader = req.headers.authorization;
@@ -1957,7 +2018,6 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
     if (!userId) {
       userId = req.body.userId || null;
     }
-    const deviceId = req.body.deviceId || null;
 
     // ── Get campaign to invalidate owner stats later ──
     const campaignDoc = await db.collection('campaigns').doc(id).get();
@@ -2089,6 +2149,15 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many complete requests. Please wait.' });
     }
 
+    // ── Require valid device ID ──
+    const deviceId = req.body.deviceId || null;
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required. Please refresh your browser and try again.'
+      });
+    }
+
     let userId = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -2101,7 +2170,6 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
     if (!userId) {
       userId = req.body.userId || null;
     }
-    const deviceId = req.body.deviceId || null;
 
     const campaignDoc = await db.collection('campaigns').doc(id).get();
     if (!campaignDoc.exists) {
@@ -2179,6 +2247,15 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many unlock requests. Please wait.' });
     }
 
+    // ── Require valid device ID ──
+    const deviceId = req.body.deviceId || null;
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required. Please refresh your browser and try again.'
+      });
+    }
+
     let userId = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -2191,7 +2268,6 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
     if (!userId) {
       userId = req.body.userId || null;
     }
-    const deviceId = req.body.deviceId || null;
 
     const campaignDoc = await db.collection('campaigns').doc(id).get();
     if (!campaignDoc.exists) {
