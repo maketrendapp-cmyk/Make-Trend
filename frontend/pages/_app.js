@@ -65,15 +65,12 @@ function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pathname = router.pathname;
 
-  // ── 🔥 GENERATE DEVICE ID ONLY ON FIRST LOAD (Instantly) ──
+  // ── GENERATE DEVICE ID ONLY ON FIRST LOAD (Instantly) ──
   useEffect(() => {
-    // 1. getDeviceId() returns the fallback UUID immediately (sync)
-    // 2. It automatically triggers the background upgrade to the real fingerprint (100ms later)
-    // 3. This runs exactly once when the app first mounts
     const id = getDeviceId();
     setDeviceId(id);
     console.log('🆔 Device ID generated on initial load:', id);
-  }, []); // Empty dependency array = runs ONCE
+  }, []);
 
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
