@@ -87,48 +87,45 @@ export default function CampaignCreated() {
       <>
         <Meta title="Loading..." />
         <div className="min-h-screen w-screen bg-gradient-to-br from-slate-50 to-purple-50/30 p-0">
-          <div className="w-full">
-            {/* Skeleton Banner - Bubble style */}
-            <div className="w-full bg-gradient-to-r from-purple-600/50 via-indigo-600/50 to-purple-700/50 px-4 py-5 animate-pulse">
-              <div className="max-w-2xl mx-auto flex items-center justify-center gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-2xl" />
+          <div className="w-full max-w-2xl mx-auto pt-2 px-4">
+            <div className="flex justify-center mb-3 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-slate-200 rounded-xl" />
                 <div>
-                  <div className="h-5 bg-white/30 rounded w-40" />
-                  <div className="h-4 bg-white/30 rounded w-28 mt-1" />
+                  <div className="h-4 bg-slate-200 rounded w-32" />
+                  <div className="h-3 bg-slate-200 rounded w-20 mt-1" />
                 </div>
               </div>
             </div>
-            {/* Skeleton Card - no gap */}
-            <div className="w-full max-w-2xl mx-auto px-4 -mt-1">
-              <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg overflow-hidden animate-pulse">
-                <div className="w-full aspect-video bg-slate-200" />
-                <div className="p-4 space-y-3">
-                  <div className="h-5 bg-slate-200 rounded w-3/4" />
-                  <div className="h-4 bg-slate-200 rounded w-full" />
-                  <div className="flex gap-2">
-                    <div className="h-5 bg-slate-200 rounded w-16" />
-                    <div className="h-5 bg-slate-200 rounded w-20" />
-                    <div className="h-5 bg-slate-200 rounded w-14" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-lg overflow-hidden mt-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="bg-white px-3 py-1.5 text-center">
-                        <div className="h-2 bg-slate-200 rounded w-10 mx-auto" />
-                        <div className="h-3 bg-slate-200 rounded w-14 mx-auto mt-0.5" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2">
-                    <div className="h-2 bg-slate-200 rounded w-20" />
-                    <div className="h-10 bg-slate-200 rounded-xl mt-1" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-11 bg-slate-200 rounded-xl" />
-                    ))}
-                  </div>
-                  <div className="h-14 bg-slate-200 rounded-xl" />
+
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg overflow-hidden animate-pulse">
+              <div className="w-full aspect-video bg-slate-200" />
+              <div className="p-4 space-y-3">
+                <div className="h-5 bg-slate-200 rounded w-3/4" />
+                <div className="h-4 bg-slate-200 rounded w-full" />
+                <div className="flex gap-2">
+                  <div className="h-5 bg-slate-200 rounded w-16" />
+                  <div className="h-5 bg-slate-200 rounded w-20" />
+                  <div className="h-5 bg-slate-200 rounded w-14" />
                 </div>
+                <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-lg overflow-hidden mt-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white px-3 py-1.5 text-center">
+                      <div className="h-2 bg-slate-200 rounded w-10 mx-auto" />
+                      <div className="h-3 bg-slate-200 rounded w-14 mx-auto mt-0.5" />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2">
+                  <div className="h-2 bg-slate-200 rounded w-20" />
+                  <div className="h-10 bg-slate-200 rounded-xl mt-1" />
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-11 bg-slate-200 rounded-xl" />
+                  ))}
+                </div>
+                <div className="h-14 bg-slate-200 rounded-xl" />
               </div>
             </div>
           </div>
@@ -216,174 +213,170 @@ export default function CampaignCreated() {
   return (
     <>
       <Meta title="🎉 Campaign Created!" />
+      <div className="min-h-screen w-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-0">
+        <div className="w-full max-w-2xl mx-auto pt-2 px-4">
 
-      {/* ── FULL WIDTH BANNER – Bubble style with rounded bottom ── */}
-      <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 rounded-b-[40px] shadow-lg shadow-purple-200/50">
-        <div className="max-w-2xl mx-auto px-4 py-5 sm:py-6">
-          <div className="flex items-center justify-center gap-4">
-            {/* Glass icon */}
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg shadow-purple-900/30 border border-white/20 flex-shrink-0">
-              <FaCheckCircle className="text-white text-2xl sm:text-3xl" />
-            </div>
-            {/* Text */}
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight drop-shadow-sm">
-                Campaign Published
-              </h1>
-              <p className="text-purple-100 text-sm sm:text-base flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full inline-block animate-pulse" />
-                Your campaign is now live
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Main Content – Connected with no gap ── */}
-      <div className="w-full max-w-2xl mx-auto px-4 -mt-1">
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-200/30 overflow-hidden">
-
-          {/* ── Campaign Image ── */}
-          <div className="w-full aspect-video bg-slate-100 overflow-hidden">
-            {image ? (
-              <img
-                src={image}
-                alt={title}
-                className="w-full h-full object-cover object-center"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-6xl text-slate-300">
-                🎯
+          {/* ── Success Banner ── CENTERED ── */}
+          <div className="flex justify-center mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 flex-shrink-0">
+                <FaCheckCircle className="text-white text-lg" />
               </div>
-            )}
-          </div>
-
-          {/* ── Campaign Details ── */}
-          <div className="p-4 space-y-3">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 truncate">{title}</h2>
-              {description && (
-                <p className="text-slate-500 text-sm line-clamp-2 mt-0.5">{description}</p>
-              )}
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {reward && (
-                  <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-amber-200">
-                    <FaGift className="text-amber-500 text-[10px]" /> {reward}
-                  </span>
-                )}
-                {features?.shareCount && (
-                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-blue-200">
-                    <FaShareAlt className="text-blue-500 text-[10px]" /> {shareCount} shares
-                  </span>
-                )}
-                {features?.tasks && tasks?.length > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-purple-200">
-                    <FaClipboardList className="text-purple-500 text-[10px]" /> {tasks.length} tasks
-                  </span>
-                )}
-                {features?.finalUrl && finalUrl && (
-                  <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-green-200">
-                    <FaExternalLinkAlt className="text-green-500 text-[10px]" /> Redirect
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* ── Stats Row ── */}
-            <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-lg overflow-hidden">
-              <div className="bg-white px-3 py-1.5 text-center">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</p>
-                <p className="text-sm font-semibold text-emerald-600 flex items-center justify-center gap-1.5 mt-0.5">
-                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> Active
+              <div>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Campaign Published</h1>
+                <p className="text-slate-500 text-xs flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block animate-pulse" />
+                  Your campaign is now live
                 </p>
               </div>
-              <div className="bg-white px-3 py-1.5 text-center border-x border-slate-100">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Created</p>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5">
-                  {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </p>
-              </div>
-              <div className="bg-white px-3 py-1.5 text-center">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Type</p>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5 capitalize">{templateSlug || 'Campaign'}</p>
-              </div>
             </div>
+          </div>
 
-            {/* ── Share Link ── */}
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <FaLink className="text-purple-500" /> Share Link
-              </label>
-              <div className="mt-1.5 flex flex-col sm:flex-row items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-purple-300 transition-colors">
-                <input
-                  type="text"
-                  value={fullUrl}
-                  readOnly
-                  className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-slate-600 truncate"
+          {/* ── Main Card ── */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-200/30 overflow-hidden">
+
+            {/* ── Campaign Image ── */}
+            <div className="w-full aspect-video bg-slate-100 overflow-hidden">
+              {image ? (
+                <img
+                  src={image}
+                  alt={title}
+                  className="w-full h-full object-cover object-center"
                 />
-                <button
-                  onClick={handleCopyLink}
-                  className={`flex-shrink-0 w-full sm:w-auto px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                    copied
-                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                      : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md'
-                  }`}
-                >
-                  {copied ? (
-                    <><FaCheckCircle className="inline mr-2 text-xs" /> Copied</>
-                  ) : (
-                    <><FaCopy className="inline mr-2 text-xs" /> Copy Link</>
-                  )}
-                </button>
-              </div>
-              {message && (
-                <p className="mt-1 text-sm text-emerald-600 text-center">{message}</p>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-6xl text-slate-300">
+                  🎯
+                </div>
               )}
             </div>
 
-            {/* ── Quick Actions ── */}
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <FaCrown className="text-amber-500" /> Quick Actions
-              </label>
-              <div className="mt-1.5 grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => router.push(`/${templateSlug || 'campaign'}/${campaignId}`)}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-50 text-purple-700 text-sm font-semibold rounded-xl hover:bg-purple-100 transition border border-purple-200 hover:border-purple-300 min-h-[44px]"
-                >
-                  <FaEye className="text-sm" /> View
-                </button>
-                <button
-                  onClick={() => router.push('/stats')}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-100 transition border border-slate-200 hover:border-slate-300 min-h-[44px]"
-                >
-                  <FaChartBar className="text-sm" /> Stats
-                </button>
-                <button
-                  onClick={() => router.push('/create')}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-100 transition border border-slate-200 hover:border-slate-300 min-h-[44px]"
-                >
-                  <FaPlus className="text-sm" /> New
-                </button>
+            {/* ── Campaign Details ── */}
+            <div className="p-4 space-y-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 truncate">{title}</h2>
+                {description && (
+                  <p className="text-slate-500 text-sm line-clamp-2 mt-0.5">{description}</p>
+                )}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {reward && (
+                    <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-amber-200">
+                      <FaGift className="text-amber-500 text-[10px]" /> {reward}
+                    </span>
+                  )}
+                  {features?.shareCount && (
+                    <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-blue-200">
+                      <FaShareAlt className="text-blue-500 text-[10px]" /> {shareCount} shares
+                    </span>
+                  )}
+                  {features?.tasks && tasks?.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-purple-200">
+                      <FaClipboardList className="text-purple-500 text-[10px]" /> {tasks.length} tasks
+                    </span>
+                  )}
+                  {features?.finalUrl && finalUrl && (
+                    <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-green-200">
+                      <FaExternalLinkAlt className="text-green-500 text-[10px]" /> Redirect
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Stats Row ── */}
+              <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-lg overflow-hidden">
+                <div className="bg-white px-3 py-1.5 text-center">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</p>
+                  <p className="text-sm font-semibold text-emerald-600 flex items-center justify-center gap-1.5 mt-0.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> Active
+                  </p>
+                </div>
+                <div className="bg-white px-3 py-1.5 text-center border-x border-slate-100">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Created</p>
+                  <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                    {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="bg-white px-3 py-1.5 text-center">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Type</p>
+                  <p className="text-sm font-semibold text-slate-700 mt-0.5 capitalize">{templateSlug || 'Campaign'}</p>
+                </div>
+              </div>
+
+              {/* ── Share Link ── */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <FaLink className="text-purple-500" /> Share Link
+                </label>
+                <div className="mt-1.5 flex flex-col sm:flex-row items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-purple-300 transition-colors">
+                  <input
+                    type="text"
+                    value={fullUrl}
+                    readOnly
+                    className="flex-1 w-full bg-transparent outline-none text-sm font-mono text-slate-600 truncate"
+                  />
+                  <button
+                    onClick={handleCopyLink}
+                    className={`flex-shrink-0 w-full sm:w-auto px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      copied
+                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                        : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md'
+                    }`}
+                  >
+                    {copied ? (
+                      <><FaCheckCircle className="inline mr-2 text-xs" /> Copied</>
+                    ) : (
+                      <><FaCopy className="inline mr-2 text-xs" /> Copy Link</>
+                    )}
+                  </button>
+                </div>
+                {message && (
+                  <p className="mt-1 text-sm text-emerald-600 text-center">{message}</p>
+                )}
+              </div>
+
+              {/* ── Quick Actions ── */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <FaCrown className="text-amber-500" /> Quick Actions
+                </label>
+                <div className="mt-1.5 grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => router.push(`/${templateSlug || 'campaign'}/${campaignId}`)}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-50 text-purple-700 text-sm font-semibold rounded-xl hover:bg-purple-100 transition border border-purple-200 hover:border-purple-300 min-h-[44px]"
+                  >
+                    <FaEye className="text-sm" /> View
+                  </button>
+                  <button
+                    onClick={() => router.push('/stats')}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-100 transition border border-slate-200 hover:border-slate-300 min-h-[44px]"
+                  >
+                    <FaChartBar className="text-sm" /> Stats
+                  </button>
+                  <button
+                    onClick={() => router.push('/create')}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-100 transition border border-slate-200 hover:border-slate-300 min-h-[44px]"
+                  >
+                    <FaPlus className="text-sm" /> New
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Share Tips ── */}
+              <div className="bg-gradient-to-r from-purple-50/80 to-indigo-50/80 rounded-xl p-3 border border-purple-100">
+                <p className="text-xs font-semibold text-purple-700 flex items-center gap-2">
+                  <FaRocket className="text-purple-500" /> Pro Tip
+                </p>
+                <p className="text-sm text-purple-700/80 mt-0.5">
+                  Share your campaign link on social media, WhatsApp, and email to maximize reach!
+                </p>
               </div>
             </div>
-
-            {/* ── Share Tips ── */}
-            <div className="bg-gradient-to-r from-purple-50/80 to-indigo-50/80 rounded-xl p-3 border border-purple-100">
-              <p className="text-xs font-semibold text-purple-700 flex items-center gap-2">
-                <FaRocket className="text-purple-500" /> Pro Tip
-              </p>
-              <p className="text-sm text-purple-700/80 mt-0.5">
-                Share your campaign link on social media, WhatsApp, and email to maximize reach!
-              </p>
-            </div>
           </div>
-        </div>
 
-        {/* ── Footer ── */}
-        <p className="text-center text-xs text-slate-400 mt-3 pb-2">
-          <FaInfinity className="inline mr-1.5 text-[10px]" /> Your campaign is live – start sharing now
-        </p>
+          {/* ── Footer ── */}
+          <p className="text-center text-xs text-slate-400 mt-3 pb-2">
+            <FaInfinity className="inline mr-1.5 text-[10px]" /> Your campaign is live – start sharing now
+          </p>
+        </div>
       </div>
     </>
   );
