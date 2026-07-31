@@ -1,8 +1,24 @@
-
 // pages/campaign-created.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
+import {
+  FaRocket,
+  FaCheckCircle,
+  FaLink,
+  FaEye,
+  FaChartBar,
+  FaPlus,
+  FaCopy,
+  FaGift,
+  FaShareAlt,
+  FaClipboardList,
+  FaExternalLinkAlt,
+  FaArrowRight,
+  FaSpinner,
+  FaExclamationTriangle,
+  FaArrowLeft,
+} from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -58,7 +74,7 @@ export default function CampaignCreated() {
     setTimeout(() => {
       setCopied(false);
       setMessage('');
-    }, 2500);
+    }, 3000);
   };
 
   // ── LOADING STATE ──
@@ -66,9 +82,9 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Loading..." />
-        <div className="h-screen w-screen overflow-hidden flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-white px-4">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
-          <p className="mt-3 text-gray-500 text-sm font-medium">Loading your campaign...</p>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-purple-50/30 px-4">
+          <FaSpinner className="animate-spin text-4xl text-purple-600" />
+          <p className="mt-4 text-gray-500 text-sm">Loading your campaign...</p>
         </div>
       </>
     );
@@ -79,18 +95,18 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Create a Campaign" />
-        <div className="h-screen w-screen overflow-hidden flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-purple-50/20">
-          <div className="max-w-md w-full text-center p-6 bg-white rounded-3xl shadow-xl border border-gray-100">
-            <div className="text-5xl mb-4">🚀</div>
+        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-purple-50/30">
+          <div className="max-w-md w-full text-center">
+            <div className="text-6xl mb-4">🚀</div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Create Your First Campaign</h1>
-            <p className="text-gray-500 text-xs sm:text-sm mb-6">
+            <p className="text-gray-500 text-sm mb-6">
               You haven't created a campaign yet. Start building your viral campaign now!
             </p>
             <button
               onClick={() => router.push('/create')}
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:shadow-lg transition-all shadow-md"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all duration-200 shadow-md hover:-translate-y-0.5"
             >
-              <span>✨</span> Create Campaign
+              <FaRocket className="text-sm" /> Create Campaign
             </button>
           </div>
         </div>
@@ -103,25 +119,25 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Campaign Not Found" />
-        <div className="h-screen w-screen overflow-hidden flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-red-50/20">
-          <div className="max-w-md w-full text-center p-6 bg-white rounded-3xl shadow-xl border border-gray-100">
-            <div className="text-5xl mb-4">😕</div>
-            <h2 className="text-xl font-bold text-gray-900 mb-1">Campaign Not Found</h2>
-            <p className="text-gray-500 text-xs sm:text-sm mb-6">
+        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-red-50/30">
+          <div className="max-w-md w-full text-center">
+            <div className="text-6xl mb-4">😕</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Campaign Not Found</h2>
+            <p className="text-gray-500 text-sm mb-6">
               {error || 'The campaign you are looking for does not exist or may have been deleted.'}
             </p>
-            <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => router.push('/create')}
-                className="flex-1 px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition shadow-sm"
+                className="px-6 py-2.5 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition shadow-sm"
               >
-                Create New
+                <FaRocket className="inline mr-2 text-sm" /> Create New
               </button>
               <button
                 onClick={() => router.push('/')}
-                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition"
+                className="px-6 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition"
               >
-                Go Home
+                <FaArrowLeft className="inline mr-2 text-sm" /> Go Home
               </button>
             </div>
           </div>
@@ -149,133 +165,144 @@ export default function CampaignCreated() {
   return (
     <>
       <Meta title="🎉 Campaign Created!" />
-      <div className="h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-purple-50/20 flex flex-col justify-center items-center px-3 sm:px-6">
-        <div className="max-w-3xl w-full">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-6 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto">
 
-          {/* ── Main Compact Card ── */}
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col">
-            
-            {/* Header Banner */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4 sm:px-6 sm:py-5 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
-                🎉
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">Campaign Created!</h1>
-                <p className="text-purple-100 text-xs sm:text-sm truncate">
-                  Your campaign is live – start sharing and watch engagement grow!
-                </p>
+          {/* ── Main Card ── */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100/80 overflow-hidden">
+
+            {/* ── Header ── Compact */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 sm:px-7">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl flex-shrink-0">
+                  <FaRocket className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">Campaign Created!</h1>
+                  <p className="text-purple-100 text-xs">
+                    Your campaign is live – start sharing!
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Body Content */}
-            <div className="p-4 sm:p-6 space-y-4">
-              
-              {/* ── Campaign Preview Box ── */}
+            {/* ── Body ── Compact spacing */}
+            <div className="p-5 sm:p-6 space-y-4">
+
+              {/* ── Campaign Preview ── */}
               <div>
-                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <span>📋</span> Overview
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <FaClipboardList className="text-purple-500" /> Campaign Preview
                 </h2>
-                <div className="bg-gray-50 rounded-2xl border border-gray-200/80 p-3 sm:p-3.5 flex items-center gap-3.5">
-                  {/* Thumbnail */}
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gray-200 flex-shrink-0 overflow-hidden shadow-sm border border-gray-100">
-                    {image ? (
-                      <img
-                        src={image}
-                        alt={title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl bg-gray-100">
-                        🎯
+                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex flex-col sm:flex-row">
+                    {/* Image */}
+                    <div className="sm:w-44 h-36 sm:h-auto bg-gray-200 flex-shrink-0 overflow-hidden">
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={title}
+                          className="w-full h-full object-cover object-center"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300 bg-gray-100">
+                          🎯
+                        </div>
+                      )}
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 p-3 space-y-1.5">
+                      <h3 className="text-base font-bold text-gray-900 truncate">{title}</h3>
+                      {description && (
+                        <p className="text-gray-600 text-sm line-clamp-2">{description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {reward && (
+                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium border border-amber-200">
+                            <FaGift className="text-amber-500 text-[10px]" /> {reward}
+                          </span>
+                        )}
+                        {features?.shareCount && (
+                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium border border-blue-200">
+                            <FaShareAlt className="text-blue-500 text-[10px]" /> {shareCount} shares
+                          </span>
+                        )}
+                        {features?.tasks && tasks?.length > 0 && (
+                          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full text-xs font-medium border border-purple-200">
+                            <FaClipboardList className="text-purple-500 text-[10px]" /> {tasks.length} tasks
+                          </span>
+                        )}
+                        {features?.finalUrl && finalUrl && (
+                          <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium border border-green-200">
+                            <FaExternalLinkAlt className="text-green-500 text-[10px]" /> Redirect
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  {/* Details */}
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="text-sm sm:text-base font-bold text-gray-900 truncate">{title}</h3>
-                    {description && (
-                      <p className="text-gray-500 text-xs line-clamp-1">{description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {reward && (
-                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-[11px] font-semibold border border-amber-200/60">
-                          🎁 {reward}
-                        </span>
-                      )}
-                      {features?.shareCount && (
-                        <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-[11px] font-semibold border border-blue-200/60">
-                          📢 {shareCount} shares
-                        </span>
-                      )}
-                      {features?.tasks && tasks?.length > 0 && (
-                        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full text-[11px] font-semibold border border-purple-200/60">
-                          📋 {tasks.length} tasks
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* ── Share Link Section ── */}
+              {/* ── Share Link ── */}
               <div>
-                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <span>🔗</span> Share Link
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <FaLink className="text-purple-500" /> Share Link
                 </h2>
-                <div className="flex items-center gap-2 p-2 sm:p-2.5 bg-gray-50 rounded-xl border border-gray-200/80">
+                <div className="flex flex-col sm:flex-row items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
                   <input
                     type="text"
                     value={fullUrl}
                     readOnly
-                    className="flex-1 bg-transparent outline-none text-xs sm:text-sm font-mono text-gray-700 px-2 truncate select-all"
+                    className="flex-1 w-full bg-transparent outline-none text-xs font-mono text-gray-600 truncate"
                   />
                   <button
                     onClick={handleCopyLink}
-                    className={`flex-shrink-0 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm ${
+                    className={`flex-shrink-0 w-full sm:w-auto px-4 py-2 text-xs font-medium rounded-lg transition-all duration-200 shadow-sm ${
                       copied
-                        ? 'bg-green-600 text-white'
-                        : 'bg-purple-600 text-white hover:bg-purple-700'
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md'
                     }`}
                   >
-                    {copied ? '✅ Copied!' : 'Copy Link'}
+                    {copied ? (
+                      <><FaCheckCircle className="inline mr-1.5 text-xs" /> Copied!</>
+                    ) : (
+                      <><FaCopy className="inline mr-1.5 text-xs" /> Copy Link</>
+                    )}
                   </button>
                 </div>
                 {message && (
-                  <p className="mt-1 text-xs text-green-600 font-medium text-center">{message}</p>
+                  <p className="mt-1.5 text-sm text-green-600 text-center">{message}</p>
                 )}
               </div>
 
               {/* ── Action Buttons ── */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-2">
+              <div className="flex flex-wrap gap-2 justify-center pt-3 border-t border-gray-200">
                 <button
                   onClick={() => router.push(`/${templateSlug || 'campaign'}/${campaignId}`)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-purple-600 text-white text-xs sm:text-sm font-semibold rounded-xl hover:bg-purple-700 transition shadow-sm"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
                 >
-                  👁️ <span className="truncate">View</span>
+                  <FaEye className="text-xs" /> View
                 </button>
                 <button
                   onClick={() => router.push('/stats')}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-100 text-gray-700 text-xs sm:text-sm font-semibold rounded-xl hover:bg-gray-200 transition"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-all duration-200"
                 >
-                  📊 <span className="truncate">Stats</span>
+                  <FaChartBar className="text-xs" /> Stats
                 </button>
                 <button
                   onClick={() => router.push('/create')}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-100 text-gray-700 text-xs sm:text-sm font-semibold rounded-xl hover:bg-gray-200 transition"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-all duration-200"
                 >
-                  ✨ <span className="truncate">New</span>
+                  <FaPlus className="text-xs" /> New
                 </button>
               </div>
-
             </div>
           </div>
 
-          {/* Footer note */}
-          <p className="text-center text-[11px] text-gray-400 mt-3">
-            🚀 Your campaign is live – start sharing and watch the engagement grow!
+          {/* ── Footer note ── */}
+          <p className="text-center text-xs text-gray-400 mt-4">
+            <FaRocket className="inline mr-1.5 text-[10px]" /> Your campaign is live – start sharing and watch the engagement grow!
           </p>
-
         </div>
       </div>
     </>
