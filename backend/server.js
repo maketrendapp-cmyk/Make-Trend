@@ -1709,11 +1709,11 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
     const templateData = templateDoc.data();
-    // ── Ensure template is active ──
     if (templateData.isActive !== true) {
       return res.status(400).json({ success: false, error: 'Template is not available' });
     }
 
+    // ── Validation (unchanged) ──
     const { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled } = features || {};
     if (typeof scEnabled !== 'boolean' || typeof tasksEnabled !== 'boolean' || typeof fuEnabled !== 'boolean') {
       return res.status(400).json({ success: false, error: 'Features must include shareCount, tasks, finalUrl as booleans' });
@@ -1795,29 +1795,44 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
+    // ── Firestore writes (fast) ──
     const docRef = await db.collection('campaigns').add(campaignData);
     await templateRef.update({ usageCount: admin.firestore.FieldValue.increment(1) });
 
-    // ── Fetch the actual campaign data (with server timestamp) ──
-    const docSnapshot = await docRef.get();
-    const actualCampaignData = docSnapshot.data();
-    const newCampaign = {
-      id: docRef.id,
-      ...actualCampaignData,
-    };
-    await addCampaignToUserListCache(uid, newCampaign);
-    await invalidateKey(`stats:user:${uid}`);
+    const campaignId = docRef.id;
 
-    // ── Update template cache with new usageCount ──
-    const updatedTemplateDoc = await templateRef.get();
-    const newUsageCount = updatedTemplateDoc.data().usageCount || 0;
-    await updateTemplateInAllCaches(templateId, { usageCount: newUsageCount });
-
+    // ── ✅ IMMEDIATE RESPONSE (no waiting for cache updates) ──
     res.status(201).json({
       success: true,
-      campaignId: docRef.id,
+      campaignId,
       message: 'Campaign created successfully',
     });
+
+    // ── BACKGROUND: Async cache updates (non‑blocking) ──
+    setImmediate(async () => {
+      try {
+        // Fetch the newly created campaign with server timestamps
+        const docSnapshot = await docRef.get();
+        const actualCampaignData = docSnapshot.data();
+        const newCampaign = { id: campaignId, ...actualCampaignData };
+
+        // ── Update user's list cache ──
+        await addCampaignToUserListCache(uid, newCampaign);
+
+        // ── Invalidate user stats cache ──
+        await invalidateKey(`stats:user:${uid}`);
+
+        // ── Update template usage in cache (only affected template) ──
+        const updatedTemplateDoc = await templateRef.get();
+        const newUsageCount = updatedTemplateDoc.data().usageCount || 0;
+        await updateTemplateInAllCaches(templateId, { usageCount: newUsageCount });
+
+        console.log(`✅ Background cache updates completed for campaign ${campaignId}`);
+      } catch (err) {
+        console.error('❌ Background cache update failed:', err);
+      }
+    });
+
   } catch (error) {
     console.error('Create campaign error:', error);
     res.status(500).json({ success: false, error: 'Failed to create campaign' });
