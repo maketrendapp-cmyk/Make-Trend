@@ -86,10 +86,9 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Loading..." />
-        <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-purple-50/30 p-0">
-          <div className="w-full max-w-2xl mx-auto animate-pulse">
-            {/* Banner Skeleton - Centered */}
-            <div className="flex justify-center mb-3">
+        <div className="min-h-screen w-screen bg-gradient-to-br from-slate-50 to-purple-50/30 p-0">
+          <div className="w-full max-w-2xl mx-auto pt-2 px-4">
+            <div className="flex justify-center mb-3 animate-pulse">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-slate-200 rounded-xl" />
                 <div>
@@ -99,8 +98,7 @@ export default function CampaignCreated() {
               </div>
             </div>
 
-            {/* Card Skeleton */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg overflow-hidden animate-pulse">
               <div className="w-full aspect-video bg-slate-200" />
               <div className="p-4 space-y-3">
                 <div className="h-5 bg-slate-200 rounded w-3/4" />
@@ -141,7 +139,7 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Create a Campaign" />
-        <div className="h-screen w-screen flex items-center justify-center p-0 bg-gradient-to-br from-slate-50 via-white to-purple-50/40">
+        <div className="min-h-screen w-screen flex items-center justify-center p-0 bg-gradient-to-br from-slate-50 via-white to-purple-50/40">
           <div className="max-w-md w-full text-center">
             <div className="w-20 h-20 mx-auto bg-purple-100 rounded-2xl flex items-center justify-center text-3xl mb-5">
               <FaRocket className="text-purple-600 text-3xl" />
@@ -167,7 +165,7 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Campaign Not Found" />
-        <div className="h-screen w-screen flex items-center justify-center p-0 bg-gradient-to-br from-slate-50 via-white to-red-50/40">
+        <div className="min-h-screen w-screen flex items-center justify-center p-0 bg-gradient-to-br from-slate-50 via-white to-red-50/40">
           <div className="max-w-md w-full text-center">
             <div className="w-20 h-20 mx-auto bg-red-50 rounded-2xl flex items-center justify-center text-3xl mb-5">
               <FaExclamationTriangle className="text-red-500 text-3xl" />
@@ -215,8 +213,8 @@ export default function CampaignCreated() {
   return (
     <>
       <Meta title="🎉 Campaign Created!" />
-      <div className="h-screen w-screen flex items-center justify-center p-0 bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
-        <div className="w-full max-w-2xl mx-auto">
+      <div className="min-h-screen w-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-0">
+        <div className="w-full max-w-2xl mx-auto pt-2 px-4">
 
           {/* ── Success Banner ── CENTERED ── */}
           <div className="flex justify-center mb-3">
@@ -283,7 +281,7 @@ export default function CampaignCreated() {
                 </div>
               </div>
 
-              {/* ── Stats Row ── TIGHT SPACING ── */}
+              {/* ── Stats Row ── */}
               <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-lg overflow-hidden">
                 <div className="bg-white px-3 py-1.5 text-center">
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</p>
@@ -375,7 +373,7 @@ export default function CampaignCreated() {
           </div>
 
           {/* ── Footer ── */}
-          <p className="text-center text-xs text-slate-400 mt-3">
+          <p className="text-center text-xs text-slate-400 mt-3 pb-2">
             <FaInfinity className="inline mr-1.5 text-[10px]" /> Your campaign is live – start sharing now
           </p>
         </div>
