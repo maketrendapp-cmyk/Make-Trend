@@ -10,36 +10,30 @@ const requestCache = new Map();
 
 async function apiRequest(endpoint, options = {}, token = null) {
   const cacheKey = `${endpoint}-${JSON.stringify(options)}-${token || 'no-token'}`;
-  
-  if (requestCache.has(cacheKey)) {
-    return requestCache.get(cacheKey);
-  }
+  if (requestCache.has(cacheKey)) return requestCache.get(cacheKey);
 
   const url = `${BACKEND_URL}/api${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (options.body) {
-    options.body = JSON.stringify(options.body);
-  }
+  if (options.body) options.body = JSON.stringify(options.body);
+
   const res = await fetch(url, { ...options, headers });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'API error');
-  
-  requestCache.set(cacheKey, data);
-  setTimeout(() => requestCache.delete(cacheKey), 5000); // 5s TTL
 
+  requestCache.set(cacheKey, data);
+  setTimeout(() => requestCache.delete(cacheKey), 5000);
   return data;
 }
 
-// ── Get user token ──
 async function getToken() {
   await auth.authStateReady();
   const user = auth.currentUser;
   if (!user) return null;
-  return await user.getIdToken(false); // false = use cached token if still valid
+  return await user.getIdToken(false);
 }
 
-// ── Queries ──
+// ── Profile ──
 export function useProfile(enabled = false) {
   return useQuery({
     queryKey: ['profile'],
@@ -54,6 +48,7 @@ export function useProfile(enabled = false) {
   });
 }
 
+// ── Stats ──
 export function useStats(enabled = false) {
   return useQuery({
     queryKey: ['stats'],
@@ -68,11 +63,12 @@ export function useStats(enabled = false) {
   });
 }
 
+// ── Templates ──
 export function useTemplates(filters = {}, initialData = null) {
   const queryString = new URLSearchParams(filters).toString();
   const queryKey = ['templates', filters];
   const hasFilters = Object.keys(filters).length > 0;
-  
+
   return useQuery({
     queryKey,
     queryFn: async () => {
@@ -82,7 +78,6 @@ export function useTemplates(filters = {}, initialData = null) {
     },
     initialData: initialData || undefined,
     staleTime: 5 * 60 * 1000,
-    // Only fetch if filters are applied OR no initial data
     enabled: hasFilters || !initialData || (Array.isArray(initialData) && initialData.length === 0),
   });
 }
@@ -91,7 +86,7 @@ export function useFeaturedTemplates(filters = {}, initialData = null) {
   const queryString = new URLSearchParams({ highlight: true, ...filters }).toString();
   const queryKey = ['featuredTemplates', filters];
   const hasFilters = Object.keys(filters).length > 0;
-  
+
   return useQuery({
     queryKey,
     queryFn: async () => {
@@ -100,11 +95,11 @@ export function useFeaturedTemplates(filters = {}, initialData = null) {
     },
     initialData: initialData || undefined,
     staleTime: 5 * 60 * 1000,
-    // Only fetch if filters are applied OR no initial data
     enabled: hasFilters || !initialData || (Array.isArray(initialData) && initialData.length === 0),
   });
 }
 
+// ── Campaigns ──
 export function useCampaigns(enabled = false) {
   return useInfiniteQuery({
     queryKey: ['campaigns'],
@@ -130,6 +125,7 @@ export function useCampaigns(enabled = false) {
   });
 }
 
+// ── Support Tickets ──
 export function useSupportTickets(enabled = false) {
   return useQuery({
     queryKey: ['supportTickets'],
@@ -144,6 +140,7 @@ export function useSupportTickets(enabled = false) {
   });
 }
 
+// ── Comments ──
 export function useComments() {
   return useQuery({
     queryKey: ['comments'],
@@ -155,7 +152,7 @@ export function useComments() {
   });
 }
 
-// ── NEW: MT Coins (matching useStats pattern) ──
+// ── NEW: MT Coins ──
 export function useMtCoins(enabled = false) {
   return useQuery({
     queryKey: ['mtCoins'],
@@ -170,7 +167,63 @@ export function useMtCoins(enabled = false) {
   });
 }
 
-// ── Mutations (for creating/updating data) ──
+// ── NEW: Withdrawal Methods ──
+export function useWithdrawalMethods(enabled = false) {
+  return useQuery({
+    queryKey: ['withdrawalMethods'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return [];
+      const data = await apiRequest('/withdrawal-methods', {}, token);
+      return data.methods || [];
+    },
+    enabled,
+    staleTime: 3600 * 1000, // 1 hour
+  });
+}
+
+// ── NEW: Withdrawals History ──
+export function useWithdrawals(enabled = false) {
+  return useQuery({
+    queryKey: ['withdrawals'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return [];
+      const data = await apiRequest('/withdrawals', {}, token);
+      return data.withdrawals || [];
+    },
+    enabled,
+    staleTime: 60 * 1000,
+  });
+}
+
+// ── NEW: Create Withdrawal ──
+export function useCreateWithdrawal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ mtCoins, method, details }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest('/withdrawals', {
+        method: 'POST',
+        body: { mtCoins, method, details },
+      }, token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['mtCoins']);
+      queryClient.invalidateQueries(['withdrawals']);
+      queryClient.invalidateQueries(['stats']);
+      queryClient.invalidateQueries(['profile']);
+      toast.success('Withdrawal request submitted successfully!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to submit withdrawal');
+    },
+  });
+}
+
+// ── Invalidation helper ──
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
   return {
@@ -181,8 +234,9 @@ export function useInvalidateQueries() {
     invalidateFeaturedTemplates: () => queryClient.invalidateQueries(['featuredTemplates']),
     invalidateSupportTickets: () => queryClient.invalidateQueries(['supportTickets']),
     invalidateComments: () => queryClient.invalidateQueries(['comments']),
-    // ── NEW ──
     invalidateMtCoins: () => queryClient.invalidateQueries(['mtCoins']),
+    invalidateWithdrawals: () => queryClient.invalidateQueries(['withdrawals']),
+    invalidateWithdrawalMethods: () => queryClient.invalidateQueries(['withdrawalMethods']),
     invalidateAll: () => {
       queryClient.invalidateQueries(['profile']);
       queryClient.invalidateQueries(['stats']);
@@ -192,6 +246,8 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['supportTickets']);
       queryClient.invalidateQueries(['comments']);
       queryClient.invalidateQueries(['mtCoins']);
+      queryClient.invalidateQueries(['withdrawals']);
+      queryClient.invalidateQueries(['withdrawalMethods']);
     },
   };
 }
