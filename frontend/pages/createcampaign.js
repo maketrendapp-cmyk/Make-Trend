@@ -50,17 +50,14 @@ export default function CreateCampaign() {
 
   // ── Load template from React Query cache ──
   useEffect(() => {
-    // Only attempt to load if slug exists and user is authenticated
     if (slug && isAuthenticated && templates.length > 0) {
       const found = templates.find(t => t.slug === slug);
       if (found) {
         setTemplate(found);
-        // Pre‑fill from template
         setCampaignTitle(found.title || '');
         setCampaignDescription(found.description || '');
         setCampaignReward(found.reward || 'Exclusive Reward');
         setError('');
-        // Load saved form from localStorage
         loadSavedForm();
         setLoading(false);
       } else {
@@ -68,7 +65,6 @@ export default function CreateCampaign() {
         setLoading(false);
       }
     } else if (!slug) {
-      // No slug → not loading, we'll render a different UI
       setLoading(false);
     } else if (!isAuthenticated) {
       setLoading(false);
@@ -96,7 +92,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ── Save form to localStorage on any change ──
+  // ── ✅ Save form to localStorage on any change (WORKING AS INTENDED) ──
   useEffect(() => {
     if (!template) return;
     const formData = {
@@ -211,7 +207,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ── Submit ──
+  // ── ✅ SUBMIT: Optimized with invalidation AFTER navigation ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -261,24 +257,34 @@ export default function CreateCampaign() {
       if (res.ok && data.success) {
         // Clear saved form after success
         localStorage.removeItem(storageKey);
-        // 🔥 Invalidate React Query cache asynchronously (non‑blocking)
-        // This prevents the redirect from being delayed.
-        invalidateCampaigns().catch(() => {});
-        invalidateStats().catch(() => {});
-        // Redirect immediately to the success page
-        router.push(`/campaign-created?id=${data.campaignId}`);
+
+        // ✅ 1. Navigate FIRST (fast, no waiting for invalidations)
+        await router.push(`/campaign-created?id=${data.campaignId}`);
+
+        // ✅ 2. THEN invalidate queries in the background (non-blocking)
+        // This doesn't slow down the page load because it runs AFTER navigation
+        setTimeout(() => {
+          invalidateCampaigns().catch(() => {});
+          invalidateStats().catch(() => {});
+        }, 500);
       } else {
         setMessage(data.error || 'Failed to create campaign');
+        setIsSubmitting(false);
       }
     } catch (err) {
       console.error('Error:', err);
       setMessage('Network error: ' + err.message);
-    } finally {
       setIsSubmitting(false);
+    } finally {
+      // Only set isSubmitting to false if we're NOT navigating
+      // If navigation succeeded, the component will unmount anyway
+      if (!router.pathname.includes('campaign-created')) {
+        setIsSubmitting(false);
+      }
     }
   };
 
-  // ── Redirect unauthenticated users to login ──
+  // ── Redirect unauthenticated users ──
   useEffect(() => {
     if (!authLoading && !isAuthenticated && slug) {
       const redirect = `/createcampaign?slug=${slug}`;
@@ -286,7 +292,7 @@ export default function CreateCampaign() {
     }
   }, [authLoading, isAuthenticated, slug]);
 
-  // ── If no slug, show the "Select a Template" page ──
+  // ── No slug: show "Select Template" page ──
   if (!slug && !authLoading) {
     return (
       <>
@@ -313,7 +319,7 @@ export default function CreateCampaign() {
     );
   }
 
-  // ── Return null while checking auth (but only if slug exists) ──
+  // ── Return null while checking auth ──
   if (!authLoading && !isAuthenticated && slug) {
     return null;
   }
