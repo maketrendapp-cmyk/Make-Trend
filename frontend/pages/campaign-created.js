@@ -75,7 +75,7 @@ export default function CampaignCreated() {
     setTimeout(() => {
       setCopied(false);
       setMessage('');
-    }, 2000);
+    }, 2500);
   };
 
   // ── LOADING STATE ──
@@ -83,13 +83,13 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Loading Campaign..." />
-        <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-slate-50 px-4">
-          <div className="relative w-10 h-10 flex items-center justify-center">
-            <div className="absolute inset-0 border-2 border-indigo-100 rounded-full"></div>
-            <div className="absolute inset-0 border-2 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-            <FaRocket className="text-indigo-600 w-3 h-3 animate-pulse" />
+        <div className="h-[100dvh] flex flex-col items-center justify-center bg-slate-50 px-4 overflow-hidden">
+          <div className="relative w-12 h-12 flex items-center justify-center">
+            <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
+            <FaRocket className="text-indigo-600 w-4 h-4 animate-pulse" />
           </div>
-          <p className="mt-2.5 text-slate-500 font-medium text-xs animate-pulse">Loading campaign...</p>
+          <p className="mt-3 text-slate-500 font-bold text-xs tracking-wide animate-pulse">Finalizing setup...</p>
         </div>
       </>
     );
@@ -100,18 +100,18 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Create a Campaign" />
-        <div className="min-h-[100dvh] flex items-center justify-center px-4 bg-slate-50 py-3">
-          <div className="max-w-sm w-full bg-white rounded-2xl p-6 text-center shadow-lg border border-slate-100">
-            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3">
-              <FaRocket className="w-5 h-5" />
+        <div className="h-[100dvh] flex items-center justify-center px-4 bg-slate-50 overflow-hidden">
+          <div className="max-w-sm w-full bg-white rounded-3xl p-6 text-center shadow-xl shadow-slate-200/50 border border-slate-100">
+            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FaRocket className="w-6 h-6" />
             </div>
-            <h1 className="text-base font-black text-slate-900 mb-1">Create Your First Campaign</h1>
-            <p className="text-slate-500 text-xs mb-5">
+            <h1 className="text-lg font-black text-slate-900 mb-1">Create Your First Campaign</h1>
+            <p className="text-slate-500 text-xs mb-6">
               You haven't created a campaign yet. Start building your viral campaign now!
             </p>
             <button
               onClick={() => router.push('/create')}
-              className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition shadow-md shadow-indigo-600/20"
             >
               <FiPlus className="w-4 h-4" /> Start Building
             </button>
@@ -126,27 +126,27 @@ export default function CampaignCreated() {
     return (
       <>
         <Meta title="Campaign Not Found" />
-        <div className="min-h-[100dvh] flex items-center justify-center px-4 bg-slate-50 py-3">
-          <div className="max-w-sm w-full bg-white rounded-2xl p-6 text-center shadow-lg border border-slate-100">
-            <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-3">
-              <FiAlertCircle className="w-6 h-6" />
+        <div className="h-[100dvh] flex items-center justify-center px-4 bg-slate-50 overflow-hidden">
+          <div className="max-w-sm w-full bg-white rounded-3xl p-6 text-center shadow-xl shadow-slate-200/50 border border-slate-100">
+            <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiAlertCircle className="w-7 h-7" />
             </div>
-            <h2 className="text-base font-black text-slate-900 mb-1">Campaign Not Found</h2>
-            <p className="text-slate-500 text-xs mb-5">
-              {error || 'This campaign does not exist or may have been removed.'}
+            <h2 className="text-lg font-black text-slate-900 mb-1">Campaign Not Found</h2>
+            <p className="text-slate-500 text-xs mb-6">
+              {error || 'This campaign does not exist or may have been securely removed.'}
             </p>
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => router.push('/create')}
-                className="w-full px-4 py-2.5 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition"
+                className="w-full px-4 py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition shadow-md shadow-indigo-600/20"
               >
                 Create New Campaign
               </button>
               <button
                 onClick={() => router.push('/')}
-                className="w-full px-4 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-200 transition"
+                className="w-full px-4 py-3 bg-slate-100 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-200 transition"
               >
-                Return Home
+                Return Dashboard
               </button>
             </div>
           </div>
@@ -170,91 +170,101 @@ export default function CampaignCreated() {
   return (
     <>
       <Meta title="🎉 Campaign Live | MakeTrend" />
-      <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center py-2 px-3">
-        <div className="max-w-md w-full my-auto">
+      {/* Container locks viewport height, prevents scrolling */}
+      <div className="h-[100dvh] w-full bg-slate-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+        <div className="max-w-[420px] w-full mx-auto">
 
-          {/* ── Main Viewport-Locked Card ── */}
-          <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden flex flex-col">
+          {/* ── Main Compact Viewport-Locked Card ── */}
+          <div className="bg-white rounded-[1.5rem] shadow-2xl shadow-indigo-900/5 border border-slate-100 overflow-hidden flex flex-col max-h-[95dvh]">
             
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 px-4 py-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center flex-shrink-0 shadow-inner">
-                <FiCheckCircle className="w-4 h-4 text-white" />
+            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 px-5 py-4 flex items-center gap-3 flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center flex-shrink-0 shadow-inner">
+                <FiCheckCircle className="w-5 h-5 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-black text-white leading-tight truncate">Campaign is Live!</h1>
-                <p className="text-indigo-100 text-[10px] font-medium truncate">Ready to receive traffic.</p>
+                <h1 className="text-base sm:text-lg font-black text-white leading-tight truncate">Campaign is Live!</h1>
+                <p className="text-indigo-100 text-[11px] font-semibold truncate mt-0.5">Your viral link is ready to share.</p>
               </div>
             </div>
 
-            {/* Body */}
-            <div className="p-3.5 space-y-3">
+            {/* Body - highly optimized vertical spacing to fit without scrolling */}
+            <div className="p-4 sm:p-5 flex flex-col gap-4 overflow-y-auto">
               
               {/* Share URL */}
               <div>
-                <div className="flex justify-between items-center mb-0.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <FiLink className="w-3 h-3" /> Share URL
+                <div className="flex justify-between items-end mb-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <FiLink className="w-3.5 h-3.5" /> Share URL
                   </label>
                   {message && (
-                    <span className="text-[10px] font-bold text-emerald-600 animate-pulse">{message}</span>
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md animate-pulse">
+                      {message}
+                    </span>
                   )}
                 </div>
-                <div className="flex items-center p-0.5 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center p-1 bg-slate-50/80 rounded-xl border border-slate-200/80 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
                   <input
                     type="text"
                     value={fullUrl}
                     readOnly
-                    className="flex-1 min-w-0 bg-transparent outline-none text-xs font-semibold text-slate-700 truncate px-2 py-1"
+                    className="flex-1 min-w-0 bg-transparent outline-none text-[13px] font-bold text-slate-700 truncate px-3 py-1.5"
                   />
                   <button
                     onClick={handleCopyLink}
-                    className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                      copied ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
+                      copied ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20'
                     }`}
                   >
-                    <FiCopy className="w-3 h-3" />
+                    {copied ? <FiCheckCircle className="w-3.5 h-3.5" /> : <FiCopy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Exact-Fit Image Box + Title/Desc Layout */}
+              {/* Exact-Fit "Gallery Style" Image Box + Title/Desc Layout */}
               <div>
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                  <FiList className="w-3 h-3" /> Preview
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                  <FiList className="w-3.5 h-3.5" /> Preview Widget
                 </label>
-                <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden flex flex-col">
-                  {/* Container fitting entire image without cropping */}
-                  <div className="w-full h-28 bg-slate-900 relative flex items-center justify-center overflow-hidden">
+                <div className="bg-white rounded-[1.25rem] border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                  
+                  {/* Image Container: Light background prevents ugly black bars. object-contain keeps the image full without cropping */}
+                  <div className="w-full h-32 sm:h-36 bg-slate-50/50 border-b border-slate-100 flex items-center justify-center p-1.5">
                     {image ? (
-                      <img src={image} alt="Preview" className="w-full h-full object-contain" />
+                      <img 
+                        src={image} 
+                        alt="Campaign Preview" 
+                        className="w-full h-full object-contain rounded-lg drop-shadow-sm" 
+                      />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">
-                        <FiImage className="w-7 h-7" />
+                      <div className="flex flex-col items-center justify-center text-slate-300">
+                        <FiImage className="w-8 h-8 mb-1" />
+                        <span className="text-[10px] font-semibold">No Image</span>
                       </div>
                     )}
                   </div>
-                  {/* Details */}
-                  <div className="p-2.5 bg-white">
-                    <h3 className="text-xs font-bold text-slate-900 line-clamp-1 mb-0.5">{title}</h3>
+                  
+                  {/* Compact Details */}
+                  <div className="p-3 bg-white">
+                    <h3 className="text-[13px] sm:text-sm font-black text-slate-900 truncate mb-0.5">{title}</h3>
                     {description && (
-                      <p className="text-[10px] text-slate-500 line-clamp-1 mb-1.5">{description}</p>
+                      <p className="text-[11px] text-slate-500 truncate mb-2">{description}</p>
                     )}
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {reward && (
-                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-amber-200/50 truncate max-w-[140px]">
-                          <FiGift className="w-2.5 h-2.5 flex-shrink-0" /> <span className="truncate">{reward}</span>
+                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-200/50 truncate max-w-[140px]">
+                          <FiGift className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{reward}</span>
                         </span>
                       )}
                       {shareCount > 0 && (
-                        <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-blue-200/50">
-                          <FiShare2 className="w-2.5 h-2.5" /> {shareCount} Shares
+                        <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-blue-200/50">
+                          <FiShare2 className="w-3 h-3" /> {shareCount}
                         </span>
                       )}
                       {tasks?.length > 0 && (
-                        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-purple-200/50">
-                          <FiList className="w-2.5 h-2.5" /> {tasks.length} Tasks
+                        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-purple-200/50">
+                          <FiList className="w-3 h-3" /> {tasks.length}
                         </span>
                       )}
                     </div>
@@ -262,25 +272,25 @@ export default function CampaignCreated() {
                 </div>
               </div>
 
-              {/* Action Buttons Grid */}
-              <div className="pt-0.5 flex flex-col gap-1.5">
+              {/* Smart Action Buttons Grid (Two rows to save vertical space) */}
+              <div className="flex flex-col gap-2 pt-1 pb-1">
                 <button
                   onClick={() => router.push(`/${templateSlug}?id=${campaignId}`)}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 bg-slate-900 text-white text-[13px] font-bold rounded-xl hover:bg-slate-800 transition shadow-md shadow-slate-900/10"
                 >
-                  <FiExternalLink className="w-3.5 h-3.5" /> View Campaign Live
+                  <FiExternalLink className="w-4 h-4" /> View Campaign Live
                 </button>
                 
-                <div className="flex gap-1.5">
+                <div className="flex gap-2">
                   <button
                     onClick={() => router.push('/stats')}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl hover:bg-indigo-100 transition border border-indigo-100/50"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 text-indigo-700 text-[12px] font-bold rounded-xl hover:bg-indigo-100 transition border border-indigo-100/50"
                   >
                     <FiBarChart2 className="w-3.5 h-3.5" /> Analytics
                   </button>
                   <button
                     onClick={() => router.push('/create')}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 text-slate-700 text-[12px] font-bold rounded-xl hover:bg-slate-200 transition"
                   >
                     <FiPlus className="w-3.5 h-3.5" /> New Campaign
                   </button>
