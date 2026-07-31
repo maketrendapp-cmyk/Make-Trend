@@ -2851,10 +2851,11 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
 });
 
 // ── Get available withdrawal methods ──
-app.get('/api/withdrawal-methods', async (req, res) => {
+// ── Get available withdrawal methods (authenticated, 24h cache) ──
+app.get('/api/withdrawal-methods', verifyToken, checkBanned, async (req, res) => {
   try {
-    const ip = getClientIp(req);
-    if (!(await checkRateLimit(ip, 'methods-get', 20, 60))) {
+    const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'methods-get', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
@@ -2933,7 +2934,7 @@ app.get('/api/withdrawal-methods', async (req, res) => {
     ];
 
     result = { success: true, methods };
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 3600);
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 86400); // ✅ 24 hours
     res.json(result);
   } catch (error) {
     console.error('❌ Get methods error:', error);
