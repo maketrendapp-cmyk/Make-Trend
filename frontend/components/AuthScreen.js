@@ -523,7 +523,9 @@ export default function AuthScreen({ onSuccess, redirectTo = '/' }) {
 // ── Sync referral code from URL when it changes ──
 useEffect(() => {
   if (ref && typeof ref === 'string') {
-    setReferralCode(ref.toUpperCase());
+    const code = ref.toUpperCase();
+    setReferralCode(code);
+    setSocialReferralCode(code);
   }
 }, [ref]);
   const [avatarFile, setAvatarFile] = useState(null);
@@ -532,7 +534,7 @@ useEffect(() => {
   const [needsSocialCompletion, setNeedsSocialCompletion] = useState(false);
   const [socialFullname, setSocialFullname] = useState('');
   const [socialUsername, setSocialUsername] = useState('');
-  const [socialReferralCode, setSocialReferralCode] = useState('');
+  const [socialReferralCode, setSocialReferralCode] = useState(ref ? ref.toUpperCase() : '');
   const [socialAvatarPreview, setSocialAvatarPreview] = useState('');
   const [socialAvatarFile, setSocialAvatarFile] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
