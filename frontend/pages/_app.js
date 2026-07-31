@@ -20,7 +20,7 @@ export const useDeviceId = () => useContext(DeviceIdContext);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
       retry: 1,
     },
@@ -65,7 +65,7 @@ function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pathname = router.pathname;
 
-  // ── GENERATE DEVICE ID ONLY ON FIRST LOAD (Instantly) ──
+  // ── Generate Device ID on first load ──
   useEffect(() => {
     const id = getDeviceId();
     setDeviceId(id);
@@ -75,45 +75,47 @@ function MyApp({ Component, pageProps }) {
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
-  // ── Wrap everything with DeviceIdContext provider ──
-  const appContent = (
-    <DeviceIdContext.Provider value={deviceId}>
-      <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-      
-      {isNoLayout ? (
-        <Component {...pageProps} />
-      ) : isTopNavOnly ? (
-        <div className="min-h-screen bg-bg">
-          <Navbar />
-          <Component {...pageProps} />
-        </div>
-      ) : (
-        <div className="h-screen bg-bg flex flex-col overflow-hidden">
-          <div className="flex-shrink-0 z-40 relative">
-            <Navbar />
-          </div>
-          <div className="flex flex-1 overflow-hidden relative">
-            <div className="hidden md:block flex-shrink-0 h-full z-30">
-              <Sidebar />
-            </div>
-            <div className="flex-1 min-w-0 h-full overflow-y-auto pb-20 md:pb-0">
-              <Component {...pageProps} />
-            </div>
-          </div>
-          <div className="md:hidden flex-shrink-0 relative z-40">
-            <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
-          </div>
-          <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
-        </div>
-      )}
-    </DeviceIdContext.Provider>
-  );
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {appContent}
-        <ReactQueryDevtools initialIsOpen={false} />
+        <DeviceIdContext.Provider value={deviceId}>
+          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+
+          {isNoLayout ? (
+            <Component {...pageProps} />
+          ) : isTopNavOnly ? (
+            <div className="min-h-screen bg-bg">
+              <Navbar />
+              <Component {...pageProps} />
+            </div>
+          ) : (
+            <div className="h-screen bg-bg flex flex-col overflow-hidden">
+              {/* Header */}
+              <div className="flex-shrink-0 z-40 relative">
+                <Navbar />
+              </div>
+
+              {/* Main Content */}
+              <div className="flex flex-1 overflow-hidden relative">
+                <div className="hidden md:block flex-shrink-0 h-full z-30">
+                  <Sidebar />
+                </div>
+                <div className="flex-1 min-w-0 h-full overflow-y-auto pb-20 md:pb-0">
+                  <Component {...pageProps} />
+                </div>
+              </div>
+
+              {/* Bottom Navigation (mobile) */}
+              <div className="md:hidden flex-shrink-0 relative z-40">
+                <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
+              </div>
+
+              <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+            </div>
+          )}
+
+          <ReactQueryDevtools initialIsOpen={false} />
+        </DeviceIdContext.Provider>
       </AuthProvider>
     </QueryClientProvider>
   );
