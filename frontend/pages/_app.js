@@ -1,6 +1,5 @@
-
 // pages/_app.js
-import { useState } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { useRouter } from 'next/router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -10,7 +9,12 @@ import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
 import Sidebar from '../components/Sidebar';
+import { getDeviceId } from '../utils/deviceId';
 import '../styles/globals.css';
+
+// ── Create Device ID Context ──
+const DeviceIdContext = createContext(null);
+export const useDeviceId = () => useContext(DeviceIdContext);
 
 // ── React Query client ──
 const queryClient = new QueryClient({
@@ -31,15 +35,14 @@ const NO_LAYOUT_PAGES = [
   '/templates/tonde-gamer-lucky-spin-v1',
   '/templates/youtube-booster-v1',
   '/ncell-reward-v1',
-'/templates/pubg-uc-giveaway-v1',
-'/templates/quiz-challenge-win-cash-v1',
-'/templates/spin-win-daraz-discount-v1',
-'/templates/lucky-draw-premium-prizes-v1',
-'/templates/gaming-clip-contest',
-'/templates/photography-contest',
-'/templates/bgmi-tournament-registration',
-'/templates/',
-
+  '/templates/pubg-uc-giveaway-v1',
+  '/templates/quiz-challenge-win-cash-v1',
+  '/templates/spin-win-daraz-discount-v1',
+  '/templates/lucky-draw-premium-prizes-v1',
+  '/templates/gaming-clip-contest',
+  '/templates/photography-contest',
+  '/templates/bgmi-tournament-registration',
+  '/templates/',
   '/tasks',
   '/share',
 ];
@@ -58,76 +61,61 @@ const TOP_NAV_ONLY_PAGES = [
 
 function MyApp({ Component, pageProps }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [deviceId, setDeviceId] = useState(null);
   const router = useRouter();
   const pathname = router.pathname;
+
+  // ── 🔥 GENERATE DEVICE ID ONLY ON FIRST LOAD (Instantly) ──
+  useEffect(() => {
+    // 1. getDeviceId() returns the fallback UUID immediately (sync)
+    // 2. It automatically triggers the background upgrade to the real fingerprint (100ms later)
+    // 3. This runs exactly once when the app first mounts
+    const id = getDeviceId();
+    setDeviceId(id);
+    console.log('🆔 Device ID generated on initial load:', id);
+  }, []); // Empty dependency array = runs ONCE
 
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
-  if (isNoLayout) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+  // ── Wrap everything with DeviceIdContext provider ──
+  const appContent = (
+    <DeviceIdContext.Provider value={deviceId}>
+      <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+      
+      {isNoLayout ? (
+        <Component {...pageProps} />
+      ) : isTopNavOnly ? (
+        <div className="min-h-screen bg-bg">
+          <Navbar />
           <Component {...pageProps} />
-          <ReactQueryDevtools initialIsOpen={false} />
-        </AuthProvider>
-      </QueryClientProvider>
-    );
-  }
-
-  if (isTopNavOnly) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-          <div className="min-h-screen bg-bg">
-            <Navbar />
-            <Component {...pageProps} />
-          </div>
-          <ReactQueryDevtools initialIsOpen={false} />
-        </AuthProvider>
-      </QueryClientProvider>
-    );
-  }
-
-  // ── Full layout (default) ──
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
-        
-        {/* CRITICAL FIX: The entire app wrapper is now strictly h-screen, no overflow allowed on the body */}
+        </div>
+      ) : (
         <div className="h-screen bg-bg flex flex-col overflow-hidden">
-          
-          {/* Header stays locked at the top */}
           <div className="flex-shrink-0 z-40 relative">
             <Navbar />
           </div>
-
-          {/* This wrapper holds the Sidebar and Main Content and splits the remaining height */}
           <div className="flex flex-1 overflow-hidden relative">
-            
-            {/* ── Sidebar (Fixed in place, matches remaining height exactly) ── */}
             <div className="hidden md:block flex-shrink-0 h-full z-30">
               <Sidebar />
             </div>
-
-            {/* ── Main Content (This is the ONLY part that scrolls!) ── */}
             <div className="flex-1 min-w-0 h-full overflow-y-auto pb-20 md:pb-0">
               <Component {...pageProps} />
             </div>
-            
           </div>
-
-          {/* ── Bottom Navigation (mobile) ── */}
           <div className="md:hidden flex-shrink-0 relative z-40">
             <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
           </div>
-
           <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
         </div>
-        
+      )}
+    </DeviceIdContext.Provider>
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        {appContent}
         <ReactQueryDevtools initialIsOpen={false} />
       </AuthProvider>
     </QueryClientProvider>
