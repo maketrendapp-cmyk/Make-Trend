@@ -1,5 +1,5 @@
 // pages/profile.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
@@ -16,13 +16,24 @@ export default function Profile() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
 
-  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-  const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
-  const { data: mtCoins, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
+  const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useProfile(isAuthenticated);
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useStats(isAuthenticated);
+  const { data: mtCoins, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
   const { invalidateProfile, invalidateStats } = useInvalidateQueries();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
+
+  // ── Force refetch when user changes (after login/registration) ──
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      invalidateProfile();
+      invalidateStats();
+      refetchProfile();
+      refetchStats();
+      refetchMtCoins();
+    }
+  }, [user?.uid, isAuthenticated]);
 
   const isLoading = profileLoading || statsLoading || mtCoinsLoading || (user && !profile);
 
@@ -56,12 +67,14 @@ export default function Profile() {
     }
   };
 
+  // ── Display user with safe fallbacks ──
   const displayUser = {
     username: profile?.username || 'guest',
-    fullName: profile?.fullname || profile?.name || 'Guest User',
+    fullName: profile?.fullname || profile?.fullName || profile?.name || 'Guest User',
     email: profile?.email || 'guest@example.com',
     profilePic: profile?.avatar || profile?.profilePic || null,
-    isPro: profile?.plan === 'pro' || false,
+    isPro: profile?.plan === 'pro' || profile?.plan?.toLowerCase() === 'pro' || false,
+    plan: profile?.plan || 'free',
     referrals: profile?.referrals || 0,
     referralCode: profile?.referralCode || '',
   };
@@ -70,7 +83,7 @@ export default function Profile() {
     { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
     { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
     { icon: FiUnlock, label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0 },
-    { icon: FiUsers, label: 'Referrals', value: displayUser.referrals ?? 0 },
+    { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
   ];
 
   const quickActions = [
@@ -152,7 +165,7 @@ export default function Profile() {
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                     displayUser.isPro ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
                   }`}>
-                    {displayUser.isPro ? 'PRO' : 'FREE'}
+                    {displayUser.isPro ? '👑 PRO' : 'FREE'}
                   </span>
                 </div>
                 <p className="text-gray-500">@{displayUser.username || 'guest'}</p>
