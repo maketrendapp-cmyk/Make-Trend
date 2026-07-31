@@ -4,10 +4,16 @@ import { useRouter } from 'next/router';
 import Meta from '../components/Meta';
 import { useAuth } from '../components/AuthScreen';
 import {
+  useProfile,
+  useMtCoins,
+  useWithdrawalMethods,
+  useWithdrawals,
+  useCreateWithdrawal,
+} from '../lib/queries';
+import {
   FaUser,
   FaEnvelope,
   FaWallet,
-  FaDollarSign,
   FaEye,
   FaCheckCircle,
   FaClock,
@@ -15,12 +21,6 @@ import {
   FaSpinner,
   FaArrowRight,
   FaArrowLeft,
-  FaCopy,
-  FaExternalLinkAlt,
-  FaGlobe,
-  FaShieldAlt,
-  FaGift,
-  FaCoins,
   FaInfoCircle,
   FaPhone,
   FaUniversity,
@@ -28,103 +28,82 @@ import {
   FaBitcoin,
   FaPaypal,
   FaBuilding,
+  FaGift,
 } from 'react-icons/fa';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
-const API_BASE = `${BACKEND_URL}/api`;
 
 export default function Withdraw() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
-  // ── State ──
-  const [profile, setProfile] = useState(null);
-  const [mtCoins, setMtCoins] = useState(null);
-  const [withdrawals, setWithdrawals] = useState([]);
-  const [methods, setMethods] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  // ── React Query hooks ──
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+  const { data: mtCoinsData, isLoading: coinsLoading } = useMtCoins(isAuthenticated);
+  const { data: methods = [], isLoading: methodsLoading } = useWithdrawalMethods();
+  const { data: withdrawals = [], isLoading: withdrawalsLoading, refetch: refetchWithdrawals } = useWithdrawals(isAuthenticated);
+  const { mutate: createWithdrawal, isLoading: isSubmitting } = useCreateWithdrawal();
+
+  // ── Local state ──
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [formData, setFormData] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   // ── Fixed amount ──
   const WITHDRAWAL_AMOUNT = 2500; // MT Coins
   const USD_AMOUNT = 15;
 
-  // ── Fetch data ──
+  // ── Check authentication ──
   useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchData();
-    } else if (!authLoading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login?redirect=/withdraw');
     }
-  }, [isAuthenticated, user, authLoading]);
+  }, [authLoading, isAuthenticated, router]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError('');
+  // ── Loading state ──
+  const isLoading = profileLoading || coinsLoading || methodsLoading || withdrawalsLoading;
+  if (isLoading) {
+    return (
+      <>
+        <Meta title="Withdraw – MT Coins" />
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="text-center">
+            <FaSpinner className="animate-spin text-4xl text-purple-600 mx-auto" />
+            <p className="mt-4 text-slate-500">Loading your dashboard...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
-    try {
-      const token = await user.getIdToken();
+  // ── Error states ──
+  if (!profile) {
+    return (
+      <>
+        <Meta title="Withdraw – MT Coins" />
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="text-center text-red-500">
+            <p>Failed to load profile. Please refresh.</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
-      // ── Fetch profile ──
-      const profileRes = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const profileData = await profileRes.json();
-      if (profileData.success) {
-        setProfile(profileData.user);
-      }
-
-      // ── Fetch MT Coins ──
-      const coinsRes = await fetch(`${API_BASE}/mt-coins`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const coinsData = await coinsRes.json();
-      if (coinsData.success) {
-        setMtCoins(coinsData.mtCoins);
-      }
-
-      // ── Fetch withdrawal methods ──
-      const methodsRes = await fetch(`${API_BASE}/withdrawal-methods`);
-      const methodsData = await methodsRes.json();
-      if (methodsData.success) {
-        setMethods(methodsData.methods);
-      }
-
-      // ── Fetch withdrawal history ──
-      const withdrawalsRes = await fetch(`${API_BASE}/withdrawals`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const withdrawalsData = await withdrawalsRes.json();
-      if (withdrawalsData.success) {
-        setWithdrawals(withdrawalsData.withdrawals);
-      }
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Failed to load data. Please refresh.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const mtCoins = mtCoinsData || { earned: 0, spent: 0, available: 0, usdValue: 0, stats: { views: 0, shares: 0, completions: 0, unlocks: 0 } };
+  const canWithdraw = (mtCoins.available || 0) >= WITHDRAWAL_AMOUNT;
 
   // ── Handle withdrawal submission ──
-  const handleWithdraw = async () => {
+  const handleWithdraw = () => {
     if (!selectedMethod) {
       setError('Please select a payment method.');
       return;
     }
 
-    // ── Check if user has enough coins ──
-    if ((mtCoins?.available || 0) < WITHDRAWAL_AMOUNT) {
+    if (!canWithdraw) {
       setError(`Insufficient MT Coins. You need ${WITHDRAWAL_AMOUNT} MT Coins ($15) to withdraw.`);
       return;
     }
 
-    // ── Validate form fields ──
     const methodObj = methods.find(m => m.id === selectedMethod);
     if (methodObj) {
       for (const field of methodObj.fields) {
@@ -135,50 +114,28 @@ export default function Withdraw() {
       }
     }
 
-    setIsSubmitting(true);
     setError('');
     setMessage('');
 
-    try {
-      const token = await user.getIdToken();
-
-      const payload = {
-        mtCoins: WITHDRAWAL_AMOUNT,
-        method: selectedMethod,
-        details: formData,
-      };
-
-      const res = await fetch(`${API_BASE}/withdrawals`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
+    createWithdrawal({
+      mtCoins: WITHDRAWAL_AMOUNT,
+      method: selectedMethod,
+      details: formData,
+    }, {
+      onSuccess: (data) => {
         setMessage(`✅ Withdrawal of ${data.mtCoins} MT Coins ($${data.amount}) requested successfully!`);
-        // Refresh data
-        setTimeout(() => {
-          fetchData();
-          setSelectedMethod(null);
-          setFormData({});
-        }, 2000);
-      } else {
-        setError(data.error || 'Failed to process withdrawal.');
-      }
-    } catch (err) {
-      console.error('Withdrawal error:', err);
-      setError('Network error. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+        // Reset form
+        setSelectedMethod(null);
+        setFormData({});
+        refetchWithdrawals();
+      },
+      onError: (err) => {
+        setError(err.message || 'Failed to submit withdrawal.');
+      },
+    });
   };
 
-  // ── Get status badge color ──
+  // ── Get status badge ──
   const getStatusBadge = (status) => {
     const styles = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -214,7 +171,6 @@ export default function Withdraw() {
     return icons[methodId] || <FaWallet />;
   };
 
-  // ── Get method name ──
   const getMethodName = (methodId) => {
     const names = {
       esewa: 'eSewa / Khalti',
@@ -227,52 +183,6 @@ export default function Withdraw() {
     };
     return names[methodId] || methodId;
   };
-
-  // ── Loading state ──
-  if (loading) {
-    return (
-      <>
-        <Meta title="Withdraw – MT Coins" />
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-          <div className="text-center">
-            <FaSpinner className="animate-spin text-4xl text-purple-600 mx-auto" />
-            <p className="mt-4 text-slate-500">Loading your dashboard...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── Skeleton loading ──
-  if (!profile || !mtCoins) {
-    return (
-      <>
-        <Meta title="Withdraw – MT Coins" />
-        <div className="min-h-screen bg-slate-50 p-4">
-          <div className="max-w-5xl mx-auto">
-            <div className="animate-pulse">
-              <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-slate-200 rounded-full" />
-                  <div className="flex-1">
-                    <div className="h-5 bg-slate-200 rounded w-32" />
-                    <div className="h-4 bg-slate-200 rounded w-48 mt-1" />
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="bg-white rounded-2xl p-6 shadow-sm h-32" />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  const canWithdraw = (mtCoins?.available || 0) >= WITHDRAWAL_AMOUNT;
 
   return (
     <>
@@ -306,7 +216,7 @@ export default function Withdraw() {
               </div>
               <div className="bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-2 rounded-xl border border-purple-200 text-center">
                 <p className="text-xs text-purple-600 font-medium">MT Coins</p>
-                <p className="text-xl font-bold text-purple-700">{mtCoins?.available?.toLocaleString() || 0}</p>
+                <p className="text-xl font-bold text-purple-700">{mtCoins.available?.toLocaleString() || 0}</p>
               </div>
             </div>
           </div>
@@ -315,19 +225,19 @@ export default function Withdraw() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
               <p className="text-xs text-slate-400 font-medium">Views</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins?.stats?.views?.toLocaleString() || 0}</p>
+              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.views?.toLocaleString() || 0}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
               <p className="text-xs text-slate-400 font-medium">Shares</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins?.stats?.shares?.toLocaleString() || 0}</p>
+              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.shares?.toLocaleString() || 0}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
               <p className="text-xs text-slate-400 font-medium">Completions</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins?.stats?.completions?.toLocaleString() || 0}</p>
+              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.completions?.toLocaleString() || 0}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 text-center">
               <p className="text-xs text-slate-400 font-medium">Unlocks</p>
-              <p className="text-xl font-bold text-slate-800">{mtCoins?.stats?.unlocks?.toLocaleString() || 0}</p>
+              <p className="text-xl font-bold text-slate-800">{mtCoins.stats?.unlocks?.toLocaleString() || 0}</p>
             </div>
           </div>
 
@@ -342,8 +252,8 @@ export default function Withdraw() {
                   <strong className="block mt-1">2,500 MT Coins = $15</strong>
                 </p>
                 <p className="text-xs text-amber-600 mt-1">
-                  Available: <strong>{mtCoins?.available?.toLocaleString() || 0}</strong> MT Coins 
-                  ≈ <strong>${((mtCoins?.available || 0) / 2500 * 15).toFixed(2)}</strong>
+                  Available: <strong>{mtCoins.available?.toLocaleString() || 0}</strong> MT Coins 
+                  ≈ <strong>${((mtCoins.available || 0) / 2500 * 15).toFixed(2)}</strong>
                 </p>
                 <p className="text-xs text-amber-600 mt-1">
                   Each withdrawal is exactly <strong>$15 (2,500 MT Coins)</strong>
@@ -378,7 +288,7 @@ export default function Withdraw() {
                   <p className="text-2xl font-bold text-purple-800">$15.00</p>
                   <p className="text-xs text-purple-600">= 2,500 MT Coins (exact amount)</p>
                   <p className="text-xs text-purple-600 mt-1">
-                    Your balance: <strong>{mtCoins?.available?.toLocaleString() || 0}</strong> MT Coins
+                    Your balance: <strong>{mtCoins.available?.toLocaleString() || 0}</strong> MT Coins
                     {canWithdraw ? ' ✅' : ' ❌ Insufficient'}
                   </p>
                 </div>
