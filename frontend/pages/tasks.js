@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
-import { getDeviceId } from '../utils/deviceId';
+import { getDeviceId, refreshDeviceId } from '../utils/deviceId';
 import {
   FaYoutube,
   FaTwitter,
@@ -50,11 +50,10 @@ function CampaignTasks({ campaign: initialCampaign }) {
     queryKey: campaignQueryKey(id),
     queryFn: () => fetchCampaign(id),
     initialData: initialCampaign,
-    // Refetch on mount and window focus to keep data fresh
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 0, // Always consider stale to trigger background refetch
-    enabled: !!id, // Only run if id exists
+    staleTime: 0,
+    enabled: !!id,
   });
 
   // ── Redirect if no tasks ──
@@ -63,6 +62,19 @@ function CampaignTasks({ campaign: initialCampaign }) {
       router.push(`/share?id=${id}`);
     }
   }, [campaign, id]);
+
+  // ── Force refresh fingerprint on page load (instantly) ──
+  useEffect(() => {
+    const refreshFingerprint = async () => {
+      try {
+        const realId = await refreshDeviceId();
+        console.log('🔄 Tasks page: refreshed fingerprint:', realId);
+      } catch (e) {
+        console.warn('Fingerprint refresh failed, using fallback:', e);
+      }
+    };
+    refreshFingerprint();
+  }, []);
 
   // ── Cleanup timers ──
   useEffect(() => {
@@ -124,13 +136,14 @@ function CampaignTasks({ campaign: initialCampaign }) {
 
     setIsSubmitting(true);
     try {
-      const deviceId = getDeviceId();
+      // ── Force real fingerprint on unlock request ──
+      const deviceId = await refreshDeviceId();
       await fetch(`${BACKEND_URL}/api/campaigns/${id}/unlock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId }),
       });
-      // After unlock, we can invalidate the query to refetch
+      // After unlock, invalidate the query to refetch
       queryClient.invalidateQueries(campaignQueryKey(id));
     } catch (err) {
       console.error('Unlock error:', err);
@@ -156,7 +169,6 @@ function CampaignTasks({ campaign: initialCampaign }) {
     return (
       <div className="min-h-screen bg-gray-50 py-4 px-4 sm:py-6">
         <div className="max-w-3xl mx-auto animate-pulse">
-          {/* Skeleton loader */}
           <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="h-48 sm:h-56 bg-gray-200" />
