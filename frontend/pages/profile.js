@@ -1,5 +1,5 @@
 // pages/profile.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
@@ -16,10 +16,22 @@ export default function Profile() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
 
+  // ── Debug logs ──
+  useEffect(() => {
+    console.log('🔍 Auth state:', { user, isAuthenticated });
+  }, [user, isAuthenticated]);
+
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
   const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
   const { invalidateProfile, invalidateStats } = useInvalidateQueries();
+
+  // ── Log mtCoins data ──
+  useEffect(() => {
+    if (mtCoinsData) {
+      console.log('💰 MT Coins data:', mtCoinsData);
+    }
+  }, [mtCoinsData]);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
@@ -80,7 +92,7 @@ export default function Profile() {
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
     { icon: FiHelpCircle, label: 'Support', href: '/support' },
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
-    { icon: FaWallet, label: 'Withdraw', href: '/withdraw' }, // ✅ Added Withdraw
+    { icon: FaWallet, label: 'Withdraw', href: '/withdraw' },
   ];
 
   const exploreOptions = [
@@ -204,7 +216,7 @@ export default function Profile() {
           </div>
 
           {/* ── Stats Grid ── */}
-          {user && (
+          {isAuthenticated && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
               {statsItems.map((stat, index) => (
                 <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
@@ -218,8 +230,8 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── MT Coins Row (simple) ── */}
-          {user && (
+          {/* ── MT Coins Row ── */}
+          {isAuthenticated && (
             <div className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-6 py-4 mb-6">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
@@ -227,7 +239,9 @@ export default function Profile() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Available MT Coins</p>
-                  <p className="text-2xl font-bold text-gray-900">{mtCoins.available?.toLocaleString() || 0}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {mtCoins?.available?.toLocaleString() ?? '0'}
+                  </p>
                 </div>
               </div>
               <Link href="/withdraw">
@@ -254,7 +268,7 @@ export default function Profile() {
           </div>
 
           {/* ── Refer & Affiliates ── */}
-          {user && (
+          {isAuthenticated && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Refer & Affiliates</h2>
               <div className="flex items-center justify-between flex-wrap gap-3">
