@@ -3,13 +3,26 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AuthScreen, { useAuth } from '../components/AuthScreen';
 import Meta from '../components/Meta';
+import Head from 'next/head';
 
-export default function Signup() {
+export default function Signup({ referralCode: initialRefCode }) {
   const router = useRouter();
   const { isAuthenticated, loading, needsCompletion, logout } = useAuth();
   const { ref, redirect } = router.query;
 
   const redirectTo = redirect || '/profile';
+
+  // ── Use the referral code from props (server‑side) or from URL ──
+  const referralCode = (ref || initialRefCode || '').toUpperCase();
+
+  // ── Build dynamic meta tags ──
+  const metaTitle = referralCode
+    ? `Join Make Trend with referral code ${referralCode} | Make Trend`
+    : 'Join Make Trend – Sign Up & Start Creating';
+  const metaDescription = referralCode
+    ? `Create your Make Trend account using referral code ${referralCode} and start launching viral campaigns!`
+    : 'Create your Make Trend account and start launching viral campaigns.';
+  const metaUrl = `https://maketrend.app/signup${referralCode ? `?ref=${referralCode}` : ''}`;
 
   // ── Redirect if already authenticated with a complete profile ──
   useEffect(() => {
@@ -53,18 +66,19 @@ export default function Signup() {
   // ── If authenticated and profile is complete, return null (will redirect) ──
   if (isAuthenticated && !needsCompletion) return null;
 
-  // ── Build dynamic meta tags with referral code ──
-  const referralCode = ref ? ref.toUpperCase() : '';
-  const metaTitle = referralCode
-    ? `Join Make Trend with referral code ${referralCode} | Make Trend`
-    : 'Join Make Trend – Sign Up & Start Creating';
-  const metaDescription = referralCode
-    ? `Create your Make Trend account using referral code ${referralCode} and start launching viral campaigns!`
-    : 'Create your Make Trend account and start launching viral campaigns.';
-  const metaUrl = `https://maketrend.app/signup${referralCode ? `?ref=${referralCode}` : ''}`;
-
   return (
     <>
+      <Head>
+        <meta property="og:title" content={metaTitle} />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="og:image" content="https://maketrend.app/og-image.png" />
+        <meta property="og:url" content={metaUrl} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={metaTitle} />
+        <meta name="twitter:description" content={metaDescription} />
+        <meta name="twitter:image" content="https://maketrend.app/og-image.png" />
+      </Head>
       <Meta
         title={metaTitle}
         description={metaDescription}
@@ -74,4 +88,14 @@ export default function Signup() {
       <AuthScreen redirectTo={redirectTo} />
     </>
   );
+}
+
+// ── Server‑Side Props to inject referral code into initial HTML ──
+export async function getServerSideProps(context) {
+  const { ref } = context.query;
+  return {
+    props: {
+      referralCode: ref || null,
+    },
+  };
 }
