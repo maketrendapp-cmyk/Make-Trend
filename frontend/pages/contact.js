@@ -189,7 +189,7 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
       icon: <FaWhatsapp className="w-6 h-6" />,
       title: 'WhatsApp',
       value: '+977 971-4501791',
-      link: 'https://wa.me/9779861234567',
+      link: 'https://wa.me/9779714501791',
       color: 'bg-green-100 text-green-600 hover:bg-green-200',
     },
     {
@@ -213,8 +213,8 @@ const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated)
       <Meta
         title="Contact Us | Make Trend"
         description="Get in touch with Make Trend support. We're here to help you with any questions or issues."
-        image="https://maketrend.vercel.app/og-contact.jpg"
-        url="https://maketrend.vercel.app/contact"
+        image="https://maketrend.app/og-image.png"
+        url="https://maketrend.app/contact"
       />
 
       <div ref={sectionRef} className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 overflow-hidden">
