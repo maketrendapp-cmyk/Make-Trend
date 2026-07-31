@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
-import { getDeviceId } from '../utils/deviceId';
+import { getDeviceId, refreshDeviceId } from '../utils/deviceId';
 import {
   FaShareAlt,
   FaCopy,
@@ -66,6 +66,19 @@ function CampaignShare({ campaign: initialCampaign }) {
       setLoading(false);
     }
   }, [id, initialCampaign]);
+
+  // ── Force refresh fingerprint on page load (instantly) ──
+  useEffect(() => {
+    const refreshFingerprint = async () => {
+      try {
+        const realId = await refreshDeviceId();
+        console.log('🔄 Share page: refreshed fingerprint:', realId);
+      } catch (e) {
+        console.warn('Fingerprint refresh failed, using fallback:', e);
+      }
+    };
+    refreshFingerprint();
+  }, []);
 
   const fetchCampaignData = async () => {
     try {
@@ -294,9 +307,10 @@ function CampaignShare({ campaign: initialCampaign }) {
     }, 500);
   };
 
+  // ── Call share API with REAL fingerprint ──
   const callShareAPI = async (totalShares) => {
     try {
-      const deviceId = getDeviceId();
+      const deviceId = await refreshDeviceId(); // Force real fingerprint
       await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -307,11 +321,12 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
+  // ── Handle claim with REAL fingerprint ──
   const handleClaim = async () => {
     if (!sharesComplete || isCompleting) return;
     setIsCompleting(true);
     try {
-      const deviceId = getDeviceId();
+      const deviceId = await refreshDeviceId(); // Force real fingerprint
       await fetch(`${API_BASE}/campaigns/${id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
