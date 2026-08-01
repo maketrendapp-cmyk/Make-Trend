@@ -708,6 +708,30 @@ async function recordAction(campaignId, userId, ip, deviceId, actionType) {
   }
 }
 
+// ── Cooldown check for device actions (minimum gap in seconds) ──
+async function checkActionCooldown(campaignId, deviceId, minInterval = 2) {
+  if (!deviceId) return true; // Shouldn't happen (we validate)
+  const key = `cooldown:${campaignId}:${deviceId}`;
+  try {
+    const last = await redis.get(key);
+    if (last) {
+      const elapsed = (Date.now() - parseInt(last)) / 1000;
+      if (elapsed < minInterval) {
+        console.warn(`⏱️ Cooldown: device ${deviceId} on campaign ${campaignId} tried action too fast (${elapsed.toFixed(2)}s)`);
+        return false;
+      }
+    }
+    // Update timestamp with TTL slightly longer than cooldown
+    await redis.set(key, Date.now().toString(), 'EX', minInterval + 1);
+    return true;
+  } catch (error) {
+    console.warn('Cooldown check failed, allowing:', error);
+    return true; // Fail-open
+  }
+}
+
+
+
 // ============================================================
 // 11. AUTH ENDPOINTS
 // ============================================================
@@ -1729,6 +1753,12 @@ app.get('/api/campaigns/:id', async (req, res) => {
           return;
         }
 
+        // ── Cooldown check for view ──
+        if (!(await checkActionCooldown(id, deviceId))) {
+          console.warn(`⏱️ View tracking skipped due to cooldown for campaign ${id}`);
+          return;
+        }
+
         // ── Use transaction to prevent race condition ──
         let newViews = 0;
         let campaignUserId = null;
@@ -2045,6 +2075,14 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       });
     }
 
+    // ── Cooldown check ──
+    if (!(await checkActionCooldown(id, deviceId))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many actions. Please wait a moment between actions.'
+      });
+    }
+
     // ── Determine acting user (verify token) ──
     let userId = null;
     const authHeader = req.headers.authorization;
@@ -2198,6 +2236,14 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
       });
     }
 
+    // ── Cooldown check ──
+    if (!(await checkActionCooldown(id, deviceId))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many actions. Please wait a moment between actions.'
+      });
+    }
+
     let userId = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -2293,6 +2339,14 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Valid device ID is required. Please refresh your browser and try again.'
+      });
+    }
+
+    // ── Cooldown check ──
+    if (!(await checkActionCooldown(id, deviceId))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many actions. Please wait a moment between actions.'
       });
     }
 
