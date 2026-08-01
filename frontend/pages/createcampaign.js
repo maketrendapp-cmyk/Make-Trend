@@ -263,12 +263,11 @@ export default function CreateCampaign() {
       if (res.ok && data.success) {
         // Clear saved form after success
         localStorage.removeItem(storageKey);
-        // 🔥 Invalidate React Query cache asynchronously (non‑blocking)
-        // This prevents the redirect from being delayed.
-        invalidateCampaigns().catch(() => {});
-        invalidateStats().catch(() => {});
-        // ── Force refetch immediately so the list is fresh when user navigates back ──
-        queryClient.refetchQueries({ queryKey: ['campaigns'] });
+// Invalidate and reset campaigns cache
+invalidateCampaigns().catch(() => {});
+invalidateStats().catch(() => {});
+// ── Reset the infinite query cache to force a fresh fetch on next mount ──
+queryClient.resetQueries({ queryKey: ['campaigns'] });
         // Redirect immediately to the success page
         router.push(`/campaign-created?id=${data.campaignId}`);
       } else {
