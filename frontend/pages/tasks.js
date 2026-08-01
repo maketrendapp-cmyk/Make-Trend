@@ -162,6 +162,40 @@ function CampaignTasks({ campaign: initialCampaign }) {
     return <FaLink className="text-gray-400" />;
   };
 
+  // ── Ad injection function ──
+  const injectAd = (containerId, adCode) => {
+    if (typeof window !== 'undefined') {
+      const container = document.getElementById(containerId);
+      if (container) {
+        const script = document.createElement('script');
+        script.innerHTML = adCode;
+        container.appendChild(script);
+      }
+    }
+  };
+
+  // ── Load top banner on mount ──
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const container = document.getElementById('top-banner-container');
+      if (container) {
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.innerHTML = `
+          atOptions = {
+            'key' : 'bd8fef55bf7ce9cf90e7c6aa9b2a7703',
+            'format' : 'iframe',
+            'height' : 90,
+            'width' : 728,
+            'params' : {}
+          };
+          document.write('<scr' + 'ipt type="text/javascript" src="https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js"></scr' + 'ipt>');
+        `;
+        container.appendChild(script);
+      }
+    }
+  }, []);
+
   // ── Loading state ──
   if (isLoading && !campaign) {
     return (
@@ -234,21 +268,10 @@ function CampaignTasks({ campaign: initialCampaign }) {
 
           {/* ─── TOP BANNER AD (728×90) ─── */}
           <div className="my-4 flex justify-center">
-            <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center">
-              <script
-                type="text/javascript"
-                dangerouslySetInnerHTML={{
-                  __html: `
-                    (function() {
-                      var s = document.createElement('script');
-                      s.src = 'https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js';
-                      s.async = true;
-                      document.currentScript.parentNode.insertBefore(s, document.currentScript);
-                    })();
-                  `,
-                }}
-              />
-            </div>
+            <div 
+              id="top-banner-container" 
+              className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center"
+            />
           </div>
 
           {/* ── Hero Card ── */}
@@ -405,17 +428,22 @@ function CampaignTasks({ campaign: initialCampaign }) {
                 {/* ─── NATIVE BANNER AD (After task #3) ─── */}
                 {tasks.length >= 3 && (
                   <div className="my-6 flex justify-center">
-                    <div className="w-full max-w-[336px]">
-                      <div id="container-4b3b3334be9dbca33558926aca954fd9"></div>
+                    <div 
+                      id="native-banner-container"
+                      className="w-full max-w-[336px] min-h-[280px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center"
+                    >
                       <script
                         dangerouslySetInnerHTML={{
                           __html: `
                             (function() {
-                              var s = document.createElement('script');
-                              s.async = true;
-                              s.setAttribute('data-cfasync', 'false');
-                              s.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
-                              document.getElementById('container-4b3b3334be9dbca33558926aca954fd9').appendChild(s);
+                              var container = document.getElementById('native-banner-container');
+                              if (container) {
+                                var s = document.createElement('script');
+                                s.async = true;
+                                s.setAttribute('data-cfasync', 'false');
+                                s.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
+                                container.appendChild(s);
+                              }
                             })();
                           `,
                         }}
