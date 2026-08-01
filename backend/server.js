@@ -3539,6 +3539,7 @@ app.post('/api/ads/status', verifyToken, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const key = `ad:${uid}:${today}`;
 
+    // ── Get data from Redis ──
     const data = await redis.hgetall(key);
     const adsWatched = parseInt(data.ads || '0');
     const coinsEarned = parseInt(data.coins || '0');
@@ -3548,6 +3549,7 @@ app.post('/api/ads/status', verifyToken, async (req, res) => {
     const COOLDOWN_SECONDS = 20;
     const now = Date.now();
 
+    // ── Check cooldown ──
     const cooldownSeconds = Math.max(0, COOLDOWN_SECONDS - Math.floor((now - lastAdTime) / 1000));
     const canWatch = adsWatched < MAX_ADS && cooldownSeconds === 0;
 
@@ -3572,6 +3574,7 @@ app.post('/api/ads/start', verifyToken, async (req, res) => {
     const uid = req.user.uid;
     const { deviceId } = req.body;
     
+    // ── Validate device ID ──
     if (!validateDeviceId(deviceId)) {
       return res.status(400).json({
         success: false,
@@ -3579,8 +3582,21 @@ app.post('/api/ads/start', verifyToken, async (req, res) => {
       });
     }
 
+    // ── Check if user already has an active session ──
     const startKey = `ad:start:${uid}`;
-    await redis.set(startKey, Date.now(), 'EX', 120); // 120 seconds expiry
+    const existing = await redis.get(startKey);
+    if (existing) {
+      const elapsed = (Date.now() - parseInt(existing)) / 1000;
+      if (elapsed < 30) {
+        return res.status(400).json({
+          success: false,
+          error: `Please wait ${Math.ceil(30 - elapsed)} seconds before starting a new ad.`,
+        });
+      }
+    }
+
+    // ── Store start time with 120s expiry ──
+    await redis.set(startKey, Date.now(), 'EX', 120);
     
     res.json({ success: true });
   } catch (error) {
@@ -3589,13 +3605,14 @@ app.post('/api/ads/start', verifyToken, async (req, res) => {
   }
 });
 
-// ── Complete ad view ──
+// ── Complete ad view (FULL VALIDATION) ──
 app.post('/api/ads/complete', verifyToken, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { deviceId } = req.body;
     const ip = getClientIp(req);
 
+    // ─── 1. DEVICE ID VALIDATION ───
     if (!validateDeviceId(deviceId)) {
       return res.status(400).json({
         success: false,
@@ -3610,7 +3627,7 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const key = `ad:${uid}:${today}`;
 
-    // ── Check daily limit ──
+    // ─── 2. DAILY LIMIT CHECK ───
     const current = await redis.hgetall(key);
     const adsWatched = parseInt(current.ads || '0');
 
@@ -3618,10 +3635,12 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
       return res.status(429).json({
         success: false,
         error: 'Daily limit reached. Come back tomorrow!',
+        adsWatched,
+        maxAds: MAX_ADS,
       });
     }
 
-    // ── Check cooldown ──
+    // ─── 3. COOLDOWN CHECK ───
     const lastAdTime = parseInt(current.lastAdTime || '0');
     if (lastAdTime > 0 && Date.now() - lastAdTime < COOLDOWN_SECONDS * 1000) {
       const remaining = Math.ceil((COOLDOWN_SECONDS - (Date.now() - lastAdTime) / 1000));
@@ -3632,7 +3651,7 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
       });
     }
 
-    // ── Verify start time (server‑side) ──
+    // ─── 4. SESSION CHECK (Must have started) ───
     const startKey = `ad:start:${uid}`;
     const startTime = await redis.get(startKey);
     
@@ -3643,44 +3662,59 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
       });
     }
     
+    // ─── 5. ELAPSED TIME CHECK (Must have watched 30s) ───
     const elapsed = (Date.now() - parseInt(startTime)) / 1000;
     if (elapsed < AD_DURATION) {
-      console.warn(`⚠️ Ad watched too quickly for user ${uid}: ${elapsed}s (required ${AD_DURATION}s)`);
+      console.warn(`⚠️ Ad watched too quickly for user ${uid}: ${elapsed.toFixed(1)}s (required ${AD_DURATION}s)`);
       return res.status(400).json({
         success: false,
-        error: `Please watch the ads for the full ${AD_DURATION} seconds.`,
+        error: `Please watch the ads for the full ${AD_DURATION} seconds. (${elapsed.toFixed(0)}s so far)`,
+        elapsed: Math.floor(elapsed),
+        required: AD_DURATION,
       });
     }
     
-    // ── Clear the start key ──
+    // ─── 6. CLEAN UP SESSION ───
     await redis.del(startKey);
 
-    // ── Device fingerprint check ──
+    // ─── 7. DEVICE FINGERPRINT CHECK (Fraud detection) ───
     const userDoc = await db.collection('users').doc(uid).get();
     if (userDoc.exists) {
       const storedDeviceId = userDoc.data().deviceId;
       if (storedDeviceId && storedDeviceId !== deviceId) {
-        console.warn(`⚠️ Device mismatch for user ${uid}`);
+        console.warn(`⚠️ Device mismatch for user ${uid}: stored ${storedDeviceId.substring(0, 20)}..., received ${deviceId.substring(0, 20)}...`);
+        // Still allow, but log for fraud detection
       }
     }
 
-    // ── Update Redis ──
+    // ─── 8. MULTIPLE DEVICES TRACKING ───
+    const deviceCountKey = `ad:devices:${uid}`;
+    const deviceCount = await redis.sadd(deviceCountKey, deviceId);
+    if (deviceCount > 3) {
+      console.warn(`⚠️ User ${uid} using multiple devices (${deviceCount}) for ads`);
+      // Optionally flag for admin review
+    }
+    await redis.expire(deviceCountKey, 86400 * 7); // 7 days
+
+    // ─── 9. UPDATE REDIS COUNTER ───
     const pipeline = redis.pipeline();
     pipeline.hincrby(key, 'ads', 1);
     pipeline.hincrby(key, 'coins', AD_REWARD);
     pipeline.hset(key, 'lastAdTime', Date.now());
-    pipeline.expire(key, 86400);
+    pipeline.expire(key, 86400); // 24 hours
     await pipeline.exec();
 
-    // ── Update user MT Coins ──
+    // ─── 10. UPDATE USER MT COINS ───
     const userRef = db.collection('users').doc(uid);
     await userRef.update({
       mtCoinsEarned: admin.firestore.FieldValue.increment(AD_REWARD),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // ─── 11. INVALIDATE CACHE ───
     await invalidateKey(`mtcoins:user:${uid}`);
 
+    // ─── 12. RESPONSE ───
     const newAdsWatched = adsWatched + 1;
     const remaining = MAX_ADS - newAdsWatched;
     const canWatch = remaining > 0;
@@ -3693,10 +3727,17 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
       remaining,
       canWatch,
       cooldownSeconds: canWatch ? COOLDOWN_SECONDS : 0,
+      // ── Additional info for debugging ──
+      elapsed: Math.floor(elapsed),
+      required: AD_DURATION,
     });
   } catch (error) {
     console.error('❌ Ad completion error:', error);
-    res.status(500).json({ success: false, error: 'Failed to process ad view' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to process ad view. Please try again.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
   }
 });
 
