@@ -18,6 +18,7 @@ export default function DesktopNav({
   const router = useRouter();
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -28,6 +29,11 @@ export default function DesktopNav({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Reset avatar error when URL changes
+  useEffect(() => {
+    setAvatarError(false);
+  }, [avatarUrl]);
 
   const isActive = (path) => router.pathname === path;
 
@@ -60,16 +66,12 @@ export default function DesktopNav({
             ) : (
               <div className="relative">
                 <div className="w-8 h-8 rounded-full overflow-hidden shadow-sm border-2 border-white">
-                  {avatarUrl ? (
+                  {avatarUrl && !avatarError ? (
                     <img
                       src={avatarUrl}
                       alt={displayName}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.parentElement.className = 'w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold';
-                        e.target.parentElement.textContent = firstLetter;
-                      }}
+                      onError={() => setAvatarError(true)}
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
