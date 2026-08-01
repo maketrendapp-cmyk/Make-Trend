@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import Script from 'next/script'; // ← Add this import
+import Script from 'next/script';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
@@ -166,61 +166,49 @@ function CampaignTasks({ campaign: initialCampaign }) {
   // ── Loading state ──
   if (isLoading && !campaign) {
     return (
-      <>
-        <Script
-          src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
-          strategy="afterInteractive"
-        />
-        <div className="min-h-screen bg-gray-50 py-4 px-4 sm:py-6">
-          <div className="max-w-3xl mx-auto animate-pulse">
-            <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="h-48 sm:h-56 bg-gray-200" />
-              <div className="p-6">
-                <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
-                <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
-                <div className="h-6 w-32 bg-gray-200 rounded-full mb-6" />
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 bg-gray-100 rounded-xl">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full" />
-                      <div className="flex-1">
-                        <div className="h-5 w-3/4 bg-gray-200 rounded" />
-                        <div className="h-3 w-1/2 bg-gray-200 rounded mt-1" />
-                      </div>
+      <div className="min-h-screen bg-gray-50 py-4 px-4 sm:py-6">
+        <div className="max-w-3xl mx-auto animate-pulse">
+          <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="h-48 sm:h-56 bg-gray-200" />
+            <div className="p-6">
+              <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
+              <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
+              <div className="h-6 w-32 bg-gray-200 rounded-full mb-6" />
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 bg-gray-100 rounded-xl">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                    <div className="flex-1">
+                      <div className="h-5 w-3/4 bg-gray-200 rounded" />
+                      <div className="h-3 w-1/2 bg-gray-200 rounded mt-1" />
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   // ── Error state ──
   if (!campaign) {
     return (
-      <>
-        <Script
-          src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
-          strategy="afterInteractive"
-        />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-          <div className="text-center max-w-md">
-            <div className="text-5xl mb-4">😕</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign not found</h2>
-            <p className="text-gray-500">The campaign you're looking for doesn't exist.</p>
-            <button
-              onClick={() => router.push('/')}
-              className="mt-6 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition"
-            >
-              Go Home
-            </button>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="text-5xl mb-4">😕</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign not found</h2>
+          <p className="text-gray-500">The campaign you're looking for doesn't exist.</p>
+          <button
+            onClick={() => router.push('/')}
+            className="mt-6 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition"
+          >
+            Go Home
+          </button>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -231,12 +219,6 @@ function CampaignTasks({ campaign: initialCampaign }) {
   // ── Main Render ──
   return (
     <>
-      {/* ── Ad Script ── */}
-      <Script
-        src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
-        strategy="afterInteractive"
-      />
-
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
 
@@ -250,6 +232,27 @@ function CampaignTasks({ campaign: initialCampaign }) {
             </svg>
             Back
           </button>
+
+          {/* ─── TOP BANNER AD (728×90) – FIXED ─── */}
+          <div className="my-4 flex justify-center">
+            <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center">
+              <script
+                type="text/javascript"
+                dangerouslySetInnerHTML={{
+                  __html: `
+                    atOptions = {
+                      'key' : 'bd8fef55bf7ce9cf90e7c6aa9b2a7703',
+                      'format' : 'iframe',
+                      'height' : 90,
+                      'width' : 728,
+                      'params' : {}
+                    };
+                    document.write('<scr' + 'ipt type="text/javascript" src="https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js"></scr' + 'ipt>');
+                  `,
+                }}
+              />
+            </div>
+          </div>
 
           {/* ── Hero Card ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 transition-all hover:shadow-md">
@@ -322,84 +325,108 @@ function CampaignTasks({ campaign: initialCampaign }) {
             {tasks.length === 0 ? (
               <div className="text-center py-8 text-gray-500">No tasks to complete.</div>
             ) : (
-              <div className="space-y-3">
-                {tasks.map((task, index) => {
-                  const isCompleted = completedIndices.includes(index);
-                  const isPending = pendingIndex === index;
+              <>
+                <div className="space-y-3">
+                  {tasks.map((task, index) => {
+                    const isCompleted = completedIndices.includes(index);
+                    const isPending = pendingIndex === index;
 
-                  return (
-                    <div
-                      key={index}
-                      className={`group relative flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 ${
-                        isCompleted
-                          ? 'bg-green-50/80 border-green-200'
-                          : isPending
-                          ? 'bg-amber-50/80 border-amber-300 shadow-sm shadow-amber-100/50'
-                          : 'bg-gray-50/80 border-gray-200 hover:bg-gray-100/60'
-                      }`}
-                    >
-                      <div className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-lg bg-white shadow-sm border border-gray-200">
-                        {isCompleted ? (
-                          <FaCheckCircle className="text-green-500 text-xl" />
-                        ) : isPending ? (
-                          <FaClock className="text-amber-500 text-xl animate-pulse" />
-                        ) : (
-                          getPlatformIcon(task.url)
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p
-                            className={`font-medium transition-all duration-300 ${
-                              isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'
-                            }`}
-                          >
-                            {task.text}
-                          </p>
-                          {isPending && (
-                            <span className="text-[10px] font-medium bg-amber-200 text-amber-700 px-2 py-0.5 rounded-full animate-pulse">
-                              ⏳ Verifying {countdown}s
-                            </span>
-                          )}
-                          {isCompleted && (
-                            <span className="text-[10px] font-medium bg-green-200 text-green-700 px-2 py-0.5 rounded-full">
-                              ✅ Done
-                            </span>
+                    return (
+                      <div
+                        key={index}
+                        className={`group relative flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 ${
+                          isCompleted
+                            ? 'bg-green-50/80 border-green-200'
+                            : isPending
+                            ? 'bg-amber-50/80 border-amber-300 shadow-sm shadow-amber-100/50'
+                            : 'bg-gray-50/80 border-gray-200 hover:bg-gray-100/60'
+                        }`}
+                      >
+                        <div className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-lg bg-white shadow-sm border border-gray-200">
+                          {isCompleted ? (
+                            <FaCheckCircle className="text-green-500 text-xl" />
+                          ) : isPending ? (
+                            <FaClock className="text-amber-500 text-xl animate-pulse" />
+                          ) : (
+                            getPlatformIcon(task.url)
                           )}
                         </div>
-                        {task.url && (
-                          <p className="text-xs text-gray-400 truncate mt-0.5">
-                            {task.url.replace(/^https?:\/\//, '')}
-                          </p>
-                        )}
-                      </div>
 
-                      <div className="flex-shrink-0">
-                        {isCompleted ? (
-                          <span className="text-xs font-medium text-green-600 bg-green-100 px-3 py-1.5 rounded-full">
-                            Completed
-                          </span>
-                        ) : isPending ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-sm font-bold text-amber-600 bg-white animate-pulse">
-                              {countdown}
-                            </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p
+                              className={`font-medium transition-all duration-300 ${
+                                isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'
+                              }`}
+                            >
+                              {task.text}
+                            </p>
+                            {isPending && (
+                              <span className="text-[10px] font-medium bg-amber-200 text-amber-700 px-2 py-0.5 rounded-full animate-pulse">
+                                ⏳ Verifying {countdown}s
+                              </span>
+                            )}
+                            {isCompleted && (
+                              <span className="text-[10px] font-medium bg-green-200 text-green-700 px-2 py-0.5 rounded-full">
+                                ✅ Done
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => handleOpenTask(index, task.url)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97]"
-                          >
-                            <FaExternalLinkAlt className="w-3 h-3" />
-                            Open Task
-                          </button>
-                        )}
+                          {task.url && (
+                            <p className="text-xs text-gray-400 truncate mt-0.5">
+                              {task.url.replace(/^https?:\/\//, '')}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex-shrink-0">
+                          {isCompleted ? (
+                            <span className="text-xs font-medium text-green-600 bg-green-100 px-3 py-1.5 rounded-full">
+                              Completed
+                            </span>
+                          ) : isPending ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-sm font-bold text-amber-600 bg-white animate-pulse">
+                                {countdown}
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenTask(index, task.url)}
+                              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97]"
+                            >
+                              <FaExternalLinkAlt className="w-3 h-3" />
+                              Open Task
+                            </button>
+                          )}
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
+
+                {/* ─── NATIVE BANNER AD (After task #3) ─── */}
+                {tasks.length >= 3 && (
+                  <div className="my-6 flex justify-center">
+                    <div className="w-full max-w-[336px]">
+                      <div id="container-4b3b3334be9dbca33558926aca954fd9"></div>
+                      <script
+                        dangerouslySetInnerHTML={{
+                          __html: `
+                            (function() {
+                              var s = document.createElement('script');
+                              s.async = true;
+                              s.setAttribute('data-cfasync', 'false');
+                              s.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
+                              document.getElementById('container-4b3b3334be9dbca33558926aca954fd9').appendChild(s);
+                            })();
+                          `,
+                        }}
+                      />
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* ── Claim Button ── */}
@@ -435,6 +462,19 @@ function CampaignTasks({ campaign: initialCampaign }) {
           </div>
         </div>
       </div>
+
+      {/* ─── POPUNDER AD (Global – shows once per session) ─── */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              var s = document.createElement('script');
+              s.src = 'https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js';
+              document.head.appendChild(s);
+            })();
+          `,
+        }}
+      />
     </>
   );
 }
