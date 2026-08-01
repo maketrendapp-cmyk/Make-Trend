@@ -1,4 +1,3 @@
-
 // pages/share.js
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -117,7 +116,7 @@ function CampaignShare({ campaign: initialCampaign }) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [sharesComplete, setSharesComplete] = useState(false);
-  const [isClaimReady, setIsClaimReady] = useState(false); // Controls the 2s API gap
+  const [isClaimReady, setIsClaimReady] = useState(false);
   
   const [shareProgress, setShareProgress] = useState(0);
   const [shareAttempt, setShareAttempt] = useState(0);
@@ -250,7 +249,7 @@ function CampaignShare({ campaign: initialCampaign }) {
     return `${title}\n\n${description}\n\nOpen The Link:\n${link}`;
   };
 
-  // ── Native Share (Text + Link context) ──
+  // ── Native Share ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
@@ -352,15 +351,13 @@ function CampaignShare({ campaign: initialCampaign }) {
         setShares(newShares);
         setShareProgress(Math.min((newShares / shareCount) * 100, 100));
 
-        // ── FINAL SHARE LOGIC: Fire API & Enforce 2s Gap ──
         if (newShares >= shareCount && !shareApiCalledRef.current) {
           shareApiCalledRef.current = true;
-          callShareAPI(shareCount); // Fire share API immediately
+          callShareAPI(shareCount);
           setSharesComplete(true);
           setShareAttempt(3);
           
-          setIsClaimReady(false); // Lock the claim button
-          // EXACTLY 2 SECOND GAP BEFORE UNLOCKING COMPLETE API
+          setIsClaimReady(false);
           setTimeout(() => {
             setIsClaimReady(true);
           }, 2000);
@@ -386,7 +383,6 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
-  // ── This is ONLY clickable when isClaimReady === true ──
   const handleClaim = async () => {
     if (!sharesComplete || !isClaimReady || isCompleting) return;
     setIsCompleting(true);
@@ -462,7 +458,7 @@ function CampaignShare({ campaign: initialCampaign }) {
           {isComplete ? 'Back to Home' : 'Back'}
         </button>
 
-        {/* ─── 1. TOP BANNER AD (High Visibility) ─── */}
+        {/* ─── 1. TOP BANNER AD ─── */}
         <div className="my-4 w-full overflow-hidden max-w-full">
           <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
         </div>
@@ -530,11 +526,6 @@ function CampaignShare({ campaign: initialCampaign }) {
           </div>
         </div>
 
-        {/* ─── 2. NATIVE IN-FEED AD ─── */}
-        {!isComplete && (
-          <NativeAd />
-        )}
-
         {/* ── Share Section ── */}
         {shareCount > 0 && !isComplete && (
           <motion.div
@@ -560,7 +551,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               </p>
             </div>
 
-            {/* ── Messenger & WhatsApp (URL only) ── */}
+            {/* ── Messenger & WhatsApp ── */}
             <div className="relative z-10 mt-5 flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={handleMessengerShare}
@@ -580,7 +571,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               </button>
             </div>
 
-            {/* ── Main Native Share Button (Pulsing to encourage clicks) ── */}
+            {/* ── Main Native Share Button ── */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -643,7 +634,6 @@ function CampaignShare({ campaign: initialCampaign }) {
 
         {isComplete && (
           <div className="mt-6">
-            {/* 2-SECOND DELAY / VERIFYING STATE */}
             {!isClaimReady ? (
                <button
                  disabled
@@ -679,6 +669,12 @@ function CampaignShare({ campaign: initialCampaign }) {
             </p>
           </div>
         )}
+
+        {/* ─── ─── 2. NATIVE AD (MOVED TO BOTTOM – AFTER CLAIM BUTTON) ─── ─── */}
+        <div className="mt-8">
+          <NativeAd />
+        </div>
+
       </div>
 
       {/* ── Claim Success Modal ── */}
@@ -719,13 +715,11 @@ function CampaignShare({ campaign: initialCampaign }) {
         )}
       </AnimatePresence>
 
-      {/* ─── 3. STICKY BOTTOM BANNER AD (FIXED SCROLL ISSUE) ─── */}
+      {/* ─── 3. STICKY BOTTOM BANNER AD ─── */}
       {showStickyAd && (
         <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none pb-2 sm:pb-4">
-          {/* Strictly capped width using calc(100vw-16px) so it never overflows the viewport */}
           <div className="bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] p-1.5 sm:p-2 rounded-xl pointer-events-auto border border-gray-200/50 relative mx-auto w-[calc(100vw-16px)] sm:w-auto sm:max-w-[760px]">
             
-            {/* Close Button */}
             <button 
               onClick={() => setShowStickyAd(false)}
               className="absolute -top-3 -right-2 bg-white border border-gray-200 text-gray-500 hover:text-red-500 rounded-full w-7 h-7 flex items-center justify-center transition shadow-md z-10"
@@ -739,15 +733,13 @@ function CampaignShare({ campaign: initialCampaign }) {
         </div>
       )}
 
-      {/* ─── 4. GLOBAL NETWORK ADS (POPUNDER & SOCIAL BAR) ─── */}
-      {/* Popunder */}
+      {/* ─── 4. GLOBAL NETWORK ADS ─── */}
       <Script
         id="popunder-ad"
         src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js"
         strategy="afterInteractive"
       />
 
-      {/* Social Bar */}
       <Script
         id="social-bar-ad"
         src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
