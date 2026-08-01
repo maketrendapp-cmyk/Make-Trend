@@ -1,8 +1,8 @@
+
 // pages/tasks.js
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import Script from 'next/script';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
@@ -17,6 +17,7 @@ import {
   FaCheckCircle,
   FaClock,
   FaExternalLinkAlt,
+  FaTimes
 } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -30,8 +31,78 @@ const defaultMeta = {
   url: 'https://maketrend.app/tasks?id={id}',
 };
 
-// ── Query key for campaign data ──
 const campaignQueryKey = (id) => ['campaign', id];
+
+// ─── AD COMPONENTS (Optimized for React/Next.js) ───
+
+// Safely loads document.write() ads without breaking React using an isolated iframe
+const IframeAd = ({ adKey, width, height }) => {
+  const srcDoc = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <style>body{margin:0;padding:0;overflow:hidden;display:flex;justify-content:center;align-items:center;}</style>
+      </head>
+      <body>
+        <script type="text/javascript">
+          atOptions = {
+            'key' : '${adKey}',
+            'format' : 'iframe',
+            'height' : ${height},
+            'width' : ${width},
+            'params' : {}
+          };
+        </script>
+        <script type="text/javascript" src="https://www.highperformanceformat.com/${adKey}/invoke.js"></script>
+      </body>
+    </html>
+  `;
+  return (
+    <div className="w-full flex justify-center overflow-hidden">
+      <div className="overflow-x-auto no-scrollbar max-w-full">
+        <iframe
+          title="Banner Ad"
+          srcDoc={srcDoc}
+          width={width}
+          height={height}
+          frameBorder="0"
+          scrolling="no"
+          style={{ display: 'block', margin: '0 auto' }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// Safely loads Native DOM injection ads
+const NativeAd = () => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    // Prevent double injection
+    if (containerRef.current.querySelector('script')) return;
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
+    containerRef.current.appendChild(script);
+  }, []);
+
+  return (
+    <div className="flex justify-center w-full my-4">
+      {/* Container collapses gracefully if ad doesn't load */}
+      <div 
+        ref={containerRef} 
+        id="container-4b3b3334be9dbca33558926aca954fd9" 
+        className="w-full flex justify-center max-w-[336px] transition-all"
+      />
+    </div>
+  );
+};
+
+// ─── MAIN COMPONENT ───
 
 function CampaignTasks({ campaign: initialCampaign }) {
   const router = useRouter();
@@ -42,11 +113,27 @@ function CampaignTasks({ campaign: initialCampaign }) {
   const [pendingIndex, setPendingIndex] = useState(null);
   const [countdown, setCountdown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showStickyAd, setShowStickyAd] = useState(true);
 
   const timerRef = useRef(null);
   const intervalRef = useRef(null);
 
-  // ── React Query: fetch campaign with background updates ──
+  // ── Global Popunder/Network Scripts ──
+  useEffect(() => {
+    const injectGlobalAd = (src) => {
+      if (!document.querySelector(`script[src="${src}"]`)) {
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        document.head.appendChild(script);
+      }
+    };
+    // Inject Popunder & Original First Ad Scripts
+    injectGlobalAd('https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js');
+    injectGlobalAd('https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js');
+  }, []);
+
+  // ── React Query ──
   const { data: campaign, isLoading } = useQuery({
     queryKey: campaignQueryKey(id),
     queryFn: () => fetchCampaign(id),
@@ -57,43 +144,32 @@ function CampaignTasks({ campaign: initialCampaign }) {
     enabled: !!id,
   });
 
-  // ── Redirect if no tasks ──
   useEffect(() => {
     if (campaign && (!campaign.tasks || campaign.tasks.length === 0)) {
       router.push(`/share?id=${id}`);
     }
   }, [campaign, id]);
 
-  // ── Force refresh fingerprint on page load (instantly) ──
   useEffect(() => {
     const refreshFingerprint = async () => {
       try {
-        const realId = await refreshDeviceId();
-        console.log('🔄 Tasks page: refreshed fingerprint:', realId);
+        await refreshDeviceId();
       } catch (e) {
-        console.warn('Fingerprint refresh failed, using fallback:', e);
+        console.warn('Fingerprint refresh failed');
       }
     };
     refreshFingerprint();
   }, []);
 
-  // ── Cleanup timers ──
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => cleanupTimers();
   }, []);
 
   const cleanupTimers = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    timerRef.current = null;
+    intervalRef.current = null;
   };
 
   const startCountdown = (index) => {
@@ -163,37 +239,14 @@ function CampaignTasks({ campaign: initialCampaign }) {
     return <FaLink className="text-gray-400" />;
   };
 
-  // ── Loading state ──
   if (isLoading && !campaign) {
     return (
-      <div className="min-h-screen bg-gray-50 py-4 px-4 sm:py-6">
-        <div className="max-w-3xl mx-auto animate-pulse">
-          <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="h-48 sm:h-56 bg-gray-200" />
-            <div className="p-6">
-              <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
-              <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
-              <div className="h-6 w-32 bg-gray-200 rounded-full mb-6" />
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 bg-gray-100 rounded-xl">
-                    <div className="w-10 h-10 bg-gray-200 rounded-full" />
-                    <div className="flex-1">
-                      <div className="h-5 w-3/4 bg-gray-200 rounded" />
-                      <div className="h-3 w-1/2 bg-gray-200 rounded mt-1" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
       </div>
     );
   }
 
-  // ── Error state ──
   if (!campaign) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -216,13 +269,11 @@ function CampaignTasks({ campaign: initialCampaign }) {
   const allCompleted = tasks.length > 0 && completedIndices.length === tasks.length;
   const progress = tasks.length > 0 ? (completedIndices.length / tasks.length) * 100 : 0;
 
-  // ── Main Render ──
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-4 sm:py-6 sm:px-6 lg:px-8 pb-32">
         <div className="max-w-3xl mx-auto">
-
-          {/* ── Back Button ── */}
+          {/* Back Button */}
           <button
             onClick={() => router.back()}
             className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100"
@@ -233,26 +284,9 @@ function CampaignTasks({ campaign: initialCampaign }) {
             Back
           </button>
 
-          {/* ─── TOP BANNER AD (728×90) ─── */}
-          <div className="my-4 flex justify-center">
-            <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center">
-              <Script
-                id="top-banner-ad"
-                strategy="afterInteractive"
-                dangerouslySetInnerHTML={{
-                  __html: `
-                    atOptions = {
-                      'key' : 'bd8fef55bf7ce9cf90e7c6aa9b2a7703',
-                      'format' : 'iframe',
-                      'height' : 90,
-                      'width' : 728,
-                      'params' : {}
-                    };
-                    document.write('<scr' + 'ipt type="text/javascript" src="https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js"></scr' + 'ipt>');
-                  `,
-                }}
-              />
-            </div>
+          {/* ─── 1. TOP BANNER AD (High Visibility) ─── */}
+          <div className="my-4">
+            <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
           </div>
 
           {/* ── Hero Card ── */}
@@ -295,19 +329,6 @@ function CampaignTasks({ campaign: initialCampaign }) {
                 <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
                   📋 {completedIndices.length}/{tasks.length} tasks
                 </span>
-                {campaign.shareCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-xs font-medium">
-                    📢 Share with {campaign.shareCount}
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-                <span className="flex items-center gap-2">
-                  <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
-                  <span>complete</span>
-                </span>
-                <span>{completedIndices.length}/{tasks.length} tasks</span>
               </div>
             </div>
           </div>
@@ -326,15 +347,14 @@ function CampaignTasks({ campaign: initialCampaign }) {
             {tasks.length === 0 ? (
               <div className="text-center py-8 text-gray-500">No tasks to complete.</div>
             ) : (
-              <>
-                <div className="space-y-3">
-                  {tasks.map((task, index) => {
-                    const isCompleted = completedIndices.includes(index);
-                    const isPending = pendingIndex === index;
+              <div className="space-y-4">
+                {tasks.map((task, index) => {
+                  const isCompleted = completedIndices.includes(index);
+                  const isPending = pendingIndex === index;
 
-                    return (
+                  return (
+                    <React.Fragment key={index}>
                       <div
-                        key={index}
                         className={`group relative flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 ${
                           isCompleted
                             ? 'bg-green-50/80 border-green-200'
@@ -355,11 +375,7 @@ function CampaignTasks({ campaign: initialCampaign }) {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p
-                              className={`font-medium transition-all duration-300 ${
-                                isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'
-                              }`}
-                            >
+                            <p className={`font-medium transition-all duration-300 ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                               {task.text}
                             </p>
                             {isPending && (
@@ -373,11 +389,6 @@ function CampaignTasks({ campaign: initialCampaign }) {
                               </span>
                             )}
                           </div>
-                          {task.url && (
-                            <p className="text-xs text-gray-400 truncate mt-0.5">
-                              {task.url.replace(/^https?:\/\//, '')}
-                            </p>
-                          )}
                         </div>
 
                         <div className="flex-shrink-0">
@@ -386,50 +397,30 @@ function CampaignTasks({ campaign: initialCampaign }) {
                               Completed
                             </span>
                           ) : isPending ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-sm font-bold text-amber-600 bg-white animate-pulse">
-                                {countdown}
-                              </div>
+                            <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-sm font-bold text-amber-600 bg-white animate-pulse">
+                              {countdown}
                             </div>
                           ) : (
                             <button
                               onClick={() => handleOpenTask(index, task.url)}
-                              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97]"
+                              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all duration-200 shadow-sm active:scale-[0.97]"
                             >
                               <FaExternalLinkAlt className="w-3 h-3" />
-                              Open Task
+                              Open
                             </button>
                           )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
 
-                {/* ─── NATIVE BANNER AD (After task #3) ─── */}
-                {tasks.length >= 3 && (
-                  <div className="my-6 flex justify-center">
-                    <div className="w-full max-w-[336px] min-h-[280px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center">
-                      <div id="container-4b3b3334be9dbca33558926aca954fd9" />
-                      <Script
-                        id="native-banner-ad"
-                        strategy="afterInteractive"
-                        dangerouslySetInnerHTML={{
-                          __html: `
-                            (function() {
-                              var s = document.createElement('script');
-                              s.async = true;
-                              s.setAttribute('data-cfasync', 'false');
-                              s.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
-                              document.getElementById('container-4b3b3334be9dbca33558926aca954fd9').appendChild(s);
-                            })();
-                          `,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
+                      {/* ─── 2. IN-FEED NATIVE AD (High CTR Strategy) ─── */}
+                      {/* Appears seamlessly after the FIRST task */}
+                      {index === 0 && tasks.length >= 2 && (
+                        <NativeAd />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
             )}
 
             {/* ── Claim Button ── */}
@@ -452,61 +443,51 @@ function CampaignTasks({ campaign: initialCampaign }) {
                     Processing...
                   </span>
                 ) : (
-                  '🎁 Claim'
+                  '🎁 Claim Reward'
                 )}
               </button>
-
-              {!allCompleted && tasks.length > 0 && (
-                <p className="mt-2 text-center text-xs text-gray-400">
-                  Complete all {tasks.length} tasks to claim your reward
-                </p>
-              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ─── POPUNDER AD ─── */}
-      <Script
-        id="popunder-ad"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              var s = document.createElement('script');
-              s.src = 'https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js';
-              s.async = true;
-              document.head.appendChild(s);
-            })();
-          `,
-        }}
-      />
+      {/* ─── 3. STICKY BOTTOM BANNER AD (Highest Revenue Format) ─── */}
+      {showStickyAd && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-2 sm:pb-4">
+          <div className="bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] p-1.5 sm:p-2 rounded-xl pointer-events-auto border border-gray-200/50 relative mx-2">
+            
+            {/* Close Button */}
+            <button 
+              onClick={() => setShowStickyAd(false)}
+              className="absolute -top-3 -right-2 bg-gray-100 border border-gray-300 text-gray-500 hover:text-gray-800 rounded-full w-6 h-6 flex items-center justify-center transition shadow-sm z-10"
+              aria-label="Close Ad"
+            >
+              <FaTimes className="w-3 h-3" />
+            </button>
+            
+            <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+          </div>
+        </div>
+      )}
 
-      {/* ─── ORIGINAL FIRST AD ─── */}
-      <Script
-        id="original-ad"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              var s = document.createElement('script');
-              s.src = 'https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js';
-              s.async = true;
-              document.head.appendChild(s);
-            })();
-          `,
-        }}
-      />
+      {/* ── CSS for Hiding Scrollbars inside Iframes ── */}
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </>
   );
 }
 
-// ── Server‑side props ──
 export async function getServerSideProps({ query }) {
   const campaignId = query.id || query.campaign || null;
   const campaign = campaignId ? await fetchCampaign(campaignId) : null;
   return { props: { campaign } };
 }
 
-// ── Wrap with Meta ──
 export default withCampaignMeta(CampaignTasks, defaultMeta);
