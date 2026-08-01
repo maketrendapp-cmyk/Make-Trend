@@ -1046,18 +1046,8 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
 app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const cacheKey = `user:profile:${uid}`;
-    let result;
-    try {
-      const cached = await redisGet(cacheKey);
-      if (cached) {
-        console.log(`📦 User profile cache HIT: ${uid}`);
-        return res.json(JSON.parse(cached));
-      }
-    } catch (error) {
-      console.warn(`⚠️ User cache miss/error for ${uid}:`, error.message);
-    }
 
+    // ── Always fetch fresh from Firestore ──
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -1077,17 +1067,10 @@ app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
         userData.plan = 'free';
         delete userData.proExpiry;
         console.log(`⏰ PRO expired for user ${uid}, downgraded to free`);
-        await invalidateKey(`user:profile:${uid}`);
       }
     }
 
-    result = { success: true, user: { uid, ...userData } };
-
-    try {
-      await redis.set(cacheKey, JSON.stringify(result));
-      console.log(`💾 User profile cached: ${uid}`);
-    } catch (err) { /* ignore */ }
-    res.json(result);
+    res.json({ success: true, user: { uid, ...userData } });
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -2950,17 +2933,6 @@ app.put('/api/withdrawals/:id/status', verifyToken, checkBanned, async (req, res
 app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const cacheKey = `mtcoins:user:${uid}`;
-
-    // ── Try cache ──
-    try {
-      const cached = await redisGet(cacheKey);
-      if (cached) {
-        return res.json(JSON.parse(cached));
-      }
-    } catch (error) {
-      console.warn(`⚠️ MT Coins cache miss: ${error.message}`);
-    }
 
     // ── 1. Calculate earned from campaign stats ──
     const statsSnapshot = await db.collection('campaigns')
@@ -2982,9 +2954,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalUnlocks += data.unlockCount || 0;
     });
 
-    // ── ✅ CORRECT: MT Coins = minimum of all four ──
-    // 1 MT Coin = 1 View + 1 Share + 1 Unlock + 1 Completion
-    // All four must be present to earn 1 coin
+    // ── MT Coins = minimum of all four ──
     const earnedFromStats = Math.min(
       totalViews,
       totalShares,
@@ -3004,7 +2974,6 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
 
     // ── 3. MIGRATION: Initialize if missing ──
     if (data.mtCoinsEarned === undefined && data.mtCoinsSpent === undefined) {
-      // Sum all successful withdrawals
       const withdrawSnapshot = await db.collection('withdrawals')
         .where('userId', '==', uid)
         .where('status', '==', 'successful')
@@ -3025,7 +2994,6 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // ── 4. Normal update: only increase earned ──
       if (earnedFromStats > mtCoinsEarned) {
         mtCoinsEarned = earnedFromStats;
         await db.collection('users').doc(uid).update({
@@ -3035,12 +3003,10 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       }
     }
 
-    // ── 5. Compute available ──
     const available = mtCoinsEarned - mtCoinsSpent;
     const usdValue = (available / 2500) * 15;
 
-    // ── 6. Response ──
-    const result = {
+    res.json({
       success: true,
       mtCoins: {
         earned: mtCoinsEarned,
@@ -3054,10 +3020,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
           unlocks: totalUnlocks,
         },
       },
-    };
-
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
-    res.json(result);
+    });
   } catch (error) {
     console.error('❌ MT Coins error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch MT Coins' });
