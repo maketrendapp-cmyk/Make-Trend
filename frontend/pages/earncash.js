@@ -15,6 +15,7 @@ import {
   FaExternalLinkAlt,
   FaSpinner,
   FaGift,
+  FaPlay,
 } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -45,7 +46,7 @@ const PopunderAd = () => {
   );
 };
 
-// Banner Ad (shows in the page)
+// Banner Ad
 const BannerAd = () => {
   return (
     <div className="w-full flex justify-center my-2">
@@ -137,9 +138,8 @@ export default function EarnCash() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalEarned, setTotalEarned] = useState(0);
   const [claimedCount, setClaimedCount] = useState(0);
-  const [showAd, setShowAd] = useState(false);
 
-  const AD_REWARD = 10; // 10 MT Coins per ad
+  const AD_REWARD = 10;
   const MAX_ADS = 5;
   const COOLDOWN_SECONDS = 20;
 
@@ -147,7 +147,10 @@ export default function EarnCash() {
   const fetchStatus = async () => {
     try {
       const token = await user?.getIdToken?.();
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       const deviceId = await refreshDeviceId();
       const res = await fetch(`${API_BASE}/ads/status`, {
@@ -165,7 +168,6 @@ export default function EarnCash() {
         setClaimedCount(completedAds);
         setTotalEarned(completedAds * AD_REWARD);
 
-        // Update slots based on how many claimed
         setAdSlots((prev) =>
           prev.map((slot, index) => ({
             ...slot,
@@ -180,6 +182,34 @@ export default function EarnCash() {
     }
   };
 
+  // ── Start ad session ──
+  const startAdSession = async () => {
+    try {
+      const token = await user?.getIdToken?.();
+      if (!token) throw new Error('Not authenticated');
+
+      const deviceId = await refreshDeviceId();
+      const res = await fetch(`${API_BASE}/ads/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ deviceId }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to start ad session');
+      }
+      return true;
+    } catch (err) {
+      console.error('Start ad session error:', err);
+      setError(err.message || 'Failed to start ad session');
+      return false;
+    }
+  };
+
   // ── Open ad in new tab ──
   const handleOpenAd = async (slotId) => {
     if (isSubmitting) return;
@@ -189,113 +219,109 @@ export default function EarnCash() {
     setError('');
     setSuccess('');
 
-    // Open popunder ad in a new tab
+    // ── Start ad session on server ──
+    const started = await startAdSession();
+    if (!started) return;
+
+    // ── Open popunder ad in a new tab ──
     const adWindow = window.open('about:blank', '_blank');
-    if (adWindow) {
-      adWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Watch Ad</title>
-            <meta charset="UTF-8" />
-            <style>
-              body { 
-                margin: 0; 
-                padding: 20px; 
-                font-family: Arial, sans-serif; 
-                background: #f5f3ff;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-              }
-              .container {
-                max-width: 800px;
-                width: 100%;
-                background: white;
-                border-radius: 20px;
-                padding: 30px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-                text-align: center;
-              }
-              .header { font-size: 24px; font-weight: bold; color: #4F46E5; margin-bottom: 10px; }
-              .sub { color: #6B7280; font-size: 14px; margin-bottom: 20px; }
-              .reward-box { 
-                background: #F3F4F6; 
-                border-radius: 12px; 
-                padding: 15px; 
-                margin: 15px 0;
-                font-size: 20px;
-                font-weight: bold;
-                color: #4F46E5;
-              }
-              .btn {
-                background: #4F46E5;
-                color: white;
-                border: none;
-                padding: 12px 30px;
-                border-radius: 12px;
-                font-size: 16px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-                margin-top: 15px;
-              }
-              .btn:hover {
-                background: #4338CA;
-                transform: translateY(-2px);
-                box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
-              }
-              .note {
-                font-size: 12px;
-                color: #9CA3AF;
-                margin-top: 15px;
-              }
-              .timer {
-                font-size: 48px;
-                font-weight: bold;
-                color: #4F46E5;
-                margin: 20px 0;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">📺 Watch Ad</div>
-              <div class="sub">Watch this ad to earn ${AD_REWARD} MT Coins</div>
-              <div class="reward-box">🎯 +${AD_REWARD} MT Coins</div>
-              
-              <!-- Load the popunder ad -->
-              <script src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" async></script>
-              
-              <p style="font-size:14px;color:#6B7280;margin:15px 0;">
-                ✅ Ad is loading in the background
-              </p>
-              
-              <button class="btn" onclick="window.close()">
-                ✕ Close &amp; Claim Reward
-              </button>
-              <div class="note">Close this tab to claim your reward on the main page</div>
-            </div>
-          </body>
-        </html>
-      `);
-      adWindow.document.close();
-
-      // Set the slot as in progress
-      setActiveSlot(slotId);
-      setAdSlots((prev) =>
-        prev.map((s) =>
-          s.id === slotId ? { ...s, inProgress: true } : s
-        )
-      );
-
-      // Show the ad popup
-      setShowAd(true);
-    } else {
+    if (!adWindow) {
       setError('⚠️ Popup blocked. Please allow popups and try again.');
+      return;
     }
+
+    adWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Watch Ad</title>
+          <meta charset="UTF-8" />
+          <style>
+            body { 
+              margin: 0; 
+              padding: 20px; 
+              font-family: Arial, sans-serif; 
+              background: #f5f3ff;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+            }
+            .container {
+              max-width: 800px;
+              width: 100%;
+              background: white;
+              border-radius: 20px;
+              padding: 30px;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+              text-align: center;
+            }
+            .header { font-size: 24px; font-weight: bold; color: #4F46E5; margin-bottom: 10px; }
+            .sub { color: #6B7280; font-size: 14px; margin-bottom: 20px; }
+            .reward-box { 
+              background: #F3F4F6; 
+              border-radius: 12px; 
+              padding: 15px; 
+              margin: 15px 0;
+              font-size: 20px;
+              font-weight: bold;
+              color: #4F46E5;
+            }
+            .btn {
+              background: #4F46E5;
+              color: white;
+              border: none;
+              padding: 12px 30px;
+              border-radius: 12px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s;
+              margin-top: 15px;
+            }
+            .btn:hover {
+              background: #4338CA;
+              transform: translateY(-2px);
+              box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+            }
+            .note {
+              font-size: 12px;
+              color: #9CA3AF;
+              margin-top: 15px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">📺 Watch Ad</div>
+            <div class="sub">Watch this ad to earn ${AD_REWARD} MT Coins</div>
+            <div class="reward-box">🎯 +${AD_REWARD} MT Coins</div>
+            
+            <!-- Load the popunder ad -->
+            <script src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" async></script>
+            
+            <p style="font-size:14px;color:#6B7280;margin:15px 0;">
+              ✅ Ad is loading in the background
+            </p>
+            
+            <button class="btn" onclick="window.close()">
+              ✕ Close &amp; Claim Reward
+            </button>
+            <div class="note">Close this tab to claim your reward on the main page</div>
+          </div>
+        </body>
+      </html>
+    `);
+    adWindow.document.close();
+
+    // ── Update UI ──
+    setActiveSlot(slotId);
+    setAdSlots((prev) =>
+      prev.map((s) =>
+        s.id === slotId ? { ...s, inProgress: true } : s
+      )
+    );
   };
 
   // ── Claim reward ──
@@ -323,10 +349,7 @@ export default function EarnCash() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          deviceId,
-          duration: 30,
-        }),
+        body: JSON.stringify({ deviceId }),
       });
 
       const data = await res.json();
@@ -336,14 +359,12 @@ export default function EarnCash() {
         setTotalEarned((prev) => prev + (data.reward || AD_REWARD));
         setClaimedCount((prev) => prev + 1);
 
-        // Mark slot as claimed
         setAdSlots((prev) =>
           prev.map((s) =>
             s.id === slotId ? { ...s, claimed: true, inProgress: false } : s
           )
         );
         setActiveSlot(null);
-        setShowAd(false);
 
         refetchMtCoins();
       } else {
@@ -354,7 +375,6 @@ export default function EarnCash() {
           )
         );
         setActiveSlot(null);
-        setShowAd(false);
       }
     } catch (err) {
       console.error('Claim error:', err);
@@ -365,7 +385,6 @@ export default function EarnCash() {
         )
       );
       setActiveSlot(null);
-      setShowAd(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -596,8 +615,7 @@ export default function EarnCash() {
             </div>
           </div>
 
-          {/* ── Multiple Hidden Ads for Extra Revenue ── */}
-          {/* These load silently in the background to generate extra impressions */}
+          {/* ── Hidden Ads for Extra Revenue ── */}
           <div className="hidden">
             <BannerAd />
             <NativeAd />
