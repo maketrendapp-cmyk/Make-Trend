@@ -1,7 +1,9 @@
+
 // pages/share.js
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
+import Script from 'next/script';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
 import { getDeviceId, refreshDeviceId } from '../utils/deviceId';
@@ -14,6 +16,8 @@ import {
   FaArrowRight,
   FaFacebookMessenger,
   FaWhatsapp,
+  FaTimes,
+  FaSpinner
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -29,6 +33,75 @@ const defaultMeta = {
   url: 'https://maketrend.app/share?id={id}',
 };
 
+// ─── AD COMPONENTS ───
+
+// Safely loads document.write() ads without breaking React
+const IframeAd = ({ adKey, width, height }) => {
+  const srcDoc = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <style>body{margin:0;padding:0;overflow:hidden;display:flex;justify-content:center;align-items:center;}</style>
+      </head>
+      <body>
+        <script type="text/javascript">
+          atOptions = {
+            'key' : '${adKey}',
+            'format' : 'iframe',
+            'height' : ${height},
+            'width' : ${width},
+            'params' : {}
+          };
+        </script>
+        <script type="text/javascript" src="https://www.highperformanceformat.com/${adKey}/invoke.js"></script>
+      </body>
+    </html>
+  `;
+  return (
+    <div className="w-full flex justify-center overflow-hidden">
+      <div className="overflow-x-auto no-scrollbar max-w-full">
+        <iframe
+          title="Banner Ad"
+          srcDoc={srcDoc}
+          width={width}
+          height={height}
+          frameBorder="0"
+          scrolling="no"
+          style={{ display: 'block', margin: '0 auto' }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// Safely loads Native DOM injection ads
+const NativeAd = () => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (containerRef.current.querySelector('script')) return;
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
+    containerRef.current.appendChild(script);
+  }, []);
+
+  return (
+    <div className="flex justify-center w-full my-4">
+      <div 
+        ref={containerRef} 
+        id="container-4b3b3334be9dbca33558926aca954fd9" 
+        className="w-full flex justify-center max-w-[336px] transition-all"
+      />
+    </div>
+  );
+};
+
+// ─── MAIN COMPONENT ───
+
 function CampaignShare({ campaign: initialCampaign }) {
   const router = useRouter();
   const { id } = router.query;
@@ -37,12 +110,15 @@ function CampaignShare({ campaign: initialCampaign }) {
   const [templateSlug, setTemplateSlug] = useState('campaign');
   const [loading, setLoading] = useState(!initialCampaign);
   const [error, setError] = useState('');
+  
   const [shares, setShares] = useState(0);
   const [shareCount, setShareCount] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [sharesComplete, setSharesComplete] = useState(false);
+  const [isClaimReady, setIsClaimReady] = useState(false); // Controls the 2s API gap
+  
   const [shareProgress, setShareProgress] = useState(0);
   const [shareAttempt, setShareAttempt] = useState(0);
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -52,6 +128,9 @@ function CampaignShare({ campaign: initialCampaign }) {
   const [verifyingCountdown, setVerifyingCountdown] = useState(0);
   const [toastMessage, setToastMessage] = useState('');
   const [isHovering, setIsHovering] = useState(false);
+  
+  // Ad state
+  const [showStickyAd, setShowStickyAd] = useState(true);
 
   const claimTimerRef = useRef(null);
   const isFinishingRef = useRef(false);
@@ -67,14 +146,13 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   }, [id, initialCampaign]);
 
-  // ── Force refresh fingerprint on page load (instantly) ──
+  // ── Force refresh fingerprint on page load ──
   useEffect(() => {
     const refreshFingerprint = async () => {
       try {
-        const realId = await refreshDeviceId();
-        console.log('🔄 Share page: refreshed fingerprint:', realId);
+        await refreshDeviceId();
       } catch (e) {
-        console.warn('Fingerprint refresh failed, using fallback:', e);
+        console.warn('Fingerprint refresh failed');
       }
     };
     refreshFingerprint();
@@ -107,10 +185,12 @@ function CampaignShare({ campaign: initialCampaign }) {
 
     if (count === 0) {
       setSharesComplete(true);
+      setIsClaimReady(true);
       setShareAttempt(3);
       setTimeout(() => setShowClaimModal(true), 800);
     } else if (currentShares >= count) {
       setSharesComplete(true);
+      setIsClaimReady(true);
       setShareAttempt(3);
     } else {
       const ratio = currentShares / count;
@@ -161,12 +241,8 @@ function CampaignShare({ campaign: initialCampaign }) {
     return () => clearTimeout(timer);
   }, [verifying, verifyingCountdown]);
 
-  // ── Get share URL ──
-  const getShareUrl = () => {
-    return `${window.location.origin}/${templateSlug}/${id}`;
-  };
+  const getShareUrl = () => `${window.location.origin}/${templateSlug}/${id}`;
 
-  // ── Build full share content (title + description + link) ──
   const buildFullContent = () => {
     const title = campaign?.title || 'Check out this campaign!';
     const description = campaign?.description || 'Share to unlock rewards!';
@@ -174,14 +250,12 @@ function CampaignShare({ campaign: initialCampaign }) {
     return `${title}\n\n${description}\n\nOpen The Link:\n${link}`;
   };
 
-  // ── Native Share (ONE message – text only, no URL field) ──
+  // ── Native Share (Text + Link context) ──
   const handleNativeShare = async () => {
     if (isSharing || verifying) return;
     if (shareCount === 0) return;
 
-    const shareData = {
-      text: buildFullContent(),
-    };
+    const shareData = { text: buildFullContent() };
 
     if (navigator.share) {
       try {
@@ -194,32 +268,25 @@ function CampaignShare({ campaign: initialCampaign }) {
         }
       }
     } else {
-      // Fallback: copy full content for devices without native share
       copyFullContent();
     }
   };
 
-  // ── Messenger share (ONLY URL) ──
+  // ── Messenger share ──
   const handleMessengerShare = () => {
-    if (isSharing || verifying) return;
-    if (shareCount === 0) return;
-
-    const shareUrl = getShareUrl();
-    window.open(`fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`, '_blank');
+    if (isSharing || verifying || shareCount === 0) return;
+    window.open(`fb-messenger://share/?link=${encodeURIComponent(getShareUrl())}`, '_blank');
     startVerification('share', 6);
   };
 
-  // ── WhatsApp share (ONLY URL) ──
+  // ── WhatsApp share ──
   const handleWhatsAppShare = () => {
-    if (isSharing || verifying) return;
-    if (shareCount === 0) return;
-
-    const shareUrl = getShareUrl();
-    window.open(`https://wa.me/?text=${encodeURIComponent(shareUrl)}`, '_blank');
+    if (isSharing || verifying || shareCount === 0) return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(getShareUrl())}`, '_blank');
     startVerification('share', 6);
   };
 
-  // ── Copy full content to clipboard ──
+  // ── Copy full content ──
   const copyFullContent = () => {
     const fullText = buildFullContent();
     navigator.clipboard
@@ -227,10 +294,7 @@ function CampaignShare({ campaign: initialCampaign }) {
       .then(() => {
         setIsCopied(true);
         setToastMessage('📋 Full details copied!');
-        setTimeout(() => {
-          setIsCopied(false);
-          setToastMessage('');
-        }, 3000);
+        setTimeout(() => { setIsCopied(false); setToastMessage(''); }, 3000);
       })
       .catch(() => {
         const textarea = document.createElement('textarea');
@@ -241,10 +305,7 @@ function CampaignShare({ campaign: initialCampaign }) {
         document.body.removeChild(textarea);
         setIsCopied(true);
         setToastMessage('📋 Full details copied!');
-        setTimeout(() => {
-          setIsCopied(false);
-          setToastMessage('');
-        }, 3000);
+        setTimeout(() => { setIsCopied(false); setToastMessage(''); }, 3000);
       });
   };
 
@@ -280,9 +341,7 @@ function CampaignShare({ campaign: initialCampaign }) {
         setShareAttempt(3);
       } else if (shareAttempt === 3) {
         increment = shareCount - shares;
-        if (increment > 0) {
-          setShareAttempt(3);
-        }
+        if (increment > 0) setShareAttempt(3);
       }
 
       const remaining = shareCount - shares;
@@ -293,11 +352,18 @@ function CampaignShare({ campaign: initialCampaign }) {
         setShares(newShares);
         setShareProgress(Math.min((newShares / shareCount) * 100, 100));
 
+        // ── FINAL SHARE LOGIC: Fire API & Enforce 2s Gap ──
         if (newShares >= shareCount && !shareApiCalledRef.current) {
           shareApiCalledRef.current = true;
-          callShareAPI(shareCount);
+          callShareAPI(shareCount); // Fire share API immediately
           setSharesComplete(true);
           setShareAttempt(3);
+          
+          setIsClaimReady(false); // Lock the claim button
+          // EXACTLY 2 SECOND GAP BEFORE UNLOCKING COMPLETE API
+          setTimeout(() => {
+            setIsClaimReady(true);
+          }, 2000);
         }
       }
     }
@@ -307,10 +373,9 @@ function CampaignShare({ campaign: initialCampaign }) {
     }, 500);
   };
 
-  // ── Call share API with REAL fingerprint ──
   const callShareAPI = async (totalShares) => {
     try {
-      const deviceId = await refreshDeviceId(); // Force real fingerprint
+      const deviceId = await refreshDeviceId();
       await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -321,12 +386,12 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
-  // ── Handle claim with REAL fingerprint ──
+  // ── This is ONLY clickable when isClaimReady === true ──
   const handleClaim = async () => {
-    if (!sharesComplete || isCompleting) return;
+    if (!sharesComplete || !isClaimReady || isCompleting) return;
     setIsCompleting(true);
     try {
-      const deviceId = await refreshDeviceId(); // Force real fingerprint
+      const deviceId = await refreshDeviceId(); 
       await fetch(`${API_BASE}/campaigns/${id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -356,20 +421,8 @@ function CampaignShare({ campaign: initialCampaign }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 py-8 px-4">
-        <div className="max-w-3xl mx-auto animate-pulse">
-          <div className="w-24 h-5 bg-gray-200 rounded mb-4" />
-          <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 overflow-hidden">
-            <div className="aspect-video bg-gray-200" />
-            <div className="p-6">
-              <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
-              <div className="h-4 w-64 bg-gray-200 rounded mb-3" />
-              <div className="h-6 w-32 bg-gray-200 rounded-full mb-6" />
-              <div className="h-3 w-full bg-gray-200 rounded mb-4" />
-              <div className="h-14 bg-gray-200 rounded-xl" />
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 py-8 px-4 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
       </div>
     );
   }
@@ -395,7 +448,7 @@ function CampaignShare({ campaign: initialCampaign }) {
   const isComplete = sharesComplete;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-4 px-4 sm:py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-4 px-4 sm:py-6 sm:px-6 lg:px-8 pb-32">
       <div className="max-w-3xl mx-auto">
 
         {/* ── Back Button ── */}
@@ -408,6 +461,11 @@ function CampaignShare({ campaign: initialCampaign }) {
           </svg>
           {isComplete ? 'Back to Home' : 'Back'}
         </button>
+
+        {/* ─── 1. TOP BANNER AD (High Visibility) ─── */}
+        <div className="my-4 w-full overflow-hidden max-w-full">
+          <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+        </div>
 
         {/* ── Hero Card ── */}
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 overflow-hidden mb-5 transition-all hover:shadow-2xl">
@@ -469,15 +527,13 @@ function CampaignShare({ campaign: initialCampaign }) {
                 <span>{shares}/{shareCount} shares</span>
               </div>
             )}
-
-            {isComplete && (
-              <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-200 text-green-700 text-sm flex items-center gap-2">
-                <FaCheckCircle className="w-5 h-5 text-green-600" />
-                <span className="font-medium">All shares completed! 🎉</span>
-              </div>
-            )}
           </div>
         </div>
+
+        {/* ─── 2. NATIVE IN-FEED AD ─── */}
+        {!isComplete && (
+          <NativeAd />
+        )}
 
         {/* ── Share Section ── */}
         {shareCount > 0 && !isComplete && (
@@ -485,14 +541,14 @@ function CampaignShare({ campaign: initialCampaign }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden"
+            className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden mt-4"
           >
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-100/30 rounded-full blur-2xl" />
             <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-100/20 rounded-full blur-2xl" />
 
             <div className="relative z-10">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-2xl mb-4 shadow-md">
-                <FaRocket className="w-8 h-8 text-purple-600" />
+                <FaRocket className="w-8 h-8 text-purple-600 animate-pulse" />
               </div>
               <h2 className="text-2xl font-extrabold text-gray-900">
                 {remaining === 1 ? 'Almost There!' : `Share ${remaining} More Time${remaining > 1 ? 's' : ''}`}
@@ -524,7 +580,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               </button>
             </div>
 
-            {/* ── Main Native Share Button ── */}
+            {/* ── Main Native Share Button (Pulsing to encourage clicks) ── */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -537,7 +593,7 @@ function CampaignShare({ campaign: initialCampaign }) {
                 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg rounded-2xl 
                 shadow-lg hover:shadow-xl transition-all duration-200 
                 disabled:opacity-50 disabled:cursor-not-allowed
-                ${isHovering ? 'shadow-purple-200/50' : ''}
+                ${isHovering ? 'shadow-purple-200/50' : 'animate-[pulse_2s_ease-in-out_infinite]'}
               `}
             >
               <FaShareAlt className={`w-5 h-5 ${isHovering ? 'animate-bounce' : ''}`} />
@@ -561,7 +617,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="relative z-10 mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm"
+                className="relative z-10 mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm font-medium"
               >
                 {toastMessage}
               </motion.div>
@@ -587,19 +643,35 @@ function CampaignShare({ campaign: initialCampaign }) {
 
         {isComplete && (
           <div className="mt-6">
-            <button
-              onClick={handleClaim}
-              className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.01] active:scale-[0.98]"
-            >
-              <FaGift className="w-5 h-5" />
-              Claim Your Reward
-              <FaArrowRight className="w-4 h-4" />
-            </button>
+            {/* 2-SECOND DELAY / VERIFYING STATE */}
+            {!isClaimReady ? (
+               <button
+                 disabled
+                 className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gray-200 text-gray-500 font-bold text-lg rounded-2xl cursor-not-allowed transition-all"
+               >
+                 <FaSpinner className="w-5 h-5 animate-spin" />
+                 Verifying final steps...
+               </button>
+            ) : (
+               <button
+                 onClick={handleClaim}
+                 disabled={isCompleting}
+                 className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.01] active:scale-[0.98]"
+               >
+                 {isCompleting ? (
+                   <FaSpinner className="w-5 h-5 animate-spin" />
+                 ) : (
+                   <FaGift className="w-5 h-5" />
+                 )}
+                 {isCompleting ? 'Processing...' : 'Claim Your Reward'}
+                 {!isCompleting && <FaArrowRight className="w-4 h-4" />}
+               </button>
+            )}
           </div>
         )}
 
         {!isComplete && shareCount > 0 && (
-          <div className="mt-5 text-center text-xs text-gray-400">
+          <div className="mt-5 text-center text-xs text-gray-400 font-medium">
             <p>
               {remaining === 1
                 ? '🔒 One more share required to unlock the reward!'
@@ -616,7 +688,7 @@ function CampaignShare({ campaign: initialCampaign }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -632,21 +704,55 @@ function CampaignShare({ campaign: initialCampaign }) {
                 {campaign?.reward ? `You've claimed: ${campaign.reward}` : 'Your reward has been claimed successfully!'}
               </p>
               <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 font-medium">
                   Redirecting in <strong className="text-purple-600">{claimCountdown}s</strong>
                 </p>
-                <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div className="mt-3 w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 rounded-full"
                     style={{ width: `${((2 - claimCountdown) / 2) * 100}%` }}
                   />
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-4">You will be redirected shortly</p>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ─── 3. STICKY BOTTOM BANNER AD (FIXED SCROLL ISSUE) ─── */}
+      {showStickyAd && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none pb-2 sm:pb-4">
+          {/* Strictly capped width using calc(100vw-16px) so it never overflows the viewport */}
+          <div className="bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] p-1.5 sm:p-2 rounded-xl pointer-events-auto border border-gray-200/50 relative mx-auto w-[calc(100vw-16px)] sm:w-auto sm:max-w-[760px]">
+            
+            {/* Close Button */}
+            <button 
+              onClick={() => setShowStickyAd(false)}
+              className="absolute -top-3 -right-2 bg-white border border-gray-200 text-gray-500 hover:text-red-500 rounded-full w-7 h-7 flex items-center justify-center transition shadow-md z-10"
+              aria-label="Close Ad"
+            >
+              <FaTimes className="w-3 h-3" />
+            </button>
+            
+            <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+          </div>
+        </div>
+      )}
+
+      {/* ─── 4. GLOBAL NETWORK ADS (POPUNDER & SOCIAL BAR) ─── */}
+      {/* Popunder */}
+      <Script
+        id="popunder-ad"
+        src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js"
+        strategy="afterInteractive"
+      />
+
+      {/* Social Bar */}
+      <Script
+        id="social-bar-ad"
+        src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
+        strategy="afterInteractive"
+      />
 
       <style jsx>{`
         @keyframes bounce {
@@ -655,6 +761,13 @@ function CampaignShare({ campaign: initialCampaign }) {
         }
         .animate-bounce {
           animation: bounce 0.6s infinite;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
       `}</style>
     </div>
