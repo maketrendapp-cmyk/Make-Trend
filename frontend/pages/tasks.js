@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
+import Script from 'next/script';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
@@ -162,40 +163,6 @@ function CampaignTasks({ campaign: initialCampaign }) {
     return <FaLink className="text-gray-400" />;
   };
 
-  // ── Ad injection function ──
-  const injectAd = (containerId, adCode) => {
-    if (typeof window !== 'undefined') {
-      const container = document.getElementById(containerId);
-      if (container) {
-        const script = document.createElement('script');
-        script.innerHTML = adCode;
-        container.appendChild(script);
-      }
-    }
-  };
-
-  // ── Load top banner on mount ──
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const container = document.getElementById('top-banner-container');
-      if (container) {
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.innerHTML = `
-          atOptions = {
-            'key' : 'bd8fef55bf7ce9cf90e7c6aa9b2a7703',
-            'format' : 'iframe',
-            'height' : 90,
-            'width' : 728,
-            'params' : {}
-          };
-          document.write('<scr' + 'ipt type="text/javascript" src="https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js"></scr' + 'ipt>');
-        `;
-        container.appendChild(script);
-      }
-    }
-  }, []);
-
   // ── Loading state ──
   if (isLoading && !campaign) {
     return (
@@ -268,10 +235,24 @@ function CampaignTasks({ campaign: initialCampaign }) {
 
           {/* ─── TOP BANNER AD (728×90) ─── */}
           <div className="my-4 flex justify-center">
-            <div 
-              id="top-banner-container" 
-              className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center"
-            />
+            <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center">
+              <Script
+                id="top-banner-ad"
+                strategy="afterInteractive"
+                dangerouslySetInnerHTML={{
+                  __html: `
+                    atOptions = {
+                      'key' : 'bd8fef55bf7ce9cf90e7c6aa9b2a7703',
+                      'format' : 'iframe',
+                      'height' : 90,
+                      'width' : 728,
+                      'params' : {}
+                    };
+                    document.write('<scr' + 'ipt type="text/javascript" src="https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js"></scr' + 'ipt>');
+                  `,
+                }}
+              />
+            </div>
           </div>
 
           {/* ── Hero Card ── */}
@@ -428,22 +409,19 @@ function CampaignTasks({ campaign: initialCampaign }) {
                 {/* ─── NATIVE BANNER AD (After task #3) ─── */}
                 {tasks.length >= 3 && (
                   <div className="my-6 flex justify-center">
-                    <div 
-                      id="native-banner-container"
-                      className="w-full max-w-[336px] min-h-[280px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center"
-                    >
-                      <script
+                    <div className="w-full max-w-[336px] min-h-[280px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center">
+                      <div id="container-4b3b3334be9dbca33558926aca954fd9" />
+                      <Script
+                        id="native-banner-ad"
+                        strategy="afterInteractive"
                         dangerouslySetInnerHTML={{
                           __html: `
                             (function() {
-                              var container = document.getElementById('native-banner-container');
-                              if (container) {
-                                var s = document.createElement('script');
-                                s.async = true;
-                                s.setAttribute('data-cfasync', 'false');
-                                s.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
-                                container.appendChild(s);
-                              }
+                              var s = document.createElement('script');
+                              s.async = true;
+                              s.setAttribute('data-cfasync', 'false');
+                              s.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
+                              document.getElementById('container-4b3b3334be9dbca33558926aca954fd9').appendChild(s);
                             })();
                           `,
                         }}
@@ -489,7 +467,9 @@ function CampaignTasks({ campaign: initialCampaign }) {
       </div>
 
       {/* ─── POPUNDER AD ─── */}
-      <script
+      <Script
+        id="popunder-ad"
+        strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
             (function() {
@@ -503,7 +483,9 @@ function CampaignTasks({ campaign: initialCampaign }) {
       />
 
       {/* ─── ORIGINAL FIRST AD ─── */}
-      <script
+      <Script
+        id="original-ad"
+        strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
             (function() {
