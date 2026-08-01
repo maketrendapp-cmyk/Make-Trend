@@ -3528,6 +3528,187 @@ if (method !== undefined && !validMethods.includes(method)) {
 });
 
 // ============================================================
+// 20. EARN CASH & ADS (WATCH ADS & EARN)
+// ============================================================
+
+// ── Get ad status ──
+app.post('/api/ads/status', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const deviceId = req.body.deviceId || req.headers['x-device-id'];
+    const today = new Date().toISOString().split('T')[0];
+    const key = `ad:${uid}:${today}`;
+
+    const data = await redis.hgetall(key);
+    const adsWatched = parseInt(data.ads || '0');
+    const coinsEarned = parseInt(data.coins || '0');
+    const lastAdTime = parseInt(data.lastAdTime || '0');
+
+    const MAX_ADS = 5;
+    const COOLDOWN_SECONDS = 20;
+    const now = Date.now();
+
+    const cooldownSeconds = Math.max(0, COOLDOWN_SECONDS - Math.floor((now - lastAdTime) / 1000));
+    const canWatch = adsWatched < MAX_ADS && cooldownSeconds === 0;
+
+    res.json({
+      success: true,
+      adsWatched,
+      maxAds: MAX_ADS,
+      coinsEarned,
+      canWatch,
+      cooldownSeconds,
+      nextAdAvailableAt: canWatch ? null : lastAdTime + COOLDOWN_SECONDS * 1000,
+    });
+  } catch (error) {
+    console.error('❌ Ad status error:', error);
+    res.status(500).json({ success: false, error: 'Failed to get ad status' });
+  }
+});
+
+// ── Start ad session ──
+app.post('/api/ads/start', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { deviceId } = req.body;
+    
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required.',
+      });
+    }
+
+    const startKey = `ad:start:${uid}`;
+    await redis.set(startKey, Date.now(), 'EX', 120); // 120 seconds expiry
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Ad start error:', error);
+    res.status(500).json({ success: false, error: 'Failed to start ad session' });
+  }
+});
+
+// ── Complete ad view ──
+app.post('/api/ads/complete', verifyToken, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { deviceId } = req.body;
+    const ip = getClientIp(req);
+
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required.',
+      });
+    }
+
+    const AD_REWARD = 10;
+    const MAX_ADS = 5;
+    const COOLDOWN_SECONDS = 20;
+    const AD_DURATION = 30;
+    const today = new Date().toISOString().split('T')[0];
+    const key = `ad:${uid}:${today}`;
+
+    // ── Check daily limit ──
+    const current = await redis.hgetall(key);
+    const adsWatched = parseInt(current.ads || '0');
+
+    if (adsWatched >= MAX_ADS) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily limit reached. Come back tomorrow!',
+      });
+    }
+
+    // ── Check cooldown ──
+    const lastAdTime = parseInt(current.lastAdTime || '0');
+    if (lastAdTime > 0 && Date.now() - lastAdTime < COOLDOWN_SECONDS * 1000) {
+      const remaining = Math.ceil((COOLDOWN_SECONDS - (Date.now() - lastAdTime) / 1000));
+      return res.status(429).json({
+        success: false,
+        error: `Please wait ${remaining} seconds before claiming again.`,
+        cooldownSeconds: remaining,
+      });
+    }
+
+    // ── Verify start time (server‑side) ──
+    const startKey = `ad:start:${uid}`;
+    const startTime = await redis.get(startKey);
+    
+    if (!startTime) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ad session not found. Please start the ad first.',
+      });
+    }
+    
+    const elapsed = (Date.now() - parseInt(startTime)) / 1000;
+    if (elapsed < AD_DURATION) {
+      console.warn(`⚠️ Ad watched too quickly for user ${uid}: ${elapsed}s (required ${AD_DURATION}s)`);
+      return res.status(400).json({
+        success: false,
+        error: `Please watch the ad for the full ${AD_DURATION} seconds.`,
+      });
+    }
+    
+    // ── Clear the start key so it can't be reused ──
+    await redis.del(startKey);
+
+    // ── Device fingerprint check ──
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (userDoc.exists) {
+      const storedDeviceId = userDoc.data().deviceId;
+      if (storedDeviceId && storedDeviceId !== deviceId) {
+        console.warn(`⚠️ Device mismatch for user ${uid}`);
+      }
+    }
+
+    // ── Track devices per user ──
+    const deviceCountKey = `ad:devices:${uid}`;
+    const deviceCount = await redis.sadd(deviceCountKey, deviceId);
+    if (deviceCount > 3) {
+      console.warn(`⚠️ User ${uid} using multiple devices (${deviceCount}) for ads`);
+    }
+    await redis.expire(deviceCountKey, 86400 * 7);
+
+    // ── Update Redis ──
+    const pipeline = redis.pipeline();
+    pipeline.hincrby(key, 'ads', 1);
+    pipeline.hincrby(key, 'coins', AD_REWARD);
+    pipeline.hset(key, 'lastAdTime', Date.now());
+    pipeline.expire(key, 86400);
+    await pipeline.exec();
+
+    // ── Update user MT Coins ──
+    const userRef = db.collection('users').doc(uid);
+    await userRef.update({
+      mtCoinsEarned: admin.firestore.FieldValue.increment(AD_REWARD),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await invalidateKey(`mtcoins:user:${uid}`);
+
+    const newAdsWatched = adsWatched + 1;
+    const remaining = MAX_ADS - newAdsWatched;
+    const canWatch = remaining > 0;
+
+    res.json({
+      success: true,
+      reward: AD_REWARD,
+      adsWatched: newAdsWatched,
+      coinsEarned: parseInt((await redis.hget(key, 'coins')) || '0'),
+      remaining,
+      canWatch,
+      cooldownSeconds: canWatch ? COOLDOWN_SECONDS : 0,
+    });
+  } catch (error) {
+    console.error('❌ Ad completion error:', error);
+    res.status(500).json({ success: false, error: 'Failed to process ad view' });
+  }
+});
+
+// ============================================================
 // 18. GLOBAL ERROR HANDLER
 // ============================================================
 app.use((err, req, res, next) => {
@@ -3543,6 +3724,7 @@ app.use((err, req, res, next) => {
     error: 'Internal server error. Please try again later.',
   });
 });
+
 
 
 
