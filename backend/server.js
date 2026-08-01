@@ -159,11 +159,28 @@ async function findFirstPageKey(uid) {
 }
 
 // ── Add a campaign to the user's list cache (first page) ──
+// ── Add a campaign to the user's list cache (first page) ──
 async function addCampaignToUserListCache(uid, campaign) {
   try {
     const firstPageKey = await findFirstPageKey(uid);
-    if (!firstPageKey) return; // No cache exists yet – nothing to update
 
+    // ── If cache doesn't exist, CREATE it ──
+    if (!firstPageKey) {
+      console.log(`📦 No cache exists for user ${uid}, creating new cache entry`);
+      const newCacheKey = `campaigns:user:${uid}:limit:25:lastCreatedAt:null:lastId:null`;
+      const newData = {
+        success: true,
+        campaigns: [campaign],
+        hasMore: false,
+        lastCreatedAt: null,
+        lastId: null,
+      };
+      await redis.set(newCacheKey, JSON.stringify(newData), 'EX', 86400);
+      console.log(`✅ Created new cache entry with campaign ${campaign.id} for user ${uid}`);
+      return;
+    }
+
+    // ── Cache exists – update it ──
     const ttl = await redis.ttl(firstPageKey);
     const cached = await redis.get(firstPageKey);
     if (!cached) return;
@@ -176,9 +193,6 @@ async function addCampaignToUserListCache(uid, campaign) {
       const limit = parseCampaignCacheKey(firstPageKey).limit || 25;
       if (data.campaigns.length > limit) {
         data.campaigns = data.campaigns.slice(0, limit);
-        // Note: we're not updating hasMore or nextCursor – the cache might become slightly stale for pagination.
-        // But the user will see the new campaign, and the next page might still show the removed item.
-        // This is a trade‑off for avoiding a full refetch. It's acceptable.
       }
       const ttlToUse = ttl > 0 ? ttl : 86400;
       await redis.set(firstPageKey, JSON.stringify(data), 'EX', ttlToUse);
