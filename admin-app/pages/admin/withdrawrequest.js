@@ -285,7 +285,7 @@ export default function AdminWithdrawRequests() {
               Refresh
             </button>
             <button
-              onClick={() => router.push('/admin')}
+              onClick={() => router.push('/')}
               className="text-sm text-purple-600 hover:text-purple-700 transition"
             >
               ← Back to Dashboard
