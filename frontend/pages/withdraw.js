@@ -33,9 +33,9 @@ import {
   FaUnlock,
   FaCoins,
   FaLightbulb,
-  FaBalanceScale,
   FaArrowUp,
   FaArrowDown,
+  FaPlusCircle,
 } from 'react-icons/fa';
 
 export default function Withdraw() {
@@ -68,6 +68,33 @@ export default function Withdraw() {
       router.push('/login?redirect=/withdraw');
     }
   }, [authLoading, isAuthenticated, router]);
+
+  // ── Format Firestore timestamp ──
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '—';
+    try {
+      let date;
+      if (timestamp.seconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+      } else if (timestamp.toDate) {
+        date = timestamp.toDate();
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else {
+        date = new Date(timestamp);
+      }
+      if (isNaN(date.getTime())) return '—';
+      return date.toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '—';
+    }
+  };
 
   const isLoading = profileLoading || coinsLoading || withdrawalsLoading || methodsLoading;
   if (isLoading) {
@@ -195,8 +222,8 @@ export default function Withdraw() {
 
   const getMethodName = (methodId) => {
     const names = {
-      esewa: 'eSewa / Khalti',
-      khalti: 'eSewa / Khalti',
+      esewa: 'eSewa',
+      khalti: 'Khalti',
       bank: 'Bank Transfer',
       wise: 'Wise',
       crypto: 'Crypto',
@@ -243,7 +270,7 @@ export default function Withdraw() {
                 </p>
               </div>
 
-              {/* ─── NEW: Available & Spent MT Coins ─── */}
+              {/* ─── THREE COIN BOXES ─── */}
               <div className="flex items-center gap-3 flex-wrap justify-center">
                 {/* Available */}
                 <div className="flex-shrink-0 bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-2 rounded-xl border border-emerald-200 text-center min-w-[100px]">
@@ -265,9 +292,14 @@ export default function Withdraw() {
                   </p>
                 </div>
 
-                {/* Earned (small badge) */}
-                <div className="flex-shrink-0 bg-slate-100 px-2.5 py-1 rounded-full text-xs text-slate-600 font-medium border border-slate-200">
-                  Earned: {mtCoins.earned?.toLocaleString() || 0}
+                {/* Earned - Now a proper box */}
+                <div className="flex-shrink-0 bg-gradient-to-r from-indigo-50 to-blue-50 px-4 py-2 rounded-xl border border-indigo-200 text-center min-w-[100px]">
+                  <p className="text-[10px] sm:text-xs text-indigo-600 font-medium flex items-center justify-center gap-1">
+                    <FaPlusCircle className="text-indigo-500" /> Earned
+                  </p>
+                  <p className="text-lg sm:text-xl font-bold text-indigo-700">
+                    {mtCoins.earned?.toLocaleString() || 0}
+                  </p>
                 </div>
               </div>
             </div>
@@ -305,7 +337,7 @@ export default function Withdraw() {
             </div>
           </div>
 
-          {/* ─── IMPROVED: How MT Coins Are Earned ─── */}
+          {/* ─── How MT Coins Are Earned ─── */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-5 mb-6">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -378,7 +410,7 @@ export default function Withdraw() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Payment Method
                 </label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
                   {methods.map((method) => (
                     <button
                       key={method.id}
@@ -448,6 +480,24 @@ export default function Withdraw() {
                           )}
                         </div>
                       ))}
+
+                    {/* ── Account Holder Name (for eSewa/Khalti) ── */}
+                    {(selectedMethod === 'esewa' || selectedMethod === 'khalti') && (
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-slate-600 mb-1">
+                          Account Holder Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Full name on account"
+                          value={formData.accountName || ''}
+                          onChange={(e) =>
+                            setFormData({ ...formData, accountName: e.target.value })
+                          }
+                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                        />
+                      </div>
+                    )}
 
                     <button
                       onClick={handleWithdraw}
@@ -520,12 +570,10 @@ export default function Withdraw() {
                           key={w.id}
                           className="border-b border-slate-100 hover:bg-slate-50 transition"
                         >
-                          <td className="py-3 px-2 text-xs text-slate-500">
-                            {w.createdAt
-                              ? new Date(w.createdAt.seconds * 1000).toLocaleDateString()
-                              : '—'}
+                          <td className="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">
+                            {formatDate(w.createdAt)}
                           </td>
-                          <td className="py-3 px-2 text-xs text-slate-700 flex items-center gap-1.5">
+                          <td className="py-3 px-2 text-xs text-slate-700 flex items-center gap-1.5 whitespace-nowrap">
                             {getMethodIcon(w.method)} {getMethodName(w.method)}
                           </td>
                           <td className="py-3 px-2 text-xs text-slate-700 text-right font-medium">
@@ -548,31 +596,68 @@ export default function Withdraw() {
             )}
           </div>
 
-          {/* ─── Quick Earn Guide (compact footer) ─── */}
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-            <div className="bg-white/70 rounded-lg p-3 border border-slate-200/60">
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                <FaEye className="text-purple-600 text-sm" />
+          {/* ─── NEW: How to Earn MT Coins (Professional Box) ─── */}
+          <div className="mt-6 bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center text-white">
+                <FaCoins className="w-5 h-5" />
               </div>
-              <p className="text-xs font-bold text-slate-700">View</p>
+              <h3 className="text-lg font-bold text-slate-900">How to Earn MT Coins</h3>
             </div>
-            <div className="bg-white/70 rounded-lg p-3 border border-slate-200/60">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                <FaShareAlt className="text-blue-600 text-sm" />
+
+            <p className="text-sm text-slate-600 mb-4">
+              Earn MT Coins by growing your campaign engagement. Every time a user interacts with your campaign, you earn coins:
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-purple-50/80 rounded-xl p-4 border border-purple-200/60 text-center hover:shadow-md transition group">
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition">
+                  <FaEye className="text-purple-600 text-xl" />
+                </div>
+                <p className="font-semibold text-slate-800 text-sm">Campaign Views</p>
+                <p className="text-xs text-slate-500 mt-1">Each view earns you progress toward MT Coins</p>
               </div>
-              <p className="text-xs font-bold text-slate-700">Share</p>
+
+              <div className="bg-blue-50/80 rounded-xl p-4 border border-blue-200/60 text-center hover:shadow-md transition group">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition">
+                  <FaShareAlt className="text-blue-600 text-xl" />
+                </div>
+                <p className="font-semibold text-slate-800 text-sm">Campaign Shares</p>
+                <p className="text-xs text-slate-500 mt-1">Shares amplify your reach and earn coins</p>
+              </div>
+
+              <div className="bg-amber-50/80 rounded-xl p-4 border border-amber-200/60 text-center hover:shadow-md transition group">
+                <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition">
+                  <FaUnlock className="text-amber-600 text-xl" />
+                </div>
+                <p className="font-semibold text-slate-800 text-sm">Campaign Unlocks</p>
+                <p className="text-xs text-slate-500 mt-1">Unlocks show engagement and earn coins</p>
+              </div>
+
+              <div className="bg-emerald-50/80 rounded-xl p-4 border border-emerald-200/60 text-center hover:shadow-md transition group">
+                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition">
+                  <FaCheckCircle className="text-emerald-600 text-xl" />
+                </div>
+                <p className="font-semibold text-slate-800 text-sm">Campaign Completions</p>
+                <p className="text-xs text-slate-500 mt-1">Completions unlock your biggest rewards</p>
+              </div>
             </div>
-            <div className="bg-white/70 rounded-lg p-3 border border-slate-200/60">
-              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                <FaUnlock className="text-amber-600 text-sm" />
-              </div>
-              <p className="text-xs font-bold text-slate-700">Unlock</p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 border border-slate-200/60">
-              <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                <FaCheckCircle className="text-emerald-600 text-sm" />
-              </div>
-              <p className="text-xs font-bold text-slate-700">Complete</p>
+
+            <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200/60 text-center">
+              <p className="text-sm font-medium text-slate-700">
+                <span className="font-bold text-amber-600">1 MT Coin</span> = 
+                <span className="mx-1 text-slate-400">|</span>
+                <span className="text-purple-600">1 View</span>
+                <span className="mx-1 text-slate-300">+</span>
+                <span className="text-blue-600">1 Share</span>
+                <span className="mx-1 text-slate-300">+</span>
+                <span className="text-amber-600">1 Unlock</span>
+                <span className="mx-1 text-slate-300">+</span>
+                <span className="text-emerald-600">1 Completion</span>
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Collect <strong>2,500 MT Coins</strong> and withdraw <strong>$15.00</strong> – 24/7 available
+              </p>
             </div>
           </div>
         </div>
