@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import MobileNav from './MobileNav';
 import DesktopNav from './DesktopNav';
 import { FiMenu, FiHome, FiUser, FiX } from 'react-icons/fi';
+import { FaCrown } from 'react-icons/fa'; // ✅ Added missing import
 
 export default function Navbar() {
   const router = useRouter();
@@ -14,6 +15,8 @@ export default function Navbar() {
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  // State for avatar image error (React-friendly fallback)
+  const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,6 +56,11 @@ export default function Navbar() {
   const isProfileLoading = profileLoading || (user && !profile);
 
   const isActive = (path) => router.pathname === path;
+
+  // Reset avatar error when avatar URL changes
+  useEffect(() => {
+    setAvatarError(false);
+  }, [avatarUrl]);
 
   return (
     <>
@@ -116,21 +124,17 @@ export default function Navbar() {
               {isAuthenticated ? (
                 <Link
                   href="/profile"
-                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200 group"
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-all duration-200 group relative"
                 >
                   <div className="w-6 h-6 rounded-full overflow-hidden shadow-sm border border-white">
                     {isProfileLoading ? (
                       <div className="w-full h-full animate-pulse bg-gray-300" />
-                    ) : avatarUrl ? (
+                    ) : avatarUrl && !avatarError ? (
                       <img
                         src={avatarUrl}
                         alt={displayName}
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.className = 'w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[8px] font-bold';
-                          e.target.parentElement.textContent = firstLetter;
-                        }}
+                        onError={() => setAvatarError(true)}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-[8px] font-bold">
