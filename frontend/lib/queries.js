@@ -41,47 +41,10 @@ export function useProfile(enabled = false) {
       const token = await getToken();
       if (!token) return null;
       const data = await apiRequest('/auth/me', {}, token);
-      if (data.user) {
-        return {
-          uid: data.user.uid || '',
-          username: data.user.username || '',
-          fullname: data.user.fullname || '',
-          email: data.user.email || '',
-          avatar: data.user.avatar || '',
-          plan: data.user.plan || 'free',
-          referralCode: data.user.referralCode || '',
-          referrals: data.user.referrals || 0,
-          completed: data.user.completed || false,
-          isBanned: data.user.isBanned || false,
-          mtCoinsEarned: data.user.mtCoinsEarned || 0,
-          mtCoinsSpent: data.user.mtCoinsSpent || 0,
-          proExpiry: data.user.proExpiry || null,
-          createdAt: data.user.createdAt || null,
-          lastLogin: data.user.lastLogin || null,
-        };
-      }
-      return null;
+      return data.user ? { ...data.user, completed: true } : null;
     },
     enabled,
     staleTime: 2 * 60 * 1000,
-    placeholderData: {
-      uid: '',
-      username: '',
-      fullname: '',
-      email: '',
-      avatar: '',
-      plan: 'free',
-      referralCode: '',
-      referrals: 0,
-      completed: false,
-      isBanned: false,
-      mtCoinsEarned: 0,
-      mtCoinsSpent: 0,
-      proExpiry: null,
-      createdAt: null,
-      lastLogin: null,
-    },
-    keepPreviousData: true, // ← Prevents cache clearing during refetch
   });
 }
 
