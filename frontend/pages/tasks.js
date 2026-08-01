@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import Script from 'next/script';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
@@ -233,21 +232,19 @@ function CampaignTasks({ campaign: initialCampaign }) {
             Back
           </button>
 
-          {/* ─── TOP BANNER AD (728×90) – FIXED ─── */}
+          {/* ─── TOP BANNER AD (728×90) ─── */}
           <div className="my-4 flex justify-center">
             <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center">
               <script
                 type="text/javascript"
                 dangerouslySetInnerHTML={{
                   __html: `
-                    atOptions = {
-                      'key' : 'bd8fef55bf7ce9cf90e7c6aa9b2a7703',
-                      'format' : 'iframe',
-                      'height' : 90,
-                      'width' : 728,
-                      'params' : {}
-                    };
-                    document.write('<scr' + 'ipt type="text/javascript" src="https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js"></scr' + 'ipt>');
+                    (function() {
+                      var s = document.createElement('script');
+                      s.src = 'https://www.highperformanceformat.com/bd8fef55bf7ce9cf90e7c6aa9b2a7703/invoke.js';
+                      s.async = true;
+                      document.currentScript.parentNode.insertBefore(s, document.currentScript);
+                    })();
                   `,
                 }}
               />
@@ -463,13 +460,28 @@ function CampaignTasks({ campaign: initialCampaign }) {
         </div>
       </div>
 
-      {/* ─── POPUNDER AD (Global – shows once per session) ─── */}
+      {/* ─── POPUNDER AD ─── */}
       <script
         dangerouslySetInnerHTML={{
           __html: `
             (function() {
               var s = document.createElement('script');
               s.src = 'https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js';
+              s.async = true;
+              document.head.appendChild(s);
+            })();
+          `,
+        }}
+      />
+
+      {/* ─── ORIGINAL FIRST AD ─── */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              var s = document.createElement('script');
+              s.src = 'https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js';
+              s.async = true;
               document.head.appendChild(s);
             })();
           `,
