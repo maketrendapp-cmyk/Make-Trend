@@ -437,13 +437,10 @@ function CampaignTasks({ campaign: initialCampaign }) {
         </div>
       </div>
 
-      {/* ─── 3. STICKY BOTTOM BANNER AD (FIXED SCROLL ISSUE) ─── */}
+      {/* ─── 3. STICKY BOTTOM BANNER AD ─── */}
       {showStickyAd && (
         <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-2 sm:pb-4">
-          {/* Strictly capped width using calc(100vw-16px) so it never overflows the viewport */}
           <div className="bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] p-1.5 sm:p-2 rounded-xl pointer-events-auto border border-gray-200/50 relative mx-auto w-[calc(100vw-16px)] sm:w-auto sm:max-w-[760px]">
-            
-            {/* Close Button */}
             <button 
               onClick={() => setShowStickyAd(false)}
               className="absolute -top-3 -right-2 bg-white border border-gray-200 text-gray-500 hover:text-red-500 rounded-full w-7 h-7 flex items-center justify-center transition shadow-md z-10"
@@ -451,42 +448,24 @@ function CampaignTasks({ campaign: initialCampaign }) {
             >
               <FaTimes className="w-3 h-3" />
             </button>
-            
             <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
           </div>
         </div>
       )}
 
-      {/* ─── POPUNDER AD (Restored to Native Next.js Script for max compatibility) ─── */}
+      {/* ─── 4. GLOBAL NETWORK ADS (POPUNDER & SOCIAL BAR) ─── */}
+      {/* Popunder */}
       <Script
         id="popunder-ad"
+        src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js"
         strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              var s = document.createElement('script');
-              s.src = 'https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js';
-              s.async = true;
-              document.head.appendChild(s);
-            })();
-          `,
-        }}
       />
 
-      {/* ─── ORIGINAL FIRST AD ─── */}
+      {/* Social Bar (Restored & Fixed) */}
       <Script
-        id="original-ad"
+        id="social-bar-ad"
+        src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
         strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              var s = document.createElement('script');
-              s.src = 'https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js';
-              s.async = true;
-              document.head.appendChild(s);
-            })();
-          `,
-        }}
       />
 
       {/* ── CSS for Hiding Scrollbars inside Iframes ── */}
