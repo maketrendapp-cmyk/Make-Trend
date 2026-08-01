@@ -12,6 +12,7 @@ import {
   FiMail,
   FiHome,
   FiPlusCircle,
+  FiDollarSign, // ← Added for withdrawals
 } from 'react-icons/fi';
 
 export default function AdminDashboard() {
@@ -61,6 +62,13 @@ export default function AdminDashboard() {
       description: 'View all campaigns',
       href: '/admin/campaigns',
       color: 'green',
+    },
+    {
+      icon: FiDollarSign, // ← New icon for withdrawals
+      label: 'Withdrawals',
+      description: 'Manage withdrawal requests',
+      href: '/admin/withdrawrequest', // ← Path to your withdraw request page
+      color: 'amber',
     },
     {
       icon: FiSettings,
@@ -122,7 +130,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Navigation Grid ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
           {navItems.map((item) => (
             <button
               key={item.href}
@@ -175,6 +183,14 @@ export default function AdminDashboard() {
             >
               <FiPlusCircle className="w-4 h-4" />
               Create Template
+            </button>
+            <span className="text-gray-300">|</span>
+            <button
+              onClick={() => router.push('/admin/withdrawrequest')}
+              className="flex items-center gap-2 hover:text-amber-600 transition"
+            >
+              <FiDollarSign className="w-4 h-4" />
+              Withdraw Requests
             </button>
           </div>
         </div>
