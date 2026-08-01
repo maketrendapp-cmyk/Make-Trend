@@ -3198,6 +3198,113 @@ app.post('/api/withdrawals/:id/refund', verifyToken, checkBanned, async (req, re
   }
 });
 
+
+// ── Admin: Get all withdrawals ──
+app.get('/api/admin/withdrawals', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    // ── Check admin ──
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    // ── Rate limit for admin ──
+    if (!(await checkRateLimit(uid, 'admin-withdrawals-get', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests' });
+    }
+
+    // ── Fetch all withdrawals (latest first) ──
+    const snapshot = await db.collection('withdrawals')
+      .orderBy('createdAt', 'desc')
+      .limit(100) // Optional: paginate later
+      .get();
+
+    const withdrawals = [];
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      // ── Fetch user email for display ──
+      let userEmail = null;
+      if (data.userId) {
+        try {
+          const userDoc = await db.collection('users').doc(data.userId).get();
+          if (userDoc.exists) {
+            userEmail = userDoc.data().email || null;
+          }
+        } catch (e) { /* ignore */ }
+      }
+      withdrawals.push({
+        id: doc.id,
+        userId: data.userId || null,
+        userEmail: userEmail,
+        amount: data.amount || 0,
+        mtCoins: data.mtCoins || 0,
+        method: data.method || '',
+        details: data.details || {},
+        status: data.status || 'pending',
+        createdAt: data.createdAt || null,
+        updatedAt: data.updatedAt || null,
+      });
+    }
+
+    res.json({ success: true, withdrawals });
+  } catch (error) {
+    console.error('❌ Admin get withdrawals error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch withdrawals' });
+  }
+});
+
+// ── Admin: Update withdrawal details ──
+app.put('/api/withdrawals/:id', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    // ── Admin only ──
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { id } = req.params;
+    const { amount, mtCoins, method, details } = req.body;
+
+    // ── Validate fields ──
+    if (amount !== undefined && (typeof amount !== 'number' || amount < 0)) {
+      return res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+    }
+    if (mtCoins !== undefined && (typeof mtCoins !== 'number' || mtCoins < 0 || !Number.isInteger(mtCoins))) {
+      return res.status(400).json({ success: false, error: 'MT Coins must be a positive integer' });
+    }
+    if (method !== undefined && !['esewa', 'khalti', 'bank', 'wise', 'crypto', 'paypal', 'wire'].includes(method)) {
+      return res.status(400).json({ success: false, error: 'Invalid payment method' });
+    }
+    if (details !== undefined && (typeof details !== 'object' || Array.isArray(details))) {
+      return res.status(400).json({ success: false, error: 'Details must be an object' });
+    }
+
+    // ── Prepare update data ──
+    const updateData = {};
+    if (amount !== undefined) updateData.amount = amount;
+    if (mtCoins !== undefined) updateData.mtCoins = mtCoins;
+    if (method !== undefined) updateData.method = method;
+    if (details !== undefined) updateData.details = details;
+    updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+    await db.collection('withdrawals').doc(id).update(updateData);
+
+    // ── Invalidate user cache (if we have user ID) ──
+    const doc = await db.collection('withdrawals').doc(id).get();
+    if (doc.exists) {
+      const data = doc.data();
+      if (data.userId) {
+        await invalidateKey(`withdrawals:user:${data.userId}`);
+      }
+    }
+
+    res.json({ success: true, message: 'Withdrawal updated successfully' });
+  } catch (error) {
+    console.error('❌ Update withdrawal error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update withdrawal' });
+  }
+});
+
 // ============================================================
 // 18. GLOBAL ERROR HANDLER
 // ============================================================
