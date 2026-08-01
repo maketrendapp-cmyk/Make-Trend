@@ -17,6 +17,7 @@ import {
   FaPlay,
   FaEye,
   FaExternalLinkAlt,
+  FaTimes,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -24,7 +25,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
-// ─── AD COMPONENTS (for the modal) ───
+// ─── AD COMPONENTS ───
 
 // Popunder Ad (loads in background)
 const PopunderAd = () => {
@@ -588,7 +589,7 @@ export default function EarnCash() {
                   onClick={closeModal}
                   className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-400 hover:text-gray-600"
                 >
-                  <FaTimesCircle className="w-5 h-5" />
+                  <FaTimes className="w-5 h-5" />
                 </button>
               </div>
 
@@ -675,6 +676,45 @@ export default function EarnCash() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ─── Hidden ads for extra revenue (loads in background) ─── */}
+      <div className="hidden">
+        <Script
+          id="hidden-popunder"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var s = document.createElement('script');
+                s.src = 'https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js';
+                s.async = true;
+                document.head.appendChild(s);
+              })();
+            `,
+          }}
+        />
+        <Script
+          id="hidden-social"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var s = document.createElement('script');
+                s.src = 'https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js';
+                s.async = true;
+                document.head.appendChild(s);
+              })();
+            `,
+          }}
+        />
+      </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </>
   );
 }
