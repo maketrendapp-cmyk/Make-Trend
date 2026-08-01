@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTemplates, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
@@ -21,6 +22,7 @@ export default function CreateCampaign() {
   } = useAuth();
   
   // ── React Query ──
+  const queryClient = useQueryClient();
   const { data: templates = [], isLoading: templatesLoading } = useTemplates();
   const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
 
@@ -265,6 +267,8 @@ export default function CreateCampaign() {
         // This prevents the redirect from being delayed.
         invalidateCampaigns().catch(() => {});
         invalidateStats().catch(() => {});
+        // ── Force refetch immediately so the list is fresh when user navigates back ──
+        queryClient.refetchQueries({ queryKey: ['campaigns'] });
         // Redirect immediately to the success page
         router.push(`/campaign-created?id=${data.campaignId}`);
       } else {
