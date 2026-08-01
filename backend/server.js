@@ -3095,7 +3095,7 @@ app.get('/api/withdrawal-methods', verifyToken, checkBanned, async (req, res) =>
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
-    const cacheKey = 'withdrawal-methods-v2';
+    const cacheKey = 'withdrawal-methods-v3';
     let result;
     try {
       const cached = await redisGet(cacheKey);
