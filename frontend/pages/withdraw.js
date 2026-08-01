@@ -36,6 +36,10 @@ import {
   FaArrowUp,
   FaArrowDown,
   FaPlusCircle,
+  FaGoogle,
+  FaMobile,
+  FaMoneyBillWave,
+  FaGlobe,
 } from 'react-icons/fa';
 
 export default function Withdraw() {
@@ -69,16 +73,13 @@ export default function Withdraw() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // ── Format Firestore timestamp with date & time ──
+  // ── Format Firestore timestamp ──
   const formatDate = (timestamp) => {
     if (!timestamp) return '—';
     try {
       let date;
-      // Firestore Timestamp: { seconds, nanoseconds } or { _seconds, _nanoseconds }
       if (timestamp.seconds !== undefined) {
         date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
-      } else if (timestamp._seconds !== undefined) {
-        date = new Date(timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1e6);
       } else if (timestamp.toDate) {
         date = timestamp.toDate();
       } else if (typeof timestamp === 'string') {
@@ -87,13 +88,12 @@ export default function Withdraw() {
         date = new Date(timestamp);
       }
       if (isNaN(date.getTime())) return '—';
-      return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
+      return date.toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true,
       });
     } catch {
       return '—';
@@ -211,26 +211,76 @@ export default function Withdraw() {
     };
   };
 
+  // ── Updated: Get icon for any payment method ──
   const getMethodIcon = (methodId) => {
     const icons = {
+      // Nepal
       esewa: <FaPhone />,
       khalti: <FaPhone />,
-      bank: <FaUniversity />,
+      bank_nepal: <FaUniversity />,
+      // India
+      paytm: <FaMobile />,
+      phonepe: <FaMobile />,
+      gpay: <FaGoogle />,
+      bhim_upi: <FaCreditCard />,
+      bank_india: <FaUniversity />,
+      // Bangladesh
+      bkash: <FaMobile />,
+      rocket: <FaMobile />,
+      // Pakistan
+      easypesa: <FaMobile />,
+      // Indonesia
+      dana: <FaMobile />,
+      gopay: <FaMobile />,
+      // Other wallets
+      vodafone_cash: <FaMobile />,
+      // International
+      payeer: <FaCreditCard />,
+      payoneer: <FaCreditCard />,
+      webmoney: <FaCreditCard />,
+      // Crypto
+      binance: <FaBitcoin />,
+      usdt_trc20: <FaBitcoin />,
+      // Existing
       wise: <FaCreditCard />,
-      crypto: <FaBitcoin />,
       paypal: <FaPaypal />,
       wire: <FaBuilding />,
     };
     return icons[methodId] || <FaWallet />;
   };
 
+  // ── Updated: Get display name for any payment method ──
   const getMethodName = (methodId) => {
     const names = {
+      // Nepal
       esewa: 'eSewa',
       khalti: 'Khalti',
-      bank: 'Bank Transfer',
+      bank_nepal: 'Bank Transfer (Nepal)',
+      // India
+      paytm: 'Paytm',
+      phonepe: 'PhonePe',
+      gpay: 'Google Pay',
+      bhim_upi: 'BHIM UPI',
+      bank_india: 'Bank Transfer (India)',
+      // Bangladesh
+      bkash: 'bKash',
+      rocket: 'Rocket',
+      // Pakistan
+      easypesa: 'EasyPesa',
+      // Indonesia
+      dana: 'Dana',
+      gopay: 'GoPay',
+      // Other wallets
+      vodafone_cash: 'Vodafone Cash',
+      // International
+      payeer: 'Payeer',
+      payoneer: 'Payoneer',
+      webmoney: 'WebMoney',
+      // Crypto
+      binance: 'Binance Pay',
+      usdt_trc20: 'USDT (TRC-20)',
+      // Existing
       wise: 'Wise',
-      crypto: 'Crypto',
       paypal: 'PayPal',
       wire: 'Wire Transfer',
     };
@@ -485,24 +535,6 @@ export default function Withdraw() {
                         </div>
                       ))}
 
-                    {/* ── Account Holder Name (for eSewa/Khalti) ── */}
-                    {(selectedMethod === 'esewa' || selectedMethod === 'khalti') && (
-                      <div className="mb-3">
-                        <label className="block text-xs font-medium text-slate-600 mb-1">
-                          Account Holder Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Full name on account"
-                          value={formData.accountName || ''}
-                          onChange={(e) =>
-                            setFormData({ ...formData, accountName: e.target.value })
-                          }
-                          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
-                        />
-                      </div>
-                    )}
-
                     <button
                       onClick={handleWithdraw}
                       disabled={isSubmitting || !selectedMethod || !canWithdraw}
@@ -550,7 +582,7 @@ export default function Withdraw() {
                   <thead>
                     <tr className="border-b border-slate-200">
                       <th className="text-left py-3 px-2 text-xs font-semibold text-slate-400 uppercase">
-                        Date & Time
+                        Date
                       </th>
                       <th className="text-left py-3 px-2 text-xs font-semibold text-slate-400 uppercase">
                         Method
