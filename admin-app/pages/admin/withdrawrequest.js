@@ -1,7 +1,7 @@
 // admin-app/pages/admin/withdrawrequest.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../../components/Auth';
+import { useAuth, auth } from '../../components/Auth';
 import {
   FiDollarSign,
   FiRefreshCw,
@@ -18,8 +18,6 @@ import {
   FiBank,
   FiGlobe,
   FiInfo,
-  FiChevronDown,
-  FiChevronUp,
   FiCornerUpLeft,
   FiEdit,
 } from 'react-icons/fi';
@@ -102,7 +100,7 @@ export default function AdminWithdrawRequests() {
     setLoadingData(true);
     setError('');
     try {
-      const token = await user?.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); // ← FIXED
       if (!token) throw new Error('Not authenticated');
       const res = await fetch(`${API_BASE}/admin/withdrawals`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -137,7 +135,7 @@ export default function AdminWithdrawRequests() {
     setUpdateError('');
     setUpdateSuccess('');
     try {
-      const token = await user?.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); // ← FIXED
       const res = await fetch(`${API_BASE}/withdrawals/${withdrawalId}/status`, {
         method: 'PUT',
         headers: {
@@ -169,7 +167,7 @@ export default function AdminWithdrawRequests() {
     setUpdateError('');
     setUpdateSuccess('');
     try {
-      const token = await user?.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); // ← FIXED
       const res = await fetch(`${API_BASE}/withdrawals/${selectedWithdrawal.id}/refund`, {
         method: 'POST',
         headers: {
@@ -203,7 +201,7 @@ export default function AdminWithdrawRequests() {
     setUpdateError('');
     setUpdateSuccess('');
     try {
-      const token = await user?.getIdToken();
+      const token = await auth.currentUser?.getIdToken(); // ← FIXED
       const res = await fetch(`${API_BASE}/withdrawals/${id}`, {
         method: 'PUT',
         headers: {
