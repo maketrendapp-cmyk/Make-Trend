@@ -2800,9 +2800,11 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
     switch (method) {
       case 'esewa':
         if (!details.phone) return res.status(400).json({ success: false, error: 'eSewa phone number required' });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name is required for eSewa' });
         break;
       case 'khalti':
         if (!details.phone) return res.status(400).json({ success: false, error: 'Khalti phone number required' });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name is required for Khalti' });
         break;
       case 'bank':
         if (!details.bankName || !details.accountNumber || !details.accountName) {
@@ -3085,11 +3087,22 @@ app.get('/api/withdrawal-methods', verifyToken, checkBanned, async (req, res) =>
     const methods = [
       {
         id: 'esewa',
-        name: 'eSewa / Khalti',
+        name: 'eSewa',
         icon: '📱',
         description: 'Nepal mobile wallet',
         fields: [
           { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '98XXXXXXXX', required: true },
+          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name on account', required: true },
+        ],
+      },
+      {
+        id: 'khalti',
+        name: 'Khalti',
+        icon: '📱',
+        description: 'Nepal mobile wallet',
+        fields: [
+          { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '98XXXXXXXX', required: true },
+          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name on account', required: true },
         ],
       },
       {
