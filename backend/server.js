@@ -2781,6 +2781,7 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
 
     // ── Validate details based on method ──
     switch (method) {
+      // ── NEPAL ──
       case 'esewa':
         if (!details.phone) return res.status(400).json({ success: false, error: 'eSewa phone number required' });
         if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name is required for eSewa' });
@@ -2789,18 +2790,76 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
         if (!details.phone) return res.status(400).json({ success: false, error: 'Khalti phone number required' });
         if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name is required for Khalti' });
         break;
-      case 'bank':
+      case 'bank_nepal':
         if (!details.bankName || !details.accountNumber || !details.accountName) {
           return res.status(400).json({ success: false, error: 'Bank details required' });
         }
         break;
+
+      // ── INDIA ──
+      case 'paytm':
+      case 'phonepe':
+      case 'gpay':
+      case 'bhim_upi':
+        if (!details.upiId) return res.status(400).json({ success: false, error: `${method.toUpperCase()} UPI ID / number required` });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+      case 'bank_india':
+        if (!details.bankName || !details.accountNumber || !details.accountName || !details.ifscCode) {
+          return res.status(400).json({ success: false, error: 'All bank details required (Bank Name, Account Name, Account Number, IFSC Code)' });
+        }
+        break;
+
+      // ── BANGLADESH ──
+      case 'bkash':
+      case 'rocket':
+        if (!details.phone) return res.status(400).json({ success: false, error: `${method.toUpperCase()} phone number required` });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+
+      // ── PAKISTAN ──
+      case 'easypesa':
+        if (!details.phone) return res.status(400).json({ success: false, error: 'EasyPesa phone number required' });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+
+      // ── INDONESIA ──
+      case 'dana':
+      case 'gopay':
+        if (!details.phone) return res.status(400).json({ success: false, error: `${method.toUpperCase()} phone number required` });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+
+      // ── OTHER WALLETS ──
+      case 'vodafone_cash':
+        if (!details.phone) return res.status(400).json({ success: false, error: 'Vodafone Cash phone number required' });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+
+      // ── INTERNATIONAL WALLETS ──
+      case 'payeer':
+      case 'webmoney':
+        if (!details.walletId) return res.status(400).json({ success: false, error: `${method.toUpperCase()} wallet ID required` });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+      case 'payoneer':
+        if (!details.email) return res.status(400).json({ success: false, error: 'Payoneer email required' });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+
+      // ── CRYPTO ──
+      case 'binance':
+        if (!details.email) return res.status(400).json({ success: false, error: 'Binance email required' });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+      case 'usdt_trc20':
+        if (!details.address) return res.status(400).json({ success: false, error: 'USDT TRC-20 address required' });
+        if (!details.accountName) return res.status(400).json({ success: false, error: 'Account holder name required' });
+        break;
+
+      // ── EXISTING (keep) ──
       case 'wise':
         if (!details.email) return res.status(400).json({ success: false, error: 'Wise email required' });
-        break;
-      case 'crypto':
-        if (!details.address || !details.currency) {
-          return res.status(400).json({ success: false, error: 'Crypto address and currency required' });
-        }
         break;
       case 'paypal':
         if (!details.email) return res.status(400).json({ success: false, error: 'PayPal email required' });
@@ -3048,81 +3107,253 @@ app.get('/api/withdrawal-methods', verifyToken, checkBanned, async (req, res) =>
     }
 
     const methods = [
-      {
-        id: 'esewa',
-        name: 'eSewa',
-        icon: '📱',
-        description: 'Nepal mobile wallet',
-        fields: [
-          { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '98XXXXXXXX', required: true },
-          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name on account', required: true },
-        ],
-      },
-      {
-        id: 'khalti',
-        name: 'Khalti',
-        icon: '📱',
-        description: 'Nepal mobile wallet',
-        fields: [
-          { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '98XXXXXXXX', required: true },
-          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name on account', required: true },
-        ],
-      },
-      {
-        id: 'bank',
-        name: 'Bank Transfer',
-        icon: '🏦',
-        description: 'Local bank transfer (Nepal)',
-        fields: [
-          { key: 'bankName', label: 'Bank Name', type: 'text', placeholder: 'e.g. NMB Bank', required: true },
-          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
-          { key: 'accountNumber', label: 'Account Number', type: 'text', placeholder: 'e.g. 1234567890', required: true },
-        ],
-      },
-      {
-        id: 'wise',
-        name: 'Wise',
-        icon: '💳',
-        description: 'Receive via Wise account',
-        fields: [
-          { key: 'email', label: 'Wise Email', type: 'email', placeholder: 'you@wise.com', required: true },
-        ],
-      },
-      {
-        id: 'crypto',
-        name: 'Crypto (BTC / USDT)',
-        icon: '₿',
-        description: 'Receive in BTC or USDT',
-        fields: [
-          { key: 'currency', label: 'Currency', type: 'select', options: ['BTC', 'USDT'], required: true },
-          { key: 'address', label: 'Wallet Address', type: 'text', placeholder: '0x...', required: true },
-        ],
-      },
-      {
-        id: 'paypal',
-        name: 'PayPal',
-        icon: '💸',
-        description: 'Receive via PayPal',
-        fields: [
-          { key: 'email', label: 'PayPal Email', type: 'email', placeholder: 'you@paypal.com', required: true },
-        ],
-      },
-      {
-        id: 'wire',
-        name: 'International Wire Transfer',
-        icon: '🌍',
-        description: 'IBAN/SWIFT wire transfer',
-        fields: [
-          { key: 'bankName', label: 'Bank Name', type: 'text', placeholder: 'e.g. HSBC', required: true },
-          { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
-          { key: 'accountNumber', label: 'Account Number / IBAN', type: 'text', placeholder: 'e.g. IBAN', required: true },
-          { key: 'swiftCode', label: 'SWIFT Code', type: 'text', placeholder: 'e.g. HSBCGB2L', required: true },
-        ],
-      },
-    ];
+  // ── NEPAL ──
+  {
+    id: 'esewa',
+    name: 'eSewa',
+    icon: '📱',
+    description: 'Nepal mobile wallet',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '98XXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name on account', required: true },
+    ],
+  },
+  {
+    id: 'khalti',
+    name: 'Khalti',
+    icon: '📱',
+    description: 'Nepal mobile wallet',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '98XXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name on account', required: true },
+    ],
+  },
+  {
+    id: 'bank_nepal',
+    name: 'Bank Transfer (Nepal)',
+    icon: '🏦',
+    description: 'Local bank transfer',
+    fields: [
+      { key: 'bankName', label: 'Bank Name', type: 'text', placeholder: 'e.g. NMB Bank', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+      { key: 'accountNumber', label: 'Account Number', type: 'text', placeholder: 'e.g. 1234567890', required: true },
+    ],
+  },
+
+  // ── INDIA ──
+  {
+    id: 'paytm',
+    name: 'Paytm',
+    icon: '📱',
+    description: 'India UPI / Wallet',
+    fields: [
+      { key: 'upiId', label: 'UPI ID / Paytm Number', type: 'text', placeholder: 'example@paytm / 98XXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'phonepe',
+    name: 'PhonePe',
+    icon: '📱',
+    description: 'India UPI / Wallet',
+    fields: [
+      { key: 'upiId', label: 'UPI ID / PhonePe Number', type: 'text', placeholder: 'example@phonepe / 98XXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'gpay',
+    name: 'Google Pay',
+    icon: '📱',
+    description: 'India UPI / Wallet',
+    fields: [
+      { key: 'upiId', label: 'UPI ID / GPay Number', type: 'text', placeholder: 'example@gpay / 98XXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'bhim_upi',
+    name: 'BHIM UPI',
+    icon: '📱',
+    description: 'India UPI',
+    fields: [
+      { key: 'upiId', label: 'UPI ID / VPA', type: 'text', placeholder: 'example@upi / 98XXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'bank_india',
+    name: 'Bank Transfer (India)',
+    icon: '🏦',
+    description: 'Indian bank transfer (NEFT/IMPS)',
+    fields: [
+      { key: 'bankName', label: 'Bank Name', type: 'text', placeholder: 'e.g. SBI', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+      { key: 'accountNumber', label: 'Account Number', type: 'text', placeholder: 'e.g. 1234567890', required: true },
+      { key: 'ifscCode', label: 'IFSC Code', type: 'text', placeholder: 'e.g. SBIN0001234', required: true },
+    ],
+  },
+
+  // ── BANGLADESH ──
+  {
+    id: 'bkash',
+    name: 'bKash',
+    icon: '📱',
+    description: 'Bangladesh mobile wallet',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '01XXXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'rocket',
+    name: 'Rocket',
+    icon: '📱',
+    description: 'Bangladesh mobile wallet',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '01XXXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+
+  // ── PAKISTAN ──
+  {
+    id: 'easypesa',
+    name: 'EasyPesa',
+    icon: '📱',
+    description: 'Pakistan mobile wallet',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '03XXXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+      { key: 'cnic', label: 'CNIC Number', type: 'text', placeholder: 'XXXXX-XXXXXXX-X', required: false },
+    ],
+  },
+
+  // ── INDONESIA ──
+  {
+    id: 'dana',
+    name: 'Dana',
+    icon: '📱',
+    description: 'Indonesia mobile wallet',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '08XXXXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'gopay',
+    name: 'GoPay',
+    icon: '📱',
+    description: 'Indonesia mobile wallet (Gojek)',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '08XXXXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+
+  // ── OTHER WALLETS ──
+  {
+    id: 'vodafone_cash',
+    name: 'Vodafone Cash',
+    icon: '📱',
+    description: 'Vodafone M-Pesa / Cash',
+    fields: [
+      { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: 'XX-XXX-XXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+
+  // ── INTERNATIONAL / CRYPTO ──
+  {
+    id: 'payeer',
+    name: 'Payeer',
+    icon: '💳',
+    description: 'International payment system',
+    fields: [
+      { key: 'walletId', label: 'Payeer Wallet ID', type: 'text', placeholder: 'PXXXXXXXXXX', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'payoneer',
+    name: 'Payoneer',
+    icon: '💳',
+    description: 'International payment system',
+    fields: [
+      { key: 'email', label: 'Payoneer Email', type: 'email', placeholder: 'you@payoneer.com', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'webmoney',
+    name: 'WebMoney',
+    icon: '💳',
+    description: 'International payment system',
+    fields: [
+      { key: 'walletId', label: 'WebMoney Wallet ID (Z/R/U)', type: 'text', placeholder: 'Z123456789012', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+
+  // ── CRYPTO (Expanded) ──
+  {
+    id: 'binance',
+    name: 'Binance Pay',
+    icon: '₿',
+    description: 'Binance crypto wallet',
+    fields: [
+      { key: 'email', label: 'Binance Email', type: 'email', placeholder: 'you@binance.com', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+  {
+    id: 'usdt_trc20',
+    name: 'USDT (TRC-20)',
+    icon: '₿',
+    description: 'USDT on TRC-20 network (Tron)',
+    fields: [
+      { key: 'address', label: 'TRC-20 Wallet Address', type: 'text', placeholder: 'T...', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+    ],
+  },
+
+  // ── WISE / PAYPAL (already exists, keeping for reference) ──
+  {
+    id: 'wise',
+    name: 'Wise',
+    icon: '💳',
+    description: 'International bank transfer via Wise',
+    fields: [
+      { key: 'email', label: 'Wise Email', type: 'email', placeholder: 'you@wise.com', required: true },
+    ],
+  },
+  {
+    id: 'paypal',
+    name: 'PayPal',
+    icon: '💸',
+    description: 'Receive via PayPal',
+    fields: [
+      { key: 'email', label: 'PayPal Email', type: 'email', placeholder: 'you@paypal.com', required: true },
+    ],
+  },
+
+  // ── INTERNATIONAL WIRE ──
+  {
+    id: 'wire',
+    name: 'International Wire Transfer',
+    icon: '🌍',
+    description: 'IBAN/SWIFT wire transfer',
+    fields: [
+      { key: 'bankName', label: 'Bank Name', type: 'text', placeholder: 'e.g. HSBC', required: true },
+      { key: 'accountName', label: 'Account Holder Name', type: 'text', placeholder: 'Full name', required: true },
+      { key: 'accountNumber', label: 'Account Number / IBAN', type: 'text', placeholder: 'e.g. IBAN', required: true },
+      { key: 'swiftCode', label: 'SWIFT Code', type: 'text', placeholder: 'e.g. HSBCGB2L', required: true },
+    ],
+  },
+];
 
     result = { success: true, methods };
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 86400); // ✅ 24 hours
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 60); // ✅ 24 hours
     res.json(result);
   } catch (error) {
     console.error('❌ Get methods error:', error);
@@ -3248,9 +3479,10 @@ app.put('/api/withdrawals/:id', verifyToken, checkBanned, async (req, res) => {
     if (mtCoins !== undefined && (typeof mtCoins !== 'number' || mtCoins < 0 || !Number.isInteger(mtCoins))) {
       return res.status(400).json({ success: false, error: 'MT Coins must be a positive integer' });
     }
-    if (method !== undefined && !['esewa', 'khalti', 'bank', 'wise', 'crypto', 'paypal', 'wire'].includes(method)) {
-      return res.status(400).json({ success: false, error: 'Invalid payment method' });
-    }
+    const validMethods = ['esewa', 'khalti', 'bank_nepal', 'paytm', 'phonepe', 'gpay', 'bhim_upi', 'bank_india', 'bkash', 'rocket', 'easypesa', 'dana', 'gopay', 'vodafone_cash', 'payeer', 'payoneer', 'webmoney', 'binance', 'usdt_trc20', 'wise', 'paypal', 'wire'];
+if (method !== undefined && !validMethods.includes(method)) {
+  return res.status(400).json({ success: false, error: 'Invalid payment method' });
+}
     if (details !== undefined && (typeof details !== 'object' || Array.isArray(details))) {
       return res.status(400).json({ success: false, error: 'Details must be an object' });
     }
