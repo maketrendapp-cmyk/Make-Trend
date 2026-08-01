@@ -5,6 +5,7 @@ import Script from 'next/script';
 import Meta from '../components/Meta';
 import { useAuth } from '../components/AuthScreen';
 import { useMtCoins } from '../lib/queries';
+import { getToken } from '../lib/queries'; // ← Use the SAME pattern as other pages
 import { refreshDeviceId } from '../utils/deviceId';
 import {
   FaCoins,
@@ -27,12 +28,13 @@ const API_BASE = `${BACKEND_URL}/api`;
 // ─── CONFIGURATION ───
 const AD_REWARD = 10;
 const MAX_ADS = 5;
-const BASE_DURATION = 15; // Base seconds
-const ADS_PER_OFFER = 3; // How many of EACH ad type to show
+const ADS_PER_OFFER = 3;
+const BASE_DURATION = 10;
+const AD_DURATION = BASE_DURATION + (ADS_PER_OFFER * 4);
 
-// ─── AD COMPONENTS ───
+// ─── AD COMPONENTS (Rendered only inside modal) ───
 
-// Popunder Ad (loads in background) - Single instance
+// Popunder Ad
 const PopunderAd = () => {
   return (
     <div className="w-full flex justify-center my-2">
@@ -54,9 +56,9 @@ const PopunderAd = () => {
   );
 };
 
-// Banner Ad (728×90) - Multiple instances with unique keys
+// Banner Ad (Multiple instances)
 const BannerAd = ({ instance = 0 }) => {
-  const uniqueId = `banner-ad-${instance}`;
+  const uniqueId = `banner-ad-modal-${instance}`;
   return (
     <div className="w-full flex justify-center my-2">
       <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200">
@@ -82,7 +84,7 @@ const BannerAd = ({ instance = 0 }) => {
   );
 };
 
-// Native Ad (336×280) - Multiple instances with unique container IDs
+// Native Ad (Multiple instances)
 const NativeAd = ({ instance = 0 }) => {
   const containerId = `container-native-modal-${instance}`;
   return (
@@ -111,7 +113,7 @@ const NativeAd = ({ instance = 0 }) => {
   );
 };
 
-// Social Bar Ad - Single instance (once per page)
+// Social Bar Ad
 const SocialBarAd = () => {
   return (
     <Script
@@ -161,16 +163,13 @@ export default function EarnCash() {
   const [canClaim, setCanClaim] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isModalReady, setIsModalReady] = useState(false);
   const timerRef = useRef(null);
-
-  // ── Calculate total duration based on number of ads ──
-  const totalAds = ADS_PER_OFFER * 3; // Banners + Natives + (1 Popunder + 1 Social)
-  const AD_DURATION = BASE_DURATION + (ADS_PER_OFFER * 3); // ~24s for 3x each
 
   // ── Fetch ad status ──
   const fetchStatus = async () => {
     try {
-      const token = await user?.getIdToken?.();
+      const token = await getToken();
       if (!token) {
         setLoading(false);
         return;
@@ -206,7 +205,7 @@ export default function EarnCash() {
     }
   };
 
-  // ── Start offer (open modal) ──
+  // ── Start offer (opens modal) ──
   const handleStartOffer = async (slotId) => {
     if (isSubmitting) return;
     const slot = adSlots.find((s) => s.id === slotId);
@@ -214,16 +213,18 @@ export default function EarnCash() {
 
     setError('');
     setSuccess('');
+    setIsModalReady(false);
 
     try {
-      const token = await user?.getIdToken?.();
+      const token = await getToken();
       if (!token) {
-        setError('Authentication required.');
+        setError('Authentication required. Please log in again.');
         return;
       }
 
       const deviceId = await refreshDeviceId();
 
+      // ── Start session on server ──
       const startRes = await fetch(`${API_BASE}/ads/start`, {
         method: 'POST',
         headers: {
@@ -232,25 +233,37 @@ export default function EarnCash() {
         },
         body: JSON.stringify({ deviceId }),
       });
+      
+      if (!startRes.ok) {
+        const text = await startRes.text();
+        console.error('Start response:', text);
+        setError('Failed to start ad session. Please try again.');
+        return;
+      }
+      
       const startData = await startRes.json();
       if (!startData.success) {
         setError(startData.error || 'Failed to start ad session');
         return;
       }
 
+      // ── Mark as in progress ──
       setAdSlots((prev) =>
         prev.map((s) =>
           s.id === slotId ? { ...s, inProgress: true } : s
         )
       );
 
+      // ── Open modal ──
       setCurrentOfferId(slotId);
       setTimer(AD_DURATION);
       setProgress(0);
       setCanClaim(false);
       setIsClaiming(false);
       setShowModal(true);
+      setIsModalReady(true);
 
+      // ── Start countdown ──
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setTimer((prev) => {
@@ -267,7 +280,7 @@ export default function EarnCash() {
 
     } catch (err) {
       console.error('Start offer error:', err);
-      setError('Network error. Please try again.');
+      setError(err.message || 'Network error. Please try again.');
     }
   };
 
@@ -279,7 +292,7 @@ export default function EarnCash() {
     setError('');
 
     try {
-      const token = await user?.getIdToken?.();
+      const token = await getToken();
       if (!token) {
         setError('Authentication required.');
         setIsClaiming(false);
@@ -323,6 +336,7 @@ export default function EarnCash() {
     }
   };
 
+  // ── Close modal and cleanup ──
   const closeModal = () => {
     setShowModal(false);
     setCurrentOfferId(null);
@@ -330,18 +344,22 @@ export default function EarnCash() {
     setProgress(0);
     setCanClaim(false);
     setIsClaiming(false);
+    setIsModalReady(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
   };
 
+  // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      closeModal();
     };
   }, []);
 
+  // ── Initial fetch ──
   useEffect(() => {
     if (user) {
       fetchStatus();
@@ -350,6 +368,7 @@ export default function EarnCash() {
     }
   }, [user]);
 
+  // ── Refetch when window gets focus ──
   useEffect(() => {
     const handleFocus = () => {
       if (user && !showModal) fetchStatus();
@@ -358,6 +377,7 @@ export default function EarnCash() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [user, showModal]);
 
+  // ── Redirect if not authenticated ──
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -553,14 +573,17 @@ export default function EarnCash() {
         </div>
       </div>
 
-      {/* ─── MODAL / OVERLAY ─── */}
+      {/* ─── MODAL ─── */}
       <AnimatePresence>
-        {showModal && (
+        {showModal && isModalReady && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentClass) closeModal();
+            }}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
@@ -587,6 +610,7 @@ export default function EarnCash() {
               </div>
 
               <div className="p-6 space-y-4">
+                {/* Timer */}
                 <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -606,7 +630,7 @@ export default function EarnCash() {
                   </p>
                 </div>
 
-                {/* ── BANNER ADS (Multiple) ── */}
+                {/* ── BANNER ADS ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">📢 Banner Ads ({ADS_PER_OFFER})</p>
                   {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
@@ -614,7 +638,7 @@ export default function EarnCash() {
                   ))}
                 </div>
 
-                {/* ── NATIVE ADS (Multiple) ── */}
+                {/* ── NATIVE ADS ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">📱 Native Ads ({ADS_PER_OFFER})</p>
                   {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
@@ -622,14 +646,13 @@ export default function EarnCash() {
                   ))}
                 </div>
 
-                {/* ── POPUNDER AD ── */}
+                {/* ── POPUNDER ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
-                  <p className="text-xs text-gray-400 mb-2">🔄 Popunder Ad (loading...)</p>
+                  <p className="text-xs text-gray-400 mb-2">🔄 Popunder Ad</p>
                   <PopunderAd />
-                  <p className="text-xs text-gray-400 mt-1">✅ Ad loaded in background</p>
                 </div>
 
-                {/* ── SOCIAL BAR AD ── */}
+                {/* ── SOCIAL BAR ── */}
                 <SocialBarAd />
 
                 {/* ── Claim Button ── */}
@@ -660,14 +683,9 @@ export default function EarnCash() {
                       </>
                     )}
                   </button>
-                  {!canClaim && (
-                    <p className="text-xs text-center text-gray-400 mt-2">
-                      ⏳ Please wait {timer} seconds while {ADS_PER_OFFER * 3}+ ads load
-                    </p>
-                  )}
                 </div>
 
-                <div className="text-center text-xs text-gray-400 mt-2">
+                <div className="text-center text-xs text-gray-400">
                   <p>🔥 {ADS_PER_OFFER * 3 + 2} total ads loaded for this offer</p>
                 </div>
               </div>
@@ -675,45 +693,6 @@ export default function EarnCash() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ─── Hidden ads for extra revenue ─── */}
-      <div className="hidden">
-        <Script
-          id="hidden-popunder"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                var s = document.createElement('script');
-                s.src = 'https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js';
-                s.async = true;
-                document.head.appendChild(s);
-              })();
-            `,
-          }}
-        />
-        <Script
-          id="hidden-social"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                var s = document.createElement('script');
-                s.src = 'https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js';
-                s.async = true;
-                document.head.appendChild(s);
-              })();
-            `,
-          }}
-        />
-      </div>
-
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
     </>
   );
 }
