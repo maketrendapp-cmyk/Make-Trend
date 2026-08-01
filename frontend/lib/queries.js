@@ -81,6 +81,7 @@ export function useProfile(enabled = false) {
       createdAt: null,
       lastLogin: null,
     },
+    keepPreviousData: true, // ← Prevents cache clearing during refetch
   });
 }
 
