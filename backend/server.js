@@ -3648,11 +3648,11 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
       console.warn(`⚠️ Ad watched too quickly for user ${uid}: ${elapsed}s (required ${AD_DURATION}s)`);
       return res.status(400).json({
         success: false,
-        error: `Please watch the ad for the full ${AD_DURATION} seconds.`,
+        error: `Please watch the ads for the full ${AD_DURATION} seconds.`,
       });
     }
     
-    // ── Clear the start key so it can't be reused ──
+    // ── Clear the start key ──
     await redis.del(startKey);
 
     // ── Device fingerprint check ──
@@ -3663,14 +3663,6 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
         console.warn(`⚠️ Device mismatch for user ${uid}`);
       }
     }
-
-    // ── Track devices per user ──
-    const deviceCountKey = `ad:devices:${uid}`;
-    const deviceCount = await redis.sadd(deviceCountKey, deviceId);
-    if (deviceCount > 3) {
-      console.warn(`⚠️ User ${uid} using multiple devices (${deviceCount}) for ads`);
-    }
-    await redis.expire(deviceCountKey, 86400 * 7);
 
     // ── Update Redis ──
     const pipeline = redis.pipeline();
