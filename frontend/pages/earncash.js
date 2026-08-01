@@ -16,7 +16,6 @@ import {
   FaGift,
   FaPlay,
   FaEye,
-  FaExternalLinkAlt,
   FaTimes,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,9 +24,15 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
+// ─── CONFIGURATION ───
+const AD_REWARD = 10;
+const MAX_ADS = 5;
+const BASE_DURATION = 15; // Base seconds
+const ADS_PER_OFFER = 3; // How many of EACH ad type to show
+
 // ─── AD COMPONENTS ───
 
-// Popunder Ad (loads in background)
+// Popunder Ad (loads in background) - Single instance
 const PopunderAd = () => {
   return (
     <div className="w-full flex justify-center my-2">
@@ -49,13 +54,15 @@ const PopunderAd = () => {
   );
 };
 
-// Banner Ad (728×90)
-const BannerAd = () => {
+// Banner Ad (728×90) - Multiple instances with unique keys
+const BannerAd = ({ instance = 0 }) => {
+  const uniqueId = `banner-ad-${instance}`;
   return (
-    <div className="w-full flex justify-center my-3">
+    <div className="w-full flex justify-center my-2">
       <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200">
         <Script
-          id="banner-ad-modal"
+          id={uniqueId}
+          key={uniqueId}
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
@@ -75,13 +82,18 @@ const BannerAd = () => {
   );
 };
 
-// Native Ad (336×280)
-const NativeAd = () => {
+// Native Ad (336×280) - Multiple instances with unique container IDs
+const NativeAd = ({ instance = 0 }) => {
+  const containerId = `container-native-modal-${instance}`;
   return (
-    <div className="w-full flex justify-center my-3">
-      <div id="container-native-modal" className="w-full max-w-[336px] min-h-[280px] bg-gray-50/50 rounded-lg border border-gray-200 flex items-center justify-center" />
+    <div className="w-full flex justify-center my-2">
+      <div 
+        id={containerId} 
+        className="w-full max-w-[336px] min-h-[280px] bg-gray-50/50 rounded-lg border border-gray-200 flex items-center justify-center"
+      />
       <Script
-        id="native-ad-modal"
+        id={`native-ad-${instance}`}
+        key={`native-ad-${instance}`}
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
@@ -90,7 +102,7 @@ const NativeAd = () => {
               s.async = true;
               s.setAttribute('data-cfasync', 'false');
               s.src = 'https://pl30634127.effectivecpmnetwork.com/4b3b3334be9dbca33558926aca954fd9/invoke.js';
-              document.getElementById('container-native-modal').appendChild(s);
+              document.getElementById('${containerId}').appendChild(s);
             })();
           `,
         }}
@@ -99,7 +111,7 @@ const NativeAd = () => {
   );
 };
 
-// Social Bar Ad (sticky bottom)
+// Social Bar Ad - Single instance (once per page)
 const SocialBarAd = () => {
   return (
     <Script
@@ -127,13 +139,14 @@ export default function EarnCash() {
   const { refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
   // ── State ──
-  const [adSlots, setAdSlots] = useState([
-    { id: 1, claimed: false, inProgress: false, reward: 10 },
-    { id: 2, claimed: false, inProgress: false, reward: 10 },
-    { id: 3, claimed: false, inProgress: false, reward: 10 },
-    { id: 4, claimed: false, inProgress: false, reward: 10 },
-    { id: 5, claimed: false, inProgress: false, reward: 10 },
-  ]);
+  const [adSlots, setAdSlots] = useState(
+    Array.from({ length: MAX_ADS }, (_, i) => ({
+      id: i + 1,
+      claimed: false,
+      inProgress: false,
+      reward: AD_REWARD,
+    }))
+  );
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
@@ -144,15 +157,15 @@ export default function EarnCash() {
   // ── Modal State ──
   const [showModal, setShowModal] = useState(false);
   const [currentOfferId, setCurrentOfferId] = useState(null);
-  const [timer, setTimer] = useState(30);
+  const [timer, setTimer] = useState(0);
   const [canClaim, setCanClaim] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [progress, setProgress] = useState(0);
   const timerRef = useRef(null);
 
-  const AD_REWARD = 10;
-  const MAX_ADS = 5;
-  const AD_DURATION = 30;
+  // ── Calculate total duration based on number of ads ──
+  const totalAds = ADS_PER_OFFER * 3; // Banners + Natives + (1 Popunder + 1 Social)
+  const AD_DURATION = BASE_DURATION + (ADS_PER_OFFER * 3); // ~24s for 3x each
 
   // ── Fetch ad status ──
   const fetchStatus = async () => {
@@ -211,7 +224,6 @@ export default function EarnCash() {
 
       const deviceId = await refreshDeviceId();
 
-      // ── Start session on server ──
       const startRes = await fetch(`${API_BASE}/ads/start`, {
         method: 'POST',
         headers: {
@@ -226,14 +238,12 @@ export default function EarnCash() {
         return;
       }
 
-      // ── Mark as in progress ──
       setAdSlots((prev) =>
         prev.map((s) =>
           s.id === slotId ? { ...s, inProgress: true } : s
         )
       );
 
-      // ── Open modal ──
       setCurrentOfferId(slotId);
       setTimer(AD_DURATION);
       setProgress(0);
@@ -241,7 +251,6 @@ export default function EarnCash() {
       setIsClaiming(false);
       setShowModal(true);
 
-      // ── Start countdown ──
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setTimer((prev) => {
@@ -290,7 +299,6 @@ export default function EarnCash() {
       const data = await res.json();
 
       if (data.success) {
-        // ── Update main page ──
         const slotId = currentOfferId;
         setAdSlots((prev) =>
           prev.map((s) =>
@@ -301,7 +309,6 @@ export default function EarnCash() {
         setTotalEarned((prev) => prev + AD_REWARD);
         refetchMtCoins();
 
-        // ── Close modal ──
         closeModal();
         setSuccess(`✅ Earned ${AD_REWARD} MT Coins!`);
         setTimeout(() => setSuccess(''), 5000);
@@ -316,7 +323,6 @@ export default function EarnCash() {
     }
   };
 
-  // ── Close modal ──
   const closeModal = () => {
     setShowModal(false);
     setCurrentOfferId(null);
@@ -330,14 +336,12 @@ export default function EarnCash() {
     }
   };
 
-  // ── Cleanup ──
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
-  // ── Initial fetch ──
   useEffect(() => {
     if (user) {
       fetchStatus();
@@ -346,7 +350,6 @@ export default function EarnCash() {
     }
   }, [user]);
 
-  // ── Poll for status when window gets focus ──
   useEffect(() => {
     const handleFocus = () => {
       if (user && !showModal) fetchStatus();
@@ -355,7 +358,6 @@ export default function EarnCash() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [user, showModal]);
 
-  // ── Redirect if not authenticated ──
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -397,13 +399,11 @@ export default function EarnCash() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4 pb-24">
         <div className="max-w-3xl mx-auto">
 
-          {/* ── Header ── */}
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900">💰 Earn Cash &amp; MT Coins</h1>
             <p className="text-gray-500 text-sm mt-1">Complete offers to earn MT Coins</p>
           </div>
 
-          {/* ── Stats Cards ── */}
           <div className="grid grid-cols-3 gap-3 mb-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
               <FaCoins className="w-6 h-6 text-yellow-500 mx-auto mb-1" />
@@ -424,7 +424,6 @@ export default function EarnCash() {
             </div>
           </div>
 
-          {/* ── Messages ── */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm flex items-start gap-2">
               <FaTimesCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -438,7 +437,6 @@ export default function EarnCash() {
             </div>
           )}
 
-          {/* ── Daily Limit Reached ── */}
           {isDailyLimitReached && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-4 text-center">
               <div className="text-4xl mb-2">🎉</div>
@@ -452,7 +450,6 @@ export default function EarnCash() {
             </div>
           )}
 
-          {/* ── Offer List ── */}
           {!isDailyLimitReached && (
             <div className="space-y-3">
               {adSlots.map((slot) => (
@@ -490,7 +487,7 @@ export default function EarnCash() {
                           {slot.claimed
                             ? 'Already claimed'
                             : slot.inProgress
-                            ? 'Watching ads...'
+                            ? `Watching ${ADS_PER_OFFER * 3}+ ads...`
                             : 'Click to start this offer'}
                         </p>
                       </div>
@@ -518,12 +515,11 @@ export default function EarnCash() {
                     </div>
                   </div>
 
-                  {/* ── Progress for active slot ── */}
                   {slot.inProgress && (
                     <div className="mt-3 pt-3 border-t border-purple-200">
                       <div className="flex items-center gap-2 text-xs text-purple-600">
                         <div className="animate-pulse">●</div>
-                        <span>Ad viewer is open. Complete the ads to claim your reward.</span>
+                        <span>{ADS_PER_OFFER * 3}+ ads are waiting for you in the viewer.</span>
                       </div>
                     </div>
                   )}
@@ -532,14 +528,12 @@ export default function EarnCash() {
             </div>
           )}
 
-          {/* ── Remaining count ── */}
           {!isDailyLimitReached && !loading && (
             <div className="mt-4 text-center text-xs text-gray-400">
               <p>{remaining} offer{remaining !== 1 ? 's' : ''} remaining today</p>
             </div>
           )}
 
-          {/* ── Info Box ── */}
           <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <div className="flex items-start gap-3">
               <FaInfoCircle className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
@@ -547,7 +541,7 @@ export default function EarnCash() {
                 <h3 className="text-sm font-semibold text-gray-900">How It Works</h3>
                 <ul className="text-xs text-gray-500 space-y-1 mt-1">
                   <li>✅ Click <strong>"Start"</strong> on any available offer</li>
-                  <li>✅ Watch the ads in the popup window</li>
+                  <li>✅ View <strong>{ADS_PER_OFFER * 3}+ ads</strong> in the popup</li>
                   <li>✅ Wait <strong>{AD_DURATION} seconds</strong> for the timer to finish</li>
                   <li>✅ Click <strong>"Claim Reward"</strong> to earn <strong>{AD_REWARD} MT Coins</strong></li>
                   <li>✅ Maximum <strong>{MAX_ADS} offers</strong> per day</li>
@@ -574,14 +568,13 @@ export default function EarnCash() {
               exit={{ scale: 0.9, y: 20 }}
               className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
             >
-              {/* ── Modal Header ── */}
               <div className="sticky top-0 bg-white z-10 rounded-t-3xl border-b border-gray-200 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center">
                     <FaEye className="text-purple-600" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">Watch Ads to Earn</h2>
+                    <h2 className="text-lg font-bold text-gray-900">Watch {ADS_PER_OFFER * 3}+ Ads</h2>
                     <p className="text-xs text-gray-500">Complete all ads to claim your reward</p>
                   </div>
                 </div>
@@ -593,9 +586,7 @@ export default function EarnCash() {
                 </button>
               </div>
 
-              {/* ── Modal Content ── */}
               <div className="p-6 space-y-4">
-                {/* ── Timer & Progress ── */}
                 <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -611,23 +602,27 @@ export default function EarnCash() {
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    {canClaim ? '✅ Ready to claim!' : '⏳ Please wait for the timer to finish...'}
+                    {canClaim ? '✅ Ready to claim!' : `⏳ Watching ${ADS_PER_OFFER * 3}+ ads...`}
                   </p>
                 </div>
 
-                {/* ── BANNER AD ── */}
+                {/* ── BANNER ADS (Multiple) ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
-                  <p className="text-xs text-gray-400 mb-2">📢 Banner Ad</p>
-                  <BannerAd />
+                  <p className="text-xs text-gray-400 mb-2">📢 Banner Ads ({ADS_PER_OFFER})</p>
+                  {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
+                    <BannerAd key={i} instance={i} />
+                  ))}
                 </div>
 
-                {/* ── NATIVE AD ── */}
+                {/* ── NATIVE ADS (Multiple) ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
-                  <p className="text-xs text-gray-400 mb-2">📱 Native Ad</p>
-                  <NativeAd />
+                  <p className="text-xs text-gray-400 mb-2">📱 Native Ads ({ADS_PER_OFFER})</p>
+                  {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
+                    <NativeAd key={i} instance={i} />
+                  ))}
                 </div>
 
-                {/* ── POPUNDER AD (hidden, loads in background) ── */}
+                {/* ── POPUNDER AD ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">🔄 Popunder Ad (loading...)</p>
                   <PopunderAd />
@@ -667,9 +662,13 @@ export default function EarnCash() {
                   </button>
                   {!canClaim && (
                     <p className="text-xs text-center text-gray-400 mt-2">
-                      ⏳ Please wait {timer} seconds for the timer to finish
+                      ⏳ Please wait {timer} seconds while {ADS_PER_OFFER * 3}+ ads load
                     </p>
                   )}
+                </div>
+
+                <div className="text-center text-xs text-gray-400 mt-2">
+                  <p>🔥 {ADS_PER_OFFER * 3 + 2} total ads loaded for this offer</p>
                 </div>
               </div>
             </motion.div>
@@ -677,7 +676,7 @@ export default function EarnCash() {
         )}
       </AnimatePresence>
 
-      {/* ─── Hidden ads for extra revenue (loads in background) ─── */}
+      {/* ─── Hidden ads for extra revenue ─── */}
       <div className="hidden">
         <Script
           id="hidden-popunder"
