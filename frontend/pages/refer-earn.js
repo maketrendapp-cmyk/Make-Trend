@@ -130,14 +130,16 @@ export default function ReferEarn() {
       });
   };
 
-  // ── Robust date formatter for Firestore Timestamps ──
+  // ── Robust date formatter for Firestore Timestamps (supports both formats) ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      // Firestore Timestamp object: { seconds, nanoseconds }
+      // Firestore Timestamp object: { seconds, nanoseconds } or { _seconds, _nanoseconds }
       if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
         date = new Date(timestamp.seconds * 1000 + timestamp.nanoseconds / 1e6);
+      } else if (timestamp._seconds !== undefined && timestamp._nanoseconds !== undefined) {
+        date = new Date(timestamp._seconds * 1000 + timestamp._nanoseconds / 1e6);
       } else if (timestamp.toDate && typeof timestamp.toDate === 'function') {
         date = timestamp.toDate();
       } else if (typeof timestamp === 'string') {
@@ -252,7 +254,7 @@ export default function ReferEarn() {
             </div>
           </div>
 
-          {/* ── Stats Cards (horizontal, compact) ── */}
+          {/* ── Stats Cards (horizontal, compact, responsive) ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
@@ -282,7 +284,7 @@ export default function ReferEarn() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-500">Plan</p>
-                <p className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <p className="text-lg font-semibold text-gray-900 flex items-center gap-2 flex-wrap">
                   {isPro ? '👑 PRO' : 'FREE'}
                   {isPro && proExpiry && (
                     <span className="text-xs text-gray-400 font-normal">
@@ -338,7 +340,7 @@ export default function ReferEarn() {
             </div>
             {referralData.referralCode || profile?.referralCode ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <code className="bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg text-xl font-mono text-gray-800">
+                <code className="bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg text-xl font-mono text-gray-800 break-all">
                   {referralData.referralCode || profile?.referralCode}
                 </code>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -377,7 +379,7 @@ export default function ReferEarn() {
             )}
           </div>
 
-          {/* ── Referred Users Table ── */}
+          {/* ── Referred Users Table (fully responsive) ── */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -396,19 +398,19 @@ export default function ReferEarn() {
                 <p className="text-sm">Share your code to start earning!</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-2">
+                <table className="w-full text-sm min-w-[480px]">
                   <thead>
                     <tr className="border-b border-gray-100 text-left text-gray-500">
-                      <th className="py-3 px-3 font-medium">User</th>
-                      <th className="py-3 px-3 font-medium hidden sm:table-cell">Email</th>
-                      <th className="py-3 px-3 font-medium">Joined</th>
+                      <th className="py-3 px-2 font-medium">User</th>
+                      <th className="py-3 px-2 font-medium hidden sm:table-cell">Email</th>
+                      <th className="py-3 px-2 font-medium">Joined</th>
                     </tr>
                   </thead>
                   <tbody>
                     {referralData.referredUsers.map((ref) => (
                       <tr key={ref.uid} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                        <td className="py-3 px-3">
+                        <td className="py-3 px-2">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-gray-600 text-sm font-medium overflow-hidden flex-shrink-0">
                               {getUserAvatar(ref) ? (
@@ -423,10 +425,10 @@ export default function ReferEarn() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-3 hidden sm:table-cell text-gray-600 truncate max-w-xs">
+                        <td className="py-3 px-2 hidden sm:table-cell text-gray-600 truncate max-w-xs">
                           {ref.email || '—'}
                         </td>
-                        <td className="py-3 px-3 text-gray-500 whitespace-nowrap">
+                        <td className="py-3 px-2 text-gray-500 whitespace-nowrap">
                           {formatDate(ref.createdAt)}
                         </td>
                       </tr>
