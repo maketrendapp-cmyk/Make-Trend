@@ -33,11 +33,10 @@ const API_BASE = `${BACKEND_URL}/api`;
 const AD_REWARD = 10;
 const MAX_ADS = 5;
 const BASE_DURATION = 12;
-const AD_DURATION = BASE_DURATION + 10; // Generous timer for massive ad layout
+const AD_DURATION = BASE_DURATION + 10;
 
-// ─── AD COMPONENTS (Optimized for React/Next.js) ───
+// ─── AD COMPONENTS (Matched to Tasks & Share pages) ───
 
-// Safely loads banner ads via Iframe (from Task/Share pages)
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
@@ -76,7 +75,7 @@ const IframeAd = ({ adKey, width, height }) => {
   );
 };
 
-// Safely loads Native DOM injection ads (from Task/Share pages)
+// Robust Native Ad component matching tasks.js implementation
 const NativeAd = ({ uniqueId }) => {
   const containerRef = useRef(null);
   const scriptInjected = useRef(false);
@@ -146,14 +145,12 @@ export default function EarnCash() {
   
   const timerRef = useRef(null);
 
-  // ── Helper to get token ──
   const getToken = async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
     return await firebaseUser.getIdToken();
   };
 
-  // ── Fetch ad status ──
   const fetchStatus = async () => {
     try {
       const token = await getToken();
@@ -192,7 +189,6 @@ export default function EarnCash() {
     }
   };
 
-  // ── Start offer ──
   const handleStartOffer = async (slotId) => {
     if (isSubmitting) return;
     const slot = adSlots.find((s) => s.id === slotId);
@@ -244,7 +240,7 @@ export default function EarnCash() {
       setProgress(0);
       setCanClaim(false);
       setIsClaiming(false);
-      setAdKey(prev => prev + 1); // Force remount of ad scripts inside modal
+      setAdKey(prev => prev + 1);
       
       setShowModal(true);
       document.body.style.overflow = 'hidden';
@@ -275,18 +271,16 @@ export default function EarnCash() {
     }
   };
 
-  // Track scrolling inside modal feed
   const handleModalScroll = (e) => {
     if (!hasScrolledRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-      if (scrollTop > 100 || (scrollTop + clientHeight >= scrollHeight - 50)) {
+      if (scrollTop > 80 || (scrollTop + clientHeight >= scrollHeight - 40)) {
         hasScrolledRef.current = true;
-        checkEngagement();
+        setUserInteracted(true);
       }
     }
   };
 
-  // Track user interaction with ad feed
   const handleAdContainerClick = () => {
     if (!hasClickedAdRef.current) {
       hasClickedAdRef.current = true;
@@ -294,13 +288,6 @@ export default function EarnCash() {
     }
   };
 
-  const checkEngagement = () => {
-    if (hasScrolledRef.current) {
-      setUserInteracted(true);
-    }
-  };
-
-  // ── Claim from modal ──
   const handleClaimFromModal = async () => {
     if (!canClaim || isClaiming || !currentOfferId) return;
 
@@ -554,7 +541,7 @@ export default function EarnCash() {
         </div>
       )}
 
-      {/* ─── MODAL WITH 10 ADS & ENGAGEMENT TRACKER ─── */}
+      {/* ─── MODAL WITH 10 MIXED ADS (BANNERS & NATIVES) ─── */}
       <AnimatePresence>
         {showModal && (
           <motion.div
@@ -586,7 +573,7 @@ export default function EarnCash() {
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-gray-900 leading-tight">Sponsored Feed ({currentOfferId})</h2>
-                    <p className="text-xs text-gray-500 font-medium">Scroll and interact to unlock reward</p>
+                    <p className="text-xs text-gray-500 font-medium">Scroll and explore to unlock reward</p>
                   </div>
                 </div>
                 {canClaim && (
@@ -599,7 +586,7 @@ export default function EarnCash() {
                 )}
               </div>
 
-              {/* Scrollable Body with 10 Ads & useRef scroll tracking */}
+              {/* Scrollable Body with 10 Mixed Ads (Banners & Natives) */}
               <div 
                 onScroll={handleModalScroll}
                 onClick={handleAdContainerClick}
@@ -610,9 +597,9 @@ export default function EarnCash() {
                 <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-purple-100 shadow-sm mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <FaClock className={`w-4 h-4 ${canClaim && userInteracted ? 'text-green-500' : 'text-purple-600'}`} />
+                      <FaClock className={`w-4 h-4 ${canClaim ? 'text-green-500' : 'text-purple-600'}`} />
                       <span className="text-sm font-bold text-gray-700">
-                        {canClaim && userInteracted ? 'Verification Complete' : 'Scroll & Explore Ads'}
+                        {canClaim ? 'Verification Complete' : 'Scroll & Explore Ads'}
                       </span>
                     </div>
                     <span className={`text-xl font-extrabold ${canClaim ? 'text-green-600' : 'text-purple-600'}`}>
@@ -630,7 +617,7 @@ export default function EarnCash() {
                 {!isModalReady ? (
                   <div className="flex flex-col items-center justify-center py-12">
                     <FaSpinner className="w-8 h-8 text-purple-500 animate-spin mb-3" />
-                    <p className="text-sm font-medium text-gray-500">Loading high-yield sponsor ads...</p>
+                    <p className="text-sm font-medium text-gray-500">Loading sponsor ads...</p>
                   </div>
                 ) : (
                   <>
@@ -652,11 +639,11 @@ export default function EarnCash() {
                       </ul>
                     </div>
 
-                    {/* 10-AD HIGH REVENUE FEED (Alternating Banners & Natives) */}
+                    {/* 10-AD HIGH REVENUE FEED (Alternating 5 Banners & 5 Natives) */}
                     <div className="space-y-4 pb-6">
                       <div className="flex items-center gap-2 px-1 opacity-70">
                         <span className="w-2 h-2 rounded-full bg-purple-500" />
-                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sponsored Feed (10 Ads Loaded)</p>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sponsored Feed (10 Ads Active)</p>
                       </div>
 
                       <IframeAd key={`ad-1-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
