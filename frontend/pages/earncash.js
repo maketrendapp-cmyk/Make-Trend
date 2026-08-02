@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import Script from 'next/script';
 import Meta from '../components/Meta';
 import { useAuth } from '../components/AuthScreen';
-import { auth } from '../services/firebase'; // ✅ FIX: import auth directly from firebase service
+import { auth } from '../services/firebase'; // ✅ correct import
 import { useMtCoins } from '../lib/queries';
 import { refreshDeviceId } from '../utils/deviceId';
 import {
@@ -32,12 +32,12 @@ const ADS_PER_OFFER = 3;
 const BASE_DURATION = 10;
 const AD_DURATION = BASE_DURATION + (ADS_PER_OFFER * 4);
 
-// ─── AD COMPONENTS ───
-const PopunderAd = () => {
+// ─── AD COMPONENTS (with a `key` prop to force remount) ───
+const PopunderAd = ({ uniqueKey }) => {
   return (
-    <div className="w-full flex justify-center my-2">
+    <div className="w-full flex justify-center my-2" key={uniqueKey}>
       <Script
-        id="popunder-ad-modal"
+        id={`popunder-ad-${uniqueKey}`}
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
@@ -54,10 +54,10 @@ const PopunderAd = () => {
   );
 };
 
-const BannerAd = ({ instance = 0 }) => {
-  const uniqueId = `banner-ad-modal-${instance}`;
+const BannerAd = ({ instance = 0, uniqueKey }) => {
+  const uniqueId = `banner-ad-${uniqueKey}-${instance}`;
   return (
-    <div className="w-full flex justify-center my-2">
+    <div className="w-full flex justify-center my-2" key={uniqueId}>
       <div className="w-full max-w-[728px] min-h-[90px] bg-gray-50/50 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200">
         <Script
           id={uniqueId}
@@ -81,17 +81,17 @@ const BannerAd = ({ instance = 0 }) => {
   );
 };
 
-const NativeAd = ({ instance = 0 }) => {
-  const containerId = `container-native-modal-${instance}`;
+const NativeAd = ({ instance = 0, uniqueKey }) => {
+  const containerId = `container-native-${uniqueKey}-${instance}`;
   return (
-    <div className="w-full flex justify-center my-2">
+    <div className="w-full flex justify-center my-2" key={containerId}>
       <div 
         id={containerId} 
         className="w-full max-w-[336px] min-h-[280px] bg-gray-50/50 rounded-lg border border-gray-200 flex items-center justify-center"
       />
       <Script
-        id={`native-ad-${instance}`}
-        key={`native-ad-${instance}`}
+        id={`native-ad-${uniqueKey}-${instance}`}
+        key={`native-ad-${uniqueKey}-${instance}`}
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
@@ -109,10 +109,11 @@ const NativeAd = ({ instance = 0 }) => {
   );
 };
 
-const SocialBarAd = () => {
+const SocialBarAd = ({ uniqueKey }) => {
   return (
     <Script
-      id="social-bar-modal"
+      id={`social-bar-${uniqueKey}`}
+      key={`social-bar-${uniqueKey}`}
       strategy="afterInteractive"
       dangerouslySetInnerHTML={{
         __html: `
@@ -159,9 +160,11 @@ export default function EarnCash() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isModalReady, setIsModalReady] = useState(false);
+  // ✅ NEW: a key to force ad scripts to re-run
+  const [adKey, setAdKey] = useState(0);
   const timerRef = useRef(null);
 
-  // ── Helper to get token using Firebase auth (same as queries.js) ──
+  // ── Helper to get token using Firebase auth ──
   const getToken = async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
@@ -235,16 +238,19 @@ export default function EarnCash() {
         body: JSON.stringify({ deviceId }),
       });
       
-      if (!startRes.ok) {
-        const text = await startRes.text();
-        console.error('Start response:', text);
-        setError('Failed to start ad session. Please try again.');
-        return;
-      }
+      // 🔍 Log the raw response for debugging
+      const responseText = await startRes.text();
+      console.log('Start response:', responseText);
       
-      const startData = await startRes.json();
-      if (!startData.success) {
-        setError(startData.error || 'Failed to start ad session');
+      let startData;
+      try {
+        startData = JSON.parse(responseText);
+      } catch (e) {
+        startData = {};
+      }
+
+      if (!startRes.ok || !startData.success) {
+        setError(startData.error || 'Failed to start ad session. Please try again.');
         return;
       }
 
@@ -259,6 +265,8 @@ export default function EarnCash() {
       setProgress(0);
       setCanClaim(false);
       setIsClaiming(false);
+      // ✅ Increment adKey to force remount of ad scripts
+      setAdKey(prev => prev + 1);
       setShowModal(true);
       setIsModalReady(true);
 
@@ -622,26 +630,27 @@ export default function EarnCash() {
                   </p>
                 </div>
 
+                {/* ✅ Pass uniqueKey to each ad component */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">📢 Banner Ads ({ADS_PER_OFFER})</p>
                   {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
-                    <BannerAd key={i} instance={i} />
+                    <BannerAd key={`banner-${adKey}-${i}`} instance={i} uniqueKey={adKey} />
                   ))}
                 </div>
 
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">📱 Native Ads ({ADS_PER_OFFER})</p>
                   {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
-                    <NativeAd key={i} instance={i} />
+                    <NativeAd key={`native-${adKey}-${i}`} instance={i} uniqueKey={adKey} />
                   ))}
                 </div>
 
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">🔄 Popunder Ad</p>
-                  <PopunderAd />
+                  <PopunderAd uniqueKey={adKey} />
                 </div>
 
-                <SocialBarAd />
+                <SocialBarAd uniqueKey={adKey} />
 
                 <div className="pt-4 border-t border-gray-200">
                   <button
