@@ -32,10 +32,10 @@ const API_BASE = `${BACKEND_URL}/api`;
 // ─── CONFIGURATION ───
 const AD_REWARD = 10;
 const MAX_ADS = 5;
-const BASE_DURATION = 12;
+const BASE_DURATION = 10;
 const AD_DURATION = BASE_DURATION + 10;
 
-// ─── AD COMPONENTS (Matched to Tasks & Share pages) ───
+// ─── AD COMPONENTS ───
 
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
@@ -75,7 +75,6 @@ const IframeAd = ({ adKey, width, height }) => {
   );
 };
 
-// Robust Native Ad component matching tasks.js implementation
 const NativeAd = ({ uniqueId }) => {
   const containerRef = useRef(null);
   const scriptInjected = useRef(false);
@@ -135,14 +134,10 @@ export default function EarnCash() {
   const [isModalReady, setIsModalReady] = useState(false);
   const [adKey, setAdKey] = useState(0);
   
-  // Engagement Tracking via useRef
   const hasScrolledRef = useRef(false);
-  const hasClickedAdRef = useRef(false);
   const [userInteracted, setUserInteracted] = useState(false);
 
-  // Ad state
   const [showStickyAd, setShowStickyAd] = useState(true);
-  
   const timerRef = useRef(null);
 
   const getToken = async () => {
@@ -199,7 +194,6 @@ export default function EarnCash() {
     setIsModalReady(false);
     setIsSubmitting(true);
     hasScrolledRef.current = false;
-    hasClickedAdRef.current = false;
     setUserInteracted(false);
 
     try {
@@ -274,17 +268,10 @@ export default function EarnCash() {
   const handleModalScroll = (e) => {
     if (!hasScrolledRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-      if (scrollTop > 80 || (scrollTop + clientHeight >= scrollHeight - 40)) {
+      if (scrollTop > 50 || (scrollTop + clientHeight >= scrollHeight - 30)) {
         hasScrolledRef.current = true;
         setUserInteracted(true);
       }
-    }
-  };
-
-  const handleAdContainerClick = () => {
-    if (!hasClickedAdRef.current) {
-      hasClickedAdRef.current = true;
-      setUserInteracted(true);
     }
   };
 
@@ -466,6 +453,11 @@ export default function EarnCash() {
             </motion.div>
           )}
 
+          {/* TOP BANNER AD PLACEMENT ON EARN PAGE */}
+          <div className="my-4">
+            <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+          </div>
+
           {!isDailyLimitReached && (
             <div className="space-y-3.5">
               {adSlots.map((slot) => (
@@ -541,14 +533,18 @@ export default function EarnCash() {
         </div>
       )}
 
-      {/* ─── MODAL WITH 10 MIXED ADS (BANNERS & NATIVES) ─── */}
+      {/* ─── GLOBAL NETWORK ADS (POPUNDER & SOCIAL BAR) ─── */}
+      <Script id="global-popunder" src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" strategy="afterInteractive" />
+      <Script id="global-social" src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js" strategy="afterInteractive" />
+
+      {/* ─── MODAL WITH HIGH-CONVERTING AD FEED & STRATEGIC OVERLAY ─── */}
       <AnimatePresence>
         {showModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4 bg-black/80 backdrop-blur-md overflow-hidden"
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4 bg-black/85 backdrop-blur-md overflow-hidden"
           >
             <motion.div
               initial={{ scale: 0.95, y: 20 }}
@@ -556,14 +552,6 @@ export default function EarnCash() {
               exit={{ scale: 0.95, y: 20 }}
               className="bg-gray-50 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl relative overflow-hidden"
             >
-              
-              {/* Global Popunder & Social Bar inside Modal Lifecycle */}
-              {isModalReady && (
-                <>
-                  <Script id={`modal-popunder-${adKey}`} src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" strategy="afterInteractive" />
-                  <Script id={`modal-social-${adKey}`} src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js" strategy="afterInteractive" />
-                </>
-              )}
 
               {/* Modal Header */}
               <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
@@ -586,10 +574,9 @@ export default function EarnCash() {
                 )}
               </div>
 
-              {/* Scrollable Body with 10 Mixed Ads (Banners & Natives) */}
+              {/* Scrollable Body with Mixed Ads */}
               <div 
                 onScroll={handleModalScroll}
-                onClick={handleAdContainerClick}
                 className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 relative bg-gray-50"
               >
                 
@@ -634,16 +621,16 @@ export default function EarnCash() {
                         </li>
                         <li className="flex items-start gap-2">
                           <FaHandPointer className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                          <span><strong>Click or tap</strong> anywhere on the feed to confirm engagement.</span>
+                          <span><strong>Click or tap</strong> on any ad banner to confirm engagement.</span>
                         </li>
                       </ul>
                     </div>
 
-                    {/* 10-AD HIGH REVENUE FEED (Alternating 5 Banners & 5 Natives) */}
+                    {/* AD FEED PLACEMENTS (Alternating Banners and Natives) */}
                     <div className="space-y-4 pb-6">
                       <div className="flex items-center gap-2 px-1 opacity-70">
                         <span className="w-2 h-2 rounded-full bg-purple-500" />
-                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sponsored Feed (10 Ads Active)</p>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sponsored Feed</p>
                       </div>
 
                       <IframeAd key={`ad-1-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
@@ -654,19 +641,22 @@ export default function EarnCash() {
 
                       <IframeAd key={`ad-5-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
                       <NativeAd key={`ad-6-${adKey}`} uniqueId={`${adKey}-feed-3`} />
-
-                      <IframeAd key={`ad-7-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
-                      <NativeAd key={`ad-8-${adKey}`} uniqueId={`${adKey}-feed-4`} />
-
-                      <IframeAd key={`ad-9-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
-                      <NativeAd key={`ad-10-${adKey}`} uniqueId={`${adKey}-feed-5`} />
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Modal Footer */}
+              {/* Modal Footer with High-Conversion Strategic Layer */}
               <div className="bg-white px-5 py-4 border-t border-gray-100 flex-shrink-0 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] relative">
+                
+                {/* STRATEGIC OVERLAY AREA: 
+                  Placing an invisible or light floating layer right above the button 
+                  or naturally letting high ad density around the CTA drive engagement.
+                */}
+                <div className="mb-3">
+                  <IframeAd key={`footer-banner-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                </div>
+
                 <button
                   onClick={handleClaimFromModal}
                   disabled={!canClaim || isClaiming}
