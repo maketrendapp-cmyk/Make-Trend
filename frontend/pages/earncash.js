@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
 import Meta from '../components/Meta';
-import { useAuth, auth } from '../components/AuthScreen'; // ✅ Import auth too
+import { useAuth } from '../components/AuthScreen';
+import { auth } from '../services/firebase'; // ✅ FIX: import auth directly from firebase service
 import { useMtCoins } from '../lib/queries';
 import { refreshDeviceId } from '../utils/deviceId';
 import {
