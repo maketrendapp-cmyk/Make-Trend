@@ -19,6 +19,8 @@ import {
   FaPlay,
   FaEye,
   FaTimes,
+  FaHandPointer,
+  FaArrowDown
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -30,13 +32,13 @@ const API_BASE = `${BACKEND_URL}/api`;
 const AD_REWARD = 10;
 const MAX_ADS = 5;
 const BASE_DURATION = 10;
-// We will show 3 visual ads in the modal to prevent network blocking (2 banners, 1 native)
-const ADS_IN_MODAL = 3; 
+// Increased visual ads in modal for higher revenue
+const ADS_IN_MODAL = 4; 
 const AD_DURATION = BASE_DURATION + (ADS_IN_MODAL * 4);
 
 // ─── AD COMPONENTS (Optimized for React/Next.js) ───
 
-// Safely loads document.write() ads without breaking React using an isolated iframe
+// Safely loads document.write() ads without breaking React
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
@@ -59,8 +61,8 @@ const IframeAd = ({ adKey, width, height }) => {
     </html>
   `;
   return (
-    <div className="w-full flex justify-center overflow-hidden my-2">
-      <div className="overflow-x-auto no-scrollbar max-w-full">
+    <div className="w-full flex justify-center overflow-hidden my-3">
+      <div className="overflow-x-auto no-scrollbar max-w-full rounded-xl shadow-sm border border-gray-100">
         <iframe
           title="Banner Ad"
           srcDoc={srcDoc}
@@ -92,11 +94,11 @@ const NativeAd = ({ uniqueId }) => {
   }, [uniqueId]);
 
   return (
-    <div className="flex justify-center w-full my-3">
+    <div className="flex justify-center w-full my-4">
       <div 
         ref={containerRef} 
         id={`container-native-${uniqueId}`} 
-        className="w-full flex justify-center max-w-[336px] transition-all min-h-[50px]"
+        className="w-full flex justify-center max-w-[336px] transition-all min-h-[50px] rounded-xl overflow-hidden shadow-sm border border-gray-100"
       />
     </div>
   );
@@ -536,24 +538,6 @@ export default function EarnCash() {
               <p>{remaining} offer{remaining !== 1 ? 's' : ''} remaining for today</p>
             </div>
           )}
-
-          {/* ── How It Works ── */}
-          <div className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <FaInfoCircle className="w-4 h-4 text-purple-600" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-gray-900">How It Works</h3>
-                <ul className="text-sm text-gray-600 space-y-2 mt-3">
-                  <li className="flex items-center gap-2"><FaPlay className="w-3 h-3 text-purple-400" /> Click <strong>"Start"</strong> on any available offer</li>
-                  <li className="flex items-center gap-2"><FaEye className="w-3 h-3 text-purple-400" /> View <strong>{ADS_IN_MODAL} ads</strong> in the popup window</li>
-                  <li className="flex items-center gap-2"><FaClock className="w-3 h-3 text-purple-400" /> Wait <strong>{AD_DURATION} seconds</strong> for the timer</li>
-                  <li className="flex items-center gap-2"><FaCoins className="w-3 h-3 text-purple-400" /> Click <strong>"Claim Reward"</strong> to earn MT Coins</li>
-                </ul>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -573,10 +557,6 @@ export default function EarnCash() {
         </div>
       )}
 
-      {/* ─── GLOBAL NETWORK ADS (POPUNDER & SOCIAL BAR) ─── */}
-      <Script id="popunder-ad" src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" strategy="afterInteractive" />
-      <Script id="social-bar-ad" src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js" strategy="afterInteractive" />
-
       {/* ─── MODAL ─── */}
       <AnimatePresence>
         {showModal && (
@@ -584,7 +564,7 @@ export default function EarnCash() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4 bg-black/70 backdrop-blur-sm overflow-hidden"
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4 bg-black/80 backdrop-blur-md overflow-hidden"
           >
             <motion.div
               initial={{ scale: 0.95, y: 20 }}
@@ -592,6 +572,15 @@ export default function EarnCash() {
               exit={{ scale: 0.95, y: 20 }}
               className="bg-gray-50 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden"
             >
+              
+              {/* Dynamic Global Ads triggered inside Modal Lifecycle */}
+              {isModalReady && (
+                <>
+                  <Script id={`modal-popunder-${adKey}`} src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" strategy="afterInteractive" />
+                  <Script id={`modal-social-${adKey}`} src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js" strategy="afterInteractive" />
+                </>
+              )}
+
               {/* Modal Header */}
               <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -600,7 +589,7 @@ export default function EarnCash() {
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-gray-900 leading-tight">Reward Offer {currentOfferId}</h2>
-                    <p className="text-xs text-gray-500 font-medium">Please view the ads below</p>
+                    <p className="text-xs text-gray-500 font-medium">Follow the instructions to claim</p>
                   </div>
                 </div>
                 {canClaim && (
@@ -614,10 +603,10 @@ export default function EarnCash() {
               </div>
 
               {/* Modal Scrollable Body */}
-              <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
+              <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 relative bg-gray-50">
                 
                 {/* Timer Banner (Sticky inside scroll for visibility) */}
-                <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-purple-100 shadow-sm mb-2">
+                <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-purple-100 shadow-sm mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <FaClock className={`w-4 h-4 ${canClaim ? 'text-green-500' : 'text-purple-600'}`} />
@@ -644,25 +633,53 @@ export default function EarnCash() {
                   </div>
                 ) : (
                   <>
-                    <div className="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm">
-                      <div className="flex items-center gap-2 mb-3 px-1">
-                        <span className="w-2 h-2 rounded-full bg-blue-500" />
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sponsor Ads</p>
+                    {/* INSTRUCTIONS BOX - HIGH CTR PUSH */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-inner">
+                      <h3 className="font-bold text-blue-800 flex items-center gap-2 text-sm mb-2">
+                        <FaInfoCircle className="w-4 h-4 text-blue-600" />
+                        Action Required to Unlock
+                      </h3>
+                      <ul className="text-sm text-blue-700 space-y-2">
+                        <li className="flex items-start gap-2">
+                          <FaArrowDown className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
+                          <span><strong>Scroll down</strong> to view the sponsor offers below.</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <FaHandPointer className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
+                          <span><strong>Click on the ads</strong> and explore them for a few seconds to verify your session.</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <FaCheckCircle className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
+                          <span>Claim your reward once the timer finishes!</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* AD FEED (Banner -> Native -> Banner -> Native) */}
+                    <div className="space-y-4 pb-4">
+                      <div className="flex items-center gap-2 px-1 opacity-70">
+                        <span className="w-2 h-2 rounded-full bg-gray-400" />
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sponsor Feed</p>
                       </div>
-                      
-                      {/* 2 Banner Ads (Safe Iframes) */}
+
+                      {/* Ad 1: Banner */}
                       <IframeAd key={`modal-banner-1-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
-                      <IframeAd key={`modal-banner-2-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
                       
-                      {/* 1 Native Ad */}
-                      <NativeAd key={`modal-native-${adKey}`} uniqueId={adKey} />
+                      {/* Ad 2: Native */}
+                      <NativeAd key={`modal-native-1-${adKey}`} uniqueId={`${adKey}-1`} />
+
+                      {/* Ad 3: Banner */}
+                      <IframeAd key={`modal-banner-2-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+
+                      {/* Ad 4: Native */}
+                      <NativeAd key={`modal-native-2-${adKey}`} uniqueId={`${adKey}-2`} />
                     </div>
                   </>
                 )}
               </div>
 
               {/* Modal Footer (Claim Button) */}
-              <div className="bg-white px-5 py-4 border-t border-gray-100 flex-shrink-0 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+              <div className="bg-white px-5 py-4 border-t border-gray-100 flex-shrink-0 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] relative">
                 <button
                   onClick={handleClaimFromModal}
                   disabled={!canClaim || isClaiming}
