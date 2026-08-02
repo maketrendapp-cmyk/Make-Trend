@@ -2,8 +2,6 @@
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 const DEVICE_ID_KEY = 'maketrend_device_id';
-
-// ── Shared promise for device ID generation ──
 let deviceIdPromise = null;
 
 // ── Generate a real fingerprint (or fallback) ──
@@ -13,7 +11,7 @@ async function generateFingerprint() {
     const result = await fp.get();
     return result.visitorId;
   } catch (e) {
-    console.warn('⚠️ FingerprintJS failed, using fallback', e);
+    console.warn('⚠️ FingerprintJS failed, using fallback');
     return 'fallback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
   }
 }
@@ -23,10 +21,14 @@ export function getDeviceIdPromise() {
   if (!deviceIdPromise) {
     deviceIdPromise = (async () => {
       let id = localStorage.getItem(DEVICE_ID_KEY);
-      if (!id) {
-        id = await generateFingerprint();
-        localStorage.setItem(DEVICE_ID_KEY, id);
+      if (id) {
+        console.log('📦 Using stored device ID:', id);
+        return id;
       }
+      console.log('🆕 Generating new device fingerprint...');
+      id = await generateFingerprint();
+      localStorage.setItem(DEVICE_ID_KEY, id);
+      console.log('✅ New device ID generated:', id);
       return id;
     })();
   }
