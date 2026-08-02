@@ -34,8 +34,7 @@ const MAX_ADS = 5;
 const BASE_DURATION = 10;
 const AD_DURATION = BASE_DURATION + 10;
 
-// ─── AD COMPONENTS ───
-
+// ─── AD COMPONENTS (unchanged) ───
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
@@ -139,13 +138,14 @@ export default function EarnCash() {
   const [showStickyAd, setShowStickyAd] = useState(true);
   const timerRef = useRef(null);
 
+  // ─── ✅ FIX 1: Wait for auth to be ready before getting token ───
   const getToken = async () => {
+    await auth.authStateReady(); // 🔥 This ensures Firebase is initialized
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
     return await firebaseUser.getIdToken();
   };
 
-  // ── FIX 2: fetchStatus now updates with Math.max to prevent reset ──
   const fetchStatus = async () => {
     try {
       const token = await getToken();
@@ -167,10 +167,8 @@ export default function EarnCash() {
       const data = await res.json();
       if (data.success) {
         const completedAds = data.adsWatched || 0;
-        // ✅ Only update if the new value is higher (prevents reset)
         setClaimedCount(prev => Math.max(prev, completedAds));
         setTotalEarned(prev => Math.max(prev, completedAds * AD_REWARD));
-
         setAdSlots((prev) =>
           prev.map((slot, index) => ({
             ...slot,
@@ -313,9 +311,7 @@ export default function EarnCash() {
         setTotalEarned((prev) => prev + AD_REWARD);
         refetchMtCoins();
 
-        // ── FIX 1: Sync with backend after claiming ──
         fetchStatus();
-
         closeModal();
         setSuccess(`✅ Earned ${AD_REWARD} MT Coins!`);
         setTimeout(() => setSuccess(''), 5000);
@@ -359,14 +355,20 @@ export default function EarnCash() {
     };
   }, []);
 
+  // ─── ✅ FIX 2: Wait for auth to be ready before initial fetch ───
   useEffect(() => {
-    if (user) {
-      fetchStatus();
-    } else {
-      setLoading(false);
-    }
+    const loadStatus = async () => {
+      await auth.authStateReady(); // ensure Firebase is ready
+      if (user) {
+        fetchStatus();
+      } else {
+        setLoading(false);
+      }
+    };
+    loadStatus();
   }, [user]);
 
+  // ── UI rendering (unchanged) ──
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -653,10 +655,7 @@ export default function EarnCash() {
               {/* Modal Footer with High-Conversion Strategic Layer */}
               <div className="bg-white px-5 py-4 border-t border-gray-100 flex-shrink-0 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] relative">
                 
-                {/* STRATEGIC OVERLAY AREA: 
-                  Placing an invisible or light floating layer right above the button 
-                  or naturally letting high ad density around the CTA drive engagement.
-                */}
+                {/* STRATEGIC OVERLAY AREA */}
                 <div className="mb-3">
                   <IframeAd key={`footer-banner-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
                 </div>
