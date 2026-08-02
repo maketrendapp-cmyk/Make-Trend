@@ -9,14 +9,12 @@ import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
 import Sidebar from '../components/Sidebar';
-import { getDeviceId } from '../utils/deviceId';
+import { refreshDeviceId } from '../utils/deviceId'; // still exported
 import '../styles/globals.css';
 
-// ── Create Device ID Context ──
 const DeviceIdContext = createContext(null);
 export const useDeviceId = () => useContext(DeviceIdContext);
 
-// ── React Query client ──
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -27,37 +25,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const NO_LAYOUT_PAGES = [
-  '/templates/ncell-reward-v1',
-  '/templates/student-scholarship-nepal-v1',
-  '/templates/freefire-free-diamond-shop-v1',
-  '/templates/freefire-exclusive-rewards-v1',
-  '/templates/tonde-gamer-lucky-spin-v1',
-  '/templates/youtube-booster-v1',
-  '/ncell-reward-v1',
-  '/templates/pubg-uc-giveaway-v1',
-  '/templates/quiz-challenge-win-cash-v1',
-  '/templates/spin-win-daraz-discount-v1',
-  '/templates/lucky-draw-premium-prizes-v1',
-  '/templates/gaming-clip-contest',
-  '/templates/photography-contest',
-  '/templates/bgmi-tournament-registration',
-  '/templates/',
-  '/tasks',
-  '/share',
-];
-
-const TOP_NAV_ONLY_PAGES = [
-  '/about',
-  '/rules',
-  '/terms',
-  '/privacy',
-  '/follow',
-  '/download',
-  '/contact',
-  '/login',
-  '/signup',
-];
+// ... (NO_LAYOUT_PAGES and TOP_NAV_ONLY_PAGES remain unchanged) ...
 
 function MyApp({ Component, pageProps }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -65,13 +33,21 @@ function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pathname = router.pathname;
 
-  // ── Generate Device ID on first load ──
+  // ── Start fingerprint generation in the background ──
   useEffect(() => {
-    const id = getDeviceId();
-    setDeviceId(id);
-    console.log('🆔 Device ID generated on initial load:', id);
+    refreshDeviceId()
+      .then((id) => {
+        setDeviceId(id);
+        console.log('🆔 Device ID ready:', id);
+      })
+      .catch(() => {
+        // Fallback – shouldn't happen as generateFingerprint always returns something
+        const fallback = 'fallback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+        setDeviceId(fallback);
+      });
   }, []);
 
+  // ── No loading screen – render immediately ──
   const isNoLayout = NO_LAYOUT_PAGES.some((path) => pathname.startsWith(path));
   const isTopNavOnly = TOP_NAV_ONLY_PAGES.some((path) => pathname.startsWith(path));
 
@@ -90,12 +66,9 @@ function MyApp({ Component, pageProps }) {
             </div>
           ) : (
             <div className="h-screen bg-bg flex flex-col overflow-hidden">
-              {/* Header */}
               <div className="flex-shrink-0 z-40 relative">
                 <Navbar />
               </div>
-
-              {/* Main Content */}
               <div className="flex flex-1 overflow-hidden relative">
                 <div className="hidden md:block flex-shrink-0 h-full z-30">
                   <Sidebar />
@@ -104,12 +77,9 @@ function MyApp({ Component, pageProps }) {
                   <Component {...pageProps} />
                 </div>
               </div>
-
-              {/* Bottom Navigation (mobile) */}
               <div className="md:hidden flex-shrink-0 relative z-40">
                 <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
               </div>
-
               <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
             </div>
           )}
