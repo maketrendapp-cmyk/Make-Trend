@@ -36,8 +36,9 @@ export default function Profile() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
-  // ── Helper: get Firebase token ──
+  // ── Helper: get Firebase token (waits for auth to be ready) ──
   const getToken = async () => {
+    await auth.authStateReady(); // ✅ Wait for Firebase to initialize
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
     return await firebaseUser.getIdToken();
@@ -107,17 +108,21 @@ export default function Profile() {
     }
   };
 
-  // ── Force refetch when user changes ──
+  // ── Force refetch when user changes (waits for auth) ──
   useEffect(() => {
-    if (isAuthenticated) {
-      invalidateProfile();
-      invalidateStats();
-      refetchProfile();
-      refetchStats();
-      refetchMtCoins();
-      fetchBonusStatus();
-    }
-  }, [isAuthenticated]);
+    const init = async () => {
+      await auth.authStateReady(); // ✅ Wait for Firebase to initialize
+      if (isAuthenticated) {
+        invalidateProfile();
+        invalidateStats();
+        refetchProfile();
+        refetchStats();
+        refetchMtCoins();
+        fetchBonusStatus();
+      }
+    };
+    init();
+  }, [isAuthenticated]); // removed user?.uid dependency
 
   // ── Copy referral code ──
   const copyReferralCode = () => {
@@ -163,7 +168,6 @@ export default function Profile() {
     referralCode: profile?.referralCode || '',
   };
 
-  // ── Stats items ──
   const statsItems = [
     { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
     { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
@@ -171,7 +175,6 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
   ];
 
-  // ── Quick Actions ──
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
@@ -181,7 +184,6 @@ export default function Profile() {
     { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
   ];
 
-  // ── Explore options ──
   const exploreOptions = [
     { icon: FiGrid, label: 'Follow Us', href: '/follow' },
     { icon: FiInfo, label: 'About Make Trend', href: '/about' },
@@ -189,7 +191,6 @@ export default function Profile() {
     { icon: FiAlertCircle, label: 'Rules to Follow', href: '/rules' },
   ];
 
-  // ── Legal links ──
   const legalLinks = [
     { icon: FiBook, label: 'Terms & Conditions', href: '/terms' },
     { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
