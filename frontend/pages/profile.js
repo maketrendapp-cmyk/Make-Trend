@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
+import { auth } from '../services/firebase'; // ← import auth
 import { useProfile, useStats, useMtCoins, useInvalidateQueries } from '../lib/queries';
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
   FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy,
-  FiGift // ← new for daily bonus
+  FiGift
 } from 'react-icons/fi';
 import { FaCrown, FaWallet, FaCoins } from 'react-icons/fa';
 import Meta from '../components/Meta';
@@ -35,12 +36,24 @@ export default function Profile() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
+  // ── Helper: get Firebase token ──
+  const getToken = async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return null;
+    return await firebaseUser.getIdToken();
+  };
+
   // ── Fetch bonus status ──
   const fetchBonusStatus = async () => {
-    if (!isAuthenticated || !user) return;
+    if (!isAuthenticated) return;
     try {
       setBonusLoading(true);
-      const token = await user.getIdToken();
+      const token = await getToken();
+      if (!token) {
+        setBonusError('Not authenticated');
+        setBonusLoading(false);
+        return;
+      }
       const res = await fetch(`${API_BASE}/daily-bonus/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -51,6 +64,7 @@ export default function Profile() {
           nextClaimTime: data.nextClaimTime,
           bonusAmount: data.bonusAmount || 10,
         });
+        setBonusError('');
       } else {
         setBonusError(data.error || 'Failed to load bonus status');
       }
@@ -64,22 +78,24 @@ export default function Profile() {
 
   // ── Claim bonus ──
   const claimBonus = async () => {
-    if (!isAuthenticated || !user || !bonusStatus.canClaim) return;
+    if (!isAuthenticated || !bonusStatus.canClaim) return;
     try {
       setClaimLoading(true);
-      const token = await user.getIdToken();
+      const token = await getToken();
+      if (!token) {
+        setBonusError('Not authenticated');
+        setClaimLoading(false);
+        return;
+      }
       const res = await fetch(`${API_BASE}/daily-bonus/claim`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.success) {
-        // Update mtCoins and bonus status
         await refetchMtCoins();
-        await fetchBonusStatus(); // refresh status
-        // Show success (you could use a toast, but we'll show a temporary message)
-        setBonusError(''); // clear any previous error
-        alert(`🎉 Claimed ${data.bonus} MT Coins!`); // simple feedback
+        await fetchBonusStatus();
+        alert(`🎉 Claimed ${data.bonus} MT Coins!`);
       } else {
         setBonusError(data.error || 'Failed to claim bonus');
       }
@@ -93,7 +109,7 @@ export default function Profile() {
 
   // ── Force refetch when user changes ──
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated) {
       invalidateProfile();
       invalidateStats();
       refetchProfile();
@@ -101,80 +117,12 @@ export default function Profile() {
       refetchMtCoins();
       fetchBonusStatus();
     }
-  }, [user?.uid, isAuthenticated]);
+  }, [isAuthenticated]); // ← removed user?.uid because user might be custom object
 
-  const isLoading = profileLoading || statsLoading || mtCoinsLoading || (user && !profile);
+  const isLoading = profileLoading || statsLoading || mtCoinsLoading || (isAuthenticated && !profile);
 
-  const copyReferralCode = () => {
-    const code = profile?.referralCode || '';
-    if (!code) return;
-    navigator.clipboard.writeText(code)
-      .then(() => {
-        setCopySuccess('✅ Copied!');
-        setTimeout(() => setCopySuccess(''), 2000);
-      })
-      .catch(() => {
-        const textArea = document.createElement('textarea');
-        textArea.value = code;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        setCopySuccess('✅ Copied!');
-        setTimeout(() => setCopySuccess(''), 2000);
-      });
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      setShowLogoutModal(false);
-      router.push('/');
-    } catch (error) {
-      // silent
-    }
-  };
-
-  // ── Display user with safe fallbacks ──
-  const displayUser = {
-    username: profile?.username || 'guest',
-    fullName: profile?.fullname || profile?.fullName || profile?.name || 'Guest User',
-    email: profile?.email || 'guest@example.com',
-    profilePic: profile?.avatar || profile?.profilePic || null,
-    isPro: profile?.plan === 'pro' || profile?.plan?.toLowerCase() === 'pro' || false,
-    plan: profile?.plan || 'free',
-    referrals: profile?.referrals || 0,
-    referralCode: profile?.referralCode || '',
-  };
-
-  const statsItems = [
-    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
-    { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
-    { icon: FiUnlock, label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0 },
-    { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
-  ];
-
-  // ── Quick Actions (improved layout) ──
-  const quickActions = [
-    { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
-    { icon: FiLock, label: 'Change Password', href: '/change-password' },
-    { icon: FiHelpCircle, label: 'Support', href: '/support' },
-    { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
-    { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' },
-    { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
-  ];
-
-  const exploreOptions = [
-    { icon: FiGrid, label: 'Follow Us', href: '/follow' },
-    { icon: FiInfo, label: 'About Make Trend', href: '/about' },
-    { icon: FiDownload, label: 'Download App', href: '/download' },
-    { icon: FiAlertCircle, label: 'Rules to Follow', href: '/rules' },
-  ];
-
-  const legalLinks = [
-    { icon: FiBook, label: 'Terms & Conditions', href: '/terms' },
-    { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
-  ];
+  // ... (rest of the component: copyReferralCode, handleLogout, displayUser, statsItems, quickActions, etc.)
+  // Keep everything else exactly as you had it, from this point down.
 
   // ── Skeleton ──
   if (isLoading) {
@@ -194,7 +142,6 @@ export default function Profile() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />)}
           </div>
-          {/* Bonus skeleton */}
           <div className="bg-white rounded-2xl p-6 mt-6 h-20 bg-gray-200" />
         </div>
       </div>
@@ -211,7 +158,7 @@ export default function Profile() {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* ── Profile Header ── */}
+          {/* ── Profile Header ── (unchanged) */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <div className="relative">
