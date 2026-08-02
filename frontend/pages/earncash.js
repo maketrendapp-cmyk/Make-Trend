@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
 import Meta from '../components/Meta';
-import { useAuth } from '../components/AuthScreen'; // ✅ Use this instead
+import { useAuth, auth } from '../components/AuthScreen'; // ✅ Import auth too
 import { useMtCoins } from '../lib/queries';
 import { refreshDeviceId } from '../utils/deviceId';
 import {
@@ -31,7 +31,7 @@ const ADS_PER_OFFER = 3;
 const BASE_DURATION = 10;
 const AD_DURATION = BASE_DURATION + (ADS_PER_OFFER * 4);
 
-// ─── AD COMPONENTS (unchanged) ───
+// ─── AD COMPONENTS ───
 const PopunderAd = () => {
   return (
     <div className="w-full flex justify-center my-2">
@@ -131,7 +131,7 @@ const SocialBarAd = () => {
 
 export default function EarnCash() {
   const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading } = useAuth(); // ✅ Use useAuth
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
   // ── State ──
@@ -160,10 +160,11 @@ export default function EarnCash() {
   const [isModalReady, setIsModalReady] = useState(false);
   const timerRef = useRef(null);
 
-  // ── Helper to get token from user ──
+  // ── Helper to get token using Firebase auth (same as queries.js) ──
   const getToken = async () => {
-    if (!user) return null;
-    return await user.getIdToken();
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return null;
+    return await firebaseUser.getIdToken();
   };
 
   // ── Fetch ad status ──
@@ -205,7 +206,7 @@ export default function EarnCash() {
     }
   };
 
-  // ── Start offer (opens modal) ──
+  // ── Start offer ──
   const handleStartOffer = async (slotId) => {
     if (isSubmitting) return;
     const slot = adSlots.find((s) => s.id === slotId);
@@ -332,7 +333,6 @@ export default function EarnCash() {
     }
   };
 
-  // ── Close modal ──
   const closeModal = () => {
     setShowModal(false);
     setCurrentOfferId(null);
@@ -347,7 +347,6 @@ export default function EarnCash() {
     }
   };
 
-  // ── Cleanup ──
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -355,7 +354,6 @@ export default function EarnCash() {
     };
   }, []);
 
-  // ── Initial fetch ──
   useEffect(() => {
     if (user) {
       fetchStatus();
@@ -364,7 +362,6 @@ export default function EarnCash() {
     }
   }, [user]);
 
-  // ── Refetch when window gets focus ──
   useEffect(() => {
     const handleFocus = () => {
       if (user && !showModal) fetchStatus();
@@ -373,7 +370,6 @@ export default function EarnCash() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [user, showModal]);
 
-  // ── Loading states ──
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -587,7 +583,6 @@ export default function EarnCash() {
               exit={{ scale: 0.9, y: 20 }}
               className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
             >
-              {/* ── Modal Header ── */}
               <div className="sticky top-0 bg-white z-10 rounded-t-3xl border-b border-gray-200 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center">
@@ -606,9 +601,7 @@ export default function EarnCash() {
                 </button>
               </div>
 
-              {/* ── Modal Content ── */}
               <div className="p-6 space-y-4">
-                {/* ── Timer ── */}
                 <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -628,7 +621,6 @@ export default function EarnCash() {
                   </p>
                 </div>
 
-                {/* ── BANNER ADS ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">📢 Banner Ads ({ADS_PER_OFFER})</p>
                   {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
@@ -636,7 +628,6 @@ export default function EarnCash() {
                   ))}
                 </div>
 
-                {/* ── NATIVE ADS ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">📱 Native Ads ({ADS_PER_OFFER})</p>
                   {Array.from({ length: ADS_PER_OFFER }, (_, i) => (
@@ -644,16 +635,13 @@ export default function EarnCash() {
                   ))}
                 </div>
 
-                {/* ── POPUNDER ── */}
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
                   <p className="text-xs text-gray-400 mb-2">🔄 Popunder Ad</p>
                   <PopunderAd />
                 </div>
 
-                {/* ── SOCIAL BAR ── */}
                 <SocialBarAd />
 
-                {/* ── Claim Button ── */}
                 <div className="pt-4 border-t border-gray-200">
                   <button
                     onClick={handleClaimFromModal}
