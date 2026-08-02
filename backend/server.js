@@ -1726,99 +1726,7 @@ app.get('/api/campaigns/:id', async (req, res) => {
 
     // ── Return the result immediately ──
     res.json(result);
-
-    // ── Silent view tracking (asynchronous, non-blocking) ──
-    setImmediate(async () => {
-      try {
-        let userId = null;
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-          try {
-            const token = authHeader.split(' ')[1];
-            const decoded = await admin.auth().verifyIdToken(token);
-            userId = decoded.uid;
-          } catch (e) { /* ignore */ }
-        }
-        if (!userId) {
-          userId = req.headers['x-user-id'] || null;
-        }
-        const deviceId = req.headers['x-device-id'] || null;
-
-        // ── Require valid device ID for view tracking ──
-        if (!validateDeviceId(deviceId)) {
-          console.warn(`⚠️ View tracking skipped: invalid deviceId for campaign ${id}`);
-          return;
-        }
-
-        // ── Cooldown check for view ──
-        if (!(await checkActionCooldown(id, deviceId))) {
-          console.warn(`⏱️ View tracking skipped due to cooldown for campaign ${id}`);
-          return;
-        }
-
-        // ── Use transaction to prevent race condition ──
-        let newViews = 0;
-        let campaignUserId = null;
-        await db.runTransaction(async (transaction) => {
-          const docRef = db.collection('campaigns').doc(id);
-          const doc = await transaction.get(docRef);
-          if (!doc.exists) return;
-          const data = doc.data();
-          if (data.status === 'deleted') return;
-
-          campaignUserId = data.userId || null;
-
-          const docId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : `ip_${ip}`);
-          const actionDocRef = docRef.collection('views').doc(docId);
-          const actionDoc = await transaction.get(actionDocRef);
-          if (actionDoc.exists) return;
-
-          // ✅ All reads done – now we can write
-          const currentViews = data.views || 0;
-          newViews = currentViews + 1;
-
-          transaction.update(docRef, {
-            views: newViews,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-          transaction.set(actionDocRef, {
-            userId: userId || null,
-            deviceId: deviceId || null,
-            ip: ip || 'unknown',
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        });
-
-        if (newViews > 0) {
-          // ── Update the campaign cache with the new view count ──
-          const cacheKey = `campaigns:id:${id}`;
-          let cached = null;
-          try {
-            const cachedStr = await redis.get(cacheKey);
-            if (cachedStr) {
-              cached = JSON.parse(cachedStr);
-            }
-          } catch (e) { /* ignore */ }
-
-          if (cached && cached.campaign) {
-            cached.campaign.views = newViews;
-            const ttl = await redis.ttl(cacheKey);
-            const ttlToUse = ttl > 0 ? ttl : 300;
-            await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
-            console.log(`🔄 Updated campaign cache for ${id} (views: ${newViews})`);
-          }
-
-          // ── Also update the user's list cache with new views ──
-          if (campaignUserId) {
-            await updateCampaignInUserListCache(campaignUserId, id, { views: newViews });
-            await invalidateKey(`stats:user:${campaignUserId}`);
-          }
-        }
-      } catch (err) {
-        console.warn('View tracking failed:', err.message);
-      }
-    });
-
+    
   } catch (error) {
     console.error('Error fetching campaign:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch campaign' });
@@ -2144,29 +2052,39 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       });
     }
 
-    // ── Update campaign cache with new shares ──
+    // ── Update campaign cache with new shares (in‑place) ──
     const cacheKey = `campaigns:id:${id}`;
-    let cached = null;
     try {
       const cachedStr = await redis.get(cacheKey);
       if (cachedStr) {
-        cached = JSON.parse(cachedStr);
+        const cached = JSON.parse(cachedStr);
+        if (cached.campaign) {
+          cached.campaign.shares = result.shares;
+          const ttl = await redis.ttl(cacheKey);
+          await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttl > 0 ? ttl : 86400);
+          console.log(`🔄 Updated campaign cache for ${id} (shares: ${result.shares})`);
+        }
       }
     } catch (e) { /* ignore */ }
 
-    if (cached && cached.campaign) {
-      cached.campaign.shares = result.shares;
-      const ttl = await redis.ttl(cacheKey);
-      const ttlToUse = ttl > 0 ? ttl : 86400; // keep existing TTL, default 24h
-      await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
-      console.log(`🔄 Updated campaign cache for ${id} (shares: ${result.shares})`);
-    }
-
-    // ── Invalidate sharecount cache and update list cache ──
-    await invalidateKey(`campaigns:sharecount:${id}`);
+    // ── Update list cache and stats cache (in‑place) ──
+    await invalidateKey(`campaigns:sharecount:${id}`); // this is a separate cache, okay to invalidate
     if (campaignData.userId) {
       await updateCampaignInUserListCache(campaignData.userId, id, { shares: result.shares });
-      await invalidateKey(`stats:user:${campaignData.userId}`);
+
+      // ── Update stats cache (increment totalShares) ──
+      try {
+        const statsCacheKey = `stats:user:${campaignData.userId}`;
+        const statsCached = await redis.get(statsCacheKey);
+        if (statsCached) {
+          const stats = JSON.parse(statsCached);
+          if (stats.stats && typeof stats.stats.totalShares === 'number') {
+            stats.stats.totalShares += 1;
+            const ttl = await redis.ttl(statsCacheKey);
+            await redis.set(statsCacheKey, JSON.stringify(stats), 'EX', ttl > 0 ? ttl : 86400);
+          }
+        }
+      } catch (e) { /* ignore */ }
     }
 
     res.json({
@@ -2287,28 +2205,39 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
       });
     });
 
-        // ── Update campaign cache with new completions ──
+    // ── Update campaign cache with new completions (in‑place) ──
     const newCompletions = (campaignData.completions || 0) + 1;
     const cacheKey = `campaigns:id:${id}`;
-    let cached = null;
     try {
       const cachedStr = await redis.get(cacheKey);
       if (cachedStr) {
-        cached = JSON.parse(cachedStr);
+        const cached = JSON.parse(cachedStr);
+        if (cached.campaign) {
+          cached.campaign.completions = newCompletions;
+          const ttl = await redis.ttl(cacheKey);
+          await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttl > 0 ? ttl : 86400);
+          console.log(`🔄 Updated campaign cache for ${id} (completions: ${newCompletions})`);
+        }
       }
     } catch (e) { /* ignore */ }
 
-    if (cached && cached.campaign) {
-      cached.campaign.completions = newCompletions;
-      const ttl = await redis.ttl(cacheKey);
-      const ttlToUse = ttl > 0 ? ttl : 86400;
-      await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
-      console.log(`🔄 Updated campaign cache for ${id} (completions: ${newCompletions})`);
-    }
-
+    // ── Update user list cache and stats cache (in‑place) ──
     if (campaignData.userId) {
       await updateCampaignInUserListCache(campaignData.userId, id, { completions: newCompletions });
-      await invalidateKey(`stats:user:${campaignData.userId}`);
+
+      // ── Update stats cache (increment totalCompletions) ──
+      try {
+        const statsCacheKey = `stats:user:${campaignData.userId}`;
+        const statsCached = await redis.get(statsCacheKey);
+        if (statsCached) {
+          const stats = JSON.parse(statsCached);
+          if (stats.stats && typeof stats.stats.totalCompletions === 'number') {
+            stats.stats.totalCompletions += 1;
+            const ttl = await redis.ttl(statsCacheKey);
+            await redis.set(statsCacheKey, JSON.stringify(stats), 'EX', ttl > 0 ? ttl : 86400);
+          }
+        }
+      } catch (e) { /* ignore */ }
     }
 
     res.json({ success: true, message: 'Campaign completed!' });
@@ -2393,28 +2322,39 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
       });
     });
 
-        // ── Update campaign cache with new unlocks ──
+    // ── Update campaign cache with new unlocks (in‑place) ──
     const newUnlocks = (campaignData.unlockCount || 0) + 1;
     const cacheKey = `campaigns:id:${id}`;
-    let cached = null;
     try {
       const cachedStr = await redis.get(cacheKey);
       if (cachedStr) {
-        cached = JSON.parse(cachedStr);
+        const cached = JSON.parse(cachedStr);
+        if (cached.campaign) {
+          cached.campaign.unlockCount = newUnlocks;
+          const ttl = await redis.ttl(cacheKey);
+          await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttl > 0 ? ttl : 86400);
+          console.log(`🔄 Updated campaign cache for ${id} (unlocks: ${newUnlocks})`);
+        }
       }
     } catch (e) { /* ignore */ }
 
-    if (cached && cached.campaign) {
-      cached.campaign.unlockCount = newUnlocks;
-      const ttl = await redis.ttl(cacheKey);
-      const ttlToUse = ttl > 0 ? ttl : 86400;
-      await redis.set(cacheKey, JSON.stringify(cached), 'EX', ttlToUse);
-      console.log(`🔄 Updated campaign cache for ${id} (unlocks: ${newUnlocks})`);
-    }
-
+    // ── Update user list cache and stats cache (in‑place) ──
     if (campaignData.userId) {
       await updateCampaignInUserListCache(campaignData.userId, id, { unlockCount: newUnlocks });
-      await invalidateKey(`stats:user:${campaignData.userId}`);
+
+      // ── Update stats cache (increment totalUnlocks) ──
+      try {
+        const statsCacheKey = `stats:user:${campaignData.userId}`;
+        const statsCached = await redis.get(statsCacheKey);
+        if (statsCached) {
+          const stats = JSON.parse(statsCached);
+          if (stats.stats && typeof stats.stats.totalUnlocks === 'number') {
+            stats.stats.totalUnlocks += 1;
+            const ttl = await redis.ttl(statsCacheKey);
+            await redis.set(statsCacheKey, JSON.stringify(stats), 'EX', ttl > 0 ? ttl : 86400);
+          }
+        }
+      } catch (e) { /* ignore */ }
     }
 
     res.json({ success: true, message: 'Campaign unlocked!' });
@@ -2477,6 +2417,136 @@ app.get('/api/stats', verifyToken, checkBanned, async (req, res) => {
   } catch (error) {
     console.error('❌ Stats error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Record a view (dedicated endpoint – updates campaign and stats caches without invalidation) ──
+app.post('/api/campaigns/:id/view', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ip = getClientIp(req);
+
+    // 1. Device ID validation – mandatory
+    const deviceId = req.body.deviceId || req.headers['x-device-id'];
+    if (!validateDeviceId(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid device ID is required.',
+      });
+    }
+
+    // 2. Rate limiting per device (10 views per minute per campaign)
+    const rateKey = `rate:view:${id}:${deviceId}`;
+    const current = await redis.incr(rateKey);
+    if (current === 1) await redis.expire(rateKey, 60);
+    if (current > 10) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many view attempts. Please slow down.',
+      });
+    }
+
+    // 3. Cooldown (2s) to prevent rapid spam
+    if (!(await checkActionCooldown(id, deviceId))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Please wait a moment before recording another view.',
+      });
+    }
+
+    // 4. Fetch campaign
+    const docRef = db.collection('campaigns').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    const campaignData = doc.data();
+    if (campaignData.status === 'deleted') {
+      return res.status(404).json({ success: false, error: 'Campaign not available' });
+    }
+
+    // 5. Check if already viewed by this device
+    const userId = req.user?.uid || null;
+    const viewDocId = userId ? `user_${userId}` : `device_${deviceId}`;
+    const viewDocRef = docRef.collection('views').doc(viewDocId);
+    const viewDoc = await viewDocRef.get();
+
+    if (viewDoc.exists) {
+      // Already viewed – no increment
+      return res.json({
+        success: true,
+        alreadyViewed: true,
+        views: campaignData.views || 0,
+      });
+    }
+
+    // 6. Atomic increment
+    const newViews = (campaignData.views || 0) + 1;
+    await db.runTransaction(async (transaction) => {
+      transaction.update(docRef, {
+        views: newViews,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(viewDocRef, {
+        userId: userId || null,
+        deviceId: deviceId,
+        ip: ip || 'unknown',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // ── 7. Update campaign cache (in‑place) ──
+    const campaignCacheKey = `campaigns:id:${id}`;
+    try {
+      const cachedStr = await redis.get(campaignCacheKey);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        if (cached.campaign) {
+          cached.campaign.views = newViews;
+          const ttl = await redis.ttl(campaignCacheKey);
+          await redis.set(campaignCacheKey, JSON.stringify(cached), 'EX', ttl > 0 ? ttl : 300);
+        }
+      }
+    } catch (e) {
+      console.warn(`View: campaign cache update failed for ${id}:`, e.message);
+    }
+
+    // ── 8. Update user campaign list cache and stats cache (in‑place) ──
+    const ownerId = campaignData.userId;
+    if (ownerId) {
+      // Update the list cache (specific campaign entry)
+      await updateCampaignInUserListCache(ownerId, id, { views: newViews });
+
+      // Update the stats cache (increment totalViews)
+      try {
+        const statsCacheKey = `stats:user:${ownerId}`;
+        const statsCached = await redis.get(statsCacheKey);
+        if (statsCached) {
+          const stats = JSON.parse(statsCached);
+          if (stats.stats && typeof stats.stats.totalViews === 'number') {
+            stats.stats.totalViews += 1;
+            const ttl = await redis.ttl(statsCacheKey);
+            await redis.set(statsCacheKey, JSON.stringify(stats), 'EX', ttl > 0 ? ttl : 86400);
+          }
+        }
+        // If stats cache doesn't exist, we don't create it – it will be built on demand.
+      } catch (e) {
+        console.warn(`View: stats cache update failed for ${ownerId}:`, e.message);
+      }
+    }
+
+    // 9. Return success
+    res.json({
+      success: true,
+      views: newViews,
+      alreadyViewed: false,
+    });
+  } catch (error) {
+    console.error('❌ View tracking error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to record view. Please try again later.',
+    });
   }
 });
 
