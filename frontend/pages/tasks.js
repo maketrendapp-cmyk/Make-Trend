@@ -1,4 +1,3 @@
-
 // pages/tasks.js
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -34,9 +33,7 @@ const defaultMeta = {
 
 const campaignQueryKey = (id) => ['campaign', id];
 
-// ─── AD COMPONENTS (Optimized for React/Next.js) ───
-
-// Safely loads document.write() ads without breaking React using an isolated iframe
+// ─── AD COMPONENTS ───
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
@@ -75,13 +72,11 @@ const IframeAd = ({ adKey, width, height }) => {
   );
 };
 
-// Safely loads Native DOM injection ads
 const NativeAd = () => {
   const containerRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
-    // Prevent double injection
     if (containerRef.current.querySelector('script')) return;
 
     const script = document.createElement('script');
@@ -93,7 +88,6 @@ const NativeAd = () => {
 
   return (
     <div className="flex justify-center w-full my-4">
-      {/* Container collapses gracefully if ad doesn't load */}
       <div 
         ref={containerRef} 
         id="container-4b3b3334be9dbca33558926aca954fd9" 
@@ -118,6 +112,7 @@ function CampaignTasks({ campaign: initialCampaign }) {
 
   const timerRef = useRef(null);
   const intervalRef = useRef(null);
+  const viewTrackedRef = useRef(false); // ── NEW: prevent multiple view calls
 
   // ── React Query ──
   const { data: campaign, isLoading } = useQuery({
@@ -130,12 +125,37 @@ function CampaignTasks({ campaign: initialCampaign }) {
     enabled: !!id,
   });
 
+  // ── Track view with 2‑second delay ──
+  useEffect(() => {
+    if (!campaign?.id || viewTrackedRef.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const deviceId = await refreshDeviceId();
+        if (!deviceId) return;
+        await fetch(`${BACKEND_URL}/api/campaigns/${campaign.id}/view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId }),
+        });
+        viewTrackedRef.current = true;
+        console.log(`📊 View recorded for campaign ${campaign.id}`);
+      } catch (e) {
+        console.warn('View tracking failed:', e);
+      }
+    }, 2000); // ── 2‑second delay
+
+    return () => clearTimeout(timer);
+  }, [campaign]);
+
+  // ── Redirect if no tasks ──
   useEffect(() => {
     if (campaign && (!campaign.tasks || campaign.tasks.length === 0)) {
       router.push(`/share?id=${id}`);
     }
   }, [campaign, id]);
 
+  // ── Refresh fingerprint on mount ──
   useEffect(() => {
     const refreshFingerprint = async () => {
       try {
@@ -147,6 +167,7 @@ function CampaignTasks({ campaign: initialCampaign }) {
     refreshFingerprint();
   }, []);
 
+  // ── Cleanup timers ──
   useEffect(() => {
     return () => cleanupTimers();
   }, []);
@@ -270,12 +291,12 @@ function CampaignTasks({ campaign: initialCampaign }) {
             Back
           </button>
 
-          {/* ─── 1. TOP BANNER AD (High Visibility) ─── */}
+          {/* TOP BANNER */}
           <div className="my-4 w-full overflow-hidden max-w-full">
             <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
           </div>
 
-          {/* ── Hero Card ── */}
+          {/* Hero Card */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 transition-all hover:shadow-md">
             <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gray-200">
               {campaign.image ? (
@@ -319,7 +340,7 @@ function CampaignTasks({ campaign: initialCampaign }) {
             </div>
           </div>
 
-          {/* ── Tasks List ── */}
+          {/* Tasks List */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 transition-all hover:shadow-md">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -398,18 +419,13 @@ function CampaignTasks({ campaign: initialCampaign }) {
                         </div>
                       </div>
 
-                      {/* ─── 2. IN-FEED NATIVE AD (High CTR Strategy) ─── */}
-                      {/* Appears seamlessly after the FIRST task */}
-                      {index === 0 && tasks.length >= 2 && (
-                        <NativeAd />
-                      )}
+                      {index === 0 && tasks.length >= 2 && <NativeAd />}
                     </React.Fragment>
                   );
                 })}
               </div>
             )}
 
-            {/* ── Claim Button ── */}
             <div className="mt-8">
               <button
                 onClick={handleContinueToShare}
@@ -437,7 +453,7 @@ function CampaignTasks({ campaign: initialCampaign }) {
         </div>
       </div>
 
-      {/* ─── 3. STICKY BOTTOM BANNER AD ─── */}
+      {/* Sticky Ad */}
       {showStickyAd && (
         <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-2 sm:pb-4">
           <div className="bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] p-1.5 sm:p-2 rounded-xl pointer-events-auto border border-gray-200/50 relative mx-auto w-[calc(100vw-16px)] sm:w-auto sm:max-w-[760px]">
@@ -453,22 +469,18 @@ function CampaignTasks({ campaign: initialCampaign }) {
         </div>
       )}
 
-      {/* ─── 4. GLOBAL NETWORK ADS (POPUNDER & SOCIAL BAR) ─── */}
-      {/* Popunder */}
+      {/* Global Scripts */}
       <Script
         id="popunder-ad"
         src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js"
         strategy="afterInteractive"
       />
-
-      {/* Social Bar (Restored & Fixed) */}
       <Script
         id="social-bar-ad"
         src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
         strategy="afterInteractive"
       />
 
-      {/* ── CSS for Hiding Scrollbars inside Iframes ── */}
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar {
           display: none;
