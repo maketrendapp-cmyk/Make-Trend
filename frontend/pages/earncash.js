@@ -3,9 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
 import Meta from '../components/Meta';
-import { useAuth } from '../components/AuthScreen';
+import { useAuth } from '../components/AuthScreen'; // ✅ Use this instead
 import { useMtCoins } from '../lib/queries';
-import { getToken } from '../lib/queries'; // ← Use the SAME pattern as other pages
 import { refreshDeviceId } from '../utils/deviceId';
 import {
   FaCoins,
@@ -32,9 +31,7 @@ const ADS_PER_OFFER = 3;
 const BASE_DURATION = 10;
 const AD_DURATION = BASE_DURATION + (ADS_PER_OFFER * 4);
 
-// ─── AD COMPONENTS (Rendered only inside modal) ───
-
-// Popunder Ad
+// ─── AD COMPONENTS (unchanged) ───
 const PopunderAd = () => {
   return (
     <div className="w-full flex justify-center my-2">
@@ -56,7 +53,6 @@ const PopunderAd = () => {
   );
 };
 
-// Banner Ad (Multiple instances)
 const BannerAd = ({ instance = 0 }) => {
   const uniqueId = `banner-ad-modal-${instance}`;
   return (
@@ -84,7 +80,6 @@ const BannerAd = ({ instance = 0 }) => {
   );
 };
 
-// Native Ad (Multiple instances)
 const NativeAd = ({ instance = 0 }) => {
   const containerId = `container-native-modal-${instance}`;
   return (
@@ -113,7 +108,6 @@ const NativeAd = ({ instance = 0 }) => {
   );
 };
 
-// Social Bar Ad
 const SocialBarAd = () => {
   return (
     <Script
@@ -137,7 +131,7 @@ const SocialBarAd = () => {
 
 export default function EarnCash() {
   const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth(); // ✅ Use useAuth
   const { refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
   // ── State ──
@@ -165,6 +159,12 @@ export default function EarnCash() {
   const [progress, setProgress] = useState(0);
   const [isModalReady, setIsModalReady] = useState(false);
   const timerRef = useRef(null);
+
+  // ── Helper to get token from user ──
+  const getToken = async () => {
+    if (!user) return null;
+    return await user.getIdToken();
+  };
 
   // ── Fetch ad status ──
   const fetchStatus = async () => {
@@ -224,7 +224,6 @@ export default function EarnCash() {
 
       const deviceId = await refreshDeviceId();
 
-      // ── Start session on server ──
       const startRes = await fetch(`${API_BASE}/ads/start`, {
         method: 'POST',
         headers: {
@@ -247,14 +246,12 @@ export default function EarnCash() {
         return;
       }
 
-      // ── Mark as in progress ──
       setAdSlots((prev) =>
         prev.map((s) =>
           s.id === slotId ? { ...s, inProgress: true } : s
         )
       );
 
-      // ── Open modal ──
       setCurrentOfferId(slotId);
       setTimer(AD_DURATION);
       setProgress(0);
@@ -263,7 +260,6 @@ export default function EarnCash() {
       setShowModal(true);
       setIsModalReady(true);
 
-      // ── Start countdown ──
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setTimer((prev) => {
@@ -336,7 +332,7 @@ export default function EarnCash() {
     }
   };
 
-  // ── Close modal and cleanup ──
+  // ── Close modal ──
   const closeModal = () => {
     setShowModal(false);
     setCurrentOfferId(null);
@@ -351,7 +347,7 @@ export default function EarnCash() {
     }
   };
 
-  // ── Cleanup on unmount ──
+  // ── Cleanup ──
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -377,7 +373,7 @@ export default function EarnCash() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [user, showModal]);
 
-  // ── Redirect if not authenticated ──
+  // ── Loading states ──
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -582,7 +578,7 @@ export default function EarnCash() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
             onClick={(e) => {
-              if (e.target === e.currentClass) closeModal();
+              if (e.target === e.currentTarget) closeModal();
             }}
           >
             <motion.div
@@ -591,6 +587,7 @@ export default function EarnCash() {
               exit={{ scale: 0.9, y: 20 }}
               className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
             >
+              {/* ── Modal Header ── */}
               <div className="sticky top-0 bg-white z-10 rounded-t-3xl border-b border-gray-200 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center">
@@ -609,8 +606,9 @@ export default function EarnCash() {
                 </button>
               </div>
 
+              {/* ── Modal Content ── */}
               <div className="p-6 space-y-4">
-                {/* Timer */}
+                {/* ── Timer ── */}
                 <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
