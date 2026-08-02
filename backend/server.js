@@ -3741,6 +3741,130 @@ app.post('/api/ads/complete', verifyToken, async (req, res) => {
   }
 });
 
+// ── Check daily bonus status ──
+app.get('/api/daily-bonus/status', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const doc = await db.collection('users').doc(uid).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const data = doc.data();
+    const lastClaim = data.dailyBonusLastClaim?.toDate?.() || null;
+    const now = new Date();
+
+    let canClaim = true;
+    let nextClaimTime = null;
+    if (lastClaim) {
+      // Check if last claim was today (same UTC date)
+      const lastDate = new Date(lastClaim);
+      const today = new Date(now);
+      if (lastDate.getUTCFullYear() === today.getUTCFullYear() &&
+          lastDate.getUTCMonth() === today.getUTCMonth() &&
+          lastDate.getUTCDate() === today.getUTCDate()) {
+        canClaim = false;
+        // Next claim at midnight UTC (next day)
+        const next = new Date(now);
+        next.setUTCHours(0, 0, 0, 0);
+        next.setUTCDate(next.getUTCDate() + 1);
+        nextClaimTime = next.toISOString();
+      }
+    }
+
+    res.json({
+      success: true,
+      canClaim,
+      lastClaim: lastClaim ? lastClaim.toISOString() : null,
+      nextClaimTime,
+      bonusAmount: 10,
+    });
+  } catch (error) {
+    console.error('❌ Daily bonus status error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check daily bonus' });
+  }
+});
+
+// ── Claim daily bonus ──
+app.post('/api/daily-bonus/claim', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    // Rate limit: max 1 claim per minute (to prevent spamming)
+    if (!(await checkRateLimit(uid, 'daily-bonus-claim', 1, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many attempts. Please wait a moment.' });
+    }
+
+    const userRef = db.collection('users').doc(uid);
+    const BONUS = 10;
+
+    let claimed = false;
+    let newEarned = 0;
+    let newAvailable = 0;
+
+    await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(userRef);
+      if (!doc.exists) {
+        throw new Error('User not found');
+      }
+      const data = doc.data();
+
+      // Check if already claimed today
+      const lastClaim = data.dailyBonusLastClaim?.toDate?.() || null;
+      const now = new Date();
+      if (lastClaim) {
+        const lastDate = new Date(lastClaim);
+        const today = new Date(now);
+        if (lastDate.getUTCFullYear() === today.getUTCFullYear() &&
+            lastDate.getUTCMonth() === today.getUTCMonth() &&
+            lastDate.getUTCDate() === today.getUTCDate()) {
+          throw new Error('Already claimed today');
+        }
+      }
+
+      // Update mtCoinsEarned and set last claim timestamp
+      const currentEarned = data.mtCoinsEarned || 0;
+      newEarned = currentEarned + BONUS;
+
+      transaction.update(userRef, {
+        mtCoinsEarned: newEarned,
+        dailyBonusLastClaim: admin.firestore.Timestamp.fromDate(now),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      claimed = true;
+      // Calculate new available (earned - spent)
+      const spent = data.mtCoinsSpent || 0;
+      newAvailable = newEarned - spent;
+    });
+
+    if (claimed) {
+      // Invalidate relevant caches
+      await invalidateKey(`mtcoins:user:${uid}`);
+      await invalidateKey(`user:profile:${uid}`);
+      await invalidateKey(`stats:user:${uid}`);
+
+      res.json({
+        success: true,
+        message: `Claimed ${BONUS} MT Coins daily bonus!`,
+        bonus: BONUS,
+        newTotalEarned: newEarned,
+        newAvailable,
+      });
+    } else {
+      res.status(400).json({ success: false, error: 'Unable to claim bonus' });
+    }
+  } catch (error) {
+    console.error('❌ Daily bonus claim error:', error);
+    if (error.message === 'Already claimed today') {
+      return res.status(429).json({ success: false, error: 'Daily bonus already claimed today. Come back tomorrow!' });
+    }
+    if (error.message === 'User not found') {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to claim daily bonus' });
+  }
+});
+
 // ============================================================
 // 18. GLOBAL ERROR HANDLER
 // ============================================================
