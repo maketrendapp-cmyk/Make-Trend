@@ -9,7 +9,7 @@ import {
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
   FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy
 } from 'react-icons/fi';
-import { FaCrown, FaWallet } from 'react-icons/fa';
+import { FaCrown, FaWallet, FaCoins } from 'react-icons/fa'; // ← added FaCoins
 import Meta from '../components/Meta';
 
 export default function Profile() {
@@ -86,11 +86,13 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
   ];
 
+  // ── Quick Actions (added Earn MT Coins) ──
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
     { icon: FiHelpCircle, label: 'Support', href: '/support' },
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
+    { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' }, // ← new
     { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
   ];
 
@@ -231,18 +233,25 @@ export default function Profile() {
 
           {/* ── MT Coins Card ── (only when logged in) ── */}
           {user && (
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-6 py-4 mb-6 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-6 py-4 mb-6 flex items-center justify-between flex-wrap gap-3">
               <div>
                 <p className="text-sm text-gray-600">Available MT Coins</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {mtCoins?.available?.toLocaleString() ?? '0'}
                 </p>
               </div>
-              <Link href="/withdraw">
-                <button className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition shadow-sm hover:shadow-md flex items-center gap-2">
-                  <FaWallet className="w-4 h-4" /> Withdraw
-                </button>
-              </Link>
+              <div className="flex gap-2">
+                <Link href="/earncash">
+                  <button className="px-4 py-2 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition shadow-sm hover:shadow-md flex items-center gap-2">
+                    <FaCoins className="w-4 h-4" /> Earn More
+                  </button>
+                </Link>
+                <Link href="/withdraw">
+                  <button className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition shadow-sm hover:shadow-md flex items-center gap-2">
+                    <FaWallet className="w-4 h-4" /> Withdraw
+                  </button>
+                </Link>
+              </div>
             </div>
           )}
 
