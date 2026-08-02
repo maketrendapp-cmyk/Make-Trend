@@ -3,31 +3,42 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 const DEVICE_ID_KEY = 'maketrend_device_id';
 
+// ── Shared promise for device ID generation ──
+let deviceIdPromise = null;
+
+// ── Generate a real fingerprint (or fallback) ──
 async function generateFingerprint() {
   try {
     const fp = await FingerprintJS.load();
     const result = await fp.get();
     return result.visitorId;
   } catch (e) {
-    console.warn('⚠️ FingerprintJS failed – returning null (views will not be counted)', e);
-    return null;
+    console.warn('⚠️ FingerprintJS failed, using fallback', e);
+    return 'fallback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
   }
 }
 
+// ── Get or create the device ID (cached promise) ──
+export function getDeviceIdPromise() {
+  if (!deviceIdPromise) {
+    deviceIdPromise = (async () => {
+      let id = localStorage.getItem(DEVICE_ID_KEY);
+      if (!id) {
+        id = await generateFingerprint();
+        localStorage.setItem(DEVICE_ID_KEY, id);
+      }
+      return id;
+    })();
+  }
+  return deviceIdPromise;
+}
+
+// ── Async getter (returns the ID, waits if needed) ──
 export async function refreshDeviceId() {
-  let id = localStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    id = await generateFingerprint();
-    if (id) {
-      localStorage.setItem(DEVICE_ID_KEY, id);
-    } else {
-      // Don't store null – next call retries
-      return null;
-    }
-  }
-  return id;
+  return getDeviceIdPromise();
 }
 
+// ── Synchronous getter (returns stored ID or null) ──
 export function getDeviceId() {
   return localStorage.getItem(DEVICE_ID_KEY) || null;
 }
