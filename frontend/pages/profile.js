@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { auth } from '../services/firebase'; // ← import auth
+import { auth } from '../services/firebase';
 import { useProfile, useStats, useMtCoins, useInvalidateQueries } from '../lib/queries';
 import {
   FiSettings, FiLock, FiHelpCircle,
@@ -117,12 +117,85 @@ export default function Profile() {
       refetchMtCoins();
       fetchBonusStatus();
     }
-  }, [isAuthenticated]); // ← removed user?.uid because user might be custom object
+  }, [isAuthenticated]);
+
+  // ── Copy referral code ──
+  const copyReferralCode = () => {
+    const code = profile?.referralCode || '';
+    if (!code) return;
+    navigator.clipboard.writeText(code)
+      .then(() => {
+        setCopySuccess('✅ Copied!');
+        setTimeout(() => setCopySuccess(''), 2000);
+      })
+      .catch(() => {
+        const textArea = document.createElement('textarea');
+        textArea.value = code;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopySuccess('✅ Copied!');
+        setTimeout(() => setCopySuccess(''), 2000);
+      });
+  };
+
+  // ── Handle logout ──
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setShowLogoutModal(false);
+      router.push('/');
+    } catch (error) {
+      // silent
+    }
+  };
+
+  // ── Display user with safe fallbacks ──
+  const displayUser = {
+    username: profile?.username || 'guest',
+    fullName: profile?.fullname || profile?.fullName || profile?.name || 'Guest User',
+    email: profile?.email || 'guest@example.com',
+    profilePic: profile?.avatar || profile?.profilePic || null,
+    isPro: profile?.plan === 'pro' || profile?.plan?.toLowerCase() === 'pro' || false,
+    plan: profile?.plan || 'free',
+    referrals: profile?.referrals || 0,
+    referralCode: profile?.referralCode || '',
+  };
+
+  // ── Stats items ──
+  const statsItems = [
+    { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
+    { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
+    { icon: FiUnlock, label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0 },
+    { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
+  ];
+
+  // ── Quick Actions ──
+  const quickActions = [
+    { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
+    { icon: FiLock, label: 'Change Password', href: '/change-password' },
+    { icon: FiHelpCircle, label: 'Support', href: '/support' },
+    { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
+    { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' },
+    { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
+  ];
+
+  // ── Explore options ──
+  const exploreOptions = [
+    { icon: FiGrid, label: 'Follow Us', href: '/follow' },
+    { icon: FiInfo, label: 'About Make Trend', href: '/about' },
+    { icon: FiDownload, label: 'Download App', href: '/download' },
+    { icon: FiAlertCircle, label: 'Rules to Follow', href: '/rules' },
+  ];
+
+  // ── Legal links ──
+  const legalLinks = [
+    { icon: FiBook, label: 'Terms & Conditions', href: '/terms' },
+    { icon: FiShield, label: 'Privacy Policy', href: '/privacy' },
+  ];
 
   const isLoading = profileLoading || statsLoading || mtCoinsLoading || (isAuthenticated && !profile);
-
-  // ... (rest of the component: copyReferralCode, handleLogout, displayUser, statsItems, quickActions, etc.)
-  // Keep everything else exactly as you had it, from this point down.
 
   // ── Skeleton ──
   if (isLoading) {
@@ -140,7 +213,7 @@ export default function Profile() {
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />)}
+            {[1, 2, 3, 4].map(i => <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />)}
           </div>
           <div className="bg-white rounded-2xl p-6 mt-6 h-20 bg-gray-200" />
         </div>
@@ -158,7 +231,7 @@ export default function Profile() {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* ── Profile Header ── (unchanged) */}
+          {/* ── Profile Header ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <div className="relative">
@@ -326,7 +399,7 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── Quick Actions ── (improved layout, left-aligned) ── */}
+          {/* ── Quick Actions ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
