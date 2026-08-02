@@ -20,7 +20,8 @@ import {
   FaEye,
   FaTimes,
   FaHandPointer,
-  FaArrowDown
+  FaArrowDown,
+  FaFire
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -31,20 +32,18 @@ const API_BASE = `${BACKEND_URL}/api`;
 // ─── CONFIGURATION ───
 const AD_REWARD = 10;
 const MAX_ADS = 5;
-const BASE_DURATION = 10;
-// Increased visual ads in modal for higher revenue
-const ADS_IN_MODAL = 4; 
-const AD_DURATION = BASE_DURATION + (ADS_IN_MODAL * 4);
+const BASE_DURATION = 12;
+const AD_DURATION = BASE_DURATION + 10; // Generous timer for massive ad layout
 
 // ─── AD COMPONENTS (Optimized for React/Next.js) ───
 
-// Safely loads document.write() ads without breaking React
+// Safely loads banner ads via Iframe (from Task/Share pages)
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
     <html>
       <head>
-        <style>body{margin:0;padding:0;overflow:hidden;display:flex;justify-content:center;align-items:center;}</style>
+        <style>body{margin:0;padding:0;overflow:hidden;display:flex;justify-content:center;align-items:center;background:#fff;}</style>
       </head>
       <body>
         <script type="text/javascript">
@@ -62,7 +61,7 @@ const IframeAd = ({ adKey, width, height }) => {
   `;
   return (
     <div className="w-full flex justify-center overflow-hidden my-3">
-      <div className="overflow-x-auto no-scrollbar max-w-full rounded-xl shadow-sm border border-gray-100">
+      <div className="overflow-x-auto no-scrollbar max-w-full rounded-2xl shadow-sm border border-gray-100 bg-white p-1">
         <iframe
           title="Banner Ad"
           srcDoc={srcDoc}
@@ -77,7 +76,7 @@ const IframeAd = ({ adKey, width, height }) => {
   );
 };
 
-// Safely loads Native DOM injection ads
+// Safely loads Native DOM injection ads (from Task/Share pages)
 const NativeAd = ({ uniqueId }) => {
   const containerRef = useRef(null);
   const scriptInjected = useRef(false);
@@ -98,7 +97,7 @@ const NativeAd = ({ uniqueId }) => {
       <div 
         ref={containerRef} 
         id={`container-native-${uniqueId}`} 
-        className="w-full flex justify-center max-w-[336px] transition-all min-h-[50px] rounded-xl overflow-hidden shadow-sm border border-gray-100"
+        className="w-full flex justify-center max-w-[336px] transition-all min-h-[50px] rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-white p-2"
       />
     </div>
   );
@@ -127,7 +126,7 @@ export default function EarnCash() {
   const [totalEarned, setTotalEarned] = useState(0);
   const [claimedCount, setClaimedCount] = useState(0);
 
-  // ── Modal State ──
+  // ── Modal & Engagement State ──
   const [showModal, setShowModal] = useState(false);
   const [currentOfferId, setCurrentOfferId] = useState(null);
   const [timer, setTimer] = useState(0);
@@ -137,6 +136,11 @@ export default function EarnCash() {
   const [isModalReady, setIsModalReady] = useState(false);
   const [adKey, setAdKey] = useState(0);
   
+  // Engagement Tracking via useRef
+  const hasScrolledRef = useRef(false);
+  const hasClickedAdRef = useRef(false);
+  const [userInteracted, setUserInteracted] = useState(false);
+
   // Ad state
   const [showStickyAd, setShowStickyAd] = useState(true);
   
@@ -198,6 +202,9 @@ export default function EarnCash() {
     setSuccess('');
     setIsModalReady(false);
     setIsSubmitting(true);
+    hasScrolledRef.current = false;
+    hasClickedAdRef.current = false;
+    setUserInteracted(false);
 
     try {
       const token = await getToken();
@@ -240,9 +247,8 @@ export default function EarnCash() {
       setAdKey(prev => prev + 1); // Force remount of ad scripts inside modal
       
       setShowModal(true);
-      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      document.body.style.overflow = 'hidden';
       
-      // Delay slightly to let modal animate in before rendering heavy iframes
       setTimeout(() => {
         setIsModalReady(true);
         setIsSubmitting(false);
@@ -266,6 +272,31 @@ export default function EarnCash() {
       console.error('Start offer error:', err);
       setError(err.message || 'Network error. Please try again.');
       setIsSubmitting(false);
+    }
+  };
+
+  // Track scrolling inside modal feed
+  const handleModalScroll = (e) => {
+    if (!hasScrolledRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      if (scrollTop > 100 || (scrollTop + clientHeight >= scrollHeight - 50)) {
+        hasScrolledRef.current = true;
+        checkEngagement();
+      }
+    }
+  };
+
+  // Track user interaction with ad feed
+  const handleAdContainerClick = () => {
+    if (!hasClickedAdRef.current) {
+      hasClickedAdRef.current = true;
+      setUserInteracted(true);
+    }
+  };
+
+  const checkEngagement = () => {
+    if (hasScrolledRef.current) {
+      setUserInteracted(true);
     }
   };
 
@@ -331,7 +362,6 @@ export default function EarnCash() {
     setIsClaiming(false);
     setIsModalReady(false);
     
-    // Reset in-progress states if closed prematurely
     setAdSlots((prev) =>
       prev.map((s) =>
         s.inProgress && !s.claimed ? { ...s, inProgress: false } : s
@@ -359,14 +389,6 @@ export default function EarnCash() {
     }
   }, [user]);
 
-  useEffect(() => {
-    const handleFocus = () => {
-      if (user && !showModal) fetchStatus();
-    };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [user, showModal]);
-
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -386,7 +408,7 @@ export default function EarnCash() {
             <p className="text-gray-500 text-sm mb-6">Complete offers and earn MT Coins.</p>
             <button
               onClick={() => router.push('/login?redirect=/earncash')}
-              className="px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition w-full shadow-md hover:shadow-lg"
+              className="px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition w-full shadow-md"
             >
               Sign In
             </button>
@@ -454,9 +476,6 @@ export default function EarnCash() {
               <p className="text-sm text-amber-700 mt-2 font-medium">
                 You've completed all {MAX_ADS} offers for today.
               </p>
-              <p className="text-xs text-amber-600 mt-1">
-                Come back tomorrow for more rewards!
-              </p>
             </motion.div>
           )}
 
@@ -483,22 +502,14 @@ export default function EarnCash() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="font-bold text-gray-900 text-sm sm:text-base truncate">
-                            {slot.claimed
-                              ? 'Offer Completed'
-                              : slot.inProgress
-                              ? '⏳ Offer In Progress'
-                              : `Reward Offer ${slot.id}`}
+                            {slot.claimed ? 'Offer Completed' : `High-Yield Offer ${slot.id}`}
                           </p>
                           <span className="text-[10px] sm:text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full flex-shrink-0">
                             +{slot.reward} MT
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 truncate">
-                          {slot.claimed
-                            ? 'Reward claimed successfully'
-                            : slot.inProgress
-                            ? `Watching ${ADS_IN_MODAL} ads...`
-                            : 'Click Start to begin earning'}
+                          {slot.claimed ? 'Reward claimed' : 'View sponsor feed to unlock'}
                         </p>
                       </div>
                     </div>
@@ -508,21 +519,13 @@ export default function EarnCash() {
                         <span className="text-xs sm:text-sm font-bold text-green-700 bg-green-100 px-3 py-1.5 rounded-xl border border-green-200">
                           Claimed
                         </span>
-                      ) : slot.inProgress ? (
-                        <span className="text-xs sm:text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1.5 rounded-xl border border-purple-200 animate-pulse">
-                          Watching...
-                        </span>
                       ) : (
                         <button
                           onClick={() => handleStartOffer(slot.id)}
                           disabled={isSubmitting}
-                          className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                          className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all duration-200 flex items-center gap-2"
                         >
-                          {isSubmitting && currentOfferId === slot.id ? (
-                            <FaSpinner className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <FaPlay className="w-3.5 h-3.5" />
-                          )}
+                          <FaPlay className="w-3.5 h-3.5" />
                           Start
                         </button>
                       )}
@@ -530,12 +533,6 @@ export default function EarnCash() {
                   </div>
                 </div>
               ))}
-            </div>
-          )}
-
-          {!isDailyLimitReached && !loading && (
-            <div className="mt-5 text-center text-xs font-medium text-gray-400">
-              <p>{remaining} offer{remaining !== 1 ? 's' : ''} remaining for today</p>
             </div>
           )}
         </div>
@@ -557,7 +554,7 @@ export default function EarnCash() {
         </div>
       )}
 
-      {/* ─── MODAL ─── */}
+      {/* ─── MODAL WITH 10 ADS & ENGAGEMENT TRACKER ─── */}
       <AnimatePresence>
         {showModal && (
           <motion.div
@@ -570,10 +567,10 @@ export default function EarnCash() {
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
-              className="bg-gray-50 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden"
+              className="bg-gray-50 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl relative overflow-hidden"
             >
               
-              {/* Dynamic Global Ads triggered inside Modal Lifecycle */}
+              {/* Global Popunder & Social Bar inside Modal Lifecycle */}
               {isModalReady && (
                 <>
                   <Script id={`modal-popunder-${adKey}`} src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" strategy="afterInteractive" />
@@ -585,11 +582,11 @@ export default function EarnCash() {
               <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                    <FaEye className="text-purple-600 w-4 h-4" />
+                    <FaFire className="text-purple-600 w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-gray-900 leading-tight">Reward Offer {currentOfferId}</h2>
-                    <p className="text-xs text-gray-500 font-medium">Follow the instructions to claim</p>
+                    <h2 className="text-base font-bold text-gray-900 leading-tight">Sponsored Feed ({currentOfferId})</h2>
+                    <p className="text-xs text-gray-500 font-medium">Scroll and interact to unlock reward</p>
                   </div>
                 </div>
                 {canClaim && (
@@ -602,16 +599,20 @@ export default function EarnCash() {
                 )}
               </div>
 
-              {/* Modal Scrollable Body */}
-              <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 relative bg-gray-50">
+              {/* Scrollable Body with 10 Ads & useRef scroll tracking */}
+              <div 
+                onScroll={handleModalScroll}
+                onClick={handleAdContainerClick}
+                className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 relative bg-gray-50"
+              >
                 
-                {/* Timer Banner (Sticky inside scroll for visibility) */}
+                {/* Timer & Engagement Bar */}
                 <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-purple-100 shadow-sm mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <FaClock className={`w-4 h-4 ${canClaim ? 'text-green-500' : 'text-purple-600'}`} />
+                      <FaClock className={`w-4 h-4 ${canClaim && userInteracted ? 'text-green-500' : 'text-purple-600'}`} />
                       <span className="text-sm font-bold text-gray-700">
-                        {canClaim ? 'Verification Complete' : 'Time Required'}
+                        {canClaim && userInteracted ? 'Verification Complete' : 'Scroll & Explore Ads'}
                       </span>
                     </div>
                     <span className={`text-xl font-extrabold ${canClaim ? 'text-green-600' : 'text-purple-600'}`}>
@@ -629,56 +630,55 @@ export default function EarnCash() {
                 {!isModalReady ? (
                   <div className="flex flex-col items-center justify-center py-12">
                     <FaSpinner className="w-8 h-8 text-purple-500 animate-spin mb-3" />
-                    <p className="text-sm font-medium text-gray-500">Loading sponsor ads...</p>
+                    <p className="text-sm font-medium text-gray-500">Loading high-yield sponsor ads...</p>
                   </div>
                 ) : (
                   <>
-                    {/* INSTRUCTIONS BOX - HIGH CTR PUSH */}
+                    {/* INSTRUCTIONS BOX */}
                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-inner">
                       <h3 className="font-bold text-blue-800 flex items-center gap-2 text-sm mb-2">
                         <FaInfoCircle className="w-4 h-4 text-blue-600" />
-                        Action Required to Unlock
+                        Verification Instructions
                       </h3>
                       <ul className="text-sm text-blue-700 space-y-2">
                         <li className="flex items-start gap-2">
                           <FaArrowDown className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                          <span><strong>Scroll down</strong> to view the sponsor offers below.</span>
+                          <span><strong>Scroll down</strong> to browse through all sponsored offers.</span>
                         </li>
                         <li className="flex items-start gap-2">
                           <FaHandPointer className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                          <span><strong>Click on the ads</strong> and explore them for a few seconds to verify your session.</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <FaCheckCircle className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                          <span>Claim your reward once the timer finishes!</span>
+                          <span><strong>Click or tap</strong> anywhere on the feed to confirm engagement.</span>
                         </li>
                       </ul>
                     </div>
 
-                    {/* AD FEED (Banner -> Native -> Banner -> Native) */}
-                    <div className="space-y-4 pb-4">
+                    {/* 10-AD HIGH REVENUE FEED (Alternating Banners & Natives) */}
+                    <div className="space-y-4 pb-6">
                       <div className="flex items-center gap-2 px-1 opacity-70">
-                        <span className="w-2 h-2 rounded-full bg-gray-400" />
-                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sponsor Feed</p>
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sponsored Feed (10 Ads Loaded)</p>
                       </div>
 
-                      {/* Ad 1: Banner */}
-                      <IframeAd key={`modal-banner-1-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                      <IframeAd key={`ad-1-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                      <NativeAd key={`ad-2-${adKey}`} uniqueId={`${adKey}-feed-1`} />
                       
-                      {/* Ad 2: Native */}
-                      <NativeAd key={`modal-native-1-${adKey}`} uniqueId={`${adKey}-1`} />
+                      <IframeAd key={`ad-3-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                      <NativeAd key={`ad-4-${adKey}`} uniqueId={`${adKey}-feed-2`} />
 
-                      {/* Ad 3: Banner */}
-                      <IframeAd key={`modal-banner-2-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                      <IframeAd key={`ad-5-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                      <NativeAd key={`ad-6-${adKey}`} uniqueId={`${adKey}-feed-3`} />
 
-                      {/* Ad 4: Native */}
-                      <NativeAd key={`modal-native-2-${adKey}`} uniqueId={`${adKey}-2`} />
+                      <IframeAd key={`ad-7-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                      <NativeAd key={`ad-8-${adKey}`} uniqueId={`${adKey}-feed-4`} />
+
+                      <IframeAd key={`ad-9-${adKey}`} adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
+                      <NativeAd key={`ad-10-${adKey}`} uniqueId={`${adKey}-feed-5`} />
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Modal Footer (Claim Button) */}
+              {/* Modal Footer */}
               <div className="bg-white px-5 py-4 border-t border-gray-100 flex-shrink-0 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] relative">
                 <button
                   onClick={handleClaimFromModal}
@@ -702,7 +702,7 @@ export default function EarnCash() {
                   ) : (
                     <>
                       <FaClock className="w-5 h-5 opacity-50" />
-                      Please wait {timer}s
+                      Please wait {timer}s & scroll feed
                     </>
                   )}
                 </button>
