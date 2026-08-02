@@ -1,4 +1,3 @@
-
 // pages/earncash.js
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -146,6 +145,7 @@ export default function EarnCash() {
     return await firebaseUser.getIdToken();
   };
 
+  // ── FIX 2: fetchStatus now updates with Math.max to prevent reset ──
   const fetchStatus = async () => {
     try {
       const token = await getToken();
@@ -167,8 +167,9 @@ export default function EarnCash() {
       const data = await res.json();
       if (data.success) {
         const completedAds = data.adsWatched || 0;
-        setClaimedCount(completedAds);
-        setTotalEarned(completedAds * AD_REWARD);
+        // ✅ Only update if the new value is higher (prevents reset)
+        setClaimedCount(prev => Math.max(prev, completedAds));
+        setTotalEarned(prev => Math.max(prev, completedAds * AD_REWARD));
 
         setAdSlots((prev) =>
           prev.map((slot, index) => ({
@@ -311,6 +312,9 @@ export default function EarnCash() {
         setClaimedCount((prev) => prev + 1);
         setTotalEarned((prev) => prev + AD_REWARD);
         refetchMtCoins();
+
+        // ── FIX 1: Sync with backend after claiming ──
+        fetchStatus();
 
         closeModal();
         setSuccess(`✅ Earned ${AD_REWARD} MT Coins!`);
