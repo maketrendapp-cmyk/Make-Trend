@@ -7,10 +7,15 @@ import { useProfile, useStats, useMtCoins, useInvalidateQueries } from '../lib/q
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
-  FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy
+  FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy,
+  FiGift // ← new for daily bonus
 } from 'react-icons/fi';
-import { FaCrown, FaWallet, FaCoins } from 'react-icons/fa'; // ← added FaCoins
+import { FaCrown, FaWallet, FaCoins } from 'react-icons/fa';
 import Meta from '../components/Meta';
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = `${BACKEND_URL}/api`;
 
 export default function Profile() {
   const router = useRouter();
@@ -21,10 +26,72 @@ export default function Profile() {
   const { data: mtCoins, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
   const { invalidateProfile, invalidateStats } = useInvalidateQueries();
 
+  // ── Daily Bonus State ──
+  const [bonusStatus, setBonusStatus] = useState({ canClaim: false, nextClaimTime: null, bonusAmount: 10 });
+  const [bonusLoading, setBonusLoading] = useState(true);
+  const [bonusError, setBonusError] = useState('');
+  const [claimLoading, setClaimLoading] = useState(false);
+
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
 
-  // ── Force refetch when user changes (after login/registration) ──
+  // ── Fetch bonus status ──
+  const fetchBonusStatus = async () => {
+    if (!isAuthenticated || !user) return;
+    try {
+      setBonusLoading(true);
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE}/daily-bonus/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBonusStatus({
+          canClaim: data.canClaim,
+          nextClaimTime: data.nextClaimTime,
+          bonusAmount: data.bonusAmount || 10,
+        });
+      } else {
+        setBonusError(data.error || 'Failed to load bonus status');
+      }
+    } catch (err) {
+      console.error('Bonus status error:', err);
+      setBonusError('Network error');
+    } finally {
+      setBonusLoading(false);
+    }
+  };
+
+  // ── Claim bonus ──
+  const claimBonus = async () => {
+    if (!isAuthenticated || !user || !bonusStatus.canClaim) return;
+    try {
+      setClaimLoading(true);
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE}/daily-bonus/claim`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update mtCoins and bonus status
+        await refetchMtCoins();
+        await fetchBonusStatus(); // refresh status
+        // Show success (you could use a toast, but we'll show a temporary message)
+        setBonusError(''); // clear any previous error
+        alert(`🎉 Claimed ${data.bonus} MT Coins!`); // simple feedback
+      } else {
+        setBonusError(data.error || 'Failed to claim bonus');
+      }
+    } catch (err) {
+      console.error('Claim bonus error:', err);
+      setBonusError('Network error');
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  // ── Force refetch when user changes ──
   useEffect(() => {
     if (isAuthenticated && user) {
       invalidateProfile();
@@ -32,6 +99,7 @@ export default function Profile() {
       refetchProfile();
       refetchStats();
       refetchMtCoins();
+      fetchBonusStatus();
     }
   }, [user?.uid, isAuthenticated]);
 
@@ -86,13 +154,13 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
   ];
 
-  // ── Quick Actions (added Earn MT Coins) ──
+  // ── Quick Actions (improved layout) ──
   const quickActions = [
     { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
     { icon: FiLock, label: 'Change Password', href: '/change-password' },
     { icon: FiHelpCircle, label: 'Support', href: '/support' },
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
-    { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' }, // ← new
+    { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' },
     { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
   ];
 
@@ -126,6 +194,8 @@ export default function Profile() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-xl p-4 h-24 bg-gray-200" />)}
           </div>
+          {/* Bonus skeleton */}
+          <div className="bg-white rounded-2xl p-6 mt-6 h-20 bg-gray-200" />
         </div>
       </div>
     );
@@ -255,10 +325,64 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── Quick Actions ── (always visible) ── */}
+          {/* ── Daily Bonus Card ── (only when logged in) ── */}
+          {user && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                    <FiGift className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Daily Bonus</h3>
+                    <p className="text-sm text-gray-500">
+                      {bonusLoading
+                        ? 'Checking availability...'
+                        : bonusStatus.canClaim
+                        ? `Claim ${bonusStatus.bonusAmount} MT Coins today!`
+                        : 'Already claimed today'}
+                    </p>
+                    {!bonusLoading && !bonusStatus.canClaim && bonusStatus.nextClaimTime && (
+                      <p className="text-xs text-gray-400">
+                        Next claim: {new Date(bonusStatus.nextClaimTime).toLocaleDateString()} at 00:00 UTC
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={claimBonus}
+                  disabled={!bonusStatus.canClaim || claimLoading || bonusLoading}
+                  className={`px-6 py-2.5 rounded-lg font-medium transition shadow-sm flex items-center gap-2 ${
+                    bonusStatus.canClaim && !claimLoading
+                      ? 'bg-green-600 text-white hover:bg-green-700 hover:shadow-md'
+                      : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  {claimLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Claiming...
+                    </>
+                  ) : bonusStatus.canClaim ? (
+                    <>
+                      <FiGift className="w-4 h-4" /> Claim Bonus
+                    </>
+                  ) : (
+                    'Claimed 🎉'
+                  )}
+                </button>
+              </div>
+              {bonusError && <p className="mt-2 text-sm text-red-600">{bonusError}</p>}
+            </div>
+          )}
+
+          {/* ── Quick Actions ── (improved layout, left-aligned) ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {quickActions.map((action, index) => (
                 <Link key={index} href={action.href}>
                   <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200 hover:shadow-sm group">
