@@ -24,6 +24,16 @@ if (!process.env.DEVICE_SECRET) {
   console.warn('⚠️ DEVICE_SECRET not set – using a random fallback (insecure!). Set it in production.');
   process.env.DEVICE_SECRET = require('crypto').randomBytes(32).toString('hex');
 }
+console.log('🔐 DEVICE_SECRET set:', process.env.DEVICE_SECRET ? 'Yes' : 'No');
+
+// ── Global error handlers for uncaught exceptions ──
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 Unhandled Rejection:', reason);
+});
 
 // ============================================================
 // 0. REDIS CLIENT (with timeout guard)
@@ -659,15 +669,18 @@ app.post('/api/device/register', async (req, res) => {
     { expiresIn: '365d' }
   );
   // Detect if the request is cross-origin (frontend on different domain)
-const isCrossOrigin = req.headers.origin && !req.headers.origin.includes(req.get('host'));
-const isSecure = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https';
+  const isCrossOrigin = req.headers.origin && !req.headers.origin.includes(req.get('host'));
+  const isSecure = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https';
 
-res.cookie('device_token', token, {
-  httpOnly: true,
-  secure: isSecure,                      // true if HTTPS (required for cross-origin)
-  sameSite: isCrossOrigin ? 'none' : 'lax', // 'none' for cross-origin, 'lax' for same-origin
-  maxAge: 365 * 24 * 60 * 60 * 1000,
-  path: '/',
+  res.cookie('device_token', token, {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: isCrossOrigin ? 'none' : 'lax',
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    path: '/',
+  });
+
+  res.json({ success: true, deviceId });
 });
 
 // ── Extract device ID from request (body or headers) ──
