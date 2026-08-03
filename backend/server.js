@@ -652,14 +652,16 @@ app.post('/api/device/register', async (req, res) => {
     process.env.DEVICE_SECRET,
     { expiresIn: '365d' }
   );
-  res.cookie('device_token', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 365 * 24 * 60 * 60 * 1000,
-    path: '/',
-  });
-  res.json({ success: true, deviceId });
+  // Detect if the request is cross-origin (frontend on different domain)
+const isCrossOrigin = req.headers.origin && !req.headers.origin.includes(req.get('host'));
+const isSecure = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https';
+
+res.cookie('device_token', token, {
+  httpOnly: true,
+  secure: isSecure,                      // true if HTTPS (required for cross-origin)
+  sameSite: isCrossOrigin ? 'none' : 'lax', // 'none' for cross-origin, 'lax' for same-origin
+  maxAge: 365 * 24 * 60 * 60 * 1000,
+  path: '/',
 });
 
 // ── Extract device ID from request (body or headers) ──
