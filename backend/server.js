@@ -849,15 +849,16 @@ app.post('/api/auth/register', async (req, res) => {
       deviceId: deviceId || '',   // store as deviceFingerprint
       completed: true,
       plan: 'free',
+      mtCoinsEarned: 0,           // default (will be set to 100 if referral is valid)
+      mtCoinsSpent: 0,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp(),
       isBanned: false,
     };
 
-    await db.collection('users').doc(uid).set(userData);
-    delete userData.deviceId;
+    let bonusAwarded = false;
 
-    // ── Process referral reward (increment count, grant PRO on every 5) ──
+    // ── Process referral reward (increment referrer count, grant PRO, give bonus to new user) ──
     if (cleanReferredBy) {
       console.log(`🔍 Referral processing: code="${cleanReferredBy}" from device "${req.body.deviceId || 'none'}"`);
       try {
@@ -881,37 +882,59 @@ app.post('/api/auth/register', async (req, res) => {
             console.warn(`⚠️ Self‑referral blocked: same device "${newUserDeviceId}" for referrer ${referrerUid}`);
             await invalidateKey(`referrals:${referrerUid}`);
           } else {
-            // ── Atomically increment referrals count ──
-            const currentReferrals = referrerData.referrals || 0;
-            const newReferrals = currentReferrals + 1;
-            console.log(`📊 Updating referrals: ${currentReferrals} → ${newReferrals}`);
+            // ── Check if this device already used this referral code ──
+            const existingReferralQuery = await db.collection('users')
+              .where('referredBy', '==', cleanReferredBy)
+              .where('deviceId', '==', newUserDeviceId)
+              .limit(1)
+              .get();
 
-            await db.collection('users').doc(referrerUid).update({
-              referrals: newReferrals,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            console.log(`✅ Referral count updated to ${newReferrals} for user ${referrerUid}`);
+            if (!existingReferralQuery.empty) {
+              console.warn(`⚠️ Duplicate device referral blocked: device "${newUserDeviceId}" already used for code "${cleanReferredBy}"`);
+              await invalidateKey(`referrals:${referrerUid}`);
+            } else {
+              // ── Give 100 MT Coins bonus to the new user ──
+              bonusAwarded = true;
+              userData.mtCoinsEarned = 100;
 
-            // ── Grant PRO for every 5 referrals ──
-            if (newReferrals % 5 === 0) {
-              await grantProFor24Hours(referrerUid);
-              console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+              // ── Atomically increment referrals count ──
+              const currentReferrals = referrerData.referrals || 0;
+              const newReferrals = currentReferrals + 1;
+              console.log(`📊 Updating referrals: ${currentReferrals} → ${newReferrals}`);
+
+              await db.collection('users').doc(referrerUid).update({
+                referrals: newReferrals,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              console.log(`✅ Referral count updated to ${newReferrals} for user ${referrerUid}`);
+
+              // ── Grant PRO for every 5 referrals ──
+              if (newReferrals % 5 === 0) {
+                await grantProFor24Hours(referrerUid);
+                console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+              }
+
+              // ── Invalidate caches ──
+              await invalidateKey(`referrals:${referrerUid}`);
+              await invalidateKey(`user:profile:${referrerUid}`);
+              console.log(`🗑️ Caches invalidated for referrer ${referrerUid}`);
             }
-
-            // ── Invalidate caches ──
-            await invalidateKey(`referrals:${referrerUid}`);
-            await invalidateKey(`user:profile:${referrerUid}`);
-            console.log(`🗑️ Caches invalidated for referrer ${referrerUid}`);
           }
         } else {
           console.warn(`❌ Referrer not found for code: "${cleanReferredBy}"`);
         }
       } catch (err) {
         console.error('🔥 Referral processing error:', err.message);
-        // Log the full error stack for debugging
         console.error(err.stack);
         // Do NOT throw – we don't want to fail the registration, just log the error
       }
+    }
+
+    await db.collection('users').doc(uid).set(userData);
+    delete userData.deviceId;
+
+    if (bonusAwarded) {
+      console.log(`🎁 New user ${uid} received 100 MT Coins referral bonus`);
     }
 
     res.status(201).json({ success: true, user: userData });
@@ -972,14 +995,16 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
       deviceId: deviceId || '',   // store as deviceFingerprint
       completed: true,
       plan: 'free',
+      mtCoinsEarned: 0,           // default (will be set to 100 if referral is valid)
+      mtCoinsSpent: 0,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp(),
       isBanned: false,
     };
 
-    await db.collection('users').doc(uid).set(userData, { merge: true });
+    let bonusAwarded = false;
 
-    // ── Process referral reward (increment count, grant PRO on every 5) ──
+    // ── Process referral reward (increment count, grant PRO, give bonus to new user) ──
     if (cleanReferredBy) {
       console.log(`🔍 Referral processing: code="${cleanReferredBy}" from device "${req.body.deviceId || 'none'}"`);
       try {
@@ -1014,6 +1039,10 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
               console.warn(`⚠️ Duplicate device referral blocked: device "${newUserDeviceId}" already used for code "${cleanReferredBy}"`);
               await invalidateKey(`referrals:${referrerUid}`);
             } else {
+              // ── Give 100 MT Coins bonus to the new user ──
+              bonusAwarded = true;
+              userData.mtCoinsEarned = 100;
+
               // ── All checks passed: increment referral count ──
               const currentReferrals = referrerData.referrals || 0;
               const newReferrals = currentReferrals + 1;
@@ -1045,6 +1074,12 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
         console.error(err.stack);
         // Do NOT throw – we don't want to fail the registration
       }
+    }
+
+    await db.collection('users').doc(uid).set(userData, { merge: true });
+
+    if (bonusAwarded) {
+      console.log(`🎁 New user ${uid} received 100 MT Coins referral bonus via social completion`);
     }
 
     // Invalidate profile cache so the next request gets fresh data
