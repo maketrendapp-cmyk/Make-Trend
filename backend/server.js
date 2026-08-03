@@ -19,6 +19,12 @@ const sharp = require('sharp');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 
+// ── Ensure DEVICE_SECRET is set (fallback for development only) ──
+if (!process.env.DEVICE_SECRET) {
+  console.warn('⚠️ DEVICE_SECRET not set – using a random fallback (insecure!). Set it in production.');
+  process.env.DEVICE_SECRET = require('crypto').randomBytes(32).toString('hex');
+}
+
 // ============================================================
 // 0. REDIS CLIENT (with timeout guard)
 // ============================================================
@@ -4130,13 +4136,16 @@ app.use((err, req, res, next) => {
 
 
 // ============================================================
-// 19. START SERVER
+// 19. START SERVER (for both local & serverless)
 // ============================================================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Backend running on port ${PORT}`);
-  console.log(`🔒 Allowed origins:`, allowedOrigins);
-  console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
-  console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
-  console.log(`📦 Redis: INDEFINITE CACHE with smart invalidation`);
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend running on port ${PORT}`);
+    console.log(`🔒 Allowed origins:`, allowedOrigins);
+    console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+    console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
+    console.log(`📦 Redis: ${process.env.REDIS_URL ? 'connected' : 'not configured'}`);
+  });
+}
+module.exports = app; // ✅ Required for Vercel serverless deployment
