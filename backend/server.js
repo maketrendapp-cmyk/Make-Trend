@@ -16,24 +16,6 @@ const multer = require('multer');
 const streamifier = require('streamifier');
 const Redis = require('ioredis');
 const sharp = require('sharp');
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-
-// ── Ensure DEVICE_SECRET is set (fallback for development only) ──
-if (!process.env.DEVICE_SECRET) {
-  console.warn('⚠️ DEVICE_SECRET not set – using a random fallback (insecure!). Set it in production.');
-  process.env.DEVICE_SECRET = require('crypto').randomBytes(32).toString('hex');
-}
-console.log('🔐 DEVICE_SECRET set:', process.env.DEVICE_SECRET ? 'Yes' : 'No');
-
-// ── Global error handlers for uncaught exceptions ──
-process.on('uncaughtException', (err) => {
-  console.error('🔥 Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('🔥 Unhandled Rejection:', reason);
-});
 
 // ============================================================
 // 0. REDIS CLIENT (with timeout guard)
@@ -432,7 +414,6 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
 
 app.use((req, res, next) => {
   if (req.query) {
@@ -568,121 +549,6 @@ function validateDeviceId(deviceId) {
   return true;
 }
 
-
-// ── Enhanced middleware: token‑first, deviceId recovery, no fallback ──
-const injectDeviceIdFromToken = async (req, res, next) => {
-  const ip = getClientIp(req);
-  let token = req.cookies.device_token || req.headers['x-device-token'];
-  const clientDeviceId = req.body.deviceId || req.headers['x-device-id']; // FingerprintJS value
-
-  // 1. Token present → validate and use it (ignore clientDeviceId)
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, process.env.DEVICE_SECRET);
-      req.deviceId = decoded.deviceId;
-      req.body.deviceId = decoded.deviceId;
-      req.headers['x-device-id'] = decoded.deviceId;
-      req.ip = ip;
-      return next();
-    } catch (e) {
-      console.warn('⚠️ Invalid token, attempting deviceId recovery...');
-    }
-  }
-
-  // 2. No token → require a valid clientDeviceId (fingerprint)
-  if (!clientDeviceId || typeof clientDeviceId !== 'string' || clientDeviceId.length < 5) {
-    return res.status(400).json({
-      success: false,
-      error: 'Valid device ID is required. Please refresh your browser.',
-    });
-  }
-
-  // 3. Rate‑limit new device creation per IP (5 per hour)
-  if (!(await checkRateLimit(ip, 'new-device', 5, 3600))) {
-    return res.status(429).json({
-      success: false,
-      error: 'Too many new devices from this IP. Please try later.',
-    });
-  }
-
-  // 4. Look up or create device mapping in Firestore
-  const doc = await db.collection('deviceMappings').doc(clientDeviceId).get();
-  let deviceId = clientDeviceId;
-  if (!doc.exists) {
-    await db.collection('deviceMappings').doc(deviceId).set({
-      deviceId: deviceId,
-      ip: ip,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  } else {
-    deviceId = doc.data().deviceId; // should match clientDeviceId
-  }
-
-  // 5. Issue a new token for this device
-  const newToken = jwt.sign(
-    { deviceId, iat: Date.now() },
-    process.env.DEVICE_SECRET,
-    { expiresIn: '365d' }
-  );
-  res.cookie('device_token', newToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 365 * 24 * 60 * 60 * 1000,
-    path: '/',
-  });
-
-  req.deviceId = deviceId;
-  req.body.deviceId = deviceId;
-  req.headers['x-device-id'] = deviceId;
-  req.ip = ip;
-  next();
-};
-
-// ── Manual device registration with IP rate‑limit ──
-app.post('/api/device/register', async (req, res) => {
-  const ip = getClientIp(req);
-  const clientDeviceId = req.body.deviceId || req.headers['x-device-id'];
-  
-  if (!clientDeviceId || typeof clientDeviceId !== 'string' || clientDeviceId.length < 5) {
-    return res.status(400).json({ success: false, error: 'Valid device ID is required.' });
-  }
-  
-  if (!(await checkRateLimit(ip, 'device-register', 5, 3600))) {
-    return res.status(429).json({ success: false, error: 'Too many registrations from this IP.' });
-  }
-  
-  // Check if mapping exists, create if not
-  const doc = await db.collection('deviceMappings').doc(clientDeviceId).get();
-  const deviceId = doc.exists ? doc.data().deviceId : clientDeviceId;
-  if (!doc.exists) {
-    await db.collection('deviceMappings').doc(deviceId).set({
-      deviceId: deviceId,
-      ip: ip,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-  
-  const token = jwt.sign(
-    { deviceId, iat: Date.now() },
-    process.env.DEVICE_SECRET,
-    { expiresIn: '365d' }
-  );
-  // Detect if the request is cross-origin (frontend on different domain)
-  const isCrossOrigin = req.headers.origin && !req.headers.origin.includes(req.get('host'));
-  const isSecure = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https';
-
-  res.cookie('device_token', token, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: isCrossOrigin ? 'none' : 'lax',
-    maxAge: 365 * 24 * 60 * 60 * 1000,
-    path: '/',
-  });
-
-  res.json({ success: true, deviceId });
-});
-
 // ── Extract device ID from request (body or headers) ──
 function extractDeviceId(req) {
   return req.body?.deviceId || req.headers['x-device-id'] || null;
@@ -747,30 +613,6 @@ async function checkRateLimit(identifier, action, limit, windowSeconds) {
   }
 }
 
-// ── Global per‑IP rate limit (hard cap on total actions) ──
-async function checkGlobalRateLimit(ip, action, limit, windowSeconds) {
-  const key = `global:${action}:${ip}:${Math.floor(Date.now() / 1000 / windowSeconds)}`;
-  const current = await redis.incr(key);
-  if (current === 1) await redis.expire(key, windowSeconds);
-  return current <= limit;
-}
-
-// ── Combined (deviceId + IP) rate limit ──
-async function checkCombinedRateLimit(deviceId, ip, action, limit, windowSeconds) {
-  const key = `rate:${action}:${deviceId}:${ip}:${Math.floor(Date.now() / 1000 / windowSeconds)}`;
-  const current = await redis.incr(key);
-  if (current === 1) await redis.expire(key, windowSeconds);
-  return current <= limit;
-}
-
-// ── Daily cap per (deviceId, IP)
-async function checkDailyLimit(deviceId, ip, action, limit) {
-  const today = new Date().toISOString().split('T')[0];
-  const key = `daily:${action}:${deviceId}:${ip}:${today}`;
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, 86400);
-  return count <= limit;
-}
 
 
 // ── Get ban status with Redis cache (5 min TTL) ──
@@ -955,7 +797,7 @@ app.get('/api/auth/check-email', async (req, res) => {
 });
 
 // ── Register new user ── (rate-limited by authLimiter)
-app.post('/api/auth/register', injectDeviceIdFromToken, async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { uid, username, fullname, email, avatar, referralCode: referredByCode, deviceId } = req.body;
 
@@ -1103,7 +945,7 @@ app.post('/api/auth/register', injectDeviceIdFromToken, async (req, res) => {
 });
 
 // ── Complete social profile ── (authenticated, with rate limit and ban check)
-app.post('/api/auth/complete-social', verifyToken, checkBanned, injectDeviceIdFromToken, async (req, res) => {
+app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     // ── Rate limit: 10 completions per minute ──
@@ -2156,7 +1998,7 @@ app.delete('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
 });
 
 // ── Record share ── (public, IP rate limit)
-app.post('/api/campaigns/:id/share', injectDeviceIdFromToken, async (req, res) => {
+app.post('/api/campaigns/:id/share', async (req, res) => {
   try {
     const { id } = req.params;
     const ip = getClientIp(req);
@@ -2327,7 +2169,7 @@ app.get('/api/campaigns/:id/share-count', async (req, res) => {
 });
 
 // ── Complete campaign ── (public, IP rate limit)
-app.post('/api/campaigns/:id/complete', injectDeviceIdFromToken, async (req, res) => {
+app.post('/api/campaigns/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
     const ip = getClientIp(req);
@@ -2444,7 +2286,7 @@ app.post('/api/campaigns/:id/complete', injectDeviceIdFromToken, async (req, res
 });
 
 // ── Unlock campaign ── (public, IP rate limit)
-app.post('/api/campaigns/:id/unlock', injectDeviceIdFromToken, async (req, res) => {
+app.post('/api/campaigns/:id/unlock', async (req, res) => {
   try {
     const { id } = req.params;
     const ip = getClientIp(req);
@@ -2614,7 +2456,7 @@ app.get('/api/stats', verifyToken, checkBanned, async (req, res) => {
 });
 
 // ── Record a view (dedicated endpoint – updates campaign and stats caches without invalidation) ──
-app.post('/api/campaigns/:id/view', injectDeviceIdFromToken, async (req, res) => {
+app.post('/api/campaigns/:id/view', async (req, res) => {
   try {
     const { id } = req.params;
     const ip = getClientIp(req);
@@ -4149,16 +3991,13 @@ app.use((err, req, res, next) => {
 
 
 // ============================================================
-// 19. START SERVER (for both local & serverless)
+// 19. START SERVER
 // ============================================================
-if (require.main === module) {
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`🚀 Backend running on port ${PORT}`);
-    console.log(`🔒 Allowed origins:`, allowedOrigins);
-    console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
-    console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
-    console.log(`📦 Redis: ${process.env.REDIS_URL ? 'connected' : 'not configured'}`);
-  });
-}
-module.exports = app; // ✅ Required for Vercel serverless deployment
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Backend running on port ${PORT}`);
+  console.log(`🔒 Allowed origins:`, allowedOrigins);
+  console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+  console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
+  console.log(`📦 Redis: INDEFINITE CACHE with smart invalidation`);
+});
