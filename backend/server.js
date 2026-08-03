@@ -159,7 +159,6 @@ async function findFirstPageKey(uid) {
 }
 
 // ── Add a campaign to the user's list cache (first page) ──
-// ── Add a campaign to the user's list cache (first page) ──
 async function addCampaignToUserListCache(uid, campaign) {
   try {
     const firstPageKey = await findFirstPageKey(uid);
@@ -189,7 +188,7 @@ async function addCampaignToUserListCache(uid, campaign) {
     if (data.campaigns && Array.isArray(data.campaigns)) {
       // Add to the beginning (most recent)
       data.campaigns = [campaign, ...data.campaigns];
-      // If the list exceeds the limit, remove the last element
+      // Extract limit from the cache key
       const limit = parseCampaignCacheKey(firstPageKey).limit || 25;
       if (data.campaigns.length > limit) {
         data.campaigns = data.campaigns.slice(0, limit);
