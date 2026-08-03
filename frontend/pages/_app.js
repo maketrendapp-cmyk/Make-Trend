@@ -9,7 +9,8 @@ import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
 import Sidebar from '../components/Sidebar';
-import { refreshDeviceId } from '../utils/deviceId'; // ✅ changed from getDeviceId
+import { refreshDeviceId } from '../utils/deviceId';
+import { ensureDeviceToken } from '../utils/deviceToken';
 import '../styles/globals.css';
 
 // ── Create Device ID Context ──
@@ -65,20 +66,22 @@ function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pathname = router.pathname;
 
-  // ── Generate Device ID in background ── (updated)
+  // ── Generate Device ID and register device token ──
   useEffect(() => {
     console.log('🔄 Initializing device ID...');
     refreshDeviceId()
       .then((id) => {
         console.log('✅ Final device ID:', id);
         setDeviceId(id);
+        // After deviceId is ready, register the device token
+        return ensureDeviceToken(id);
+      })
+      .then(() => {
+        console.log('✅ Device token registered (or already exists).');
       })
       .catch((err) => {
-        console.error('❌ Device ID error:', err);
-        // Fallback – should not happen because generateFingerprint always returns something
-        const fallback = 'fallback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-        console.warn('⚠️ Using fallback ID:', fallback);
-        setDeviceId(fallback);
+        console.error('❌ Device initialization error:', err);
+        // Fallback – deviceId may still be available but token not set; API calls will create token on the fly.
       });
   }, []);
 
