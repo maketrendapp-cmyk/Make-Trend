@@ -134,10 +134,11 @@ function CampaignTasks({ campaign: initialCampaign }) {
         const deviceId = await refreshDeviceId();
         if (!deviceId) return;
         await fetch(`${BACKEND_URL}/api/campaigns/${campaign.id}/view`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId }),
-        });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include', // 👈 sends device token cookie
+  body: JSON.stringify({ deviceId }),
+});
         viewTrackedRef.current = true;
         console.log(`📊 View recorded for campaign ${campaign.id}`);
       } catch (e) {
@@ -222,10 +223,11 @@ function CampaignTasks({ campaign: initialCampaign }) {
     try {
       const deviceId = await refreshDeviceId();
       await fetch(`${BACKEND_URL}/api/campaigns/${id}/unlock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId }),
-      });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include', // 👈 sends device token cookie
+  body: JSON.stringify({ deviceId }),
+});
       queryClient.invalidateQueries(campaignQueryKey(id));
     } catch (err) {
       console.error('Unlock error:', err);
