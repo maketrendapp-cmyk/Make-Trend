@@ -34,7 +34,6 @@ const defaultMeta = {
 
 // ─── AD COMPONENTS ───
 
-// Safely loads document.write() ads without breaking React
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
@@ -73,7 +72,6 @@ const IframeAd = ({ adKey, width, height }) => {
   );
 };
 
-// Safely loads Native DOM injection ads
 const NativeAd = () => {
   const containerRef = useRef(null);
 
@@ -128,24 +126,22 @@ function CampaignShare({ campaign: initialCampaign }) {
   const [toastMessage, setToastMessage] = useState('');
   const [isHovering, setIsHovering] = useState(false);
   
-  // Ad state
   const [showStickyAd, setShowStickyAd] = useState(true);
 
   const claimTimerRef = useRef(null);
   const isFinishingRef = useRef(false);
   const shareApiCalledRef = useRef(false);
 
-  // ── Fetch campaign if not provided ──
+  // ── Fetch campaign ──
   useEffect(() => {
     if (!initialCampaign && id) {
       fetchCampaignData();
     } else if (initialCampaign) {
-      initializeCampaign(initialCampaign);
+      fetchCampaignData();
       setLoading(false);
     }
   }, [id, initialCampaign]);
 
-  // ── Force refresh fingerprint on page load ──
   useEffect(() => {
     const refreshFingerprint = async () => {
       try {
@@ -160,14 +156,16 @@ function CampaignShare({ campaign: initialCampaign }) {
   const fetchCampaignData = async () => {
     try {
       setLoading(true);
-      const camp = await fetchCampaign(id);
-      if (!camp) {
+      const deviceId = await refreshDeviceId();
+      const response = await fetch(`${API_BASE}/campaigns/${id}?deviceId=${deviceId}`);
+      const data = await response.json();
+      if (!data.success || !data.campaign) {
         setError('Campaign not found');
         setLoading(false);
         return;
       }
-      setCampaign(camp);
-      initializeCampaign(camp);
+      setCampaign(data.campaign);
+      initializeCampaign(data.campaign);
     } catch (err) {
       console.error('Error fetching:', err);
       setError('Could not load campaign. Please try again.');
@@ -182,6 +180,7 @@ function CampaignShare({ campaign: initialCampaign }) {
     setShares(currentShares);
     setShareProgress(Math.min((currentShares / (count || 1)) * 100, 100));
 
+    // Set shareAttempt based on progress (original logic)
     if (count === 0) {
       setSharesComplete(true);
       setIsClaimReady(true);
@@ -249,43 +248,6 @@ function CampaignShare({ campaign: initialCampaign }) {
     return `${title}\n\n${description}\n\nOpen The Link:\n${link}`;
   };
 
-  // ── Native Share ──
-  const handleNativeShare = async () => {
-    if (isSharing || verifying) return;
-    if (shareCount === 0) return;
-
-    const shareData = { text: buildFullContent() };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        startVerification('share', 6);
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          setToastMessage('Share cancelled or failed.');
-          setTimeout(() => setToastMessage(''), 3000);
-        }
-      }
-    } else {
-      copyFullContent();
-    }
-  };
-
-  // ── Messenger share ──
-  const handleMessengerShare = () => {
-    if (isSharing || verifying || shareCount === 0) return;
-    window.open(`fb-messenger://share/?link=${encodeURIComponent(getShareUrl())}`, '_blank');
-    startVerification('share', 6);
-  };
-
-  // ── WhatsApp share ──
-  const handleWhatsAppShare = () => {
-    if (isSharing || verifying || shareCount === 0) return;
-    window.open(`https://wa.me/?text=${encodeURIComponent(getShareUrl())}`, '_blank');
-    startVerification('share', 6);
-  };
-
-  // ── Copy full content ──
   const copyFullContent = () => {
     const fullText = buildFullContent();
     navigator.clipboard
@@ -376,7 +338,7 @@ function CampaignShare({ campaign: initialCampaign }) {
       await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'native', deviceId, shares: totalShares }),
+        body: JSON.stringify({ deviceId, shares: totalShares }),
       });
     } catch (err) {
       console.error('Error recording share completion:', err);
@@ -412,8 +374,41 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
-  const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
-  const remaining = Math.max(shareCount - shares, 0);
+  // ── Native Share ──
+  const handleNativeShare = async () => {
+    if (isSharing || verifying || sharesComplete) return;
+    if (shareCount === 0) return;
+
+    const shareData = { text: buildFullContent() };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        startVerification('share', 6);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setToastMessage('Share cancelled or failed.');
+          setTimeout(() => setToastMessage(''), 3000);
+        }
+      }
+    } else {
+      copyFullContent();
+    }
+  };
+
+  // ── Messenger share ──
+  const handleMessengerShare = () => {
+    if (isSharing || verifying || sharesComplete) return;
+    window.open(`fb-messenger://share/?link=${encodeURIComponent(getShareUrl())}`, '_blank');
+    startVerification('share', 6);
+  };
+
+  // ── WhatsApp share ──
+  const handleWhatsAppShare = () => {
+    if (isSharing || verifying || sharesComplete) return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(getShareUrl())}`, '_blank');
+    startVerification('share', 6);
+  };
 
   if (loading) {
     return (
@@ -441,6 +436,7 @@ function CampaignShare({ campaign: initialCampaign }) {
     );
   }
 
+  const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const isComplete = sharesComplete;
 
   return (
@@ -480,6 +476,7 @@ function CampaignShare({ campaign: initialCampaign }) {
                 📤
               </div>
             )}
+            {/* Progress bar – shows user's progress (shareAttempt based) */}
             <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/80">
               <div
                 className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"
@@ -501,11 +498,6 @@ function CampaignShare({ campaign: initialCampaign }) {
                   {campaign.reward}
                 </span>
               )}
-              {shareCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
-                  📤 {shares}/{shareCount} shares
-                </span>
-              )}
               {isComplete && (
                 <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
                   <FaCheckCircle className="w-3.5 h-3.5" />
@@ -514,13 +506,14 @@ function CampaignShare({ campaign: initialCampaign }) {
               )}
             </div>
 
+            {/* Per‑user progress text (no global numbers) */}
             {shareCount > 0 && !isComplete && (
               <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
-                  <span>complete</span>
+                  <span>progress</span>
                 </div>
-                <span>{shares}/{shareCount} shares</span>
+                <span>{shareAttempt}/{shareCount} steps</span>
               </div>
             )}
           </div>
@@ -542,12 +535,12 @@ function CampaignShare({ campaign: initialCampaign }) {
                 <FaRocket className="w-8 h-8 text-purple-600 animate-pulse" />
               </div>
               <h2 className="text-2xl font-extrabold text-gray-900">
-                {remaining === 1 ? 'Almost There!' : `Share ${remaining} More Time${remaining > 1 ? 's' : ''}`}
+                {shareAttempt === 3 ? 'Almost There!' : `Share ${shareCount - shareAttempt} More`}
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-sm mx-auto">
-                {remaining === 1
+                {shareAttempt === 3
                   ? 'One more share unlocks your reward!'
-                  : `Share this campaign with your friends to unlock "${campaign.reward || 'your reward'}"`}
+                  : `Share this campaign to unlock "${campaign.reward || 'your reward'}"`}
               </p>
             </div>
 
@@ -555,7 +548,7 @@ function CampaignShare({ campaign: initialCampaign }) {
             <div className="relative z-10 mt-5 flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={handleMessengerShare}
-                disabled={verifying || isSharing}
+                disabled={verifying || isSharing || isComplete}
                 className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50"
               >
                 <FaFacebookMessenger className="w-4 h-4" />
@@ -563,7 +556,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               </button>
               <button
                 onClick={handleWhatsAppShare}
-                disabled={verifying || isSharing}
+                disabled={verifying || isSharing || isComplete}
                 className="inline-flex items-center gap-2 px-5 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50"
               >
                 <FaWhatsapp className="w-4 h-4" />
@@ -578,7 +571,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               onHoverStart={() => setIsHovering(true)}
               onHoverEnd={() => setIsHovering(false)}
               onClick={handleNativeShare}
-              disabled={verifying || isSharing}
+              disabled={verifying || isSharing || isComplete}
               className={`
                 relative z-10 mt-4 w-full inline-flex items-center justify-center gap-3 px-6 py-4 
                 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg rounded-2xl 
@@ -617,21 +610,6 @@ function CampaignShare({ campaign: initialCampaign }) {
         )}
 
         {/* ── Claim Button ── */}
-        {!isComplete && shareCount === 0 && (
-          <div className="mt-6 p-4 bg-amber-50 rounded-2xl border border-amber-200 text-center">
-            <p className="text-amber-700 font-medium">
-              No shares required – you can claim your reward directly!
-            </p>
-            <button
-              onClick={handleClaim}
-              className="mt-3 inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:shadow-lg transition"
-            >
-              <FaGift className="w-4 h-4" />
-              Claim Now
-            </button>
-          </div>
-        )}
-
         {isComplete && (
           <div className="mt-6">
             {!isClaimReady ? (
@@ -660,17 +638,7 @@ function CampaignShare({ campaign: initialCampaign }) {
           </div>
         )}
 
-        {!isComplete && shareCount > 0 && (
-          <div className="mt-5 text-center text-xs text-gray-400 font-medium">
-            <p>
-              {remaining === 1
-                ? '🔒 One more share required to unlock the reward!'
-                : `🔒 ${remaining} more share${remaining > 1 ? 's' : ''} needed to unlock`}
-            </p>
-          </div>
-        )}
-
-        {/* ─── ─── 2. NATIVE AD (MOVED TO BOTTOM – AFTER CLAIM BUTTON) ─── ─── */}
+        {/* ─── 2. NATIVE AD ─── */}
         <div className="mt-8">
           <NativeAd />
         </div>
