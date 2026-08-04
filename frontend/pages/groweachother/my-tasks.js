@@ -1,9 +1,9 @@
-// pages/my-tasks.js
+// pages/groweachother/my-tasks.js
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../components/AuthScreen';
-import { Meta } from '../components/Meta';
-import { getToken } from '../lib/api';
+import Meta from '../../components/Meta';
+import { useAuth } from '../../components/AuthScreen';
+import { getToken } from '../../lib/api';
 import {
   FiPlus,
   FiEdit2,
