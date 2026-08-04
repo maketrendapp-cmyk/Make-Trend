@@ -368,6 +368,7 @@ export default function Home({ initialFeaturedTemplates }) {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Make Trend",
+"alternateName": "MakeTrend",
     "url": siteUrl,
     "description": "Create viral share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates.",
     "potentialAction": {
