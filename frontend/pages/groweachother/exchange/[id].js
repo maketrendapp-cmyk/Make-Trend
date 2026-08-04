@@ -1,10 +1,10 @@
-// pages/exchange/[id].js
+// pages/groweachother/exchange/[id].js
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { useAuth } from '../../components/AuthScreen';
-import { Meta } from '../../components/Meta';
-import { getToken } from '../../lib/api';
+import Meta from '../../../components/Meta';
+import { useAuth } from '../../../components/AuthScreen';
+import { getToken } from '../../../lib/api';
 import {
   FiArrowLeft,
   FiCheckCircle,
@@ -211,7 +211,7 @@ export default function ExchangeDetail() {
         <Meta title="Exchange | Make Trend" />
         <div className="min-h-screen bg-gray-50 py-8 px-4">
           <div className="max-w-2xl mx-auto">
-            <Link href="/my-exchanges" className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition mb-4">
+            <Link href="/groweachother/my-exchanges" className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition mb-4">
               <FiArrowLeft className="w-4 h-4" />
               Back to Exchanges
             </Link>
@@ -249,7 +249,7 @@ export default function ExchangeDetail() {
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-2xl mx-auto">
           {/* ── Back ── */}
-          <Link href="/my-exchanges" className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition mb-4">
+          <Link href="/groweachother/my-exchanges" className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition mb-4">
             <FiArrowLeft className="w-4 h-4" />
             Back to Exchanges
           </Link>
