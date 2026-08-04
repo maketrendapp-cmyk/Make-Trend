@@ -36,6 +36,16 @@ export default function ReferEarn() {
   const [copySuccess, setCopySuccess] = useState('');
   const [visible, setVisible] = useState(false);
 
+  // ── Scroll to top on mount ──
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   const username = profile?.username || user?.username || user?.email?.split('@')[0] || 'User';
   const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
   const isPro = profile?.plan === 'pro';
@@ -46,11 +56,6 @@ export default function ReferEarn() {
   const nextRewardAt = (Math.floor(referralsCount / 5) + 1) * 5;
   const remaining = Math.max(nextRewardAt - referralsCount, 0);
   const progress = Math.min((referralsCount % 5) / 5 * 100, 100);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
 
   // ── Copy referral code ──
   const copyReferralCode = () => {
