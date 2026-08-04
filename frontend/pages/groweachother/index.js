@@ -1,0 +1,249 @@
+// pages/groweachother/index.js
+import React from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import Meta from '../../components/Meta';
+import { useAuth } from '../../components/AuthScreen';
+import {
+  FiHeart,
+  FiUsers,
+  FiPlusCircle,
+  FiCheckCircle,
+  FiArrowRight,
+  FiUser,
+  FiGithub,
+  FiYoutube,
+  FiInstagram,
+  FiTwitter,
+  FiFacebook,
+} from 'react-icons/fi';
+
+export default function GrowTogetherLanding() {
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
+
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      router.push('/groweachother/grow-feed');
+    } else {
+      router.push('/login?redirect=/groweachother/grow-feed');
+    }
+  };
+
+  return (
+    <>
+      <Meta
+        title="Grow Together – Help Others & Get Help Back"
+        description="A fair Sub4Sub, Follow4Follow, Like4Like platform. Exchange social growth with real people."
+      />
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        {/* ── Hero Section ── */}
+        <section className="relative overflow-hidden py-16 md:py-24 px-4">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 to-indigo-600/5" />
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-300/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-300/20 rounded-full blur-3xl" />
+          
+          <div className="max-w-5xl mx-auto relative z-10 text-center">
+            <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm font-medium mb-6 border border-purple-200">
+              <FiHeart className="w-4 h-4" />
+              <span>Sub4Sub • Follow4Follow • Like4Like</span>
+            </div>
+            <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight">
+              Grow Together
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-600 mt-4 max-w-3xl mx-auto">
+              Help others grow their social presence and get help in return – no coins, no rewards, just real human exchange.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                onClick={handleGetStarted}
+                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-purple-200/50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {isAuthenticated ? 'Start Growing' : 'Get Started – Free'}
+                <FiArrowRight className="w-5 h-5" />
+              </button>
+              {!isAuthenticated && (
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-gray-100 text-gray-700 font-medium rounded-2xl hover:bg-gray-200 transition"
+                >
+                  Sign In
+                </Link>
+              )}
+            </div>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <FiCheckCircle className="w-4 h-4 text-green-500" />
+                No coins
+              </span>
+              <span className="flex items-center gap-1.5">
+                <FiCheckCircle className="w-4 h-4 text-green-500" />
+                No rewards
+              </span>
+              <span className="flex items-center gap-1.5">
+                <FiCheckCircle className="w-4 h-4 text-green-500" />
+                100% fair exchange
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Features (3 Cards) ── */}
+        <section className="max-w-6xl mx-auto px-4 py-12 md:py-16">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
+            How It Works
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Card 1: Feed */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition">
+              <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600 mb-5">
+                <FiUsers className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">1. Browse the Feed</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                See public tasks from other users – they need subscribers, followers, likes, or comments.
+              </p>
+              <Link
+                href={isAuthenticated ? '/groweachother/grow-feed' : '/login?redirect=/groweachother/grow-feed'}
+                className="inline-flex items-center gap-1 mt-4 text-purple-600 font-medium hover:underline text-sm"
+              >
+                View Feed <FiArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Card 2: My Tasks */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 mb-5">
+                <FiPlusCircle className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">2. Add Your Task</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                Create your own social tasks – choose platform, URL, and what action you need (Subscribe, Follow, etc.).
+              </p>
+              <Link
+                href={isAuthenticated ? '/groweachother/my-tasks' : '/login?redirect=/groweachother/my-tasks'}
+                className="inline-flex items-center gap-1 mt-4 text-purple-600 font-medium hover:underline text-sm"
+              >
+                Manage Tasks <FiArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Card 3: Exchanges */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 hover:shadow-md transition">
+              <div className="w-14 h-14 rounded-2xl bg-green-100 flex items-center justify-center text-green-600 mb-5">
+                <FiCheckCircle className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">3. Exchange & Grow</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                Help someone, and they help you back. Track all your exchanges and complete them together.
+              </p>
+              <Link
+                href={isAuthenticated ? '/groweachother/my-exchanges' : '/login?redirect=/groweachother/my-exchanges'}
+                className="inline-flex items-center gap-1 mt-4 text-purple-600 font-medium hover:underline text-sm"
+              >
+                View Exchanges <FiArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Detailed Steps ── */}
+        <section className="bg-white border-t border-gray-100 py-16 px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
+              Simple Steps to Grow Together
+            </h2>
+            <div className="space-y-8">
+              <div className="flex flex-col sm:flex-row gap-6 items-start">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xl font-bold">
+                  1
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Add Your Social Task</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">
+                    Go to <strong>My Tasks</strong> and add your social account – e.g., YouTube channel with task “Subscribe”.
+                    You can add as many tasks as you like.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-6 items-start">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xl font-bold">
+                  2
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Find Someone to Help</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">
+                    Browse the <strong>Grow Feed</strong> and click <strong>Help To Grow</strong> on any task.
+                    Choose which of your tasks you want them to help with in return.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-6 items-start">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xl font-bold">
+                  3
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Complete Your Part</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">
+                    Open the exchange, visit the other user’s channel, perform the action (subscribe/follow), then press <strong>Done</strong>.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-6 items-start">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xl font-bold">
+                  4
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Wait & Complete</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">
+                    The other user completes their part. When both are done, the exchange is marked <strong>Completed</strong>.
+                    Everyone grows!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Platforms We Support ── */}
+        <section className="py-12 px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Supported Platforms</h2>
+            <div className="flex flex-wrap items-center justify-center gap-6 text-gray-500">
+              <div className="flex items-center gap-2"><FiYoutube className="w-6 h-6 text-red-600" /> YouTube</div>
+              <div className="flex items-center gap-2"><FiInstagram className="w-6 h-6 text-pink-600" /> Instagram</div>
+              <div className="flex items-center gap-2"><FiTwitter className="w-6 h-6 text-blue-400" /> Twitter</div>
+              <div className="flex items-center gap-2"><FiFacebook className="w-6 h-6 text-blue-700" /> Facebook</div>
+              <div className="flex items-center gap-2"><FiGithub className="w-6 h-6 text-gray-800" /> GitHub</div>
+              <div className="flex items-center gap-2 text-gray-400">+ more</div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Call to Action ── */}
+        <section className="bg-gradient-to-r from-purple-600 to-indigo-600 py-16 px-4 text-center text-white">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Ready to Grow Together?
+            </h2>
+            <p className="text-purple-100 text-lg mb-8">
+              Join the community and start exchanging real social growth today.
+            </p>
+            <button
+              onClick={handleGetStarted}
+              className="inline-flex items-center gap-2 px-8 py-4 bg-white text-purple-700 font-bold rounded-2xl shadow-lg hover:shadow-xl transition hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {isAuthenticated ? 'Go to Feed' : 'Get Started – Free'}
+              <FiArrowRight className="w-5 h-5" />
+            </button>
+            {!isAuthenticated && (
+              <p className="mt-4 text-sm text-purple-200">
+                Already have an account? <Link href="/login" className="underline font-medium hover:text-white transition">Sign in</Link>
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
