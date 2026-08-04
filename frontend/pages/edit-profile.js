@@ -22,9 +22,7 @@ import {
   FiLink,
   FiBookmark,
   FiUsers,
-  FiAtSign,
   FiEdit2,
-  FiHeart,
 } from 'react-icons/fi';
 import {
   FaFacebook,
@@ -133,10 +131,6 @@ export default function EditProfile() {
   const [country, setCountry] = useState('');
   const [gender, setGender] = useState('');
 
-  // ── Hobbies ──
-  const [hobbies, setHobbies] = useState([]);
-  const [newHobby, setNewHobby] = useState('');
-
   // ── Avatar ──
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
@@ -153,10 +147,6 @@ export default function EditProfile() {
   // ── Websites ──
   const [websites, setWebsites] = useState([]);
   const [newWebsite, setNewWebsite] = useState({ label: '', url: '' });
-
-  // ── Additional Contacts ──
-  const [contacts, setContacts] = useState([]);
-  const [newContact, setNewContact] = useState({ type: '', value: '' });
 
   // ── Availability states ──
   const [usernameAvailable, setUsernameAvailable] = useState(null);
@@ -180,11 +170,9 @@ export default function EditProfile() {
       setPhone(profile.phone || '');
       setCountry(profile.country || '');
       setGender(profile.gender || '');
-      setHobbies(profile.hobbies || []);
       setSkills(profile.skills || []);
       setSocialLinks(profile.socialLinks || []);
       setWebsites(profile.websites || []);
-      setContacts(profile.additionalContacts || []);
       setLoading(false);
     } else if (!profileLoading) {
       setLoading(false);
@@ -263,26 +251,6 @@ export default function EditProfile() {
     reader.readAsDataURL(file);
   };
 
-  // ── Add/Remove Hobbies ──
-  const addHobby = () => {
-    const hobby = newHobby.trim();
-    if (!hobby) return;
-    if (hobbies.includes(hobby)) {
-      setError('Hobby already added.');
-      return;
-    }
-    if (hobbies.length >= 50) {
-      setError('Maximum 50 hobbies allowed.');
-      return;
-    }
-    setHobbies([...hobbies, hobby]);
-    setNewHobby('');
-  };
-
-  const removeHobby = (index) => {
-    setHobbies(hobbies.filter((_, i) => i !== index));
-  };
-
   // ── Add/Remove Skills ──
   const addSkill = () => {
     const skill = newSkill.trim();
@@ -347,25 +315,6 @@ export default function EditProfile() {
 
   const removeWebsite = (index) => {
     setWebsites(websites.filter((_, i) => i !== index));
-  };
-
-  // ── Add/Remove Additional Contacts ──
-  const addContact = () => {
-    const { type, value } = newContact;
-    if (!type || !value) {
-      setError('Please fill both type and value.');
-      return;
-    }
-    if (contacts.length >= 20) {
-      setError('Maximum 20 contacts allowed.');
-      return;
-    }
-    setContacts([...contacts, { type: type.trim(), value: value.trim() }]);
-    setNewContact({ type: '', value: '' });
-  };
-
-  const removeContact = (index) => {
-    setContacts(contacts.filter((_, i) => i !== index));
   };
 
   // ── Submit ──
@@ -438,11 +387,9 @@ export default function EditProfile() {
         phone: phone.trim(),
         country: country.trim(),
         gender: gender.trim(),
-        hobbies: hobbies,
         skills: skills,
         socialLinks: socialLinks,
         websites: websites,
-        additionalContacts: contacts,
       };
 
       const updateRes = await fetch(`${API_BASE}/auth/profile`, {
@@ -495,7 +442,7 @@ export default function EditProfile() {
                     <div className="h-3 w-32 bg-gray-200 rounded animate-pulse" />
                   </div>
                 </div>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                   <div key={i} className="space-y-1">
                     <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
                     <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
@@ -748,38 +695,6 @@ export default function EditProfile() {
                 </div>
               </div>
 
-              {/* ── Hobbies ── */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <FiHeart className="w-5 h-5 text-purple-600" /> Hobbies (optional)
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {hobbies.map((hobby, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 bg-pink-100 text-pink-700 px-3 py-1.5 rounded-full text-sm font-medium">
-                      {hobby}
-                      <button type="button" onClick={() => removeHobby(idx)} className="text-pink-400 hover:text-red-500 transition">
-                        <FiX className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newHobby}
-                    onChange={(e) => setNewHobby(e.target.value)}
-                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
-                    disabled={saving}
-                    placeholder="e.g. Reading, Guitar, Gaming"
-                    onKeyDown={(e) => e.key === 'Enter' && addHobby()}
-                  />
-                  <button type="button" onClick={addHobby} className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
-                    <FiPlus className="w-5 h-5" />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400">Press Enter or click + to add hobby.</p>
-              </div>
-
               {/* ── Skills ── */}
               <div className="space-y-4">
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -867,7 +782,7 @@ export default function EditProfile() {
                 </div>
               </div>
 
-              {/* ── Websites with Favicon ── */}
+              {/* ── Websites ── */}
               <div className="space-y-4">
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <FiGlobe className="w-5 h-5 text-purple-600" /> Websites (optional)
@@ -909,45 +824,6 @@ export default function EditProfile() {
                     disabled={saving}
                   />
                   <button type="button" onClick={addWebsite} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
-                    <FiPlus className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* ── Additional Contacts ── */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <FiAtSign className="w-5 h-5 text-purple-600" /> Additional Contacts (optional)
-                </h2>
-                <div className="space-y-2">
-                  {contacts.map((contact, idx) => (
-                    <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                      <span className="font-medium text-sm text-gray-700">{contact.type}</span>
-                      <span className="text-sm text-gray-500 flex-1">{contact.value}</span>
-                      <button type="button" onClick={() => removeContact(idx)} className="text-gray-400 hover:text-red-500 transition">
-                        <FiTrash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={newContact.type}
-                    onChange={(e) => setNewContact({ ...newContact, type: e.target.value })}
-                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
-                    placeholder="e.g. WhatsApp, Telegram, Signal"
-                    disabled={saving}
-                  />
-                  <input
-                    type="text"
-                    value={newContact.value}
-                    onChange={(e) => setNewContact({ ...newContact, value: e.target.value })}
-                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
-                    placeholder="Contact value"
-                    disabled={saving}
-                  />
-                  <button type="button" onClick={addContact} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
                     <FiPlus className="w-5 h-5" />
                   </button>
                 </div>
