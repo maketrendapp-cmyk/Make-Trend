@@ -517,15 +517,43 @@ async function generateUniqueReferralCode() {
 }
 
 // ── Grant PRO for 24 hours ──
+// ── Grant PRO for 24 hours (stacking) ──
 async function grantProFor24Hours(uid) {
-  const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  // Fetch the user's current data
+  const userDoc = await db.collection('users').doc(uid).get();
+  const userData = userDoc.data();
+  
+  let expiry;
+  
+  // Check if user already has a valid PRO expiry
+  if (userData?.plan === 'pro' && userData?.proExpiry) {
+    const currentExpiry = userData.proExpiry.toDate(); // Convert Firestore timestamp to Date
+    const now = new Date();
+    
+    if (currentExpiry > now) {
+      // PRO is still active → add 24 hours to the existing expiry
+      expiry = new Date(currentExpiry.getTime() + 24 * 60 * 60 * 1000);
+      console.log(`🔄 PRO extended for ${uid} from ${currentExpiry.toISOString()} to ${expiry.toISOString()}`);
+    } else {
+      // PRO has expired → start from now
+      expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      console.log(`⏰ PRO expired, granting fresh 24h to ${uid}`);
+    }
+  } else {
+    // No PRO or free plan → start from now
+    expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    console.log(`👑 PRO granted for 24h to ${uid}`);
+  }
+  
+  // Update the user
   await db.collection('users').doc(uid).update({
     plan: 'pro',
     proExpiry: admin.firestore.Timestamp.fromDate(expiry),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  
+  // Invalidate cache
   await invalidateKey(`user:profile:${uid}`);
-  console.log(`👑 PRO granted for 24h to ${uid}`);
 }
 
 // ── Get client IP ──
