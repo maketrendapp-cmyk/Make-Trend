@@ -1,10 +1,10 @@
-// pages/my-exchanges.js
+// pages/groweachother/my-exchanges.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useAuth } from '../components/AuthScreen';
-import { Meta } from '../components/Meta';
-import { getToken } from '../lib/api';
+import Meta from '../../components/Meta';
+import { useAuth } from '../../components/AuthScreen';
+import { getToken } from '../../lib/api';
 import {
   FiUsers,
   FiRefreshCw,
@@ -48,7 +48,6 @@ export default function MyExchanges() {
   const [statusFilter, setStatusFilter] = useState('');
 
   const loadingRef = useRef(false);
-  const observerRef = useRef(null);
 
   // ── Fetch exchanges ──
   const fetchExchanges = useCallback(async (reset = false) => {
@@ -100,7 +99,7 @@ export default function MyExchanges() {
   }, [lastId, hasMore, statusFilter]);
 
   // ── Initial load ──
-  useEffect => {
+  useEffect(() => {
     if (isAuthenticated && user) {
       setLastId(null);
       setHasMore(true);
@@ -266,7 +265,7 @@ export default function MyExchanges() {
               <p className="text-gray-500 font-medium">No exchanges yet.</p>
               <p className="text-sm text-gray-400">Go to the Grow Feed to help someone!</p>
               <button
-                onClick={() => router.push('/grow-feed')}
+                onClick={() => router.push('/groweachother/grow-feed')}
                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
               >
                 View Grow Feed
@@ -283,7 +282,7 @@ export default function MyExchanges() {
               return (
                 <Link
                   key={exchange.id}
-                  href={`/exchange/${exchange.id}`}
+                  href={`/groweachother/exchange/${exchange.id}`}
                   className="block bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
