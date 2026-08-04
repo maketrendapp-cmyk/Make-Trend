@@ -223,7 +223,7 @@ export function useCreateWithdrawal() {
   });
 }
 
-// ── 🔥 NEW: Daily Bonus Status ──
+// ── 🔥 Daily Bonus Status ──
 export function useDailyBonus(enabled = false) {
   return useQuery({
     queryKey: ['dailyBonus'],
@@ -241,7 +241,7 @@ export function useDailyBonus(enabled = false) {
   });
 }
 
-// ── 🔥 NEW: Claim Daily Bonus ──
+// ── 🔥 Claim Daily Bonus ──
 export function useClaimDailyBonus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -256,15 +256,30 @@ export function useClaimDailyBonus() {
     },
     onSuccess: (data) => {
       if (data.success) {
-        // Invalidate daily bonus cache so it refetches fresh status
         queryClient.invalidateQueries({ queryKey: ['dailyBonus'] });
-        // Also refresh MT coins
         queryClient.invalidateQueries({ queryKey: ['mtCoins'] });
       }
     },
     onError: (error) => {
-      // we don't show toast here; profile.js will handle error state
+      console.error('Claim bonus error:', error);
     },
+  });
+}
+
+// ── 🔥 Referrals ──
+export function useReferrals(enabled = false) {
+  return useQuery({
+    queryKey: ['referrals'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return { referralCode: '', totalReferrals: 0, referredUsers: [], referrer: null };
+      const data = await apiRequest('/auth/referrals', {}, token);
+      return data;
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true, // refetch when tab becomes visible
+    retry: 1,
   });
 }
 
@@ -282,6 +297,8 @@ export function useInvalidateQueries() {
     invalidateMtCoins: () => queryClient.invalidateQueries(['mtCoins']),
     invalidateWithdrawals: () => queryClient.invalidateQueries(['withdrawals']),
     invalidateWithdrawalMethods: () => queryClient.invalidateQueries(['withdrawalMethods']),
+    invalidateReferrals: () => queryClient.invalidateQueries(['referrals']),
+    invalidateDailyBonus: () => queryClient.invalidateQueries(['dailyBonus']),
     invalidateAll: () => {
       queryClient.invalidateQueries(['profile']);
       queryClient.invalidateQueries(['stats']);
@@ -293,6 +310,8 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['mtCoins']);
       queryClient.invalidateQueries(['withdrawals']);
       queryClient.invalidateQueries(['withdrawalMethods']);
+      queryClient.invalidateQueries(['referrals']);
+      queryClient.invalidateQueries(['dailyBonus']);
     },
   };
 }
