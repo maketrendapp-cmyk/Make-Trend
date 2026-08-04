@@ -42,7 +42,6 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
-// ── Country list ──
 const COUNTRIES = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
   'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
@@ -66,10 +65,8 @@ const COUNTRIES = [
   'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
 ];
 
-// ── Gender options ──
 const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
-// ── Platform icons and colors ──
 const PLATFORM_ICONS = {
   youtube: FaYoutube,
   facebook: FaFacebook,
@@ -98,7 +95,6 @@ const PLATFORM_COLORS = {
   reddit: 'text-orange-500',
 };
 
-// ── Helper: get favicon URL ──
 const getFavicon = (url) => {
   try {
     const domain = new URL(url).hostname;
@@ -119,36 +115,29 @@ export default function EditProfile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // ── Basic Info ──
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
 
-  // ── About ──
   const [bio, setBio] = useState('');
   const [age, setAge] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('');
   const [gender, setGender] = useState('');
 
-  // ── Avatar ──
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [currentAvatar, setCurrentAvatar] = useState('');
 
-  // ── Skills ──
   const [skills, setSkills] = useState([]);
   const [newSkill, setNewSkill] = useState('');
 
-  // ── Social Links ──
   const [socialLinks, setSocialLinks] = useState([]);
   const [newSocial, setNewSocial] = useState({ platform: '', channelName: '', url: '' });
 
-  // ── Websites ──
   const [websites, setWebsites] = useState([]);
   const [newWebsite, setNewWebsite] = useState({ label: '', url: '' });
 
-  // ── Availability states ──
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [emailAvailable, setEmailAvailable] = useState(null);
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
@@ -157,7 +146,6 @@ export default function EditProfile() {
   const usernameTimer = useRef(null);
   const emailTimer = useRef(null);
 
-  // ── Populate form from profile ──
   useEffect(() => {
     if (profile) {
       setFullName(profile.fullname || profile.name || '');
@@ -179,14 +167,12 @@ export default function EditProfile() {
     }
   }, [profile, profileLoading]);
 
-  // ── Redirect if not authenticated ──
   useEffect(() => {
     if (!profileLoading && !user) {
       router.push('/login');
     }
   }, [profileLoading, user, router]);
 
-  // ── Check username availability ──
   useEffect(() => {
     clearTimeout(usernameTimer.current);
     if (!username || username === profile?.username || username.length < 3) {
@@ -208,7 +194,6 @@ export default function EditProfile() {
     return () => clearTimeout(usernameTimer.current);
   }, [username, profile]);
 
-  // ── Check email availability ──
   useEffect(() => {
     clearTimeout(emailTimer.current);
     if (!email || email === profile?.email || !email.includes('@')) {
@@ -230,7 +215,6 @@ export default function EditProfile() {
     return () => clearTimeout(emailTimer.current);
   }, [email, profile]);
 
-  // ── Avatar upload ──
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -251,7 +235,6 @@ export default function EditProfile() {
     reader.readAsDataURL(file);
   };
 
-  // ── Add/Remove Skills ──
   const addSkill = () => {
     const skill = newSkill.trim();
     if (!skill) return;
@@ -271,7 +254,6 @@ export default function EditProfile() {
     setSkills(skills.filter((_, i) => i !== index));
   };
 
-  // ── Add/Remove Social Links ──
   const addSocialLink = () => {
     const { platform, channelName, url } = newSocial;
     if (!platform || !channelName || !url) {
@@ -294,7 +276,6 @@ export default function EditProfile() {
     setSocialLinks(socialLinks.filter((_, i) => i !== index));
   };
 
-  // ── Add/Remove Websites ──
   const addWebsite = () => {
     const { label, url } = newWebsite;
     if (!label || !url) {
@@ -317,7 +298,6 @@ export default function EditProfile() {
     setWebsites(websites.filter((_, i) => i !== index));
   };
 
-  // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -737,24 +717,24 @@ export default function EditProfile() {
                     const Icon = PLATFORM_ICONS[link.platform.toLowerCase()] || FiLink;
                     const color = PLATFORM_COLORS[link.platform.toLowerCase()] || 'text-purple-600';
                     return (
-                      <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                        <Icon className={`w-5 h-5 ${color}`} />
-                        <span className="font-medium text-sm text-gray-700">{link.platform}</span>
+                      <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 overflow-hidden">
+                        <Icon className={`w-5 h-5 ${color} flex-shrink-0`} />
+                        <span className="font-medium text-sm text-gray-700 whitespace-nowrap">{link.platform}</span>
                         <span className="text-sm text-gray-500 truncate flex-1">{link.channelName}</span>
-                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-sm">Visit</a>
-                        <button type="button" onClick={() => removeSocialLink(idx)} className="text-gray-400 hover:text-red-500 transition">
+                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-sm whitespace-nowrap">Visit</a>
+                        <button type="button" onClick={() => removeSocialLink(idx)} className="text-gray-400 hover:text-red-500 transition flex-shrink-0">
                           <FiTrash2 className="w-4 h-4" />
                         </button>
                       </div>
                     );
                   })}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={newSocial.platform}
                     onChange={(e) => setNewSocial({ ...newSocial, platform: e.target.value })}
-                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
                     placeholder="Platform (e.g. YouTube)"
                     disabled={saving}
                   />
@@ -762,11 +742,11 @@ export default function EditProfile() {
                     type="text"
                     value={newSocial.channelName}
                     onChange={(e) => setNewSocial({ ...newSocial, channelName: e.target.value })}
-                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
                     placeholder="Channel Name"
                     disabled={saving}
                   />
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-1">
                     <input
                       type="url"
                       value={newSocial.url}
@@ -775,7 +755,7 @@ export default function EditProfile() {
                       placeholder="https://..."
                       disabled={saving}
                     />
-                    <button type="button" onClick={addSocialLink} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
+                    <button type="button" onClick={addSocialLink} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50 flex-shrink-0" disabled={saving}>
                       <FiPlus className="w-5 h-5" />
                     </button>
                   </div>
@@ -791,22 +771,22 @@ export default function EditProfile() {
                   {websites.map((site, idx) => {
                     const favicon = getFavicon(site.url);
                     return (
-                      <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                      <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 overflow-hidden">
                         {favicon ? (
-                          <img src={favicon} alt="" className="w-5 h-5 rounded" />
+                          <img src={favicon} alt="" className="w-5 h-5 rounded flex-shrink-0" />
                         ) : (
-                          <FiLink className="w-5 h-5 text-purple-600" />
+                          <FiLink className="w-5 h-5 text-purple-600 flex-shrink-0" />
                         )}
-                        <span className="font-medium text-sm text-gray-700">{site.label}</span>
-                        <a href={site.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-sm flex-1 truncate">{site.url}</a>
-                        <button type="button" onClick={() => removeWebsite(idx)} className="text-gray-400 hover:text-red-500 transition">
+                        <span className="font-medium text-sm text-gray-700 whitespace-nowrap">{site.label}</span>
+                        <a href={site.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-sm truncate flex-1">{site.url}</a>
+                        <button type="button" onClick={() => removeWebsite(idx)} className="text-gray-400 hover:text-red-500 transition flex-shrink-0">
                           <FiTrash2 className="w-4 h-4" />
                         </button>
                       </div>
                     );
                   })}
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={newWebsite.label}
@@ -823,7 +803,7 @@ export default function EditProfile() {
                     placeholder="https://..."
                     disabled={saving}
                   />
-                  <button type="button" onClick={addWebsite} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
+                  <button type="button" onClick={addWebsite} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50 flex-shrink-0" disabled={saving}>
                     <FiPlus className="w-5 h-5" />
                   </button>
                 </div>
