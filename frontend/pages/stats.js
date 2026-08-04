@@ -43,6 +43,9 @@ export default function Stats() {
   const [sortBy, setSortBy] = useState('newest');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Count active filters (excluding sort)
+  const activeFilterCount = [statusFilter, featureFilter].filter(f => f !== 'all').length + (searchTerm.trim() ? 1 : 0);
+
   // ── Filtered & Sorted Campaigns ──
   const filteredCampaigns = useMemo(() => {
     let result = [...allCampaigns];
@@ -64,11 +67,11 @@ export default function Stats() {
 
     // Feature filter
     if (featureFilter !== 'all') {
-      const features = c => c.features || {};
       result = result.filter(c => {
-        if (featureFilter === 'share') return features(c).shareCount === true;
-        if (featureFilter === 'tasks') return features(c).tasks === true;
-        if (featureFilter === 'finalUrl') return features(c).finalUrl === true;
+        const features = c.features || {};
+        if (featureFilter === 'share') return features.shareCount === true;
+        if (featureFilter === 'tasks') return features.tasks === true;
+        if (featureFilter === 'finalUrl') return features.finalUrl === true;
         return true;
       });
     }
@@ -76,10 +79,18 @@ export default function Stats() {
     // Sort
     switch (sortBy) {
       case 'newest':
-        result.sort((a, b) => new Date(b.createdAt?.seconds * 1000) - new Date(a.createdAt?.seconds * 1000));
+        result.sort((a, b) => {
+          const aTime = a.createdAt?.seconds || 0;
+          const bTime = b.createdAt?.seconds || 0;
+          return bTime - aTime;
+        });
         break;
       case 'oldest':
-        result.sort((a, b) => new Date(a.createdAt?.seconds * 1000) - new Date(b.createdAt?.seconds * 1000));
+        result.sort((a, b) => {
+          const aTime = a.createdAt?.seconds || 0;
+          const bTime = b.createdAt?.seconds || 0;
+          return aTime - bTime;
+        });
         break;
       case 'views':
         result.sort((a, b) => (b.views || 0) - (a.views || 0));
@@ -99,6 +110,14 @@ export default function Stats() {
 
     return result;
   }, [allCampaigns, searchTerm, statusFilter, featureFilter, sortBy]);
+
+  // ── Clear All Filters ──
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setFeatureFilter('all');
+    setSortBy('newest');
+  };
 
   // ── Edit Modal State ──
   const [editingCampaign, setEditingCampaign] = useState(null);
@@ -335,14 +354,6 @@ export default function Stats() {
     setTimeout(() => setCopiedCampaignId(null), 2000);
   };
 
-  // ── Clear Filters ──
-  const clearFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('all');
-    setFeatureFilter('all');
-    setSortBy('newest');
-  };
-
   // ============================================================
   // RENDER: UNAUTHENTICATED / NEEDS COMPLETION / LOADING
   // ============================================================
@@ -484,18 +495,25 @@ export default function Stats() {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium transition"
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                isFilterOpen ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
             >
               <FiFilter className="w-4 h-4" />
               Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 bg-purple-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
               <FiChevronDown className={`w-4 h-4 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
             </button>
-            {(searchTerm || statusFilter !== 'all' || featureFilter !== 'all' || sortBy !== 'newest') && (
+            {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}
                 className="inline-flex items-center gap-1 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl transition"
               >
-                <FiX className="w-4 h-4" /> Clear
+                <FiX className="w-4 h-4" /> Clear All
               </button>
             )}
           </div>
