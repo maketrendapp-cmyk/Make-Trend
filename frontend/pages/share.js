@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Script from 'next/script';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
-import { getDeviceId, refreshDeviceId } from '../utils/deviceId';
 import {
   FaShareAlt,
   FaCopy,
@@ -24,7 +23,6 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
-// ── Default Meta ──
 const defaultMeta = {
   title: 'Share to Unlock – Campaign Rewards',
   description: 'Share this campaign with your friends to unlock rewards. Complete tasks and claim your prize!',
@@ -32,8 +30,7 @@ const defaultMeta = {
   url: 'https://maketrend.app/share?id={id}',
 };
 
-// ─── AD COMPONENTS (unchanged) ───
-
+// ─── AD COMPONENTS (unchanged) ──────────────────────────────
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
@@ -97,7 +94,7 @@ const NativeAd = () => {
   );
 };
 
-// ─── MAIN COMPONENT ───
+// ─── MAIN COMPONENT ──────────────────────────────────────────
 
 function CampaignShare({ campaign: initialCampaign }) {
   const router = useRouter();
@@ -108,8 +105,9 @@ function CampaignShare({ campaign: initialCampaign }) {
   const [loading, setLoading] = useState(!initialCampaign);
   const [error, setError] = useState('');
   
-  const [shares, setShares] = useState(0);          // user's own progress (number of shares they've "earned")
-  const [shareCount, setShareCount] = useState(0);  // target (set by creator)
+  // ── User's session progress ──
+  const [shares, setShares] = useState(0);
+  const [shareCount, setShareCount] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -142,30 +140,17 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   }, [id, initialCampaign]);
 
-  useEffect(() => {
-    const refreshFingerprint = async () => {
-      try {
-        await refreshDeviceId();
-      } catch (e) {
-        console.warn('Fingerprint refresh failed');
-      }
-    };
-    refreshFingerprint();
-  }, []);
-
   const fetchCampaignData = async () => {
     try {
       setLoading(true);
-      const deviceId = await refreshDeviceId();
-      const response = await fetch(`${API_BASE}/campaigns/${id}?deviceId=${deviceId}`);
-      const data = await response.json();
-      if (!data.success || !data.campaign) {
+      const camp = await fetchCampaign(id);
+      if (!camp) {
         setError('Campaign not found');
         setLoading(false);
         return;
       }
-      setCampaign(data.campaign);
-      initializeCampaign(data.campaign, data.userHasShared || false);
+      setCampaign(camp);
+      initializeCampaign(camp);
     } catch (err) {
       console.error('Error fetching:', err);
       setError('Could not load campaign. Please try again.');
@@ -173,26 +158,16 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
-  const initializeCampaign = (camp, hasShared) => {
+  const initializeCampaign = (camp) => {
     const count = camp.shareCount || 0;
     setShareCount(count);
-
-    // ── Determine user's completion status ──
-    if (hasShared) {
-      // User already shared → completed
-      setShares(count);
-      setShareProgress(100);
-      setSharesComplete(true);
-      setShareAttempt(3);
-      setIsClaimReady(true);
-    } else {
-      // New user: start from scratch
-      setShares(0);
-      setShareProgress(0);
-      setSharesComplete(false);
-      setShareAttempt(0);
-      setIsClaimReady(false);
-    }
+    // Reset session progress
+    setShares(0);
+    setShareProgress(0);
+    setShareAttempt(0);
+    setSharesComplete(false);
+    setIsClaimReady(false);
+    shareApiCalledRef.current = false;
 
     let slug = 'campaign';
     if (camp.templateSlug) slug = camp.templateSlug;
@@ -286,9 +261,10 @@ function CampaignShare({ campaign: initialCampaign }) {
         return;
       }
 
+      // ── Original shareAttempt logic ──
       let increment = 0;
       if (shareAttempt === 0) {
-        increment = 0; // first share does nothing (original behaviour)
+        increment = 0;
         setShareAttempt(1);
       } else if (shareAttempt === 1) {
         increment = Math.ceil(shareCount * 0.25);
@@ -311,7 +287,7 @@ function CampaignShare({ campaign: initialCampaign }) {
 
         if (newShares >= shareCount && !shareApiCalledRef.current) {
           shareApiCalledRef.current = true;
-          callShareAPI(shareCount);
+          callShareAPI();
           setSharesComplete(true);
           setShareAttempt(3);
           
@@ -328,16 +304,16 @@ function CampaignShare({ campaign: initialCampaign }) {
     }, 500);
   };
 
-  const callShareAPI = async (totalShares) => {
+  // ── Backend API calls (no deviceId) ──
+  const callShareAPI = async () => {
     try {
-      const deviceId = await refreshDeviceId();
       await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId, shares: totalShares }),
+        body: JSON.stringify({}),
       });
     } catch (err) {
-      console.error('Error recording share completion:', err);
+      console.error('Error recording share:', err);
     }
   };
 
@@ -345,11 +321,10 @@ function CampaignShare({ campaign: initialCampaign }) {
     if (!sharesComplete || !isClaimReady || isCompleting) return;
     setIsCompleting(true);
     try {
-      const deviceId = await refreshDeviceId(); 
       await fetch(`${API_BASE}/campaigns/${id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId }),
+        body: JSON.stringify({}),
       });
     } catch (err) {
       console.error('Completion error:', err);
@@ -370,7 +345,7 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
-  // ── Native Share ──
+  // ── Share handlers ──
   const handleNativeShare = async () => {
     if (isSharing || verifying || sharesComplete) return;
     if (shareCount === 0) return;
@@ -392,14 +367,12 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
-  // ── Messenger share ──
   const handleMessengerShare = () => {
     if (isSharing || verifying || sharesComplete) return;
     window.open(`fb-messenger://share/?link=${encodeURIComponent(getShareUrl())}`, '_blank');
     startVerification('share', 6);
   };
 
-  // ── WhatsApp share ──
   const handleWhatsAppShare = () => {
     if (isSharing || verifying || sharesComplete) return;
     window.open(`https://wa.me/?text=${encodeURIComponent(getShareUrl())}`, '_blank');
@@ -453,7 +426,6 @@ function CampaignShare({ campaign: initialCampaign }) {
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300 bg-gradient-to-br from-purple-50 to-indigo-50">📤</div>
             )}
-            {/* Progress bar – shows user's own progress */}
             <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/80">
               <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
             </div>
@@ -522,7 +494,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               </button>
             </div>
 
-            {/* Main Share Button */}
+            {/* Main Native Share Button */}
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onHoverStart={() => setIsHovering(true)} onHoverEnd={() => setIsHovering(false)}
               onClick={handleNativeShare} disabled={verifying || isSharing || isComplete}
