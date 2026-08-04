@@ -152,7 +152,7 @@ export function useComments() {
   });
 }
 
-// ── NEW: MT Coins ──
+// ── MT Coins ──
 export function useMtCoins(enabled = false) {
   return useQuery({
     queryKey: ['mtCoins'],
@@ -167,7 +167,7 @@ export function useMtCoins(enabled = false) {
   });
 }
 
-// ── NEW: Withdrawal Methods ──
+// ── Withdrawal Methods ──
 export function useWithdrawalMethods(enabled = false) {
   return useQuery({
     queryKey: ['withdrawalMethods'],
@@ -182,7 +182,7 @@ export function useWithdrawalMethods(enabled = false) {
   });
 }
 
-// ── NEW: Withdrawals History ──
+// ── Withdrawals History ──
 export function useWithdrawals(enabled = false) {
   return useQuery({
     queryKey: ['withdrawals'],
@@ -197,7 +197,7 @@ export function useWithdrawals(enabled = false) {
   });
 }
 
-// ── NEW: Create Withdrawal ──
+// ── Create Withdrawal ──
 export function useCreateWithdrawal() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -219,6 +219,51 @@ export function useCreateWithdrawal() {
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to submit withdrawal');
+    },
+  });
+}
+
+// ── 🔥 NEW: Daily Bonus Status ──
+export function useDailyBonus(enabled = false) {
+  return useQuery({
+    queryKey: ['dailyBonus'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return null;
+      const data = await apiRequest('/daily-bonus/status', {}, token);
+      return data; // { canClaim, nextClaimTime, bonusAmount }
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes – bonus status rarely changes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
+}
+
+// ── 🔥 NEW: Claim Daily Bonus ──
+export function useClaimDailyBonus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest('/daily-bonus/claim', {
+        method: 'POST',
+        body: {},
+      }, token);
+      return data; // { success, bonus }
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        // Invalidate daily bonus cache so it refetches fresh status
+        queryClient.invalidateQueries({ queryKey: ['dailyBonus'] });
+        // Also refresh MT coins
+        queryClient.invalidateQueries({ queryKey: ['mtCoins'] });
+      }
+    },
+    onError: (error) => {
+      // we don't show toast here; profile.js will handle error state
     },
   });
 }
