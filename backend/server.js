@@ -4534,6 +4534,7 @@ async function populateExchange(data) {
 // 1. CREATE SOCIAL TASK
 // ─────────────────────────────────────────────
 // 1. CREATE SOCIAL TASK
+// 1. CREATE SOCIAL TASK
 app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -4564,7 +4565,8 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     const docRef = await db.collection('socialTasks').add(taskData);
     // ── Invalidate both feed and user's own task cache ──
     await invalidatePattern(`grow-feed:*`);
-    await invalidatePattern(`social-tasks:${uid}:*`); // ✅ ADD THIS LINE
+    await invalidatePattern(`social-tasks:${uid}:*`);
+    console.log(`✅ Task created and caches invalidated for user ${uid}`);
     res.status(201).json({ success: true, task: { id: docRef.id, ...taskData } });
   } catch (error) {
     console.error('Create social task error:', error);
@@ -4583,8 +4585,11 @@ app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     if (!(await checkRateLimit(uid, 'social-task-list', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
+    // ── Cache key format: social-tasks:uid:limit:lastId (or 'null' for none)
     const cacheKey = `social-tasks:${uid}:${limit}:${lastId || 'null'}`;
+    console.log(`📦 GET social-tasks cache key: ${cacheKey}`);
     const result = await getOrSetCache(cacheKey, async () => {
+      console.log(`🔁 Fetching fresh tasks for user ${uid}`);
       let query = db.collection('socialTasks')
         .where('uid', '==', uid)
         .orderBy('createdAt', 'desc')
