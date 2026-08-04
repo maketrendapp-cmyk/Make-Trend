@@ -1158,7 +1158,27 @@ app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
       }
     }
 
-    res.json({ success: true, user: { uid, ...userData } });
+    // ── Ensure new fields exist with default values ──
+    const userWithDefaults = {
+      uid,
+      ...userData,
+      // Basic info (already there, but keep safe)
+      username: userData.username || '',
+      fullname: userData.fullname || '',
+      email: userData.email || '',
+      avatar: userData.avatar || '',
+      // New fields
+      bio: userData.bio || '',
+      age: userData.age ?? null,
+      phone: userData.phone || '',
+      country: userData.country || '',
+      gender: userData.gender || '',
+      skills: Array.isArray(userData.skills) ? userData.skills : [],
+      socialLinks: Array.isArray(userData.socialLinks) ? userData.socialLinks : [],
+      websites: Array.isArray(userData.websites) ? userData.websites : [],
+    };
+
+    res.json({ success: true, user: userWithDefaults });
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -1252,35 +1272,163 @@ app.put('/api/auth/profile', verifyToken, checkBanned, async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many profile updates. Please wait.' });
     }
 
-    const { username, fullname, email, avatar } = req.body;
-    const cleanUsername = sanitizeUsername(username);
-    const cleanFullname = sanitizeFullName(fullname);
-    const cleanEmail = email?.trim().toLowerCase();
+    // ── 1. Extract all fields ──
+    const {
+      username,
+      fullname,
+      email,
+      avatar,
+      bio,
+      age,
+      phone,
+      country,
+      gender,
+      skills,
+      socialLinks,
+      websites,
+    } = req.body;
 
-    if (!cleanUsername || !cleanFullname || !cleanEmail) {
-      return res.status(400).json({ success: false, error: 'All fields are required' });
+    // ── 2. Sanitize required fields ──
+    const cleanUsername = username !== undefined ? sanitizeUsername(username) : undefined;
+    const cleanFullname = fullname !== undefined ? sanitizeFullName(fullname) : undefined;
+    const cleanEmail = email !== undefined ? email?.trim().toLowerCase() : undefined;
+
+    // ── 3. Validate required fields (if provided) ──
+    if (cleanUsername !== undefined) {
+      if (!cleanUsername || cleanUsername.length < 3 || cleanUsername.length > 30) {
+        return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
+      }
     }
-    // ── Validate avatar URL ──
-    if (avatar && !validateImageUrl(avatar)) {
+    if (cleanFullname !== undefined) {
+      if (!cleanFullname || cleanFullname.length < 2 || cleanFullname.length > 100) {
+        return res.status(400).json({ success: false, error: 'Full name must be 2-100 characters' });
+      }
+    }
+    if (cleanEmail !== undefined) {
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        return res.status(400).json({ success: false, error: 'Invalid email' });
+      }
+    }
+    if (avatar !== undefined && !validateImageUrl(avatar)) {
       return res.status(400).json({ success: false, error: 'Invalid avatar URL' });
     }
-    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
-      return res.status(400).json({ success: false, error: 'Username must be 3-30 characters' });
-    }
-    if (cleanFullname.length < 2 || cleanFullname.length > 100) {
-      return res.status(400).json({ success: false, error: 'Full name must be 2-100 characters' });
-    }
-    if (!cleanEmail.includes('@')) {
-      return res.status(400).json({ success: false, error: 'Invalid email' });
+
+    // ── 4. Validate optional fields ──
+
+    // Bio
+    if (bio !== undefined && (typeof bio !== 'string' || bio.length > 500)) {
+      return res.status(400).json({ success: false, error: 'Bio must be a string of max 500 characters' });
     }
 
+    // Age – allow null or empty string to clear, else must be number 1-150
+    let cleanAge = null;
+    if (age !== undefined) {
+      if (age === null || age === '') {
+        cleanAge = null; // clear the field
+      } else {
+        const ageNum = Number(age);
+        if (isNaN(ageNum) || ageNum < 1 || ageNum > 150) {
+          return res.status(400).json({ success: false, error: 'Age must be between 1 and 150' });
+        }
+        cleanAge = ageNum;
+      }
+    }
+
+    // Phone – optional, allow empty string to clear
+    if (phone !== undefined && phone.trim() !== '') {
+      const phoneRegex = /^[+]?[\d\s()-]{5,20}$/;
+      if (!phoneRegex.test(phone.trim())) {
+        return res.status(400).json({ success: false, error: 'Invalid phone number format' });
+      }
+    }
+
+    // Country – if provided, must be string ≤100 chars
+    if (country !== undefined && (typeof country !== 'string' || country.length > 100)) {
+      return res.status(400).json({ success: false, error: 'Country must be a string of max 100 characters' });
+    }
+
+    // Gender – optional, must be one of allowed values, or empty to clear
+    const allowedGenders = ['Male', 'Female', 'Other', 'Prefer not to say'];
+    if (gender !== undefined && gender.trim() !== '' && !allowedGenders.includes(gender.trim())) {
+      return res.status(400).json({ success: false, error: 'Gender must be one of: Male, Female, Other, Prefer not to say' });
+    }
+
+    // Skills – array of strings, max 50 items
+    if (skills !== undefined) {
+      if (!Array.isArray(skills)) {
+        return res.status(400).json({ success: false, error: 'Skills must be an array' });
+      }
+      if (skills.length > 50) {
+        return res.status(400).json({ success: false, error: 'Maximum 50 skills allowed' });
+      }
+      for (let i = 0; i < skills.length; i++) {
+        if (typeof skills[i] !== 'string' || skills[i].trim().length === 0) {
+          return res.status(400).json({ success: false, error: `Skill at index ${i} must be a non-empty string` });
+        }
+        if (skills[i].trim().length > 100) {
+          return res.status(400).json({ success: false, error: `Skill "${skills[i]}" is too long (max 100 chars)` });
+        }
+      }
+    }
+
+    // Social Links – array of objects, max 100
+    if (socialLinks !== undefined) {
+      if (!Array.isArray(socialLinks)) {
+        return res.status(400).json({ success: false, error: 'SocialLinks must be an array' });
+      }
+      if (socialLinks.length > 100) {
+        return res.status(400).json({ success: false, error: 'Maximum 100 social links allowed' });
+      }
+      for (let i = 0; i < socialLinks.length; i++) {
+        const link = socialLinks[i];
+        if (!link || typeof link !== 'object') {
+          return res.status(400).json({ success: false, error: `Social link at index ${i} is invalid` });
+        }
+        const { platform, channelName, url } = link;
+        if (!platform || typeof platform !== 'string' || platform.trim().length === 0 || platform.trim().length > 50) {
+          return res.status(400).json({ success: false, error: `Social link ${i}: platform is required and must be 1-50 chars` });
+        }
+        if (!channelName || typeof channelName !== 'string' || channelName.trim().length === 0 || channelName.trim().length > 100) {
+          return res.status(400).json({ success: false, error: `Social link ${i}: channel name is required and must be 1-100 chars` });
+        }
+        if (!url || typeof url !== 'string' || !isValidUrl(url.trim())) {
+          return res.status(400).json({ success: false, error: `Social link ${i}: URL is invalid` });
+        }
+      }
+    }
+
+    // Websites – array of objects, max 100
+    if (websites !== undefined) {
+      if (!Array.isArray(websites)) {
+        return res.status(400).json({ success: false, error: 'Websites must be an array' });
+      }
+      if (websites.length > 100) {
+        return res.status(400).json({ success: false, error: 'Maximum 100 websites allowed' });
+      }
+      for (let i = 0; i < websites.length; i++) {
+        const site = websites[i];
+        if (!site || typeof site !== 'object') {
+          return res.status(400).json({ success: false, error: `Website at index ${i} is invalid` });
+        }
+        const { label, url } = site;
+        if (!label || typeof label !== 'string' || label.trim().length === 0 || label.trim().length > 100) {
+          return res.status(400).json({ success: false, error: `Website ${i}: label is required and must be 1-100 chars` });
+        }
+        if (!url || typeof url !== 'string' || !isValidUrl(url.trim())) {
+          return res.status(400).json({ success: false, error: `Website ${i}: URL is invalid` });
+        }
+      }
+    }
+
+    // ── 5. Fetch existing user data ──
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
     const currentData = userDoc.data();
 
-    if (cleanUsername !== currentData.username) {
+    // ── 6. Check uniqueness for username and email (if changed) ──
+    if (cleanUsername !== undefined && cleanUsername !== currentData.username) {
       const existingUsername = await db.collection('users')
         .where('username', '==', cleanUsername)
         .limit(1)
@@ -1290,7 +1438,7 @@ app.put('/api/auth/profile', verifyToken, checkBanned, async (req, res) => {
       }
     }
 
-    if (cleanEmail !== currentData.email) {
+    if (cleanEmail !== undefined && cleanEmail !== currentData.email) {
       const existingEmail = await db.collection('users')
         .where('email', '==', cleanEmail)
         .limit(1)
@@ -1310,16 +1458,47 @@ app.put('/api/auth/profile', verifyToken, checkBanned, async (req, res) => {
       }
     }
 
-    const updateData = {
-      username: cleanUsername,
-      fullname: cleanFullname,
-      email: cleanEmail,
-      avatar: avatar || currentData.avatar || '',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    // ── 7. Build updateData object (only include fields that were sent) ──
+    const updateData = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+
+    if (cleanUsername !== undefined) updateData.username = cleanUsername;
+    if (cleanFullname !== undefined) updateData.fullname = cleanFullname;
+    if (cleanEmail !== undefined) updateData.email = cleanEmail;
+    if (avatar !== undefined) updateData.avatar = avatar || '';
+
+    // Optional fields – include only if sent
+    if (bio !== undefined) updateData.bio = bio.trim();
+    if (age !== undefined) {
+      // If age is null or empty, we store null (clears the field)
+      updateData.age = cleanAge;
+    }
+    if (phone !== undefined) updateData.phone = phone.trim();
+    if (country !== undefined) updateData.country = country.trim();
+    if (gender !== undefined) updateData.gender = gender.trim();
+
+    // Arrays – store trimmed versions (or empty arrays if sent)
+    if (skills !== undefined) {
+      updateData.skills = skills.map(s => s.trim());
+    }
+    if (socialLinks !== undefined) {
+      updateData.socialLinks = socialLinks.map(link => ({
+        platform: link.platform.trim(),
+        channelName: link.channelName.trim(),
+        url: link.url.trim(),
+      }));
+    }
+    if (websites !== undefined) {
+      updateData.websites = websites.map(site => ({
+        label: site.label.trim(),
+        url: site.url.trim(),
+      }));
+    }
+
+    // ── 8. Update Firestore ──
     await db.collection('users').doc(uid).update(updateData);
     await invalidateKey(`user:profile:${uid}`);
 
+    // ── 9. Fetch updated document and return ──
     const updatedDoc = await db.collection('users').doc(uid).get();
     const updatedUser = updatedDoc.data();
     res.json({
