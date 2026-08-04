@@ -4486,6 +4486,455 @@ app.post('/api/daily-bonus/claim', verifyToken, checkBanned, async (req, res) =>
   }
 });
 
+
+// ============================================================
+// 21. GROW TOGETHER – SOCIAL TASKS & EXCHANGES
+// ============================================================
+
+// ── Helper: Fetch user info (cached 5 min) ──
+async function getUserInfo(uid) {
+  if (!uid) return null;
+  const cacheKey = `user:info:${uid}`;
+  try {
+    const cached = await redisGet(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (e) { /* ignore */ }
+  const doc = await db.collection('users').doc(uid).get();
+  if (!doc.exists) return null;
+  const data = doc.data();
+  const result = {
+    uid,
+    username: data.username || '',
+    fullname: data.fullname || '',
+    avatar: data.avatar || ''
+  };
+  await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+  return result;
+}
+
+// ── Helper: Populate exchange with tasks and user info ──
+async function populateExchange(data) {
+  if (!data) return null;
+  const [userATask, userBTask, userA, userB] = await Promise.all([
+    db.collection('socialTasks').doc(data.userATaskId).get(),
+    db.collection('socialTasks').doc(data.userBTaskId).get(),
+    getUserInfo(data.userAUid),
+    getUserInfo(data.userBUid),
+  ]);
+  return {
+    ...data,
+    userATask: userATask.exists ? { id: userATask.id, ...userATask.data() } : null,
+    userBTask: userBTask.exists ? { id: userBTask.id, ...userBTask.data() } : null,
+    userA,
+    userB,
+  };
+}
+
+// ─────────────────────────────────────────────
+// 1. CREATE SOCIAL TASK
+// ─────────────────────────────────────────────
+app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'social-task-create', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const { platform, url, taskType, title } = req.body;
+    if (!platform || typeof platform !== 'string' || platform.trim().length === 0 || platform.trim().length > 50) {
+      return res.status(400).json({ success: false, error: 'Platform is required (max 50 chars)' });
+    }
+    if (!url || typeof url !== 'string' || !isValidUrl(url.trim())) {
+      return res.status(400).json({ success: false, error: 'Valid URL is required' });
+    }
+    if (!taskType || typeof taskType !== 'string' || taskType.trim().length === 0 || taskType.trim().length > 50) {
+      return res.status(400).json({ success: false, error: 'Task type is required (max 50 chars)' });
+    }
+    const cleanTitle = title ? title.trim().slice(0, 100) : '';
+    const taskData = {
+      uid,
+      platform: platform.trim(),
+      url: url.trim(),
+      taskType: taskType.trim(),
+      title: cleanTitle,
+      active: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    const docRef = await db.collection('socialTasks').add(taskData);
+    await invalidatePattern(`grow-feed:*`);
+    res.status(201).json({ success: true, task: { id: docRef.id, ...taskData } });
+  } catch (error) {
+    console.error('Create social task error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create task' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 2. LIST USER'S TASKS (paginated)
+// ─────────────────────────────────────────────
+app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const lastId = req.query.lastId || null;
+    if (!(await checkRateLimit(uid, 'social-task-list', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const cacheKey = `social-tasks:${uid}:${limit}:${lastId || 'null'}`;
+    const result = await getOrSetCache(cacheKey, async () => {
+      let query = db.collection('socialTasks')
+        .where('uid', '==', uid)
+        .orderBy('createdAt', 'desc')
+        .limit(limit + 1);
+      if (lastId) {
+        const lastDoc = await db.collection('socialTasks').doc(lastId).get();
+        if (lastDoc.exists) query = query.startAfter(lastDoc);
+      }
+      const snapshot = await query.get();
+      const tasks = [];
+      let hasMore = false;
+      let nextId = null;
+      snapshot.forEach((doc, index) => {
+        if (index < limit) {
+          tasks.push({ id: doc.id, ...doc.data() });
+          nextId = doc.id;
+        } else hasMore = true;
+      });
+      return { success: true, tasks, hasMore, lastId: nextId };
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('List tasks error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tasks' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 3. UPDATE SOCIAL TASK
+// ─────────────────────────────────────────────
+app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { id } = req.params;
+    const { platform, url, taskType, title, active } = req.body;
+    if (!(await checkRateLimit(uid, 'social-task-update', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const docRef = db.collection('socialTasks').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ success: false, error: 'Task not found' });
+    if (doc.data().uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
+    const updateData = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (platform !== undefined) {
+      if (typeof platform !== 'string' || platform.trim().length === 0 || platform.trim().length > 50) {
+        return res.status(400).json({ success: false, error: 'Platform must be 1-50 chars' });
+      }
+      updateData.platform = platform.trim();
+    }
+    if (url !== undefined) {
+      if (!isValidUrl(url.trim())) return res.status(400).json({ success: false, error: 'Invalid URL' });
+      updateData.url = url.trim();
+    }
+    if (taskType !== undefined) {
+      if (typeof taskType !== 'string' || taskType.trim().length === 0 || taskType.trim().length > 50) {
+        return res.status(400).json({ success: false, error: 'Task type must be 1-50 chars' });
+      }
+      updateData.taskType = taskType.trim();
+    }
+    if (title !== undefined) updateData.title = title.trim().slice(0, 100);
+    if (active !== undefined) {
+      if (typeof active !== 'boolean') return res.status(400).json({ success: false, error: 'Active must be boolean' });
+      updateData.active = active;
+    }
+    await docRef.update(updateData);
+    await invalidateKey(`social-tasks:${uid}`);
+    await invalidatePattern(`grow-feed:*`);
+    const updatedDoc = await docRef.get();
+    res.json({ success: true, task: { id: updatedDoc.id, ...updatedDoc.data() } });
+  } catch (error) {
+    console.error('Update task error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update task' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 4. DELETE SOCIAL TASK
+// ─────────────────────────────────────────────
+app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { id } = req.params;
+    if (!(await checkRateLimit(uid, 'social-task-delete', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const docRef = db.collection('socialTasks').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ success: false, error: 'Task not found' });
+    if (doc.data().uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
+    await docRef.delete();
+    await invalidateKey(`social-tasks:${uid}`);
+    await invalidatePattern(`grow-feed:*`);
+    res.json({ success: true, message: 'Task deleted' });
+  } catch (error) {
+    console.error('Delete task error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete task' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 5. GROW FEED – PUBLIC TASKS (paginated)
+// ─────────────────────────────────────────────
+app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const lastTaskId = req.query.lastTaskId || null;
+    if (!(await checkRateLimit(uid, 'grow-feed', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const cacheKey = `grow-feed:${uid}:${limit}:${lastTaskId || 'null'}`;
+    const result = await getOrSetCache(cacheKey, async () => {
+      let query = db.collection('socialTasks')
+        .where('active', '==', true)
+        .orderBy('createdAt', 'desc')
+        .limit(limit + 1);
+      if (lastTaskId) {
+        const lastDoc = await db.collection('socialTasks').doc(lastTaskId).get();
+        if (lastDoc.exists) query = query.startAfter(lastDoc);
+      }
+      const snapshot = await query.get();
+      const tasks = [];
+      let hasMore = false;
+      let lastId = null;
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (data.uid === uid) continue;
+        if (tasks.length < limit) {
+          const user = await getUserInfo(data.uid);
+          tasks.push({ id: doc.id, ...data, owner: user });
+          lastId = doc.id;
+        } else {
+          hasMore = true;
+          break;
+        }
+      }
+      return { success: true, tasks, hasMore, lastId };
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Grow feed error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load feed' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 6. CREATE EXCHANGE
+// ─────────────────────────────────────────────
+app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { targetTaskId, yourTaskId } = req.body;
+    if (!targetTaskId || !yourTaskId) {
+      return res.status(400).json({ success: false, error: 'Both task IDs are required' });
+    }
+    if (!(await checkRateLimit(uid, 'exchange-create', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many exchanges. Please wait.' });
+    }
+    const targetTaskDoc = await db.collection('socialTasks').doc(targetTaskId).get();
+    if (!targetTaskDoc.exists) return res.status(404).json({ success: false, error: 'Target task not found' });
+    const targetTask = targetTaskDoc.data();
+    if (targetTask.uid === uid) return res.status(400).json({ success: false, error: 'Cannot exchange with yourself' });
+    if (!targetTask.active) return res.status(400).json({ success: false, error: 'Target task is inactive' });
+
+    const yourTaskDoc = await db.collection('socialTasks').doc(yourTaskId).get();
+    if (!yourTaskDoc.exists) return res.status(404).json({ success: false, error: 'Your task not found' });
+    const yourTask = yourTaskDoc.data();
+    if (yourTask.uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
+    if (!yourTask.active) return res.status(400).json({ success: false, error: 'Your task is inactive' });
+
+    const existing = await db.collection('exchanges')
+      .where('userATaskId', '==', yourTaskId)
+      .where('userBTaskId', '==', targetTaskId)
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .get();
+    if (!existing.empty) {
+      return res.status(409).json({ success: false, error: 'Exchange already exists between these tasks' });
+    }
+
+    const exchangeData = {
+      userAUid: uid,
+      userBUid: targetTask.uid,
+      userATaskId: yourTaskId,
+      userBTaskId: targetTaskId,
+      userAStatus: 'waiting',
+      userBStatus: 'waiting',
+      overallStatus: 'active',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    const exchangeRef = await db.collection('exchanges').add(exchangeData);
+    const newExchange = { id: exchangeRef.id, ...exchangeData };
+    await invalidateKey(`exchanges:${uid}`);
+    await invalidateKey(`exchanges:${targetTask.uid}`);
+    await invalidatePattern(`exchanges:*`);
+    const populated = await populateExchange(newExchange);
+    res.status(201).json({ success: true, exchange: populated });
+  } catch (error) {
+    console.error('Create exchange error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create exchange' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 7. LIST EXCHANGES (paginated, with status filter)
+// ─────────────────────────────────────────────
+app.get('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const status = req.query.status;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const lastId = req.query.lastId || null;
+    if (!(await checkRateLimit(uid, 'exchanges-list', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const cacheKey = `exchanges:${uid}:${status || 'all'}:${limit}:${lastId || 'null'}`;
+    const result = await getOrSetCache(cacheKey, async () => {
+      const statuses = status ? [status] : ['active', 'completed', 'cancelled'];
+      let baseQuery = db.collection('exchanges')
+        .where('overallStatus', 'in', statuses)
+        .orderBy('createdAt', 'desc')
+        .limit(limit + 1);
+      if (lastId) {
+        const lastDoc = await db.collection('exchanges').doc(lastId).get();
+        if (lastDoc.exists) baseQuery = baseQuery.startAfter(lastDoc);
+      }
+      const snapshotA = await baseQuery.where('userAUid', '==', uid).get();
+      const snapshotB = await baseQuery.where('userBUid', '==', uid).get();
+      const exchangeMap = new Map();
+      snapshotA.forEach(doc => exchangeMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      snapshotB.forEach(doc => exchangeMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      const exchanges = Array.from(exchangeMap.values())
+        .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+      const hasMore = exchanges.length > limit;
+      const paginated = exchanges.slice(0, limit);
+      const nextId = paginated.length > 0 ? paginated[paginated.length - 1].id : null;
+      const populated = await Promise.all(paginated.map(populateExchange));
+      return { success: true, exchanges: populated, hasMore, lastId: nextId };
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('List exchanges error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch exchanges' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 8. GET SINGLE EXCHANGE
+// ─────────────────────────────────────────────
+app.get('/api/exchanges/:id', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { id } = req.params;
+    if (!(await checkRateLimit(uid, 'exchange-detail', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const doc = await db.collection('exchanges').doc(id).get();
+    if (!doc.exists) return res.status(404).json({ success: false, error: 'Exchange not found' });
+    const data = doc.data();
+    if (data.userAUid !== uid && data.userBUid !== uid) {
+      return res.status(403).json({ success: false, error: 'Not your exchange' });
+    }
+    const populated = await populateExchange(data);
+    res.json({ success: true, exchange: populated });
+  } catch (error) {
+    console.error('Get exchange error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch exchange' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 9. UPDATE EXCHANGE STATUS (Done / Cancel)
+// ─────────────────────────────────────────────
+app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { id } = req.params;
+    const { status } = req.body;
+    if (status !== 'done' && status !== 'cancel') {
+      return res.status(400).json({ success: false, error: 'Status must be "done" or "cancel"' });
+    }
+    if (!(await checkRateLimit(uid, 'exchange-status', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many updates. Please wait.' });
+    }
+    const docRef = db.collection('exchanges').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ success: false, error: 'Exchange not found' });
+    const data = doc.data();
+    let side;
+    if (data.userAUid === uid) side = 'A';
+    else if (data.userBUid === uid) side = 'B';
+    else return res.status(403).json({ success: false, error: 'Not your exchange' });
+    if (data.overallStatus === 'completed' || data.overallStatus === 'cancelled') {
+      return res.status(400).json({ success: false, error: `Exchange already ${data.overallStatus}` });
+    }
+    const updateData = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (status === 'done') {
+      if (side === 'A') {
+        if (data.userAStatus === 'done') return res.status(400).json({ success: false, error: 'Already done' });
+        updateData.userAStatus = 'done';
+      } else {
+        if (data.userBStatus === 'done') return res.status(400).json({ success: false, error: 'Already done' });
+        updateData.userBStatus = 'done';
+      }
+      const newA = side === 'A' ? 'done' : data.userAStatus;
+      const newB = side === 'B' ? 'done' : data.userBStatus;
+      updateData.overallStatus = (newA === 'done' && newB === 'done') ? 'completed' : 'active';
+    } else { // cancel
+      if (side === 'A') {
+        if (data.userAStatus === 'cancelled') return res.status(400).json({ success: false, error: 'Already cancelled' });
+        updateData.userAStatus = 'cancelled';
+      } else {
+        if (data.userBStatus === 'cancelled') return res.status(400).json({ success: false, error: 'Already cancelled' });
+        updateData.userBStatus = 'cancelled';
+      }
+      updateData.overallStatus = 'cancelled';
+    }
+    await docRef.update(updateData);
+    await invalidateKey(`exchanges:${data.userAUid}`);
+    await invalidateKey(`exchanges:${data.userBUid}`);
+    await invalidatePattern(`exchanges:*`);
+    const updatedDoc = await docRef.get();
+    const populated = await populateExchange(updatedDoc.data());
+    res.json({ success: true, exchange: populated });
+  } catch (error) {
+    console.error('Update exchange error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update exchange' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 10. GET AVAILABLE TASKS (for modal selection)
+// ─────────────────────────────────────────────
+app.get('/api/social-tasks/available', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await checkRateLimit(uid, 'social-task-available', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
+    }
+    const snapshot = await db.collection('socialTasks')
+      .where('uid', '==', uid)
+      .where('active', '==', true)
+      .orderBy('createdAt', 'desc')
+      .get();
+    const tasks = [];
+    snapshot.forEach(doc => tasks.push({ id: doc.id, ...doc.data() }));
+    res.json({ success: true, tasks });
+  } catch (error) {
+    console.error('Available tasks error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tasks' });
+  }
+});
+
 // ============================================================
 // 18. GLOBAL ERROR HANDLER
 // ============================================================
