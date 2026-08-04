@@ -597,6 +597,18 @@ function validateImageUrl(url) {
   }
 }
 
+// ── Validate URL format ──
+function isValidUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+
 // ── Generic rate limit helper ──
 async function checkRateLimit(identifier, action, limit, windowSeconds) {
   const key = `rate:${action}:${identifier}:${Math.floor(Date.now() / 1000 / windowSeconds)}`;
@@ -1923,16 +1935,24 @@ app.put('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
     const uid = req.user.uid;
-    if (!(await checkRateLimit(uid, 'campaign-update', 10, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many updates. Please wait.' });
+    const ip = getClientIp(req);
+    
+    // ── Rate limit: 5 updates per minute (reduced from 10) ──
+    if (!(await checkRateLimit(uid, 'campaign-update', 5, 60, ip))) {
+      return res.status(429).json({ 
+        success: false, 
+        error: 'Too many update attempts. Please wait a moment.' 
+      });
     }
-    const updates = req.body;
 
+    // ── 1. Fetch existing campaign ──
     const doc = await db.collection('campaigns').doc(id).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
     const data = doc.data();
+    
+    // ── 2. Ownership verification ──
     if (data.userId !== uid) {
       return res.status(403).json({ success: false, error: 'Forbidden: You do not own this campaign' });
     }
@@ -1940,25 +1960,277 @@ app.put('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
 
-    const allowedFields = ['title', 'description', 'reward', 'image', 'shareCount', 'tasks', 'finalUrl', 'status', 'features'];
-    const filteredUpdates = {};
-    allowedFields.forEach(field => {
-      if (updates[field] !== undefined) {
-        filteredUpdates[field] = updates[field];
-      }
-    });
-    filteredUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-    await doc.ref.update(filteredUpdates);
+    // ── 3. Extract ONLY allowed fields (NO status, NO views/unlocks/shares/completions) ──
+    const {
+      title, description, reward, image,
+      shareCount, tasks, finalUrl,
+      features
+    } = req.body;
 
-    // ── Update the specific campaign in the list cache ──
-    await updateCampaignInUserListCache(uid, id, filteredUpdates);
+    // ── Build update object with validation ──
+    const updates = {};
+    let hasChanges = false;
+
+    // ── Validate Title (optional) ──
+    if (title !== undefined) {
+      const trimmed = title.trim();
+      if (trimmed.length < 1 || trimmed.length > 100) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Title must be between 1 and 100 characters' 
+        });
+      }
+      updates.title = trimmed;
+      hasChanges = true;
+    }
+
+    // ── Validate Description (optional) ──
+    if (description !== undefined) {
+      const trimmed = description.trim();
+      if (trimmed.length > 500) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Description must be less than 500 characters' 
+        });
+      }
+      updates.description = trimmed;
+      hasChanges = true;
+    }
+
+    // ── Validate Reward (optional) ──
+    if (reward !== undefined) {
+      const trimmed = reward.trim();
+      if (trimmed.length > 100) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Reward must be less than 100 characters' 
+        });
+      }
+      updates.reward = trimmed;
+      hasChanges = true;
+    }
+
+    // ── Validate Image URL (optional) ──
+    if (image !== undefined) {
+      if (image && !validateImageUrl(image)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Invalid image URL. Only HTTPS images from allowed domains are accepted.' 
+        });
+      }
+      updates.image = image || '';
+      hasChanges = true;
+    }
+
+    // ── Validate Features (optional) ──
+    if (features !== undefined) {
+      // Must be an object
+      if (typeof features !== 'object' || Array.isArray(features)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Features must be an object' 
+        });
+      }
+      
+      const { shareCount: sc, tasks: ts, finalUrl: fu } = features;
+      
+      // All features must be booleans
+      if (typeof sc !== 'boolean' || typeof ts !== 'boolean' || typeof fu !== 'boolean') {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Each feature must be a boolean (true/false)' 
+        });
+      }
+      
+      // At least one feature must be enabled
+      if (!sc && !ts && !fu) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'At least one feature (Share Count, Tasks, or Final URL) must be enabled' 
+        });
+      }
+      
+      updates.features = { shareCount: sc, tasks: ts, finalUrl: fu };
+      hasChanges = true;
+    }
+
+    // ── Validate ShareCount (only if feature enabled) ──
+    if (shareCount !== undefined) {
+      // Determine if the shareCount feature is enabled (using updated features or existing)
+      const featureEnabled = (features !== undefined) 
+        ? features.shareCount 
+        : (data.features?.shareCount || false);
+      
+      if (featureEnabled) {
+        const num = Number(shareCount);
+        if (!Number.isInteger(num) || num < 1 || num > 9999) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Share count must be a whole number between 1 and 9999' 
+          });
+        }
+        updates.shareCount = num;
+        hasChanges = true;
+      } else {
+        // If feature disabled, force shareCount to 0 (clean up)
+        updates.shareCount = 0;
+        hasChanges = true;
+      }
+    }
+
+    // ── Validate Tasks (only if feature enabled) ──
+    if (tasks !== undefined) {
+      const featureEnabled = (features !== undefined) 
+        ? features.tasks 
+        : (data.features?.tasks || false);
+      
+      if (featureEnabled) {
+        // Must be an array
+        if (!Array.isArray(tasks)) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Tasks must be an array' 
+          });
+        }
+        
+        // At least one task required
+        if (tasks.length === 0) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'At least one task is required when tasks are enabled' 
+          });
+        }
+        
+        // Max 100 tasks
+        if (tasks.length > 100) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Maximum 100 tasks allowed' 
+          });
+        }
+        
+        // Validate each task
+        for (let i = 0; i < tasks.length; i++) {
+          const task = tasks[i];
+          
+          // Check text
+          if (!task.text || typeof task.text !== 'string') {
+            return res.status(400).json({ 
+              success: false, 
+              error: `Task ${i+1}: Text is required and must be a string` 
+            });
+          }
+          
+          const textTrimmed = task.text.trim();
+          if (textTrimmed.length < 1 || textTrimmed.length > 250) {
+            return res.status(400).json({ 
+              success: false, 
+              error: `Task ${i+1}: Text must be between 1-250 characters` 
+            });
+          }
+          
+          // Check URL
+          if (!task.url || typeof task.url !== 'string') {
+            return res.status(400).json({ 
+              success: false, 
+              error: `Task ${i+1}: URL is required and must be a string` 
+            });
+          }
+          
+          const urlTrimmed = task.url.trim();
+          if (!isValidUrl(urlTrimmed)) {
+            return res.status(400).json({ 
+              success: false, 
+              error: `Task ${i+1}: Invalid URL format` 
+            });
+          }
+        }
+        
+        // All valid - store cleaned tasks
+        updates.tasks = tasks.map(t => ({ 
+          text: t.text.trim(), 
+          url: t.url.trim() 
+        }));
+        hasChanges = true;
+      } else {
+        // If feature disabled, set tasks to empty array
+        updates.tasks = [];
+        hasChanges = true;
+      }
+    }
+
+    // ── Validate FinalUrl (only if feature enabled) ──
+    if (finalUrl !== undefined) {
+      const featureEnabled = (features !== undefined) 
+        ? features.finalUrl 
+        : (data.features?.finalUrl || false);
+      
+      if (featureEnabled) {
+        if (!finalUrl || typeof finalUrl !== 'string') {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Final redirect URL is required when enabled' 
+          });
+        }
+        
+        const urlTrimmed = finalUrl.trim();
+        if (!isValidUrl(urlTrimmed)) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Invalid final redirect URL format. Please enter a valid HTTPS URL.' 
+          });
+        }
+        
+        updates.finalUrl = urlTrimmed;
+        hasChanges = true;
+      } else {
+        // If feature disabled, set finalUrl to empty string
+        updates.finalUrl = '';
+        hasChanges = true;
+      }
+    }
+
+    // ── 4. If no changes, return early ──
+    if (!hasChanges) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No valid fields to update. Please provide at least one field.' 
+      });
+    }
+
+    // ── 5. Prevent updating protected fields ──
+    // These fields should NEVER be updated by users
+    const protectedFields = ['views', 'unlockCount', 'shares', 'completions', 'userId', 'templateId', 'createdAt', 'status'];
+    for (const field of protectedFields) {
+      if (req.body[field] !== undefined) {
+        console.warn(`⚠️ User ${uid} attempted to update protected field: ${field}`);
+        // Silently ignore - don't block the entire request, just ignore the protected field
+        // But we should NOT add it to updates
+      }
+    }
+
+    // ── 6. Apply updates ──
+    updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    await doc.ref.update(updates);
+
+    // ── 7. Invalidate caches ──
+    await updateCampaignInUserListCache(uid, id, updates);
     await invalidateKey(`campaigns:id:${id}`);
     await invalidateKey(`stats:user:${uid}`);
 
-    res.json({ success: true, message: 'Campaign updated' });
+    // ── 8. Success response ──
+    res.json({ 
+      success: true, 
+      message: 'Campaign updated successfully',
+      updatedFields: Object.keys(updates).filter(key => key !== 'updatedAt')
+    });
+
   } catch (error) {
-    console.error('Update campaign error:', error);
-    res.status(500).json({ success: false, error: 'Failed to update campaign' });
+    console.error('❌ Update campaign error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update campaign. Please try again later.' 
+    });
   }
 });
 
