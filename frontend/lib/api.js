@@ -28,8 +28,17 @@ export const serverFetch = (url, options = {}) => {
   return fetch(`${API_BASE}${url}`, options).then((res) => res.json());
 };
 
+// ── Get Firebase token (for use with fetch directly) ──
+export const getToken = async () => {
+  await auth.authStateReady();
+  const user = auth.currentUser;
+  if (!user) return null;
+  return await user.getIdToken(false);
+};
+
 // ── Default export for convenience ──
 export default {
   apiClient,
   serverFetch,
+  getToken,
 };
