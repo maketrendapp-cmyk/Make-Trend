@@ -11,7 +11,7 @@ import {
   FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy,
   FiGift, FiCheckCircle, FiChevronRight
 } from 'react-icons/fi';
-import { FaCrown, FaWallet, FaCoins } from 'react-icons/fa';
+import { FaCrown, FaWallet, FaCoins, FaClock } from 'react-icons/fa';
 import Meta from '../components/Meta';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -81,7 +81,7 @@ export default function Profile() {
     }
   };
 
-  // ── Claim bonus (FIXED: Replaced alert() with sleek Modal) ──
+  // ── Claim bonus (Replaced alert() with sleek Modal) ──
   const claimBonus = async () => {
     if (!isAuthenticated || !bonusStatus.canClaim) return;
     try {
