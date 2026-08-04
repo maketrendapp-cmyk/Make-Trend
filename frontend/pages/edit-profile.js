@@ -10,7 +10,6 @@ import {
   FiCamera,
   FiUser,
   FiMail,
-  FiLock,
   FiCheck,
   FiX,
   FiLoader,
@@ -24,7 +23,6 @@ import {
   FiBookmark,
   FiUsers,
   FiAtSign,
-  FiBriefcase,
   FiEdit2,
   FiHeart,
 } from 'react-icons/fi';
@@ -48,27 +46,32 @@ const API_BASE = `${BACKEND_URL}/api`;
 
 // ── Country list ──
 const COUNTRIES = [
-  'Afghanistan',
-  'Albania',
-  // ... (full list from previous code, keep it)
-  // I'll abbreviate here for brevity – include the full list from the previous version.
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
+  'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+  'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde',
+  'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo',
+  'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic',
+  'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland',
+  'France', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau',
+  'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Korea, North', 'Korea, South', 'Kuwait', 'Kyrgyzstan',
+  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+  'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia',
+  'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal',
+  'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Macedonia', 'Norway', 'Oman', 'Pakistan', 'Palau',
+  'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania',
+  'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent', 'Samoa', 'San Marino', 'Sao Tome and Principe',
+  'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands',
+  'Somalia', 'South Africa', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
+  'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey',
+  'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay',
+  'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
 ];
 
 // ── Gender options ──
 const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
-// ── Relationship status options ──
-const RELATIONSHIP_STATUSES = [
-  'Single',
-  'In a relationship',
-  'Married',
-  'Divorced',
-  'Widowed',
-  'Complicated',
-  'Prefer not to say',
-];
-
-// ── Platform icons ──
+// ── Platform icons and colors ──
 const PLATFORM_ICONS = {
   youtube: FaYoutube,
   facebook: FaFacebook,
@@ -101,7 +104,7 @@ const PLATFORM_COLORS = {
 const getFavicon = (url) => {
   try {
     const domain = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}`;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
   } catch {
     return null;
   }
@@ -129,7 +132,6 @@ export default function EditProfile() {
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('');
   const [gender, setGender] = useState('');
-  const [relationshipStatus, setRelationshipStatus] = useState('');
 
   // ── Hobbies ──
   const [hobbies, setHobbies] = useState([]);
@@ -178,7 +180,6 @@ export default function EditProfile() {
       setPhone(profile.phone || '');
       setCountry(profile.country || '');
       setGender(profile.gender || '');
-      setRelationshipStatus(profile.relationshipStatus || '');
       setHobbies(profile.hobbies || []);
       setSkills(profile.skills || []);
       setSocialLinks(profile.socialLinks || []);
@@ -374,7 +375,6 @@ export default function EditProfile() {
     setSuccess('');
     setSaving(true);
 
-    // Validations
     if (fullName.length < 2) {
       setError('Full name must be at least 2 characters.');
       setSaving(false);
@@ -438,7 +438,6 @@ export default function EditProfile() {
         phone: phone.trim(),
         country: country.trim(),
         gender: gender.trim(),
-        relationshipStatus: relationshipStatus.trim(),
         hobbies: hobbies,
         skills: skills,
         socialLinks: socialLinks,
@@ -479,7 +478,6 @@ export default function EditProfile() {
 
   const showSkeleton = loading || profileLoading || (user && !profile);
 
-  // ── Skeleton Loader ──
   if (showSkeleton) {
     return (
       <>
@@ -497,7 +495,7 @@ export default function EditProfile() {
                     <div className="h-3 w-32 bg-gray-200 rounded animate-pulse" />
                   </div>
                 </div>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
                   <div key={i} className="space-y-1">
                     <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
                     <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
@@ -515,13 +513,11 @@ export default function EditProfile() {
     );
   }
 
-  // ── Main Render ──
   return (
     <>
       <Meta title="Edit Profile | Make Trend" />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-8 px-4">
         <div className="max-w-3xl mx-auto">
-          {/* Back Button */}
           <button
             onClick={() => router.back()}
             className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-4 px-3 py-1.5 rounded-lg hover:bg-gray-100"
@@ -557,11 +553,7 @@ export default function EditProfile() {
                 <div className="relative group">
                   <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white shadow-md transition-all duration-300 group-hover:shadow-xl">
                     {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Avatar"
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
                       <FiUser className="w-12 h-12 text-gray-400" />
                     )}
@@ -571,23 +563,12 @@ export default function EditProfile() {
                     className="absolute -bottom-1 -right-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full p-2.5 cursor-pointer hover:shadow-lg transition-all duration-200 shadow-md hover:scale-110 hover:shadow-purple-200"
                   >
                     <FiCamera className="w-5 h-5" />
-                    <input
-                      id="avatar-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleAvatarChange}
-                      disabled={saving}
-                    />
+                    <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={saving} />
                   </label>
                 </div>
                 <div className="flex-1 text-center sm:text-left">
-                  <p className="text-sm font-medium text-gray-700">
-                    Click the camera icon to change your profile picture.
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    JPEG, PNG, WEBP, GIF up to 5MB
-                  </p>
+                  <p className="text-sm font-medium text-gray-700">Click the camera icon to change your profile picture.</p>
+                  <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, GIF up to 5MB</p>
                 </div>
               </div>
 
@@ -596,8 +577,96 @@ export default function EditProfile() {
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <FiUser className="w-5 h-5 text-purple-600" /> Basic Information
                 </h2>
-                {/* Full Name, Username, Email – same as before */}
-                {/* ... (keep full name, username, email fields) ... */}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    required
+                    disabled={saving}
+                    placeholder="John Doe"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">{fullName.length}/100 characters</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Username <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                      className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 transition disabled:opacity-50 pr-28 ${
+                        username === profile?.username
+                          ? 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                          : usernameAvailable === true && username.length >= 3
+                          ? 'border-green-500 focus:ring-green-200 bg-green-50/30'
+                          : usernameAvailable === false && username.length >= 3
+                          ? 'border-red-500 focus:ring-red-200 bg-red-50/30'
+                          : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                      }`}
+                      required
+                      disabled={saving}
+                      placeholder="john_doe"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium">
+                      {username !== profile?.username && (
+                        isCheckingUsername ? (
+                          <span className="text-gray-400 flex items-center gap-1"><FiLoader className="w-3 h-3 animate-spin" /> Checking…</span>
+                        ) : username.length >= 3 && usernameAvailable === true ? (
+                          <span className="text-green-600">✓ Available</span>
+                        ) : username.length >= 3 && usernameAvailable === false ? (
+                          <span className="text-red-600">✗ Taken</span>
+                        ) : null
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">3-30 characters, lowercase letters, numbers, underscore.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
+                      className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 transition disabled:opacity-50 pr-28 ${
+                        email === profile?.email
+                          ? 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                          : emailAvailable === true && email.includes('@')
+                          ? 'border-green-500 focus:ring-green-200 bg-green-50/30'
+                          : emailAvailable === false && email.includes('@')
+                          ? 'border-red-500 focus:ring-red-200 bg-red-50/30'
+                          : 'border-gray-300 focus:border-purple-500 focus:ring-purple-200'
+                      }`}
+                      required
+                      disabled={saving}
+                      placeholder="you@example.com"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium">
+                      {email !== profile?.email && (
+                        isCheckingEmail ? (
+                          <span className="text-gray-400 flex items-center gap-1"><FiLoader className="w-3 h-3 animate-spin" /> Checking…</span>
+                        ) : email.includes('@') && emailAvailable === true ? (
+                          <span className="text-green-600">✓ Available</span>
+                        ) : email.includes('@') && emailAvailable === false ? (
+                          <span className="text-red-600">✗ Taken</span>
+                        ) : null
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">Changing your email will update your login credentials.</p>
+                </div>
               </div>
 
               {/* ── About You ── */}
@@ -606,43 +675,73 @@ export default function EditProfile() {
                   <FiEdit2 className="w-5 h-5 text-purple-600" /> About You
                 </h2>
 
-                {/* Bio, Age, Phone, Country – keep existing */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Bio (optional)</label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    disabled={saving}
+                    placeholder="Tell us a bit about yourself..."
+                    maxLength={500}
+                  />
+                  <p className="mt-1 text-xs text-gray-400">{bio.length}/500 characters</p>
+                </div>
 
-                {/* Gender & Relationship Status */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Gender (optional)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Age (optional)</label>
+                    <input
+                      type="number"
+                      value={age}
+                      onChange={(e) => setAge(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                      disabled={saving}
+                      placeholder="e.g. 25"
+                      min="1"
+                      max="150"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone (optional)</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                      disabled={saving}
+                      placeholder="+1 234 567 8900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Country (optional)</label>
                     <select
-                      value={gender}
-                      onChange={(e) => setGender(e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-white"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-white disabled:opacity-50"
                       disabled={saving}
                     >
-                      <option value="">Select gender</option>
-                      {GENDERS.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
+                      <option value="">Select your country</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Relationship Status (optional)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender (optional)</label>
                     <select
-                      value={relationshipStatus}
-                      onChange={(e) => setRelationshipStatus(e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-white"
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-white disabled:opacity-50"
                       disabled={saving}
                     >
-                      <option value="">Select status</option>
-                      {RELATIONSHIP_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
+                      <option value="">Select gender</option>
+                      {GENDERS.map((g) => (
+                        <option key={g} value={g}>{g}</option>
                       ))}
                     </select>
                   </div>
@@ -656,16 +755,9 @@ export default function EditProfile() {
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {hobbies.map((hobby, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 bg-pink-100 text-pink-700 px-3 py-1.5 rounded-full text-sm font-medium"
-                    >
+                    <span key={idx} className="inline-flex items-center gap-1 bg-pink-100 text-pink-700 px-3 py-1.5 rounded-full text-sm font-medium">
                       {hobby}
-                      <button
-                        type="button"
-                        onClick={() => removeHobby(idx)}
-                        className="text-pink-400 hover:text-red-500 transition"
-                      >
+                      <button type="button" onClick={() => removeHobby(idx)} className="text-pink-400 hover:text-red-500 transition">
                         <FiX className="w-3.5 h-3.5" />
                       </button>
                     </span>
@@ -681,25 +773,101 @@ export default function EditProfile() {
                     placeholder="e.g. Reading, Guitar, Gaming"
                     onKeyDown={(e) => e.key === 'Enter' && addHobby()}
                   />
-                  <button
-                    type="button"
-                    onClick={addHobby}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50"
-                    disabled={saving}
-                  >
+                  <button type="button" onClick={addHobby} className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
                     <FiPlus className="w-5 h-5" />
                   </button>
                 </div>
                 <p className="text-xs text-gray-400">Press Enter or click + to add hobby.</p>
               </div>
 
-              {/* ── Skills ── (same as before) */}
-              {/* ... */}
+              {/* ── Skills ── */}
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <FiBookmark className="w-5 h-5 text-purple-600" /> Skills (optional)
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {skills.map((skill, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 bg-purple-100 text-purple-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                      {skill}
+                      <button type="button" onClick={() => removeSkill(idx)} className="text-purple-400 hover:text-red-500 transition">
+                        <FiX className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSkill}
+                    onChange={(e) => setNewSkill(e.target.value)}
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    disabled={saving}
+                    placeholder="e.g. React, UI/UX, Marketing"
+                    onKeyDown={(e) => e.key === 'Enter' && addSkill()}
+                  />
+                  <button type="button" onClick={addSkill} className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
+                    <FiPlus className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400">Press Enter or click + to add skill.</p>
+              </div>
 
-              {/* ── Social Links ── (same as before) */}
-              {/* ... */}
+              {/* ── Social Links ── */}
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <FiUsers className="w-5 h-5 text-purple-600" /> Social Links (optional)
+                </h2>
+                <div className="space-y-2">
+                  {socialLinks.map((link, idx) => {
+                    const Icon = PLATFORM_ICONS[link.platform.toLowerCase()] || FiLink;
+                    const color = PLATFORM_COLORS[link.platform.toLowerCase()] || 'text-purple-600';
+                    return (
+                      <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <Icon className={`w-5 h-5 ${color}`} />
+                        <span className="font-medium text-sm text-gray-700">{link.platform}</span>
+                        <span className="text-sm text-gray-500 truncate flex-1">{link.channelName}</span>
+                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-sm">Visit</a>
+                        <button type="button" onClick={() => removeSocialLink(idx)} className="text-gray-400 hover:text-red-500 transition">
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    value={newSocial.platform}
+                    onChange={(e) => setNewSocial({ ...newSocial, platform: e.target.value })}
+                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    placeholder="Platform (e.g. YouTube)"
+                    disabled={saving}
+                  />
+                  <input
+                    type="text"
+                    value={newSocial.channelName}
+                    onChange={(e) => setNewSocial({ ...newSocial, channelName: e.target.value })}
+                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    placeholder="Channel Name"
+                    disabled={saving}
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={newSocial.url}
+                      onChange={(e) => setNewSocial({ ...newSocial, url: e.target.value })}
+                      className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                      placeholder="https://..."
+                      disabled={saving}
+                    />
+                    <button type="button" onClick={addSocialLink} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
+                      <FiPlus className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-              {/* ── Websites ── (with favicon) */}
+              {/* ── Websites with Favicon ── */}
               <div className="space-y-4">
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <FiGlobe className="w-5 h-5 text-purple-600" /> Websites (optional)
@@ -708,31 +876,15 @@ export default function EditProfile() {
                   {websites.map((site, idx) => {
                     const favicon = getFavicon(site.url);
                     return (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200"
-                      >
+                      <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
                         {favicon ? (
                           <img src={favicon} alt="" className="w-5 h-5 rounded" />
                         ) : (
                           <FiLink className="w-5 h-5 text-purple-600" />
                         )}
-                        <span className="font-medium text-sm text-gray-700">
-                          {site.label}
-                        </span>
-                        <a
-                          href={site.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline text-sm flex-1 truncate"
-                        >
-                          {site.url}
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => removeWebsite(idx)}
-                          className="text-gray-400 hover:text-red-500 transition"
-                        >
+                        <span className="font-medium text-sm text-gray-700">{site.label}</span>
+                        <a href={site.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-sm flex-1 truncate">{site.url}</a>
+                        <button type="button" onClick={() => removeWebsite(idx)} className="text-gray-400 hover:text-red-500 transition">
                           <FiTrash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -744,7 +896,7 @@ export default function EditProfile() {
                     type="text"
                     value={newWebsite.label}
                     onChange={(e) => setNewWebsite({ ...newWebsite, label: e.target.value })}
-                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
                     placeholder="Label (e.g. Portfolio)"
                     disabled={saving}
                   />
@@ -752,23 +904,54 @@ export default function EditProfile() {
                     type="url"
                     value={newWebsite.url}
                     onChange={(e) => setNewWebsite({ ...newWebsite, url: e.target.value })}
-                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
                     placeholder="https://..."
                     disabled={saving}
                   />
-                  <button
-                    type="button"
-                    onClick={addWebsite}
-                    className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50"
-                    disabled={saving}
-                  >
+                  <button type="button" onClick={addWebsite} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
                     <FiPlus className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* ── Additional Contacts ── (same as before) */}
-              {/* ... */}
+              {/* ── Additional Contacts ── */}
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <FiAtSign className="w-5 h-5 text-purple-600" /> Additional Contacts (optional)
+                </h2>
+                <div className="space-y-2">
+                  {contacts.map((contact, idx) => (
+                    <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                      <span className="font-medium text-sm text-gray-700">{contact.type}</span>
+                      <span className="text-sm text-gray-500 flex-1">{contact.value}</span>
+                      <button type="button" onClick={() => removeContact(idx)} className="text-gray-400 hover:text-red-500 transition">
+                        <FiTrash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={newContact.type}
+                    onChange={(e) => setNewContact({ ...newContact, type: e.target.value })}
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    placeholder="e.g. WhatsApp, Telegram, Signal"
+                    disabled={saving}
+                  />
+                  <input
+                    type="text"
+                    value={newContact.value}
+                    onChange={(e) => setNewContact({ ...newContact, value: e.target.value })}
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                    placeholder="Contact value"
+                    disabled={saving}
+                  />
+                  <button type="button" onClick={addContact} className="px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50" disabled={saving}>
+                    <FiPlus className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
 
               {/* ── Action Buttons ── */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
@@ -805,14 +988,8 @@ export default function EditProfile() {
 
       <style jsx>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
