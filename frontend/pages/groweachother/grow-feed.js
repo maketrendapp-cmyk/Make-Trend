@@ -1,9 +1,9 @@
-// pages/grow-feed.js
+// pages/groweachother/grow-feed.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../components/AuthScreen';
-import { Meta } from '../components/Meta';
-import { getToken } from '../lib/api';
+import Meta from '../../components/Meta';
+import { useAuth } from '../../components/AuthScreen';
+import { getToken } from '../../lib/api';
 import {
   FiHeart,
   FiUser,
@@ -69,7 +69,6 @@ export default function GrowFeed() {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
-  const observerRef = useRef(null);
   const loadingRef = useRef(false);
 
   // ── Fetch feed ──
@@ -186,7 +185,7 @@ export default function GrowFeed() {
       setShowModal(false);
       setSelectedTargetTask(null);
       setSelectedMyTask(null);
-      // Refresh feed to remove the task (or keep it, but we'll just refetch)
+      // Refresh feed
       setLastId(null);
       setHasMore(true);
       await fetchFeed(true);
@@ -331,7 +330,7 @@ export default function GrowFeed() {
               <p className="text-gray-500 font-medium">No tasks available right now.</p>
               <p className="text-sm text-gray-400">Check back later or create your own tasks!</p>
               <button
-                onClick={() => router.push('/my-tasks')}
+                onClick={() => router.push('/groweachother/my-tasks')}
                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
               >
                 <FiPlus className="w-4 h-4" />
@@ -468,7 +467,7 @@ export default function GrowFeed() {
                 <button
                   onClick={() => {
                     setShowModal(false);
-                    router.push('/my-tasks');
+                    router.push('/groweachother/my-tasks');
                   }}
                   className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
                 >
