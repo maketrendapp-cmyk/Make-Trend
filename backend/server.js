@@ -4533,6 +4533,7 @@ async function populateExchange(data) {
 // ─────────────────────────────────────────────
 // 1. CREATE SOCIAL TASK
 // ─────────────────────────────────────────────
+// 1. CREATE SOCIAL TASK
 app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -4561,7 +4562,9 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     const docRef = await db.collection('socialTasks').add(taskData);
+    // ── Invalidate both feed and user's own task cache ──
     await invalidatePattern(`grow-feed:*`);
+    await invalidatePattern(`social-tasks:${uid}:*`); // ✅ ADD THIS LINE
     res.status(201).json({ success: true, task: { id: docRef.id, ...taskData } });
   } catch (error) {
     console.error('Create social task error:', error);
@@ -4647,7 +4650,7 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
       updateData.active = active;
     }
     await docRef.update(updateData);
-    await invalidateKey(`social-tasks:${uid}`);
+    await invalidatePattern(`social-tasks:${uid}:*`);
     await invalidatePattern(`grow-feed:*`);
     const updatedDoc = await docRef.get();
     res.json({ success: true, task: { id: updatedDoc.id, ...updatedDoc.data() } });
@@ -4672,7 +4675,7 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
     if (!doc.exists) return res.status(404).json({ success: false, error: 'Task not found' });
     if (doc.data().uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
     await docRef.delete();
-    await invalidateKey(`social-tasks:${uid}`);
+    await invalidatePattern(`social-tasks:${uid}:*`);
     await invalidatePattern(`grow-feed:*`);
     res.json({ success: true, message: 'Task deleted' });
   } catch (error) {
