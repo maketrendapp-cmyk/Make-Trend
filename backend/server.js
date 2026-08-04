@@ -1766,6 +1766,18 @@ app.get('/api/campaigns/:id', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
+    // ── Get deviceId from query or header ──
+    const deviceId = req.query.deviceId || req.headers['x-device-id'] || null;
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        userId = decoded.uid;
+      } catch (e) { /* ignore */ }
+    }
+
     const cacheKey = `campaigns:id:${id}`;
     let result = null;
 
@@ -1791,15 +1803,28 @@ app.get('/api/campaigns/:id', async (req, res) => {
         return res.status(404).json({ success: false, error: 'Campaign not available' });
       }
       result = { success: true, campaign: { id: doc.id, ...campaignData } };
-      // Store in cache with 60 second TTL
       try {
         await redis.set(cacheKey, JSON.stringify(result));
         console.log(`💾 Campaign cached (60s TTL): ${id}`);
       } catch (err) { /* ignore */ }
     }
 
-    // ── Return the result immediately ──
-    res.json(result);
+    // ── ✅ NEW: Check if this user/device already shared ──
+    let userHasShared = false;
+    if (deviceId || userId) {
+      const shareDocId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : null);
+      if (shareDocId) {
+        try {
+          const shareDoc = await db.collection('campaigns').doc(id).collection('shares').doc(shareDocId).get();
+          userHasShared = shareDoc.exists;
+        } catch (e) {
+          console.warn('Error checking share status:', e);
+        }
+      }
+    }
+
+    // ── Return the result with userHasShared ──
+    res.json({ ...result, userHasShared });
     
   } catch (error) {
     console.error('Error fetching campaign:', error);
@@ -2362,7 +2387,7 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
       }
 
       const shareCountValue = data.shareCount || 0;
-      const newShares = (data.shares || 0) + shareCountValue;
+      const newShares = (data.shares || 0) + (data.shareCount || 0);
       transaction.update(docRef, {
         shares: newShares,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2515,6 +2540,19 @@ app.post('/api/campaigns/:id/complete', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
 
+    // ─── ✅ NEW: Check if this user/device already shared ───
+    const docRef = campaignDoc.ref;
+    const shareDocId = userId ? `user_${userId}` : (deviceId ? `device_${deviceId}` : `ip_${ip}`);
+    const shareDocRef = docRef.collection('shares').doc(shareDocId);
+    const shareDoc = await shareDocRef.get();
+    if (!shareDoc.exists) {
+      return res.status(403).json({
+        success: false,
+        error: 'You must share this campaign before claiming.'
+      });
+    }
+
+    // ── Transaction ──
     await db.runTransaction(async (transaction) => {
       const docRef = db.collection('campaigns').doc(id);
       const doc = await transaction.get(docRef);
