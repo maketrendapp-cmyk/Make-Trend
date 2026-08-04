@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Script from 'next/script';
 import { withCampaignMeta } from '../lib/withCampaignMeta';
 import { fetchCampaign } from '../lib/fetchCampaign';
+import { getDeviceId, refreshDeviceId } from '../utils/deviceId';
 import {
   FaShareAlt,
   FaCopy,
@@ -105,7 +106,7 @@ function CampaignShare({ campaign: initialCampaign }) {
   const [loading, setLoading] = useState(!initialCampaign);
   const [error, setError] = useState('');
   
-  // ── User's session progress ──
+  // ── User's session progress (resets on each page load) ──
   const [shares, setShares] = useState(0);
   const [shareCount, setShareCount] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
@@ -140,6 +141,18 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   }, [id, initialCampaign]);
 
+  // ── Force refresh fingerprint on page load ──
+  useEffect(() => {
+    const refreshFingerprint = async () => {
+      try {
+        await refreshDeviceId();
+      } catch (e) {
+        console.warn('Fingerprint refresh failed');
+      }
+    };
+    refreshFingerprint();
+  }, []);
+
   const fetchCampaignData = async () => {
     try {
       setLoading(true);
@@ -161,7 +174,7 @@ function CampaignShare({ campaign: initialCampaign }) {
   const initializeCampaign = (camp) => {
     const count = camp.shareCount || 0;
     setShareCount(count);
-    // Reset session progress
+    // ── Reset session progress ──
     setShares(0);
     setShareProgress(0);
     setShareAttempt(0);
@@ -304,13 +317,14 @@ function CampaignShare({ campaign: initialCampaign }) {
     }, 500);
   };
 
-  // ── Backend API calls (no deviceId) ──
+  // ── Backend API calls (with deviceId) ──
   const callShareAPI = async () => {
     try {
+      const deviceId = await refreshDeviceId();
       await fetch(`${API_BASE}/campaigns/${id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deviceId }),
       });
     } catch (err) {
       console.error('Error recording share:', err);
@@ -321,10 +335,11 @@ function CampaignShare({ campaign: initialCampaign }) {
     if (!sharesComplete || !isClaimReady || isCompleting) return;
     setIsCompleting(true);
     try {
+      const deviceId = await refreshDeviceId();
       await fetch(`${API_BASE}/campaigns/${id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deviceId }),
       });
     } catch (err) {
       console.error('Completion error:', err);
@@ -448,7 +463,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               )}
             </div>
 
-            {/* Per‑user progress as X/Y shares */}
+            {/* ── Per‑user progress ── */}
             {shareCount > 0 && !isComplete && (
               <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
                 <div className="flex items-center gap-2">
@@ -461,7 +476,7 @@ function CampaignShare({ campaign: initialCampaign }) {
           </div>
         </div>
 
-        {/* Share Section (only if not complete) */}
+        {/* Share Section */}
         {shareCount > 0 && !isComplete && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
             className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden mt-4">
@@ -494,7 +509,7 @@ function CampaignShare({ campaign: initialCampaign }) {
               </button>
             </div>
 
-            {/* Main Native Share Button */}
+            {/* Main Share Button */}
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onHoverStart={() => setIsHovering(true)} onHoverEnd={() => setIsHovering(false)}
               onClick={handleNativeShare} disabled={verifying || isSharing || isComplete}
