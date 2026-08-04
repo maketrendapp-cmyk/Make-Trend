@@ -1,9 +1,8 @@
 // pages/refer-earn.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
-import { useProfile } from '../lib/queries';
-import { auth } from '../services/firebase';
+import { useProfile, useReferrals } from '../lib/queries';
 import Link from 'next/link';
 import Meta from '../components/Meta';
 import {
@@ -15,10 +14,8 @@ import {
   FiLogIn,
   FiUser,
   FiAward,
-  FiClock,
   FiCheckCircle,
   FiRefreshCw,
-  FiCalendar,
 } from 'react-icons/fi';
 import { FaCrown, FaGift } from 'react-icons/fa';
 
@@ -29,14 +26,13 @@ export default function ReferEarn() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [referralData, setReferralData] = useState({
-    referralCode: '',
-    totalReferrals: 0,
-    referredUsers: [],
-    referrer: null,
-  });
+  const {
+    data: referralData,
+    isLoading: referralLoading,
+    isRefetching: isRefreshing,
+    refetch: refetchReferrals,
+  } = useReferrals(isAuthenticated);
+
   const [copySuccess, setCopySuccess] = useState('');
   const [visible, setVisible] = useState(false);
 
@@ -44,7 +40,7 @@ export default function ReferEarn() {
   const displayName = profile?.fullname || user?.fullName || user?.fullname || user?.displayName || 'User';
   const isPro = profile?.plan === 'pro';
   const proExpiry = profile?.proExpiry?.toDate?.() || null;
-  const referralsCount = referralData.totalReferrals;
+  const referralsCount = referralData?.totalReferrals || 0;
 
   // ── Calculate progress ──
   const nextRewardAt = (Math.floor(referralsCount / 5) + 1) * 5;
@@ -56,62 +52,9 @@ export default function ReferEarn() {
     return () => clearTimeout(timer);
   }, []);
 
-  // ── Fetch referrals ──
-  const fetchReferrals = useCallback(async () => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        setLoading(false);
-        return;
-      }
-      const token = await firebaseUser.getIdToken();
-      const res = await fetch(`${BACKEND_URL}/api/auth/referrals`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setReferralData({
-          referralCode: data.referralCode || profile?.referralCode || '',
-          totalReferrals: data.totalReferrals || 0,
-          referredUsers: data.referredUsers || [],
-          referrer: data.referrer || null,
-        });
-      }
-    } catch (err) {
-      console.error('Fetch referrals error:', err);
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [profile?.referralCode]);
-
-  // ── Auto refresh ──
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchReferrals();
-    } else {
-      setLoading(false);
-    }
-  }, [isAuthenticated, user, fetchReferrals]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isAuthenticated && user) {
-        setIsRefreshing(true);
-        fetchReferrals();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isAuthenticated, user, fetchReferrals]);
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    fetchReferrals();
-  };
-
+  // ── Copy referral code ──
   const copyReferralCode = () => {
-    const code = referralData.referralCode || profile?.referralCode;
+    const code = referralData?.referralCode || profile?.referralCode;
     if (!code) return;
     navigator.clipboard.writeText(code)
       .then(() => {
@@ -130,12 +73,11 @@ export default function ReferEarn() {
       });
   };
 
-  // ── Robust date formatter for Firestore Timestamps (supports both formats) ──
-  const formatDate = (timestamp) => {
+  // ── Format date & time ──
+  const formatDateTime = (timestamp) => {
     if (!timestamp) return 'N/A';
     try {
       let date;
-      // Firestore Timestamp object: { seconds, nanoseconds } or { _seconds, _nanoseconds }
       if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
         date = new Date(timestamp.seconds * 1000 + timestamp.nanoseconds / 1e6);
       } else if (timestamp._seconds !== undefined && timestamp._nanoseconds !== undefined) {
@@ -150,7 +92,13 @@ export default function ReferEarn() {
         date = new Date(timestamp);
       }
       if (isNaN(date.getTime())) return 'N/A';
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
     } catch {
       return 'N/A';
     }
@@ -160,8 +108,10 @@ export default function ReferEarn() {
     return ref.avatar || ref.photoURL || null;
   };
 
+  const isLoading = profileLoading || referralLoading || (isAuthenticated && !profile);
+
   // ── Skeleton ──
-  if (profileLoading || loading || (user && !profile)) {
+  if (isLoading) {
     return (
       <>
         <Meta title="Refer & Earn | Make Trend" />
@@ -185,6 +135,7 @@ export default function ReferEarn() {
     );
   }
 
+  // ── Not logged in ──
   if (!user) {
     return (
       <>
@@ -215,6 +166,7 @@ export default function ReferEarn() {
     );
   }
 
+  // ── Main Page ──
   return (
     <>
       <Meta title="Refer & Earn – Make Trend" description="Invite friends and earn PRO access for free." />
@@ -234,7 +186,7 @@ export default function ReferEarn() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={handleRefresh}
+                  onClick={() => refetchReferrals()}
                   disabled={isRefreshing}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-600 hover:text-purple-800 transition-colors disabled:opacity-50"
                 >
@@ -254,7 +206,7 @@ export default function ReferEarn() {
             </div>
           </div>
 
-          {/* ── Stats Cards (horizontal, compact, responsive) ── */}
+          {/* ── Stats Cards ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
@@ -262,7 +214,7 @@ export default function ReferEarn() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-500">Total Referrals</p>
-                <p className="text-2xl font-bold text-gray-900">{referralData.totalReferrals}</p>
+                <p className="text-2xl font-bold text-gray-900">{referralsCount}</p>
               </div>
             </div>
 
@@ -273,7 +225,7 @@ export default function ReferEarn() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-500">Referred By</p>
                 <p className="text-lg font-semibold text-gray-900 truncate">
-                  {referralData.referrer?.username || referralData.referrer?.fullname || '—'}
+                  {referralData?.referrer?.username || referralData?.referrer?.fullname || '—'}
                 </p>
               </div>
             </div>
@@ -338,10 +290,10 @@ export default function ReferEarn() {
               <FiAward className="w-5 h-5 text-purple-600" />
               <h2 className="text-lg font-semibold text-gray-900">Your Referral Code</h2>
             </div>
-            {referralData.referralCode || profile?.referralCode ? (
+            {referralData?.referralCode || profile?.referralCode ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <code className="bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg text-xl font-mono text-gray-800 break-all">
-                  {referralData.referralCode || profile?.referralCode}
+                  {referralData?.referralCode || profile?.referralCode}
                 </code>
                 <div className="flex items-center gap-3 flex-wrap">
                   <button
@@ -353,11 +305,11 @@ export default function ReferEarn() {
                   </button>
                   <button
                     onClick={() => {
-                      const shareUrl = `${window.location.origin}/signup?ref=${referralData.referralCode || profile?.referralCode}`;
+                      const shareUrl = `${window.location.origin}/signup?ref=${referralData?.referralCode || profile?.referralCode}`;
                       if (navigator.share) {
                         navigator.share({
                           title: 'Join Make Trend!',
-                          text: `Use my referral code ${referralData.referralCode || profile?.referralCode} to get started!`,
+                          text: `Use my referral code ${referralData?.referralCode || profile?.referralCode} to get started!`,
                           url: shareUrl,
                         }).catch(() => {});
                       } else {
@@ -379,19 +331,19 @@ export default function ReferEarn() {
             )}
           </div>
 
-          {/* ── Referred Users Table (fully responsive) ── */}
+          {/* ── Referred Users Table ── */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <FiUsers className="w-5 h-5 text-purple-600" />
                 <h2 className="text-lg font-semibold text-gray-900">People You've Referred</h2>
                 <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
-                  {referralData.totalReferrals}
+                  {referralsCount}
                 </span>
               </div>
             </div>
 
-            {referralData.referredUsers.length === 0 ? (
+            {referralData?.referredUsers?.length === 0 ? (
               <div className="text-center py-10 text-gray-500">
                 <div className="text-5xl mb-3">👥</div>
                 <p className="font-medium">No referrals yet.</p>
@@ -429,7 +381,7 @@ export default function ReferEarn() {
                           {ref.email || '—'}
                         </td>
                         <td className="py-3 px-2 text-gray-500 whitespace-nowrap">
-                          {formatDate(ref.createdAt)}
+                          {formatDateTime(ref.createdAt)}
                         </td>
                       </tr>
                     ))}
