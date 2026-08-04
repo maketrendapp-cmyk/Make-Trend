@@ -32,7 +32,7 @@ const defaultMeta = {
   url: 'https://maketrend.app/share?id={id}',
 };
 
-// ─── AD COMPONENTS ───
+// ─── AD COMPONENTS (unchanged) ───
 
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
@@ -108,8 +108,8 @@ function CampaignShare({ campaign: initialCampaign }) {
   const [loading, setLoading] = useState(!initialCampaign);
   const [error, setError] = useState('');
   
-  const [shares, setShares] = useState(0);
-  const [shareCount, setShareCount] = useState(0);
+  const [shares, setShares] = useState(0);          // user's own progress (number of shares they've "earned")
+  const [shareCount, setShareCount] = useState(0);  // target (set by creator)
   const [isCopied, setIsCopied] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -165,7 +165,7 @@ function CampaignShare({ campaign: initialCampaign }) {
         return;
       }
       setCampaign(data.campaign);
-      initializeCampaign(data.campaign);
+      initializeCampaign(data.campaign, data.userHasShared || false);
     } catch (err) {
       console.error('Error fetching:', err);
       setError('Could not load campaign. Please try again.');
@@ -173,29 +173,25 @@ function CampaignShare({ campaign: initialCampaign }) {
     }
   };
 
-  const initializeCampaign = (camp) => {
+  const initializeCampaign = (camp, hasShared) => {
     const count = camp.shareCount || 0;
     setShareCount(count);
-    const currentShares = camp.shares || 0;
-    setShares(currentShares);
-    setShareProgress(Math.min((currentShares / (count || 1)) * 100, 100));
 
-    // Set shareAttempt based on progress (original logic)
-    if (count === 0) {
+    // ── Determine user's completion status ──
+    if (hasShared) {
+      // User already shared → completed
+      setShares(count);
+      setShareProgress(100);
       setSharesComplete(true);
-      setIsClaimReady(true);
       setShareAttempt(3);
-      setTimeout(() => setShowClaimModal(true), 800);
-    } else if (currentShares >= count) {
-      setSharesComplete(true);
       setIsClaimReady(true);
-      setShareAttempt(3);
     } else {
-      const ratio = currentShares / count;
-      if (ratio === 0) setShareAttempt(0);
-      else if (ratio < 0.25) setShareAttempt(1);
-      else if (ratio < 0.75) setShareAttempt(2);
-      else setShareAttempt(3);
+      // New user: start from scratch
+      setShares(0);
+      setShareProgress(0);
+      setSharesComplete(false);
+      setShareAttempt(0);
+      setIsClaimReady(false);
     }
 
     let slug = 'campaign';
@@ -292,7 +288,7 @@ function CampaignShare({ campaign: initialCampaign }) {
 
       let increment = 0;
       if (shareAttempt === 0) {
-        increment = 0;
+        increment = 0; // first share does nothing (original behaviour)
         setShareAttempt(1);
       } else if (shareAttempt === 1) {
         increment = Math.ceil(shareCount * 0.25);
@@ -411,122 +407,92 @@ function CampaignShare({ campaign: initialCampaign }) {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 py-8 px-4 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
-      </div>
-    );
+    return <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 py-8 px-4 flex justify-center items-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
+    </div>;
   }
 
   if (error || !campaign) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="text-5xl mb-4">😕</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign not found</h2>
-          <p className="text-gray-500">{error || 'The campaign you\'re looking for doesn\'t exist.'}</p>
-          <button
-            onClick={() => router.push('/')}
-            className="mt-6 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition"
-          >
-            Go Home
-          </button>
-        </div>
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="text-center max-w-md">
+        <div className="text-5xl mb-4">😕</div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign not found</h2>
+        <p className="text-gray-500">{error || 'The campaign you\'re looking for doesn\'t exist.'}</p>
+        <button onClick={() => router.push('/')} className="mt-6 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition">Go Home</button>
       </div>
-    );
+    </div>;
   }
 
   const progress = shareCount > 0 ? Math.min((shares / shareCount) * 100, 100) : 100;
   const isComplete = sharesComplete;
+  const remaining = Math.max(shareCount - shares, 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/20 py-4 px-4 sm:py-6 sm:px-6 lg:px-8 pb-32">
       <div className="max-w-3xl mx-auto">
 
-        {/* ── Back Button ── */}
-        <button
-          onClick={() => (isComplete ? router.push('/') : router.back())}
-          className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100"
-        >
+        {/* Back Button */}
+        <button onClick={() => (isComplete ? router.push('/') : router.back())}
+          className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-3 px-3 py-1.5 rounded-lg hover:bg-gray-100">
           <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
           {isComplete ? 'Back to Home' : 'Back'}
         </button>
 
-        {/* ─── 1. TOP BANNER AD ─── */}
+        {/* Top Banner Ad */}
         <div className="my-4 w-full overflow-hidden max-w-full">
           <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
         </div>
 
-        {/* ── Hero Card ── */}
+        {/* Hero Card */}
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 overflow-hidden mb-5 transition-all hover:shadow-2xl">
           <div className="relative aspect-video w-full bg-gray-200 overflow-hidden">
             {campaign.image ? (
-              <Image
-                src={campaign.image}
-                alt={campaign.title}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 768px"
-                priority
-              />
+              <Image src={campaign.image} alt={campaign.title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 768px" priority />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300 bg-gradient-to-br from-purple-50 to-indigo-50">
-                📤
-              </div>
+              <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300 bg-gradient-to-br from-purple-50 to-indigo-50">📤</div>
             )}
-            {/* Progress bar – shows user's progress (shareAttempt based) */}
+            {/* Progress bar – shows user's own progress */}
             <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200/80">
-              <div
-                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
             </div>
           </div>
 
           <div className="p-5 sm:p-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{campaign.title || 'Campaign'}</h1>
-            {campaign.description && (
-              <p className="text-gray-500 text-sm sm:text-base mt-1">{campaign.description}</p>
-            )}
+            {campaign.description && <p className="text-gray-500 text-sm sm:text-base mt-1">{campaign.description}</p>}
 
             <div className="flex flex-wrap items-center gap-2 mt-3">
               {campaign.reward && (
                 <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200">
-                  <FaGift className="w-3.5 h-3.5" />
-                  {campaign.reward}
+                  <FaGift className="w-3.5 h-3.5" /> {campaign.reward}
                 </span>
               )}
               {isComplete && (
                 <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
-                  <FaCheckCircle className="w-3.5 h-3.5" />
-                  Complete
+                  <FaCheckCircle className="w-3.5 h-3.5" /> Complete
                 </span>
               )}
             </div>
 
-            {/* Per‑user progress text (no global numbers) */}
+            {/* Per‑user progress as X/Y shares */}
             {shareCount > 0 && !isComplete && (
               <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-700">{Math.round(progress)}%</span>
-                  <span>progress</span>
+                  <span>complete</span>
                 </div>
-                <span>{shareAttempt}/{shareCount} steps</span>
+                <span>{shares}/{shareCount} shares</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* ── Share Section ── */}
+        {/* Share Section (only if not complete) */}
         {shareCount > 0 && !isComplete && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden mt-4"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+            className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 sm:p-7 text-center relative overflow-hidden mt-4">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-100/30 rounded-full blur-2xl" />
             <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-100/20 rounded-full blur-2xl" />
 
@@ -535,147 +501,93 @@ function CampaignShare({ campaign: initialCampaign }) {
                 <FaRocket className="w-8 h-8 text-purple-600 animate-pulse" />
               </div>
               <h2 className="text-2xl font-extrabold text-gray-900">
-                {shareAttempt === 3 ? 'Almost There!' : `Share ${shareCount - shareAttempt} More`}
+                {remaining === 1 ? 'Almost There!' : `Share ${remaining} More Time${remaining > 1 ? 's' : ''}`}
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-sm mx-auto">
-                {shareAttempt === 3
+                {remaining === 1
                   ? 'One more share unlocks your reward!'
-                  : `Share this campaign to unlock "${campaign.reward || 'your reward'}"`}
+                  : `Share this campaign ${remaining} more time${remaining > 1 ? 's' : ''} to unlock "${campaign.reward || 'your reward'}"`}
               </p>
             </div>
 
-            {/* ── Messenger & WhatsApp ── */}
+            {/* Messenger & WhatsApp */}
             <div className="relative z-10 mt-5 flex flex-wrap items-center justify-center gap-3">
-              <button
-                onClick={handleMessengerShare}
-                disabled={verifying || isSharing || isComplete}
-                className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50"
-              >
-                <FaFacebookMessenger className="w-4 h-4" />
-                Messenger
+              <button onClick={handleMessengerShare} disabled={verifying || isSharing || isComplete}
+                className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50">
+                <FaFacebookMessenger className="w-4 h-4" /> Messenger
               </button>
-              <button
-                onClick={handleWhatsAppShare}
-                disabled={verifying || isSharing || isComplete}
-                className="inline-flex items-center gap-2 px-5 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50"
-              >
-                <FaWhatsapp className="w-4 h-4" />
-                WhatsApp
+              <button onClick={handleWhatsAppShare} disabled={verifying || isSharing || isComplete}
+                className="inline-flex items-center gap-2 px-5 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50">
+                <FaWhatsapp className="w-4 h-4" /> WhatsApp
               </button>
             </div>
 
-            {/* ── Main Native Share Button ── */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onHoverStart={() => setIsHovering(true)}
-              onHoverEnd={() => setIsHovering(false)}
-              onClick={handleNativeShare}
-              disabled={verifying || isSharing || isComplete}
-              className={`
-                relative z-10 mt-4 w-full inline-flex items-center justify-center gap-3 px-6 py-4 
-                bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg rounded-2xl 
-                shadow-lg hover:shadow-xl transition-all duration-200 
-                disabled:opacity-50 disabled:cursor-not-allowed
-                ${isHovering ? 'shadow-purple-200/50' : 'animate-[pulse_2s_ease-in-out_infinite]'}
-              `}
-            >
+            {/* Main Share Button */}
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onHoverStart={() => setIsHovering(true)} onHoverEnd={() => setIsHovering(false)}
+              onClick={handleNativeShare} disabled={verifying || isSharing || isComplete}
+              className={`relative z-10 mt-4 w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${isHovering ? 'shadow-purple-200/50' : 'animate-[pulse_2s_ease-in-out_infinite]'}`}>
               <FaShareAlt className={`w-5 h-5 ${isHovering ? 'animate-bounce' : ''}`} />
               {verifying ? `Verifying (${verifyingCountdown}s)` : 'Share Now & Claim ✨'}
               <FaArrowRight className="w-4 h-4" />
             </motion.button>
 
-            {/* ── Copy Full Details ── */}
+            {/* Copy Full Details */}
             <div className="relative z-10 mt-3 flex items-center justify-center gap-2 text-sm">
               <span className="text-gray-400">or</span>
-              <button
-                onClick={copyFullContent}
-                className="inline-flex items-center gap-1.5 text-purple-600 hover:text-purple-800 transition-colors font-medium"
-              >
-                <FaCopy className="w-3.5 h-3.5" />
-                {isCopied ? 'Copied!' : 'Copy Full Details'}
+              <button onClick={copyFullContent} className="inline-flex items-center gap-1.5 text-purple-600 hover:text-purple-800 transition-colors font-medium">
+                <FaCopy className="w-3.5 h-3.5" /> {isCopied ? 'Copied!' : 'Copy Full Details'}
               </button>
             </div>
 
             {toastMessage && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative z-10 mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm font-medium"
-              >
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                className="relative z-10 mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 text-blue-700 text-sm font-medium">
                 {toastMessage}
               </motion.div>
             )}
           </motion.div>
         )}
 
-        {/* ── Claim Button ── */}
+        {/* Claim Button */}
         {isComplete && (
           <div className="mt-6">
             {!isClaimReady ? (
-               <button
-                 disabled
-                 className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gray-200 text-gray-500 font-bold text-lg rounded-2xl cursor-not-allowed transition-all"
-               >
-                 <FaSpinner className="w-5 h-5 animate-spin" />
-                 Verifying final steps...
-               </button>
+              <button disabled className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gray-200 text-gray-500 font-bold text-lg rounded-2xl cursor-not-allowed transition-all">
+                <FaSpinner className="w-5 h-5 animate-spin" /> Verifying final steps...
+              </button>
             ) : (
-               <button
-                 onClick={handleClaim}
-                 disabled={isCompleting}
-                 className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.01] active:scale-[0.98]"
-               >
-                 {isCompleting ? (
-                   <FaSpinner className="w-5 h-5 animate-spin" />
-                 ) : (
-                   <FaGift className="w-5 h-5" />
-                 )}
-                 {isCompleting ? 'Processing...' : 'Claim Your Reward'}
-                 {!isCompleting && <FaArrowRight className="w-4 h-4" />}
-               </button>
+              <button onClick={handleClaim} disabled={isCompleting}
+                className="w-full inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.01] active:scale-[0.98]">
+                {isCompleting ? <FaSpinner className="w-5 h-5 animate-spin" /> : <FaGift className="w-5 h-5" />}
+                {isCompleting ? 'Processing...' : 'Claim Your Reward'}
+                {!isCompleting && <FaArrowRight className="w-4 h-4" />}
+              </button>
             )}
           </div>
         )}
 
-        {/* ─── 2. NATIVE AD ─── */}
-        <div className="mt-8">
-          <NativeAd />
-        </div>
+        {/* Native Ad */}
+        <div className="mt-8"><NativeAd /></div>
 
       </div>
 
-      {/* ── Claim Success Modal ── */}
+      {/* Claim Success Modal */}
       <AnimatePresence>
         {showClaimModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl border border-gray-100 my-8"
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl border border-gray-100 my-8">
               <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
                 <FaCheckCircle className="w-10 h-10 text-green-500" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900">🎉 Reward Unlocked!</h2>
-              <p className="text-gray-500 mt-2">
-                {campaign?.reward ? `You've claimed: ${campaign.reward}` : 'Your reward has been claimed successfully!'}
-              </p>
+              <p className="text-gray-500 mt-2">{campaign?.reward ? `You've claimed: ${campaign.reward}` : 'Your reward has been claimed successfully!'}</p>
               <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                <p className="text-sm text-gray-500 font-medium">
-                  Redirecting in <strong className="text-purple-600">{claimCountdown}s</strong>
-                </p>
+                <p className="text-sm text-gray-500 font-medium">Redirecting in <strong className="text-purple-600">{claimCountdown}s</strong></p>
                 <div className="mt-3 w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 rounded-full"
-                    style={{ width: `${((2 - claimCountdown) / 2) * 100}%` }}
-                  />
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 rounded-full" style={{ width: `${((2 - claimCountdown) / 2) * 100}%` }} />
                 </div>
               </div>
             </motion.div>
@@ -683,52 +595,27 @@ function CampaignShare({ campaign: initialCampaign }) {
         )}
       </AnimatePresence>
 
-      {/* ─── 3. STICKY BOTTOM BANNER AD ─── */}
+      {/* Sticky Bottom Banner */}
       {showStickyAd && (
         <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none pb-2 sm:pb-4">
           <div className="bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] p-1.5 sm:p-2 rounded-xl pointer-events-auto border border-gray-200/50 relative mx-auto w-[calc(100vw-16px)] sm:w-auto sm:max-w-[760px]">
-            
-            <button 
-              onClick={() => setShowStickyAd(false)}
-              className="absolute -top-3 -right-2 bg-white border border-gray-200 text-gray-500 hover:text-red-500 rounded-full w-7 h-7 flex items-center justify-center transition shadow-md z-10"
-              aria-label="Close Ad"
-            >
+            <button onClick={() => setShowStickyAd(false)} className="absolute -top-3 -right-2 bg-white border border-gray-200 text-gray-500 hover:text-red-500 rounded-full w-7 h-7 flex items-center justify-center transition shadow-md z-10">
               <FaTimes className="w-3 h-3" />
             </button>
-            
             <IframeAd adKey="bd8fef55bf7ce9cf90e7c6aa9b2a7703" width={728} height={90} />
           </div>
         </div>
       )}
 
-      {/* ─── 4. GLOBAL NETWORK ADS ─── */}
-      <Script
-        id="popunder-ad"
-        src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js"
-        strategy="afterInteractive"
-      />
-
-      <Script
-        id="social-bar-ad"
-        src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js"
-        strategy="afterInteractive"
-      />
+      {/* Global Network Scripts */}
+      <Script id="popunder-ad" src="https://pl30634061.effectivecpmnetwork.com/8e/bb/ac/8ebbac19d902ee907cd27ffdddc2ac6b.js" strategy="afterInteractive" />
+      <Script id="social-bar-ad" src="https://pl30631129.effectivecpmnetwork.com/05/02/b9/0502b976b36284a7767fd6cb4ce00971.js" strategy="afterInteractive" />
 
       <style jsx>{`
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
-        }
-        .animate-bounce {
-          animation: bounce 0.6s infinite;
-        }
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        .animate-bounce { animation: bounce 0.6s infinite; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );
@@ -741,5 +628,4 @@ export async function getServerSideProps({ query }) {
   return { props: { campaign } };
 }
 
-// ── Wrap with Meta ──
 export default withCampaignMeta(CampaignShare, defaultMeta);
