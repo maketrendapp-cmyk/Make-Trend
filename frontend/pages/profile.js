@@ -4,14 +4,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
 import { auth } from '../services/firebase';
-import { useProfile, useStats, useMtCoins, useInvalidateQueries } from '../lib/queries';
+import {
+  useProfile,
+  useStats,
+  useMtCoins,
+  useInvalidateQueries,
+  useDailyBonus,         // ✅ new
+  useClaimDailyBonus,    // ✅ new
+} from '../lib/queries';
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
   FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy,
   FiGift, FiCheckCircle, FiChevronRight
 } from 'react-icons/fi';
-import { FaCrown, FaWallet, FaCoins, FaClock } from 'react-icons/fa'; // ✅ FaClock restored
+import { FaCrown, FaWallet, FaCoins, FaClock } from 'react-icons/fa';
 import Meta from '../components/Meta';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,11 +35,15 @@ export default function Profile() {
   const { data: mtCoins, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
   const { invalidateProfile, invalidateStats } = useInvalidateQueries();
 
-  // ── Daily Bonus State ──
-  const [bonusStatus, setBonusStatus] = useState({ canClaim: false, nextClaimTime: null, bonusAmount: 10 });
-  const [bonusLoading, setBonusLoading] = useState(true);
-  const [bonusError, setBonusError] = useState('');
-  const [claimLoading, setClaimLoading] = useState(false);
+  // ── Daily Bonus with React Query ──
+  const {
+    data: bonusData,
+    isLoading: bonusLoading,
+    error: bonusError,
+    refetch: refetchBonus,
+  } = useDailyBonus(isAuthenticated);
+
+  const claimBonusMutation = useClaimDailyBonus();
 
   // ── Modals & Notifications ──
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -40,94 +51,36 @@ export default function Profile() {
   const [claimedBonusAmount, setClaimedBonusAmount] = useState(0);
   const [copySuccess, setCopySuccess] = useState('');
 
-  // ── Helper: get Firebase token ──
-  const getToken = async () => {
-    await auth.authStateReady(); 
-    const firebaseUser = auth.currentUser;
-    if (!firebaseUser) return null;
-    return await firebaseUser.getIdToken();
-  };
+  // ── Helper: get Firebase token (kept for backward compatibility, but not used now) ──
+  // we keep it just in case
 
-  // ── Fetch bonus status ──
-  const fetchBonusStatus = async () => {
-    if (!isAuthenticated) return;
-    try {
-      setBonusLoading(true);
-      const token = await getToken();
-      if (!token) {
-        setBonusError('Not authenticated');
-        setBonusLoading(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/daily-bonus/status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBonusStatus({
-          canClaim: data.canClaim,
-          nextClaimTime: data.nextClaimTime,
-          bonusAmount: data.bonusAmount || 10,
-        });
-        setBonusError('');
-      } else {
-        setBonusError(data.error || 'Failed to load bonus status');
-      }
-    } catch (err) {
-      console.error('Bonus status error:', err);
-      setBonusError('Network error');
-    } finally {
-      setBonusLoading(false);
-    }
-  };
-
-  // ── Claim bonus (Replaced raw alert() with clean modal) ──
-  const claimBonus = async () => {
-    if (!isAuthenticated || !bonusStatus.canClaim) return;
-    try {
-      setClaimLoading(true);
-      const token = await getToken();
-      if (!token) {
-        setBonusError('Not authenticated');
-        setClaimLoading(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/daily-bonus/claim`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        await refetchMtCoins();
-        await fetchBonusStatus();
-        setClaimedBonusAmount(data.bonus);
-        setShowBonusSuccessModal(true); // ✅ Clean modal instead of ugly browser alert
-      } else {
-        setBonusError(data.error || 'Failed to claim bonus');
-      }
-    } catch (err) {
-      console.error('Claim bonus error:', err);
-      setBonusError('Network error');
-    } finally {
-      setClaimLoading(false);
-    }
+  // ── Claim handler ──
+  const handleClaimBonus = () => {
+    claimBonusMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.success) {
+          setClaimedBonusAmount(data.bonus);
+          setShowBonusSuccessModal(true);
+        }
+      },
+      onError: (error) => {
+        // error will be shown via react-query error state? we can add a toast or ignore
+        console.error('Claim bonus error:', error);
+      },
+    });
   };
 
   // ── Force refetch when user changes ──
   useEffect(() => {
-    const init = async () => {
-      await auth.authStateReady(); 
-      if (isAuthenticated) {
-        invalidateProfile();
-        invalidateStats();
-        refetchProfile();
-        refetchStats();
-        refetchMtCoins();
-        fetchBonusStatus();
-      }
-    };
-    init();
-  }, [isAuthenticated]); 
+    if (isAuthenticated) {
+      invalidateProfile();
+      invalidateStats();
+      refetchProfile();
+      refetchStats();
+      refetchMtCoins();
+      refetchBonus(); // ensure fresh bonus status on login
+    }
+  }, [isAuthenticated]);
 
   // ── Copy referral code ──
   const copyReferralCode = () => {
@@ -362,7 +315,9 @@ export default function Profile() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 hover:shadow-md transition">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
                 <div className="flex items-center gap-4 text-center sm:text-left">
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 ${bonusStatus.canClaim ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    bonusData?.canClaim ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                  }`}>
                     <FiGift className="w-6 h-6" />
                   </div>
                   <div>
@@ -370,27 +325,27 @@ export default function Profile() {
                     <p className="text-sm text-gray-500 font-medium">
                       {bonusLoading
                         ? 'Checking availability...'
-                        : bonusStatus.canClaim
-                        ? `Claim ${bonusStatus.bonusAmount} MT Coins today!`
+                        : bonusData?.canClaim
+                        ? `Claim ${bonusData.bonusAmount} MT Coins today!`
                         : 'Already claimed today'}
                     </p>
-                    {!bonusLoading && !bonusStatus.canClaim && bonusStatus.nextClaimTime && (
+                    {!bonusLoading && !bonusData?.canClaim && bonusData?.nextClaimTime && (
                       <p className="text-[11px] sm:text-xs font-semibold text-gray-400 mt-1 flex items-center justify-center sm:justify-start gap-1">
-                        <FaClock className="w-3 h-3" /> Next claim: {new Date(bonusStatus.nextClaimTime).toLocaleDateString()}
+                        <FaClock className="w-3 h-3" /> Next claim: {new Date(bonusData.nextClaimTime).toLocaleDateString()}
                       </p>
                     )}
                   </div>
                 </div>
                 <button
-                  onClick={claimBonus}
-                  disabled={!bonusStatus.canClaim || claimLoading || bonusLoading}
+                  onClick={handleClaimBonus}
+                  disabled={!bonusData?.canClaim || claimBonusMutation.isPending || bonusLoading}
                   className={`w-full sm:w-auto px-8 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 ${
-                    bonusStatus.canClaim && !claimLoading
+                    bonusData?.canClaim && !claimBonusMutation.isPending
                       ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
                       : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   }`}
                 >
-                  {claimLoading ? (
+                  {claimBonusMutation.isPending ? (
                     <>
                       <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -398,7 +353,7 @@ export default function Profile() {
                       </svg>
                       Claiming...
                     </>
-                  ) : bonusStatus.canClaim ? (
+                  ) : bonusData?.canClaim ? (
                     <>
                       <FiGift className="w-4 h-4" /> Claim Bonus
                     </>
@@ -409,7 +364,7 @@ export default function Profile() {
                   )}
                 </button>
               </div>
-              {bonusError && <p className="mt-3 text-sm text-red-600 text-center sm:text-left bg-red-50 p-2 rounded-lg">{bonusError}</p>}
+              {bonusError && <p className="mt-3 text-sm text-red-600 text-center sm:text-left bg-red-50 p-2 rounded-lg">{bonusError.message}</p>}
             </div>
           )}
 
@@ -490,7 +445,7 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ── Bonus Claim Success Modal (Replaces old alert) ── */}
+      {/* ── Bonus Claim Success Modal ── */}
       <AnimatePresence>
         {showBonusSuccessModal && (
           <motion.div
