@@ -4903,11 +4903,47 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
     if (!doc.exists) return res.status(404).json({ success: false, error: 'Task not found' });
     if (doc.data().uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
 
+    // ── Find all exchanges that reference this task ──
+    const exchangesA = await db.collection('exchanges')
+      .where('userATaskId', '==', id)
+      .get();
+    const exchangesB = await db.collection('exchanges')
+      .where('userBTaskId', '==', id)
+      .get();
+
+    const allExchanges = [...exchangesA.docs, ...exchangesB.docs];
+    const affectedUserIds = new Set();
+
+    // ── Cancel only ACTIVE exchanges, leave others unchanged ──
+    for (const exchangeDoc of allExchanges) {
+      const data = exchangeDoc.data();
+      affectedUserIds.add(data.userAUid);
+      affectedUserIds.add(data.userBUid);
+
+      if (data.overallStatus === 'active') {
+        await exchangeDoc.ref.update({
+          overallStatus: 'cancelled',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`🔄 Cancelled active exchange ${exchangeDoc.id} because task ${id} was deleted.`);
+      }
+    }
+
+    // ── Invalidate exchange caches for all affected users ──
+    for (const userId of affectedUserIds) {
+      await invalidateUserExchanges(userId);
+    }
+
     // ── Remove from global feed cache ──
     await removeTaskFromGlobalFeed(id);
 
+    // ── Delete the task document ──
     await docRef.delete();
-    res.json({ success: true, message: 'Task deleted' });
+
+    res.json({
+      success: true,
+      message: `Task deleted${allExchanges.some(e => e.data().overallStatus === 'active') ? ' and active exchanges cancelled' : ''}.`
+    });
   } catch (error) {
     console.error('Delete task error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete task' });
