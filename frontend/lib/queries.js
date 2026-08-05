@@ -178,7 +178,7 @@ export function useWithdrawalMethods(enabled = false) {
       return data.methods || [];
     },
     enabled,
-    staleTime: 3600 * 1000, // 1 hour
+    staleTime: 3600 * 1000,
   });
 }
 
@@ -223,7 +223,7 @@ export function useCreateWithdrawal() {
   });
 }
 
-// ── 🔥 Daily Bonus Status ──
+// ── Daily Bonus Status ──
 export function useDailyBonus(enabled = false) {
   return useQuery({
     queryKey: ['dailyBonus'],
@@ -231,17 +231,17 @@ export function useDailyBonus(enabled = false) {
       const token = await getToken();
       if (!token) return null;
       const data = await apiRequest('/daily-bonus/status', {}, token);
-      return data; // { canClaim, nextClaimTime, bonusAmount }
+      return data;
     },
     enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes – bonus status rarely changes
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     retry: 1,
   });
 }
 
-// ── 🔥 Claim Daily Bonus ──
+// ── Claim Daily Bonus ──
 export function useClaimDailyBonus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -252,7 +252,7 @@ export function useClaimDailyBonus() {
         method: 'POST',
         body: {},
       }, token);
-      return data; // { success, bonus }
+      return data;
     },
     onSuccess: (data) => {
       if (data.success) {
@@ -266,7 +266,7 @@ export function useClaimDailyBonus() {
   });
 }
 
-// ── 🔥 Referrals ──
+// ── Referrals ──
 export function useReferrals(enabled = false) {
   return useQuery({
     queryKey: ['referrals'],
@@ -277,9 +277,106 @@ export function useReferrals(enabled = false) {
       return data;
     },
     enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: true, // refetch when tab becomes visible
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
     retry: 1,
+  });
+}
+
+// ── 🔥 GROW TOGETHER QUERIES ──
+
+// 1. Grow Feed (infinite scroll)
+export function useGrowFeed(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ['growFeed'],
+    queryFn: async ({ pageParam = null }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const url = pageParam
+        ? `/grow-feed?limit=20&lastTaskId=${pageParam}`
+        : '/grow-feed?limit=20';
+      const data = await apiRequest(url, {}, token);
+      return {
+        tasks: data.tasks || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
+    },
+    enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+}
+
+// 2. My Tasks
+export function useMyTasks(enabled = true) {
+  return useQuery({
+    queryKey: ['myTasks'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return [];
+      const data = await apiRequest('/social-tasks', {}, token);
+      return data.tasks || [];
+    },
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// 3. Available Tasks (for modal selection)
+export function useAvailableTasks(enabled = true) {
+  return useQuery({
+    queryKey: ['availableTasks'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return [];
+      const data = await apiRequest('/social-tasks/available', {}, token);
+      return data.tasks || [];
+    },
+    enabled,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// 4. My Exchanges (infinite scroll with status filter)
+export function useMyExchanges(status = '', enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ['myExchanges', status],
+    queryFn: async ({ pageParam = null }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      let url = `/exchanges?limit=20`;
+      if (status) url += `&status=${status}`;
+      if (pageParam) url += `&lastId=${pageParam}`;
+      const data = await apiRequest(url, {}, token);
+      return {
+        exchanges: data.exchanges || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
+    },
+    enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// 5. Exchange Detail
+export function useExchangeDetail(id, enabled = true) {
+  return useQuery({
+    queryKey: ['exchangeDetail', id],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/exchanges/${id}`, {}, token);
+      return data.exchange;
+    },
+    enabled: !!id && enabled,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -299,6 +396,11 @@ export function useInvalidateQueries() {
     invalidateWithdrawalMethods: () => queryClient.invalidateQueries(['withdrawalMethods']),
     invalidateReferrals: () => queryClient.invalidateQueries(['referrals']),
     invalidateDailyBonus: () => queryClient.invalidateQueries(['dailyBonus']),
+    invalidateGrowFeed: () => queryClient.invalidateQueries(['growFeed']),
+    invalidateMyTasks: () => queryClient.invalidateQueries(['myTasks']),
+    invalidateAvailableTasks: () => queryClient.invalidateQueries(['availableTasks']),
+    invalidateMyExchanges: () => queryClient.invalidateQueries(['myExchanges']),
+    invalidateExchangeDetail: (id) => queryClient.invalidateQueries(['exchangeDetail', id]),
     invalidateAll: () => {
       queryClient.invalidateQueries(['profile']);
       queryClient.invalidateQueries(['stats']);
@@ -312,6 +414,11 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['withdrawalMethods']);
       queryClient.invalidateQueries(['referrals']);
       queryClient.invalidateQueries(['dailyBonus']);
+      queryClient.invalidateQueries(['growFeed']);
+      queryClient.invalidateQueries(['myTasks']);
+      queryClient.invalidateQueries(['availableTasks']);
+      queryClient.invalidateQueries(['myExchanges']);
+      // exchangeDetail keys are dynamic, so skip here
     },
   };
 }
