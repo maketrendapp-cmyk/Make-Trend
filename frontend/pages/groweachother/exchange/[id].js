@@ -85,6 +85,30 @@ export default function ExchangeDetail() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Format date robustly ──
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    try {
+      let date;
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } else if (timestamp.seconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        date = new Date(timestamp);
+      }
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
+  // ── Fetch exchange ──
   const fetchExchange = async () => {
     if (!id || !isAuthenticated) return;
     try {
@@ -118,6 +142,7 @@ export default function ExchangeDetail() {
     else if (!isAuthenticated) setLoading(false);
   }, [id, isAuthenticated, user]);
 
+  // ── Update exchange status ──
   const updateStatus = async (status) => {
     if (!exchange || submitting) return;
     setSubmitting(true);
@@ -229,9 +254,11 @@ export default function ExchangeDetail() {
   const MyStatusClass = getStatusClass(myStatus);
   const OtherStatusClass = getStatusClass(otherStatus);
 
+  const exchangeIdDisplay = exchange.id?.slice(-6) || id?.slice(-6) || 'N/A';
+
   return (
     <>
-      <Meta title={`Exchange #${exchange.id?.slice(-6) || ''} | Make Trend`} />
+      <Meta title={`Exchange #${exchangeIdDisplay} | Make Trend`} />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-4xl mx-auto">
           <Link href="/groweachother/my-exchanges" className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition mb-4">
@@ -242,8 +269,8 @@ export default function ExchangeDetail() {
             {/* ── Header ── */}
             <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Exchange #{exchange.id?.slice(-6) || 'N/A'}</h1>
-                <p className="text-sm text-gray-500">Created {new Date(exchange.createdAt?.toDate?.() || exchange.createdAt).toLocaleDateString()}</p>
+                <h1 className="text-2xl font-bold text-gray-900">Exchange #{exchangeIdDisplay}</h1>
+                <p className="text-sm text-gray-500">Created {formatDate(exchange.createdAt)}</p>
               </div>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border ${
                 isCompleted ? 'text-blue-600 bg-blue-50 border-blue-200' :
