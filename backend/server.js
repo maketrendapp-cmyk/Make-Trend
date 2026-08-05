@@ -4672,13 +4672,16 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     const docRef = await db.collection('socialTasks').add(taskData);
     const newTask = { id: docRef.id, ...taskData };
 
+    // ── Fetch the user's info to populate owner ──
+    const ownerInfo = await getUserInfo(uid);
+
     // ── Update feed cache in‑place: add the new task to the first page ──
     await updateUserFeedCache(uid, (data) => {
       if (!data.tasks) return null;
       if (data.tasks.length >= 25) {
         data.tasks = data.tasks.slice(0, 24);
       }
-      data.tasks = [{ id: docRef.id, ...taskData, owner: null, isOwn: true, hasExchange: false }, ...data.tasks];
+      data.tasks = [{ id: docRef.id, ...taskData, owner: ownerInfo, isOwn: true, hasExchange: false }, ...data.tasks];
       return data;
     });
 
