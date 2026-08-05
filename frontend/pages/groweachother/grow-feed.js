@@ -13,6 +13,8 @@ import {
   FiRefreshCw,
   FiPlus,
   FiExternalLink,
+  FiCompass,
+  FiRepeat,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -42,14 +44,14 @@ const PLATFORM_ICONS = {
 };
 
 const PLATFORM_COLORS = {
-  youtube: 'text-red-600',
-  instagram: 'text-pink-600',
-  twitter: 'text-blue-400',
-  facebook: 'text-blue-700',
-  tiktok: 'text-black',
-  twitch: 'text-purple-600',
-  linkedin: 'text-blue-600',
-  github: 'text-gray-800',
+  youtube: 'text-red-600 bg-red-50',
+  instagram: 'text-pink-600 bg-pink-50',
+  twitter: 'text-blue-400 bg-blue-50',
+  facebook: 'text-blue-700 bg-blue-50',
+  tiktok: 'text-black bg-gray-100',
+  twitch: 'text-purple-600 bg-purple-50',
+  linkedin: 'text-blue-600 bg-blue-50',
+  github: 'text-gray-800 bg-gray-100',
 };
 
 export default function GrowFeed() {
@@ -89,7 +91,6 @@ export default function GrowFeed() {
         return;
       }
 
-      // Add timestamp to bypass cache when force is true
       const ts = force ? `&_t=${Date.now()}` : '';
       const url = reset
         ? `${API_BASE}/grow-feed?limit=20${ts}`
@@ -188,7 +189,6 @@ export default function GrowFeed() {
       setShowModal(false);
       setSelectedTargetTask(null);
       setSelectedMyTask(null);
-      // Force refresh the feed (bypass cache)
       setLastId(null);
       setHasMore(true);
       await fetchFeed(true, true);
@@ -230,25 +230,13 @@ export default function GrowFeed() {
     };
   }, [loading, hasMore, tasks.length]);
 
-  // ── Get platform icon ──
   const getPlatformIcon = (platform) => {
     const Icon = PLATFORM_ICONS[platform?.toLowerCase()] || FaLink;
     return Icon;
   };
 
   const getPlatformColor = (platform) => {
-    return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600';
-  };
-
-  // ── Helper to truncate URL ──
-  const truncateUrl = (url) => {
-    if (!url) return '';
-    try {
-      const parsed = new URL(url);
-      return parsed.hostname + parsed.pathname;
-    } catch {
-      return url.replace(/^https?:\/\//, '').slice(0, 40);
-    }
+    return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600 bg-purple-50';
   };
 
   if (!isAuthenticated) {
@@ -256,17 +244,17 @@ export default function GrowFeed() {
       <>
         <Meta title="Grow Feed | Make Trend" />
         <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FiHeart className="w-10 h-10 text-purple-600" />
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-sm p-8 text-center border border-gray-100">
+            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
+              <FiHeart className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Grow Together</h2>
-            <p className="text-gray-500 mt-2 text-sm">
+            <h2 className="text-xl font-bold text-gray-900">Grow Together Feed</h2>
+            <p className="text-gray-500 mt-1.5 text-sm">
               Sign in to see tasks from others and start growing together.
             </p>
             <button
               onClick={() => router.push('/login')}
-              className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition w-full"
+              className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium text-sm rounded-xl hover:bg-purple-700 transition w-full shadow-sm"
             >
               Sign In
             </button>
@@ -293,7 +281,6 @@ export default function GrowFeed() {
                     </div>
                   </div>
                   <div className="h-4 bg-gray-200 rounded w-40" />
-                  <div className="h-3 bg-gray-200 rounded w-24 mt-2" />
                   <div className="mt-4 h-10 bg-gray-200 rounded-xl w-32" />
                 </div>
               ))}
@@ -309,14 +296,22 @@ export default function GrowFeed() {
       <Meta title="Grow Feed | Make Trend" description="Help others grow and get help in return." />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
-          {/* ── Header ── */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <FiHeart className="text-purple-600" />
-                Grow Feed
-              </h1>
-              <p className="text-sm text-gray-500">Help others grow and get help in return</p>
+          
+          {/* ── Top Navigation Bar ── */}
+          <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/groweachother/my-tasks')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl font-medium text-xs sm:text-sm transition"
+              >
+                <FiPlus className="w-4 h-4" /> My Tasks
+              </button>
+              <button
+                onClick={() => router.push('/groweachother/my-exchanges')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-medium text-xs sm:text-sm transition"
+              >
+                <FiRepeat className="w-4 h-4" /> Exchanges
+              </button>
             </div>
             <button
               onClick={() => {
@@ -324,28 +319,39 @@ export default function GrowFeed() {
                 setHasMore(true);
                 fetchFeed(true, true);
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-purple-600 hover:text-purple-800 transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
+              title="Refresh Feed"
             >
               <FiRefreshCw className="w-4 h-4" />
-              Refresh
             </button>
           </div>
 
+          {/* ── Header ── */}
+          <div className="flex items-center justify-between mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <FiHeart className="text-purple-600 w-5 h-5" />
+                Grow Feed
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Help others grow and receive mutual engagement</p>
+            </div>
+          </div>
+
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
               {error}
             </div>
           )}
 
           {/* ── Feed ── */}
           {tasks.length === 0 && !loading && (
-            <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-5xl mb-3">🌱</div>
-              <p className="text-gray-500 font-medium">No tasks available right now.</p>
-              <p className="text-sm text-gray-400">Check back later or create your own tasks!</p>
+            <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
+              <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">🌱</div>
+              <h3 className="text-base font-bold text-gray-900 mb-1">No tasks available</h3>
+              <p className="text-sm text-gray-400 mb-6 font-medium">Check back later or create your own tasks!</p>
               <button
                 onClick={() => router.push('/groweachother/my-tasks')}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
               >
                 <FiPlus className="w-4 h-4" />
                 Create Task
@@ -356,15 +362,16 @@ export default function GrowFeed() {
           <div className="space-y-4">
             {tasks.map((task) => {
               const Icon = getPlatformIcon(task.platform);
-              const color = getPlatformColor(task.platform);
+              const colorClass = getPlatformColor(task.platform);
               return (
                 <div
                   key={task.id}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition"
+                  className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all"
                 >
-                  <div className="flex items-start justify-between">
+                  {/* Owner Header */}
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {task.owner?.avatar ? (
                           <img
                             src={task.owner.avatar}
@@ -372,66 +379,73 @@ export default function GrowFeed() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <FiUser className="w-5 h-5 text-purple-600" />
+                          <FiUser className="w-4 h-4 text-purple-600" />
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">
-                          {task.owner?.fullname || task.owner?.username || 'User'}
+                        <p className="font-bold text-gray-900 text-sm">
+                          {task.owner?.fullname || task.owner?.username || 'Community Member'}
                         </p>
-                        <p className="text-xs text-gray-400">@{task.owner?.username || 'unknown'}</p>
+                        <p className="text-xs text-gray-400 font-medium">@{task.owner?.username || 'user'}</p>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full">
+                    <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full uppercase tracking-wider">
                       {task.platform || 'Social'}
                     </span>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      {React.createElement(Icon, {
-                        className: `w-5 h-5 ${color}`,
-                      })}
+                  {/* Clean Post Card Layout (Replaced Raw URL) */}
+                  <div className="bg-gray-50/70 border border-gray-200/60 rounded-2xl p-4 mb-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200/50 shadow-sm ${colorClass}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                            {task.platform || 'Platform'} Request
+                          </span>
+                          <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md">
+                            {task.taskType || 'Support'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-700 truncate">
+                          {task.title || `${task.taskType} my ${task.platform} profile`}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-700">
-                        {task.taskType || 'Follow'}
-                      </p>
-                      {task.url && (
-                        <a
-                          href={task.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-500 hover:underline flex items-center gap-1"
-                        >
-                          <span className="truncate">{truncateUrl(task.url)}</span>
-                          <FiExternalLink className="w-3 h-3 flex-shrink-0" />
-                        </a>
-                      )}
-                    </div>
+
+                    <a
+                      href={task.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition shadow-sm flex-shrink-0"
+                    >
+                      <span>Visit</span>
+                      <FiExternalLink className="w-3.5 h-3.5 text-gray-400" />
+                    </a>
                   </div>
 
-                  {task.title && (
-                    <p className="mt-2 text-sm text-gray-500">{task.title}</p>
-                  )}
+                  {/* Footer / Action */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-gray-400 font-medium">
+                      Mutual community exchange
+                    </span>
 
-                  <div className="mt-4 flex items-center gap-3">
                     {task.isOwn ? (
-                      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-xl">
-                        <FiUser className="w-4 h-4" />
-                        Your Task
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-500 text-xs font-semibold rounded-xl">
+                        <FiUser className="w-3.5 h-3.5" /> Your Task
                       </span>
                     ) : task.hasExchange ? (
-                      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-xl">
-                        <FiCheckCircle className="w-4 h-4" />
-                        Already Exchanged
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 text-xs font-semibold rounded-xl">
+                        <FiCheckCircle className="w-3.5 h-3.5" /> Exchanged
                       </span>
                     ) : (
                       <button
                         onClick={() => handleHelpToGrow(task)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-xl hover:shadow-lg transition shadow-sm"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:shadow-md transition shadow-sm active:scale-95"
                       >
-                        <FiHeart className="w-4 h-4" />
+                        <FiHeart className="w-3.5 h-3.5" />
                         Help To Grow
                       </button>
                     )}
@@ -443,11 +457,11 @@ export default function GrowFeed() {
 
           {/* ── Infinite scroll sentinel ── */}
           {hasMore && (
-            <div id="feed-end" className="py-4 flex justify-center">
+            <div id="feed-end" className="py-6 flex justify-center">
               {loading ? (
-                <div className="flex items-center gap-2 text-gray-400">
-                  <FiLoader className="w-5 h-5 animate-spin" />
-                  Loading more...
+                <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
+                  <FiLoader className="w-4 h-4 animate-spin text-purple-600" />
+                  Loading more tasks...
                 </div>
               ) : (
                 <div className="h-4" />
@@ -456,8 +470,8 @@ export default function GrowFeed() {
           )}
 
           {!hasMore && tasks.length > 0 && (
-            <p className="text-center text-sm text-gray-400 py-4">
-              You've seen all tasks 🎉
+            <p className="text-center text-xs font-medium text-gray-400 py-6">
+              You've reached the end of the feed 🎉
             </p>
           )}
         </div>
@@ -465,10 +479,10 @@ export default function GrowFeed() {
 
       {/* ── Help To Grow Modal ── */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Help To Grow</h2>
+              <h2 className="text-lg font-bold text-gray-900">Help To Grow</h2>
               <button
                 onClick={() => {
                   setShowModal(false);
@@ -476,75 +490,77 @@ export default function GrowFeed() {
                   setSelectedMyTask(null);
                   setModalError('');
                 }}
-                className="text-gray-400 hover:text-gray-600 transition"
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"
               >
-                <FiX className="w-6 h-6" />
+                <FiX className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mb-4 p-3 bg-purple-50 rounded-xl">
-              <p className="text-sm text-gray-700">
+            <div className="mb-4 p-3.5 bg-purple-50/80 border border-purple-100 rounded-2xl">
+              <p className="text-xs sm:text-sm text-purple-900 font-medium leading-relaxed">
                 You're helping <strong>{selectedTargetTask?.owner?.fullname || selectedTargetTask?.owner?.username}</strong>
                 {' '}with their <strong>{selectedTargetTask?.taskType}</strong> on{' '}
                 <strong>{selectedTargetTask?.platform}</strong>.
               </p>
             </div>
 
-            <p className="text-sm font-medium text-gray-700 mb-3">
-              What do you want them to help you with?
+            <p className="text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wider mb-2.5">
+              Select your task to return the favor:
             </p>
 
             {myTasks.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-gray-500 text-sm">You don't have any active tasks.</p>
+              <div className="text-center py-6 bg-gray-50 rounded-2xl border border-gray-100">
+                <p className="text-gray-500 text-xs sm:text-sm font-medium mb-3">You don't have any active tasks available.</p>
                 <button
                   onClick={() => {
                     setShowModal(false);
                     router.push('/groweachother/my-tasks');
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-xs font-bold shadow-sm"
                 >
                   <FiPlus className="w-4 h-4" />
-                  Create Task
+                  Create Task First
                 </button>
               </div>
             ) : (
-              <div className="space-y-2 mb-4">
-                {myTasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => setSelectedMyTask(task)}
-                    className={`w-full text-left p-3 rounded-xl border transition ${
-                      selectedMyTask?.id === task.id
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-purple-200 hover:bg-purple-50/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                        {React.createElement(getPlatformIcon(task.platform), {
-                          className: `w-4 h-4 ${getPlatformColor(task.platform)}`,
-                        })}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {task.platform} – {task.taskType}
-                        </p>
-                        {task.title && (
-                          <p className="text-xs text-gray-500">{task.title}</p>
+              <div className="space-y-2 mb-4 max-h-56 overflow-y-auto pr-1">
+                {myTasks.map((task) => {
+                  const Icon = getPlatformIcon(task.platform);
+                  const colorClass = getPlatformColor(task.platform);
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => setSelectedMyTask(task)}
+                      className={`w-full text-left p-3 rounded-2xl border transition-all ${
+                        selectedMyTask?.id === task.id
+                          ? 'border-purple-500 bg-purple-50/60 shadow-sm'
+                          : 'border-gray-200/80 hover:border-purple-200 hover:bg-purple-50/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200/60 shadow-sm ${colorClass}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                            {task.platform} – {task.taskType}
+                          </p>
+                          {task.title && (
+                            <p className="text-[11px] text-gray-500 truncate">{task.title}</p>
+                          )}
+                        </div>
+                        {selectedMyTask?.id === task.id && (
+                          <FiCheckCircle className="w-5 h-5 text-purple-600 ml-auto flex-shrink-0" />
                         )}
                       </div>
-                      {selectedMyTask?.id === task.id && (
-                        <FiCheckCircle className="w-5 h-5 text-green-500 ml-auto" />
-                      )}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
             {modalError && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-bold">
                 {modalError}
               </div>
             )}
@@ -552,16 +568,16 @@ export default function GrowFeed() {
             <button
               onClick={handleCreateExchange}
               disabled={!selectedMyTask || submitting || myTasks.length === 0}
-              className={`w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
+              className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
                 !selectedMyTask || submitting || myTasks.length === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-lg'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-md active:scale-95'
               }`}
             >
               {submitting ? (
                 <>
-                  <FiLoader className="w-5 h-5 animate-spin" />
-                  Creating...
+                  <FiLoader className="w-4 h-4 animate-spin" />
+                  Creating Exchange...
                 </>
               ) : (
                 'Create Exchange'
