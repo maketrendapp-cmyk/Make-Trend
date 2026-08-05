@@ -4842,6 +4842,23 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
     if (!doc.exists) return res.status(404).json({ success: false, error: 'Task not found' });
     if (doc.data().uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
 
+    // ── ✅ NEW: Check if this task is involved in any active or completed exchange ──
+    const exchangeCheckA = await db.collection('exchanges')
+      .where('userATaskId', '==', id)
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .get();
+    const exchangeCheckB = await db.collection('exchanges')
+      .where('userBTaskId', '==', id)
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .get();
+
+    if (!exchangeCheckA.empty || !exchangeCheckB.empty) {
+      return res.status(409).json({
+        success: false,
+        error: 'Cannot delete this task because it is part of an active or completed exchange.'
+      });
+    }
+
     // ── Update user's own task cache in‑place ──
     await updateUserTasksCache(uid, (data) => {
       if (!data.tasks) return null;
