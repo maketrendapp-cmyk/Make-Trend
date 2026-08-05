@@ -12,6 +12,7 @@ import {
   FiLoader,
   FiRefreshCw,
   FiPlus,
+  FiExternalLink,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -237,6 +238,17 @@ export default function GrowFeed() {
     return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600';
   };
 
+  // ── Helper to truncate URL ──
+  const truncateUrl = (url) => {
+    if (!url) return '';
+    try {
+      const parsed = new URL(url);
+      return parsed.hostname + parsed.pathname;
+    } catch {
+      return url.replace(/^https?:\/\//, '').slice(0, 40);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <>
@@ -352,7 +364,11 @@ export default function GrowFeed() {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {task.owner?.avatar ? (
-                          <img src={task.owner.avatar} alt="" className="w-full h-full object-cover" />
+                          <img
+                            src={task.owner.avatar}
+                            alt={task.owner.fullname || 'User'}
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <FiUser className="w-5 h-5 text-purple-600" />
                         )}
@@ -370,24 +386,27 @@ export default function GrowFeed() {
                   </div>
 
                   <div className="mt-3 flex items-center gap-3">
-                    <Icon className={`w-5 h-5 ${color}`} />
-                    <span className="text-sm font-medium text-gray-700">
-                      {task.taskType || 'Follow'}
-                    </span>
-                    <span className="text-xs text-gray-400 truncate flex-1">
-                      {task.url ? (
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      {React.createElement(Icon, {
+                        className: `w-5 h-5 ${color}`,
+                      })}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-700">
+                        {task.taskType || 'Follow'}
+                      </p>
+                      {task.url && (
                         <a
                           href={task.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline"
+                          className="text-xs text-blue-500 hover:underline flex items-center gap-1"
                         >
-                          {task.url.replace(/^https?:\/\//, '')}
+                          <span className="truncate">{truncateUrl(task.url)}</span>
+                          <FiExternalLink className="w-3 h-3 flex-shrink-0" />
                         </a>
-                      ) : (
-                        'No URL'
                       )}
-                    </span>
+                    </div>
                   </div>
 
                   {task.title && (
@@ -395,13 +414,20 @@ export default function GrowFeed() {
                   )}
 
                   <div className="mt-4 flex items-center gap-3">
-                    <button
-                      onClick={() => handleHelpToGrow(task)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-xl hover:shadow-lg transition shadow-sm"
-                    >
-                      <FiHeart className="w-4 h-4" />
-                      Help To Grow
-                    </button>
+                    {task.isOwn ? (
+                      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-xl">
+                        <FiUser className="w-4 h-4" />
+                        Your Task
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleHelpToGrow(task)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-xl hover:shadow-lg transition shadow-sm"
+                      >
+                        <FiHeart className="w-4 h-4" />
+                        Help To Grow
+                      </button>
+                    )}
                   </div>
                 </div>
               );
