@@ -13,6 +13,9 @@ import {
   FiUser,
   FiLoader,
   FiExternalLink,
+  FiCheck,
+  FiX,
+  FiArrowRight,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -60,12 +63,20 @@ const STATUS_COLORS = {
   active: 'text-purple-600 bg-purple-50 border-purple-200',
 };
 
+const STATUS_ICONS = {
+  waiting: FiClock,
+  done: FiCheckCircle,
+  cancelled: FiXCircle,
+  completed: FiCheck,
+  active: FiClock,
+};
+
 const STATUS_LABELS = {
-  waiting: '⏳ Waiting',
-  done: '✅ Done',
-  cancelled: '❌ Cancelled',
-  completed: '🎉 Completed',
-  active: '🔄 Active',
+  waiting: 'Waiting',
+  done: 'Done',
+  cancelled: 'Cancelled',
+  completed: 'Completed',
+  active: 'Active',
 };
 
 export default function ExchangeDetail() {
@@ -167,6 +178,12 @@ export default function ExchangeDetail() {
     return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600';
   };
 
+  // ── Get status icon ──
+  const getStatusIcon = (status) => {
+    const Icon = STATUS_ICONS[status] || FiClock;
+    return Icon;
+  };
+
   if (!isAuthenticated) {
     return (
       <>
@@ -226,7 +243,6 @@ export default function ExchangeDetail() {
   }
 
   const userIsA = exchange.userA?.uid === user?.uid;
-  const mySide = userIsA ? 'A' : 'B';
   const myTask = userIsA ? exchange.userATask : exchange.userBTask;
   const otherTask = userIsA ? exchange.userBTask : exchange.userATask;
   const otherUser = userIsA ? exchange.userB : exchange.userA;
@@ -242,10 +258,12 @@ export default function ExchangeDetail() {
   const MyColor = getPlatformColor(myTask?.platform);
   const OtherIcon = getPlatformIcon(otherTask?.platform);
   const OtherColor = getPlatformColor(otherTask?.platform);
+  const MyStatusIcon = getStatusIcon(myStatus);
+  const OtherStatusIcon = getStatusIcon(otherStatus);
 
   return (
     <>
-      <Meta title="Exchange | Make Trend" />
+      <Meta title={`Exchange ${exchange.id?.slice(-6) || ''} | Make Trend`} />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-2xl mx-auto">
           {/* ── Back ── */}
@@ -263,7 +281,7 @@ export default function ExchangeDetail() {
                 <p className="text-sm text-gray-500">#{exchange.id?.slice(-6) || 'N/A'}</p>
               </div>
               <span
-                className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-full border ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border ${
                   isCompleted
                     ? 'text-blue-600 bg-blue-50 border-blue-200'
                     : isCancelled
@@ -271,54 +289,14 @@ export default function ExchangeDetail() {
                     : 'text-purple-600 bg-purple-50 border-purple-200'
                 }`}
               >
-                {isCompleted ? '✅ Completed' : isCancelled ? '❌ Cancelled' : '🔄 Active'}
+                {isCompleted ? <FiCheck className="w-4 h-4" /> : isCancelled ? <FiX className="w-4 h-4" /> : <FiClock className="w-4 h-4" />}
+                {isCompleted ? 'Completed' : isCancelled ? 'Cancelled' : 'Active'}
               </span>
             </div>
 
-            {/* ── Your Side ── */}
+            {/* ── Opponent's Task (What you need to do) ── */}
             <div className="p-5 border-b border-gray-100">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">You</p>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
-                  <MyIcon className={`w-6 h-6 ${MyColor}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900">
-                    {myTask?.platform || 'Task'} – {myTask?.taskType || 'Action'}
-                  </p>
-                  {myTask?.title && (
-                    <p className="text-sm text-gray-500">{myTask.title}</p>
-                  )}
-                  <a
-                    href={myTask?.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-500 hover:underline flex items-center gap-1"
-                  >
-                    <FiExternalLink className="w-3 h-3" />
-                    {myTask?.url?.replace(/^https?:\/\//, '') || 'View'}
-                  </a>
-                </div>
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${
-                    STATUS_COLORS[myStatus] || STATUS_COLORS.waiting
-                  }`}
-                >
-                  {STATUS_LABELS[myStatus] || myStatus}
-                </span>
-              </div>
-            </div>
-
-            {/* ── Exchange Arrow ── */}
-            <div className="flex justify-center py-2 text-gray-300">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-            </div>
-
-            {/* ── Other Side ── */}
-            <div className="p-5 border-b border-gray-100">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                   {otherUser?.avatar ? (
                     <img src={otherUser.avatar} alt="" className="w-full h-full object-cover" />
@@ -326,8 +304,8 @@ export default function ExchangeDetail() {
                     <FiUser className="w-3 h-3 text-gray-500" />
                   )}
                 </div>
-                <p className="text-xs font-medium text-gray-400">
-                  {otherUser?.fullname || otherUser?.username || 'User'}
+                <p className="text-xs font-medium text-gray-500">
+                  You need to do: <span className="text-gray-700">{otherUser?.fullname || otherUser?.username || 'User'}</span>
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -339,23 +317,79 @@ export default function ExchangeDetail() {
                     {otherTask?.platform || 'Task'} – {otherTask?.taskType || 'Action'}
                   </p>
                   {otherTask?.title && (
-                    <p className="text-sm text-gray-500">{otherTask.title}</p>
+                    <p className="text-sm text-gray-500 truncate">{otherTask.title}</p>
                   )}
-                  <a
-                    href={otherTask?.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-500 hover:underline flex items-center gap-1"
-                  >
-                    <FiExternalLink className="w-3 h-3" />
-                    {otherTask?.url?.replace(/^https?:\/\//, '') || 'View'}
-                  </a>
+                  {otherTask?.url && (
+                    <a
+                      href={otherTask.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline"
+                    >
+                      <FiExternalLink className="w-3 h-3" />
+                      Open
+                    </a>
+                  )}
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${
+                    STATUS_COLORS[myStatus] || STATUS_COLORS.waiting
+                  }`}
+                >
+                  <MyStatusIcon className="w-3 h-3" />
+                  {STATUS_LABELS[myStatus] || myStatus}
+                </span>
+              </div>
+            </div>
+
+            {/* ── Exchange Arrow ── */}
+            <div className="flex justify-center py-2 text-gray-300">
+              <FiArrowRight className="w-6 h-6" />
+            </div>
+
+            {/* ── Your Task (What opponent needs to do) ── */}
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {user?.photoURL ? (
+                    <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <FiUser className="w-3 h-3 text-purple-600" />
+                  )}
+                </div>
+                <p className="text-xs font-medium text-gray-500">
+                  They need to do: <span className="text-gray-700">You</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
+                  <MyIcon className={`w-6 h-6 ${MyColor}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900">
+                    {myTask?.platform || 'Task'} – {myTask?.taskType || 'Action'}
+                  </p>
+                  {myTask?.title && (
+                    <p className="text-sm text-gray-500 truncate">{myTask.title}</p>
+                  )}
+                  {myTask?.url && (
+                    <a
+                      href={myTask.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline"
+                    >
+                      <FiExternalLink className="w-3 h-3" />
+                      Open
+                    </a>
+                  )}
                 </div>
                 <span
                   className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${
                     STATUS_COLORS[otherStatus] || STATUS_COLORS.waiting
                   }`}
                 >
+                  <OtherStatusIcon className="w-3 h-3" />
                   {STATUS_LABELS[otherStatus] || otherStatus}
                 </span>
               </div>
@@ -365,12 +399,18 @@ export default function ExchangeDetail() {
             <div className="p-5 bg-gray-50">
               {isCompleted ? (
                 <div className="text-center py-2">
-                  <p className="text-green-600 font-medium">🎉 Exchange Completed!</p>
+                  <p className="text-green-600 font-medium flex items-center justify-center gap-2">
+                    <FiCheck className="w-5 h-5" />
+                    Exchange Completed!
+                  </p>
                   <p className="text-sm text-gray-500">Both sides have completed their tasks.</p>
                 </div>
               ) : isCancelled ? (
                 <div className="text-center py-2">
-                  <p className="text-red-600 font-medium">❌ Exchange Cancelled</p>
+                  <p className="text-red-600 font-medium flex items-center justify-center gap-2">
+                    <FiX className="w-5 h-5" />
+                    Exchange Cancelled
+                  </p>
                   <p className="text-sm text-gray-500">This exchange has been cancelled.</p>
                 </div>
               ) : (
@@ -387,7 +427,7 @@ export default function ExchangeDetail() {
                         ) : (
                           <FiCheckCircle className="w-5 h-5" />
                         )}
-                        {submitting ? 'Updating...' : '✅ Done'}
+                        {submitting ? 'Updating...' : 'Done'}
                       </button>
                       <button
                         onClick={() => {
@@ -405,13 +445,20 @@ export default function ExchangeDetail() {
                   )}
                   {!canAct && isActive && myStatus === 'done' && (
                     <div className="text-center py-2 w-full">
-                      <p className="text-green-600 font-medium">✅ You've completed your part!</p>
-                      <p className="text-sm text-gray-500">Waiting for {otherUser?.fullname || otherUser?.username || 'the other user'} to complete theirs.</p>
+                      <p className="text-green-600 font-medium flex items-center justify-center gap-2">
+                        <FiCheckCircle className="w-5 h-5" />
+                        You've completed the opponent's task!
+                      </p>
+                      <p className="text-sm text-gray-500">Waiting for {otherUser?.fullname || otherUser?.username || 'the other user'} to complete yours.</p>
                     </div>
                   )}
                   {!canAct && isActive && myStatus === 'waiting' && (
                     <div className="text-center py-2 w-full">
-                      <p className="text-yellow-600 font-medium">⏳ Waiting for you to complete your part.</p>
+                      <p className="text-yellow-600 font-medium flex items-center justify-center gap-2">
+                        <FiClock className="w-5 h-5" />
+                        Waiting for you to complete the opponent's task.
+                      </p>
+                      <p className="text-sm text-gray-500">Open the link above and complete the action.</p>
                     </div>
                   )}
                 </div>
