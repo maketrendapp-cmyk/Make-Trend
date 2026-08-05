@@ -1,10 +1,9 @@
 // pages/groweachother/my-exchanges.js
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
-import { getToken } from '../../lib/api';
 import {
   FiUsers,
   FiRefreshCw,
@@ -18,6 +17,7 @@ import {
   FiPlus,
   FiRepeat,
 } from 'react-icons/fi';
+import { useMyExchanges, useInvalidateQueries } from '../../lib/queries';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -42,98 +42,57 @@ const STATUS_LABELS = {
 export default function MyExchanges() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const [exchanges, setExchanges] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [lastId, setLastId] = useState(null);
-  const [error, setError] = useState('');
+  const { invalidateMyExchanges } = useInvalidateQueries();
+
+  // ── Status filter state ──
   const [statusFilter, setStatusFilter] = useState('');
 
+  // ── React Query: My Exchanges (infinite) ──
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isLoading,
+    isFetchingNextPage,
+    refetch,
+    isError,
+    error,
+  } = useMyExchanges(statusFilter, isAuthenticated && !!user);
+
+  // ── Flatten exchanges from all pages ──
+  const exchanges = data?.pages?.flatMap((page) => page.exchanges) || [];
+  const hasMore = hasNextPage;
+
+  // ── Intersection Observer for infinite scroll ──
   const loadingRef = useRef(false);
+  const observerRef = useRef(null);
 
-  // ── Fetch exchanges ──
-  const fetchExchanges = useCallback(async (reset = false) => {
-    if (loadingRef.current) return;
-    if (!reset && !hasMore) return;
-
-    loadingRef.current = true;
-    setLoading(true);
-
-    try {
-      const token = await getToken();
-      if (!token) {
-        setInitialLoading(false);
-        setLoading(false);
-        loadingRef.current = false;
-        return;
-      }
-
-      let url = `${API_BASE}/exchanges?limit=20`;
-      if (statusFilter) url += `&status=${statusFilter}`;
-      if (!reset && lastId) url += `&lastId=${lastId}`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-
-      if (!data.success) throw new Error(data.error || 'Failed to load exchanges');
-
-      if (reset) {
-        setExchanges(data.exchanges || []);
-      } else {
-        setExchanges((prev) => [...prev, ...(data.exchanges || [])]);
-      }
-
-      setHasMore(data.hasMore || false);
-      if (data.exchanges && data.exchanges.length > 0) {
-        setLastId(data.lastId);
-      }
-      setError('');
-    } catch (err) {
-      console.error('Fetch exchanges error:', err);
-      setError(err.message || 'Failed to load exchanges');
-    } finally {
-      setInitialLoading(false);
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  }, [lastId, hasMore, statusFilter]);
-
-  // ── Initial load ──
   useEffect(() => {
-    if (isAuthenticated && user) {
-      setLastId(null);
-      setHasMore(true);
-      fetchExchanges(true);
-    } else {
-      setInitialLoading(false);
-    }
-  }, [isAuthenticated, user, statusFilter]);
+    if (isFetchingNextPage || !hasMore || exchanges.length === 0) return;
 
-  // ── Intersection Observer ──
-  useEffect(() => {
-    if (loading || !hasMore || exchanges.length === 0) return;
+    const lastElement = document.querySelector('#exchange-end');
+    if (!lastElement) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
-          fetchExchanges(false);
+        if (entries[0].isIntersecting && hasMore && !isFetchingNextPage) {
+          fetchNextPage();
         }
       },
       { threshold: 0.1 }
     );
 
-    const lastElement = document.querySelector('#exchange-end');
-    if (lastElement) observer.observe(lastElement);
+    observer.observe(lastElement);
+    observerRef.current = observer;
 
     return () => {
-      if (lastElement) observer.unobserve(lastElement);
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
     };
-  }, [loading, hasMore, exchanges.length]);
+  }, [isFetchingNextPage, hasMore, exchanges.length, fetchNextPage]);
 
-  // ── Get user display name ──
+  // ── Helper to get user display name ──
   const getUserDisplay = (exchange, uid) => {
     if (exchange.userA?.uid === uid) {
       return exchange.userB;
@@ -180,7 +139,7 @@ export default function MyExchanges() {
     );
   }
 
-  if (initialLoading) {
+  if (isLoading) {
     return (
       <>
         <Meta title="My Exchanges | Make Trend" />
@@ -208,13 +167,30 @@ export default function MyExchanges() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-6 px-4 flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center max-w-md">
+          <p className="text-red-600 font-medium">Failed to load exchanges.</p>
+          <p className="text-sm text-red-500 mt-1">{error?.message}</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm"
+          >
+            <FiRefreshCw className="w-4 h-4" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Meta title="My Exchanges | Make Trend" description="Track your Grow Together exchanges." />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
           
-          {/* ── Top Navigation Links Bar (Linked to Feed, My Tasks, and Exchanges) ── */}
+          {/* ── Top Navigation Links Bar ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
             <div className="flex items-center gap-2">
               <button
@@ -238,9 +214,8 @@ export default function MyExchanges() {
             </div>
             <button
               onClick={() => {
-                setLastId(null);
-                setHasMore(true);
-                fetchExchanges(true);
+                // Force refetch the first page only
+                refetch({ refetchPage: (page, index) => index === 0 });
               }}
               className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
               title="Refresh"
@@ -272,14 +247,14 @@ export default function MyExchanges() {
             </div>
           </div>
 
-          {error && (
+          {isError && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
-              {error}
+              {error?.message || 'Failed to load exchanges'}
             </div>
           )}
 
           {/* ── Exchanges List ── */}
-          {exchanges.length === 0 && !loading && (
+          {exchanges.length === 0 && !isFetchingNextPage && (
             <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
               <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">🤝</div>
               <h3 className="text-base font-bold text-gray-900 mb-1">No exchanges yet</h3>
@@ -340,7 +315,7 @@ export default function MyExchanges() {
           {/* ── Infinite scroll sentinel ── */}
           {hasMore && (
             <div id="exchange-end" className="py-6 flex justify-center">
-              {loading ? (
+              {isFetchingNextPage ? (
                 <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
                   <FiLoader className="w-4 h-4 animate-spin text-purple-600" />
                   Loading more...
