@@ -4961,41 +4961,31 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     if (yourTask.uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
     if (!yourTask.active) return res.status(400).json({ success: false, error: 'Your task is inactive' });
 
-    // ── Duplicate checks (prevents any duplicate exchange) ──
-    // 1. Target task already in exchange with current user (any direction)
-    const existingTarget = await db.collection('exchanges')
-      .where('overallStatus', 'in', ['active', 'completed'])
-      .where('userBTaskId', '==', targetTaskId)
-      .where('userAUid', '==', uid)
-      .get();
-    if (!existingTarget.empty) {
-      return res.status(409).json({ success: false, error: 'This task is already in an exchange with you.' });
-    }
-    const existingTargetReverse = await db.collection('exchanges')
+    // ── Duplicate checks ──
+    // 1. Target task must not already be in any active/completed exchange
+    const targetInExchange = await db.collection('exchanges')
       .where('overallStatus', 'in', ['active', 'completed'])
       .where('userATaskId', '==', targetTaskId)
-      .where('userBUid', '==', uid)
       .get();
-    if (!existingTargetReverse.empty) {
-      return res.status(409).json({ success: false, error: 'This task is already in an exchange with you.' });
+    const targetInExchangeReverse = await db.collection('exchanges')
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .where('userBTaskId', '==', targetTaskId)
+      .get();
+    if (!targetInExchange.empty || !targetInExchangeReverse.empty) {
+      return res.status(409).json({ success: false, error: 'This task is already in an exchange with someone.' });
     }
 
-    // 2. Your task already in exchange with target user (any direction)
-    const existingYourTask = await db.collection('exchanges')
+    // 2. Your task must not already be in any active/completed exchange
+    const yourTaskInExchange = await db.collection('exchanges')
       .where('overallStatus', 'in', ['active', 'completed'])
       .where('userATaskId', '==', yourTaskId)
-      .where('userBUid', '==', targetTask.uid)
       .get();
-    if (!existingYourTask.empty) {
-      return res.status(409).json({ success: false, error: 'Your task is already in an exchange with this user.' });
-    }
-    const existingYourTaskReverse = await db.collection('exchanges')
+    const yourTaskInExchangeReverse = await db.collection('exchanges')
       .where('overallStatus', 'in', ['active', 'completed'])
       .where('userBTaskId', '==', yourTaskId)
-      .where('userAUid', '==', targetTask.uid)
       .get();
-    if (!existingYourTaskReverse.empty) {
-      return res.status(409).json({ success: false, error: 'Your task is already in an exchange with this user.' });
+    if (!yourTaskInExchange.empty || !yourTaskInExchangeReverse.empty) {
+      return res.status(409).json({ success: false, error: 'Your task is already in an exchange with someone.' });
     }
 
     // 3. Exact pair (same tasks) already exists
