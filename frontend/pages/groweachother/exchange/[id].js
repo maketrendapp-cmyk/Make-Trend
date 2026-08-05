@@ -19,6 +19,7 @@ import {
   FiPlus,
   FiRepeat,
   FiInfo,
+  FiAlertTriangle,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -233,7 +234,14 @@ export default function ExchangeDetail() {
   const isCompleted = exchange.overallStatus === 'completed';
   const isCancelled = exchange.overallStatus === 'cancelled';
   const isActive = exchange.overallStatus === 'active';
-  const canAct = isActive && myStatus !== 'done' && myStatus !== 'cancelled';
+
+  // ── Check if tasks are missing (deleted) ──
+  const isMyTaskMissing = !myTask || !myTask.id;
+  const isOtherTaskMissing = !otherTask || !otherTask.id;
+  const hasMissingTask = isMyTaskMissing || isOtherTaskMissing;
+
+  // Can only act if exchange is active, user status is not done/cancelled, and NO missing tasks
+  const canAct = isActive && myStatus !== 'done' && myStatus !== 'cancelled' && !hasMissingTask;
 
   const MyIcon = getPlatformIcon(myTask?.platform);
   const MyColor = getPlatformColor(myTask?.platform);
@@ -306,6 +314,19 @@ export default function ExchangeDetail() {
               </span>
             </div>
 
+            {/* ── Missing Task Warning ── */}
+            {hasMissingTask && (
+              <div className="mx-5 sm:mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                <FiAlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">One or both tasks have been deleted</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    This exchange can no longer be completed. Please contact support if you have questions.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* ── Two-column task cards ── */}
             <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
               
@@ -314,7 +335,6 @@ export default function ExchangeDetail() {
                 <div>
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200/50">
                     <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center overflow-hidden flex-shrink-0 font-bold text-xs shadow-sm">
-                      {/* Use user's own avatar from exchange data */}
                       {getUserAvatar(userIsA ? exchange.userA : exchange.userB) ? (
                         <img
                           src={getUserAvatar(userIsA ? exchange.userA : exchange.userB)}
@@ -331,41 +351,46 @@ export default function ExchangeDetail() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3.5">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${MyColor}`}>
-                      <MyIcon className="w-5 h-5" />
+                  {isMyTaskMissing ? (
+                    <div className="py-4 text-center text-gray-400">
+                      <FiAlertTriangle className="w-8 h-8 mx-auto mb-2 text-amber-400" />
+                      <p className="text-sm font-medium text-gray-500">This task has been deleted</p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase">
-                          {myTask?.taskType || 'Support'}
-                        </span>
-                        <span className="text-xs font-semibold text-gray-500">on {myTask?.platform || 'Platform'}</span>
+                  ) : (
+                    <div className="flex items-start gap-3.5">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${MyColor}`}>
+                        <MyIcon className="w-5 h-5" />
                       </div>
-                      <h4 className="text-sm font-bold text-gray-900 truncate mb-1">
-                        {myTask?.title || `${myTask?.taskType || 'Task'} request`}
-                      </h4>
-                      {/* ── Description ── */}
-                      {myTask?.description && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-3 leading-relaxed">
-                          <FiInfo className="inline w-3 h-3 mr-1 text-gray-400" />
-                          {myTask.description}
-                        </p>
-                      )}
-                      {/* ── Open Link Button ── */}
-                      {myTask?.url && (
-                        <a
-                          href={myTask.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-white hover:bg-gray-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-medium transition shadow-sm"
-                        >
-                          <FiExternalLink className="w-3 h-3" />
-                          Open in app
-                        </a>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase">
+                            {myTask?.taskType || 'Support'}
+                          </span>
+                          <span className="text-xs font-semibold text-gray-500">on {myTask?.platform || 'Platform'}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-gray-900 truncate mb-1">
+                          {myTask?.title || `${myTask?.taskType || 'Task'} request`}
+                        </h4>
+                        {myTask?.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-3 leading-relaxed">
+                            <FiInfo className="inline w-3 h-3 mr-1 text-gray-400" />
+                            {myTask.description}
+                          </p>
+                        )}
+                        {myTask?.url && (
+                          <a
+                            href={myTask.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-white hover:bg-gray-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-medium transition shadow-sm"
+                          >
+                            <FiExternalLink className="w-3 h-3" />
+                            Open in app
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="mt-5 pt-3 border-t border-gray-200/50 flex items-center justify-between text-xs font-medium">
@@ -381,7 +406,6 @@ export default function ExchangeDetail() {
                 <div>
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200/50">
                     <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 font-bold text-xs shadow-sm">
-                      {/* Use other user's avatar from exchange data */}
                       {getUserAvatar(userIsA ? exchange.userB : exchange.userA) ? (
                         <img
                           src={getUserAvatar(userIsA ? exchange.userB : exchange.userA)}
@@ -398,41 +422,46 @@ export default function ExchangeDetail() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3.5">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${OtherColor}`}>
-                      <OtherIcon className="w-5 h-5" />
+                  {isOtherTaskMissing ? (
+                    <div className="py-4 text-center text-gray-400">
+                      <FiAlertTriangle className="w-8 h-8 mx-auto mb-2 text-amber-400" />
+                      <p className="text-sm font-medium text-gray-500">This task has been deleted</p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase">
-                          {otherTask?.taskType || 'Support'}
-                        </span>
-                        <span className="text-xs font-semibold text-gray-500">on {otherTask?.platform || 'Platform'}</span>
+                  ) : (
+                    <div className="flex items-start gap-3.5">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${OtherColor}`}>
+                        <OtherIcon className="w-5 h-5" />
                       </div>
-                      <h4 className="text-sm font-bold text-gray-900 truncate mb-1">
-                        {otherTask?.title || `${otherTask?.taskType || 'Task'} request`}
-                      </h4>
-                      {/* ── Description ── */}
-                      {otherTask?.description && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-3 leading-relaxed">
-                          <FiInfo className="inline w-3 h-3 mr-1 text-gray-400" />
-                          {otherTask.description}
-                        </p>
-                      )}
-                      {/* ── Open Link Button ── */}
-                      {otherTask?.url && (
-                        <a
-                          href={otherTask.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-white hover:bg-gray-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-medium transition shadow-sm"
-                        >
-                          <FiExternalLink className="w-3 h-3" />
-                          Open in app
-                        </a>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md uppercase">
+                            {otherTask?.taskType || 'Support'}
+                          </span>
+                          <span className="text-xs font-semibold text-gray-500">on {otherTask?.platform || 'Platform'}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-gray-900 truncate mb-1">
+                          {otherTask?.title || `${otherTask?.taskType || 'Task'} request`}
+                        </h4>
+                        {otherTask?.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-3 leading-relaxed">
+                            <FiInfo className="inline w-3 h-3 mr-1 text-gray-400" />
+                            {otherTask.description}
+                          </p>
+                        )}
+                        {otherTask?.url && (
+                          <a
+                            href={otherTask.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-white hover:bg-gray-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-medium transition shadow-sm"
+                          >
+                            <FiExternalLink className="w-3 h-3" />
+                            Open in app
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="mt-5 pt-3 border-t border-gray-200/50 flex items-center justify-between text-xs font-medium">
@@ -456,6 +485,11 @@ export default function ExchangeDetail() {
                 <div className="py-2">
                   <p className="text-red-600 font-bold flex items-center justify-center gap-2 text-base"><FiX className="w-5 h-5" /> Exchange Cancelled</p>
                   <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">This exchange session has been closed.</p>
+                </div>
+              ) : hasMissingTask ? (
+                <div className="py-2">
+                  <p className="text-amber-600 font-bold flex items-center justify-center gap-2 text-base"><FiAlertTriangle className="w-5 h-5" /> Tasks Missing</p>
+                  <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">This exchange cannot be completed because one or both tasks are missing.</p>
                 </div>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
