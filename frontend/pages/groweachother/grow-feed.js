@@ -73,7 +73,7 @@ export default function GrowFeed() {
   const loadingRef = useRef(false);
 
   // ── Fetch feed ──
-  const fetchFeed = useCallback(async (reset = false) => {
+  const fetchFeed = useCallback(async (reset = false, force = false) => {
     if (loadingRef.current) return;
     if (!reset && !hasMore) return;
 
@@ -89,9 +89,11 @@ export default function GrowFeed() {
         return;
       }
 
+      // Add timestamp to bypass cache when force is true
+      const ts = force ? `&_t=${Date.now()}` : '';
       const url = reset
-        ? `${API_BASE}/grow-feed?limit=20`
-        : `${API_BASE}/grow-feed?limit=20&lastTaskId=${lastId}`;
+        ? `${API_BASE}/grow-feed?limit=20${ts}`
+        : `${API_BASE}/grow-feed?limit=20&lastTaskId=${lastId}${ts}`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -186,10 +188,10 @@ export default function GrowFeed() {
       setShowModal(false);
       setSelectedTargetTask(null);
       setSelectedMyTask(null);
-      // Refresh feed
+      // Force refresh the feed (bypass cache)
       setLastId(null);
       setHasMore(true);
-      await fetchFeed(true);
+      await fetchFeed(true, true);
     } catch (err) {
       console.error('Create exchange error:', err);
       setModalError(err.message || 'Failed to create exchange');
@@ -320,7 +322,7 @@ export default function GrowFeed() {
               onClick={() => {
                 setLastId(null);
                 setHasMore(true);
-                fetchFeed(true);
+                fetchFeed(true, true);
               }}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-purple-600 hover:text-purple-800 transition-colors"
             >
@@ -418,6 +420,11 @@ export default function GrowFeed() {
                       <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-xl">
                         <FiUser className="w-4 h-4" />
                         Your Task
+                      </span>
+                    ) : task.hasExchange ? (
+                      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-xl">
+                        <FiCheckCircle className="w-4 h-4" />
+                        Already Exchanged
                       </span>
                     ) : (
                       <button
