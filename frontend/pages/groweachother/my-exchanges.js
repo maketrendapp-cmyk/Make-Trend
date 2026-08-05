@@ -14,6 +14,9 @@ import {
   FiXCircle,
   FiClock,
   FiUser,
+  FiCompass,
+  FiPlus,
+  FiRepeat,
 } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -21,11 +24,11 @@ if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
 const STATUS_COLORS = {
-  waiting: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-  done: 'text-green-600 bg-green-50 border-green-200',
-  cancelled: 'text-red-600 bg-red-50 border-red-200',
-  completed: 'text-blue-600 bg-blue-50 border-blue-200',
-  active: 'text-purple-600 bg-purple-50 border-purple-200',
+  waiting: 'text-yellow-700 bg-yellow-50 border-yellow-200/60',
+  done: 'text-emerald-700 bg-emerald-50 border-emerald-200/60',
+  cancelled: 'text-red-700 bg-red-50 border-red-200/60',
+  completed: 'text-blue-700 bg-blue-50 border-blue-200/60',
+  active: 'text-purple-700 bg-purple-50 border-purple-200/60',
 };
 
 const STATUS_LABELS = {
@@ -138,14 +141,6 @@ export default function MyExchanges() {
     return exchange.userA;
   };
 
-  // ── Get user's task in exchange ──
-  const getUserTask = (exchange, uid) => {
-    if (exchange.userA?.uid === uid) {
-      return exchange.userATask;
-    }
-    return exchange.userBTask;
-  };
-
   // ── Get other user's task in exchange ──
   const getOtherTask = (exchange, uid) => {
     if (exchange.userA?.uid === uid) {
@@ -167,15 +162,15 @@ export default function MyExchanges() {
       <>
         <Meta title="My Exchanges | Make Trend" />
         <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FiUsers className="w-10 h-10 text-purple-600" />
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-sm p-8 text-center border border-gray-100">
+            <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <FiUsers className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">My Exchanges</h2>
-            <p className="text-gray-500 mt-2 text-sm">Sign in to view your exchanges.</p>
+            <h2 className="text-xl font-bold text-gray-900">My Exchanges</h2>
+            <p className="text-gray-500 mt-1.5 text-sm">Sign in to view your exchanges.</p>
             <button
               onClick={() => router.push('/login')}
-              className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition w-full"
+              className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium text-sm rounded-xl hover:bg-purple-700 transition w-full shadow-sm"
             >
               Sign In
             </button>
@@ -192,7 +187,7 @@ export default function MyExchanges() {
         <div className="min-h-screen bg-gray-50 py-8 px-4">
           <div className="max-w-3xl mx-auto animate-pulse">
             <div className="flex items-center justify-between mb-6">
-              <div className="h-8 w-40 bg-gray-200 rounded" />
+              <div className="h-7 w-40 bg-gray-200 rounded-lg" />
               <div className="h-10 w-28 bg-gray-200 rounded-xl" />
             </div>
             {[1, 2, 3].map((i) => (
@@ -201,7 +196,7 @@ export default function MyExchanges() {
                   <div className="w-10 h-10 rounded-full bg-gray-200" />
                   <div className="flex-1">
                     <div className="h-4 bg-gray-200 rounded w-32" />
-                    <div className="h-3 bg-gray-200 rounded w-24 mt-1" />
+                    <div className="h-3 bg-gray-200 rounded w-24 mt-1.5" />
                   </div>
                   <div className="h-6 w-20 bg-gray-200 rounded-full" />
                 </div>
@@ -218,55 +213,80 @@ export default function MyExchanges() {
       <Meta title="My Exchanges | Make Trend" description="Track your Grow Together exchanges." />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
+          
+          {/* ── Top Navigation Links Bar (Linked to Feed, My Tasks, and Exchanges) ── */}
+          <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/groweachother/grow-feed')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-xl font-medium text-xs sm:text-sm transition border border-purple-100/60 whitespace-nowrap"
+              >
+                <FiCompass className="w-4 h-4" /> Go to Feed
+              </button>
+              <button
+                onClick={() => router.push('/groweachother/my-tasks')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-xl font-medium text-xs sm:text-sm transition border border-purple-100/60 whitespace-nowrap"
+              >
+                <FiPlus className="w-4 h-4" /> My Tasks
+              </button>
+              <button
+                onClick={() => router.push('/groweachother/my-exchanges')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-xl font-medium text-xs sm:text-sm transition whitespace-nowrap shadow-sm"
+              >
+                <FiRepeat className="w-4 h-4" /> Exchanges
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setLastId(null);
+                setHasMore(true);
+                fetchExchanges(true);
+              }}
+              className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
+              title="Refresh"
+            >
+              <FiRefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* ── Header ── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <FiUsers className="text-purple-600" />
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <FiUsers className="text-purple-600 w-5 h-5" />
                 My Exchanges
               </h1>
-              <p className="text-sm text-gray-500">Track your exchanges with others</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Track your mutual community exchanges</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-sm rounded-xl border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-white"
+                className="text-xs sm:text-sm rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2 font-medium focus:border-purple-500 focus:bg-white focus:outline-none transition cursor-pointer"
               >
-                <option value="">All</option>
+                <option value="">All Statuses</option>
                 <option value="active">Active</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <button
-                onClick={() => {
-                  setLastId(null);
-                  setHasMore(true);
-                  fetchExchanges(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-purple-600 hover:text-purple-800 transition-colors"
-              >
-                <FiRefreshCw className="w-4 h-4" />
-                Refresh
-              </button>
             </div>
           </div>
 
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
               {error}
             </div>
           )}
 
           {/* ── Exchanges List ── */}
           {exchanges.length === 0 && !loading && (
-            <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-5xl mb-3">🤝</div>
-              <p className="text-gray-500 font-medium">No exchanges yet.</p>
-              <p className="text-sm text-gray-400">Go to the Grow Feed to help someone!</p>
+            <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
+              <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">🤝</div>
+              <h3 className="text-base font-bold text-gray-900 mb-1">No exchanges yet</h3>
+              <p className="text-sm text-gray-400 mb-6 font-medium">Go to the Grow Feed to help someone and start exchanging!</p>
               <button
                 onClick={() => router.push('/groweachother/grow-feed')}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
               >
                 View Grow Feed
               </button>
@@ -283,10 +303,10 @@ export default function MyExchanges() {
                 <Link
                   key={exchange.id}
                   href={`/groweachother/exchange/${exchange.id}`}
-                  className="block bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition cursor-pointer"
+                  className="block bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 hover:shadow-md transition-all group"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-100/60 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
                       {otherUser?.avatar ? (
                         <img src={otherUser.avatar} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -294,22 +314,22 @@ export default function MyExchanges() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900">
-                        {otherUser?.fullname || otherUser?.username || 'User'}
+                      <p className="font-bold text-gray-900 text-sm sm:text-base truncate">
+                        {otherUser?.fullname || otherUser?.username || 'Community Member'}
                       </p>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span>{otherTask?.platform || 'Task'}</span>
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
+                        <span className="font-semibold text-purple-700">{otherTask?.platform || 'Task'}</span>
                         <span className="text-gray-300">•</span>
                         <span>{otherTask?.taskType || 'Action'}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${STATUS_COLORS[userStatus] || STATUS_COLORS.waiting}`}
+                        className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-lg border ${STATUS_COLORS[userStatus] || STATUS_COLORS.waiting}`}
                       >
                         {STATUS_LABELS[userStatus] || userStatus}
                       </span>
-                      <FiChevronRight className="w-4 h-4 text-gray-400" />
+                      <FiChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
                     </div>
                   </div>
                 </Link>
@@ -319,10 +339,10 @@ export default function MyExchanges() {
 
           {/* ── Infinite scroll sentinel ── */}
           {hasMore && (
-            <div id="exchange-end" className="py-4 flex justify-center">
+            <div id="exchange-end" className="py-6 flex justify-center">
               {loading ? (
-                <div className="flex items-center gap-2 text-gray-400">
-                  <FiLoader className="w-5 h-5 animate-spin" />
+                <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
+                  <FiLoader className="w-4 h-4 animate-spin text-purple-600" />
                   Loading more...
                 </div>
               ) : (
@@ -332,7 +352,7 @@ export default function MyExchanges() {
           )}
 
           {!hasMore && exchanges.length > 0 && (
-            <p className="text-center text-sm text-gray-400 py-4">
+            <p className="text-center text-xs font-medium text-gray-400 py-6">
               You've seen all exchanges 🎉
             </p>
           )}
