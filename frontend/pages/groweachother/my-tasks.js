@@ -1,5 +1,5 @@
 // pages/groweachother/my-tasks.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
@@ -16,6 +16,7 @@ import {
   FiCompass,
   FiRepeat,
   FiExternalLink,
+  FiChevronDown,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -55,8 +56,23 @@ const PLATFORM_COLORS = {
   github: 'text-gray-800',
 };
 
+// ── Predefined platforms ──
 const PLATFORMS = ['YouTube', 'Instagram', 'Twitter', 'Facebook', 'TikTok', 'Twitch', 'LinkedIn', 'GitHub'];
-const TASK_TYPES = ['Subscribe', 'Follow', 'Like', 'Comment', 'Share', 'Watch', 'View'];
+
+// ── Task types per platform ──
+const TASK_TYPES_BY_PLATFORM = {
+  YouTube: ['Subscribe', 'Like', 'Comment', 'Share', 'Watch', 'View'],
+  Instagram: ['Follow', 'Like', 'Comment', 'Share', 'View'],
+  Facebook: ['Like', 'Follow', 'Comment', 'Share', 'Watch'],
+  Twitter: ['Follow', 'Like', 'Retweet', 'Reply'],
+  TikTok: ['Follow', 'Like', 'Comment', 'Share'],
+  Twitch: ['Follow', 'Subscribe', 'Like', 'Watch'],
+  LinkedIn: ['Follow', 'Like', 'Comment', 'Share'],
+  GitHub: ['Follow', 'Star', 'Watch'],
+};
+
+// ── Default task types (for custom platforms) ──
+const DEFAULT_TASK_TYPES = ['Follow', 'Like', 'Comment', 'Share'];
 
 export default function MyTasks() {
   const router = useRouter();
@@ -80,7 +96,13 @@ export default function MyTasks() {
     url: '',
     taskType: '',
     title: '',
+    description: '', // ← NEW
   });
+  const [customPlatform, setCustomPlatform] = useState('');
+  const [customTaskType, setCustomTaskType] = useState('');
+  const [showCustomPlatformInput, setShowCustomPlatformInput] = useState(false);
+  const [showCustomTaskTypeInput, setShowCustomTaskTypeInput] = useState(false);
+  const [availableTaskTypes, setAvailableTaskTypes] = useState(DEFAULT_TASK_TYPES);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
@@ -92,21 +114,79 @@ export default function MyTasks() {
   // ── Open modal for create/edit ──
   const openCreateModal = () => {
     setEditingTask(null);
-    setFormData({ platform: '', url: '', taskType: '', title: '' });
+    setFormData({ platform: '', url: '', taskType: '', title: '', description: '' });
+    setCustomPlatform('');
+    setCustomTaskType('');
+    setShowCustomPlatformInput(false);
+    setShowCustomTaskTypeInput(false);
+    setAvailableTaskTypes(DEFAULT_TASK_TYPES);
     setModalError('');
     setShowModal(true);
   };
 
   const openEditModal = (task) => {
     setEditingTask(task);
+    const platform = task.platform || '';
+    const taskType = task.taskType || '';
+    // Determine if platform is custom
+    const isCustomPlatform = platform && !PLATFORMS.includes(platform);
+    const isCustomTaskType = taskType && !DEFAULT_TASK_TYPES.includes(taskType) && !Object.values(TASK_TYPES_BY_PLATFORM).flat().includes(taskType);
+
     setFormData({
-      platform: task.platform || '',
+      platform: isCustomPlatform ? 'custom' : platform,
       url: task.url || '',
-      taskType: task.taskType || '',
+      taskType: isCustomTaskType ? 'custom' : taskType,
       title: task.title || '',
+      description: task.description || '',
     });
+    setCustomPlatform(isCustomPlatform ? platform : '');
+    setCustomTaskType(isCustomTaskType ? taskType : '');
+    setShowCustomPlatformInput(isCustomPlatform);
+    setShowCustomTaskTypeInput(isCustomTaskType);
+    // Set available task types based on platform
+    if (platform && PLATFORMS.includes(platform)) {
+      setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[platform] || DEFAULT_TASK_TYPES);
+    } else {
+      setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+    }
     setModalError('');
     setShowModal(true);
+  };
+
+  // ── Handle platform change ──
+  const handlePlatformChange = (e) => {
+    const val = e.target.value;
+    setFormData({ ...formData, platform: val });
+    if (val === 'custom') {
+      setShowCustomPlatformInput(true);
+      setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+    } else {
+      setShowCustomPlatformInput(false);
+      setCustomPlatform('');
+      // Update task types based on selected platform
+      if (PLATFORMS.includes(val)) {
+        setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[val] || DEFAULT_TASK_TYPES);
+      } else {
+        setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+      }
+      // Reset task type if it's not in the new list
+      const currentTaskType = formData.taskType;
+      if (currentTaskType && !availableTaskTypes.includes(currentTaskType) && currentTaskType !== 'custom') {
+        setFormData(prev => ({ ...prev, taskType: '' }));
+      }
+    }
+  };
+
+  // ── Handle task type change ──
+  const handleTaskTypeChange = (e) => {
+    const val = e.target.value;
+    setFormData({ ...formData, taskType: val });
+    if (val === 'custom') {
+      setShowCustomTaskTypeInput(true);
+    } else {
+      setShowCustomTaskTypeInput(false);
+      setCustomTaskType('');
+    }
   };
 
   // ── Submit task ──
@@ -115,9 +195,35 @@ export default function MyTasks() {
     setSubmitting(true);
     setModalError('');
 
-    const { platform, url, taskType, title } = formData;
-    if (!platform || !url || !taskType) {
+    let finalPlatform = formData.platform;
+    let finalTaskType = formData.taskType;
+
+    if (finalPlatform === 'custom') {
+      if (!customPlatform.trim()) {
+        setModalError('Please enter a custom platform name.');
+        setSubmitting(false);
+        return;
+      }
+      finalPlatform = customPlatform.trim();
+    }
+
+    if (finalTaskType === 'custom') {
+      if (!customTaskType.trim()) {
+        setModalError('Please enter a custom task type.');
+        setSubmitting(false);
+        return;
+      }
+      finalTaskType = customTaskType.trim();
+    }
+
+    const { url, title, description } = formData;
+    if (!finalPlatform || !url || !finalTaskType) {
       setModalError('Platform, URL, and Task Type are required.');
+      setSubmitting(false);
+      return;
+    }
+    if (description && description.length > 500) {
+      setModalError('Description cannot exceed 500 characters.');
       setSubmitting(false);
       return;
     }
@@ -130,7 +236,13 @@ export default function MyTasks() {
         return;
       }
 
-      const payload = { platform, url, taskType, title: title || '' };
+      const payload = {
+        platform: finalPlatform,
+        url,
+        taskType: finalTaskType,
+        title: title || '',
+        description: description || '',
+      };
 
       let res;
       if (editingTask) {
@@ -157,9 +269,8 @@ export default function MyTasks() {
       if (!data.success) throw new Error(data.error || 'Failed to save task');
 
       setShowModal(false);
-      // Invalidate cache to refetch
       invalidateMyTasks();
-      await refetch(); // immediate update
+      await refetch();
     } catch (err) {
       console.error('Save task error:', err);
       setModalError(err.message || 'Failed to save task');
@@ -193,8 +304,6 @@ export default function MyTasks() {
       await refetch();
     } catch (err) {
       console.error('Delete task error:', err);
-      // We'll show error via the React Query error state, but we keep a local error?
-      // We'll handle it in a local error state.
       setModalError(err.message || 'Failed to delete task');
     } finally {
       setDeleting(false);
@@ -404,6 +513,9 @@ export default function MyTasks() {
                           {task.title && (
                             <p className="text-xs sm:text-sm text-gray-600 font-medium truncate mb-1">{task.title}</p>
                           )}
+                          {task.description && (
+                            <p className="text-xs text-gray-500 line-clamp-2 mb-1">{task.description}</p>
+                          )}
                           <a
                             href={task.url}
                             target="_blank"
@@ -476,15 +588,28 @@ export default function MyTasks() {
                 </label>
                 <select
                   value={formData.platform}
-                  onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  onChange={handlePlatformChange}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E')] bg-[length:16px] bg-[right:1rem_center] bg-no-repeat pr-10"
                   required
                 >
                   <option value="">Select platform</option>
                   {PLATFORMS.map((p) => (
                     <option key={p} value={p}>{p}</option>
                   ))}
+                  <option value="custom">✏️ Custom</option>
                 </select>
+                {showCustomPlatformInput && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      value={customPlatform}
+                      onChange={(e) => setCustomPlatform(e.target.value)}
+                      placeholder="Enter custom platform name"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2 text-sm focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                      required={formData.platform === 'custom'}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* URL */}
@@ -509,15 +634,28 @@ export default function MyTasks() {
                 </label>
                 <select
                   value={formData.taskType}
-                  onChange={(e) => setFormData({ ...formData, taskType: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  onChange={handleTaskTypeChange}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E')] bg-[length:16px] bg-[right:1rem_center] bg-no-repeat pr-10"
                   required
                 >
                   <option value="">Select task type</option>
-                  {TASK_TYPES.map((t) => (
+                  {availableTaskTypes.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
+                  <option value="custom">✏️ Custom</option>
                 </select>
+                {showCustomTaskTypeInput && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      value={customTaskType}
+                      onChange={(e) => setCustomTaskType(e.target.value)}
+                      placeholder="Enter custom task type"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2 text-sm focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                      required={formData.taskType === 'custom'}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Title (optional) */}
@@ -534,6 +672,22 @@ export default function MyTasks() {
                   maxLength={100}
                 />
                 <p className="mt-1 text-[11px] text-gray-400 font-medium">{formData.title.length}/100 characters</p>
+              </div>
+
+              {/* Description (optional) */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+                  Description / Instructions (optional)
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition resize-none"
+                  placeholder="Add instructions or details about this task..."
+                  maxLength={500}
+                />
+                <p className="mt-1 text-[11px] text-gray-400 font-medium text-right">{formData.description.length}/500 characters</p>
               </div>
 
               {modalError && (
