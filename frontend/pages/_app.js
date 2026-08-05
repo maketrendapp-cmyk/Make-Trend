@@ -57,6 +57,8 @@ const TOP_NAV_ONLY_PAGES = [
   '/contact',
   '/login',
   '/signup',
+'/groweachother/',
+
 ];
 
 function MyApp({ Component, pageProps }) {
