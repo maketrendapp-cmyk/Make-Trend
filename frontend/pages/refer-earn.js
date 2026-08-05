@@ -36,11 +36,7 @@ export default function ReferEarn() {
   const [copySuccess, setCopySuccess] = useState('');
   const [visible, setVisible] = useState(false);
 
-  // ── Scroll to top on mount ──
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
+  // Allow Next.js to handle scroll naturally instead of forcing it which causes jumps
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 100);
     return () => clearTimeout(timer);
@@ -57,7 +53,7 @@ export default function ReferEarn() {
   const remaining = Math.max(nextRewardAt - referralsCount, 0);
   const progress = Math.min((referralsCount % 5) / 5 * 100, 100);
 
-  // ── Copy referral code ──
+  // ── Copy referral code (Fixed scroll jump) ──
   const copyReferralCode = () => {
     const code = referralData?.referralCode || profile?.referralCode;
     if (!code) return;
@@ -67,12 +63,20 @@ export default function ReferEarn() {
         setTimeout(() => setCopySuccess(''), 2000);
       })
       .catch(() => {
+        // Fallback for older browsers
         const textArea = document.createElement('textarea');
         textArea.value = code;
+        // Fix: Prevent browser from jumping to the bottom of the page when appending
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.opacity = '0';
+        
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
+        
         setCopySuccess('✅ Copied!');
         setTimeout(() => setCopySuccess(''), 2000);
       });
