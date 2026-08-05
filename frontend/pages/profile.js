@@ -9,14 +9,14 @@ import {
   useStats,
   useMtCoins,
   useInvalidateQueries,
-  useDailyBonus,         // ✅ new
-  useClaimDailyBonus,    // ✅ new
+  useDailyBonus,
+  useClaimDailyBonus,
 } from '../lib/queries';
 import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
-  FiBook, FiShield, FiUsers, FiEye, FiUnlock, FiTrendingUp, FiCopy,
-  FiGift, FiCheckCircle, FiChevronRight
+  FiBook, FiShield, FiUsers, FiTrendingUp, FiCopy,
+  FiGift, FiCheckCircle, FiChevronRight, FiHeart
 } from 'react-icons/fi';
 import { FaCrown, FaWallet, FaCoins, FaClock } from 'react-icons/fa';
 import Meta from '../components/Meta';
@@ -51,9 +51,6 @@ export default function Profile() {
   const [claimedBonusAmount, setClaimedBonusAmount] = useState(0);
   const [copySuccess, setCopySuccess] = useState('');
 
-  // ── Helper: get Firebase token (kept for backward compatibility, but not used now) ──
-  // we keep it just in case
-
   // ── Claim handler ──
   const handleClaimBonus = () => {
     claimBonusMutation.mutate(undefined, {
@@ -64,7 +61,6 @@ export default function Profile() {
         }
       },
       onError: (error) => {
-        // error will be shown via react-query error state? we can add a toast or ignore
         console.error('Claim bonus error:', error);
       },
     });
@@ -78,7 +74,7 @@ export default function Profile() {
       refetchProfile();
       refetchStats();
       refetchMtCoins();
-      refetchBonus(); // ensure fresh bonus status on login
+      refetchBonus();
     }
   }, [isAuthenticated]);
 
@@ -126,10 +122,9 @@ export default function Profile() {
     referralCode: profile?.referralCode || '',
   };
 
+  // Cleaned up stats (removed views and unlocks as requested)
   const statsItems = [
     { icon: FiTrendingUp, label: 'Campaigns Created', value: stats?.totalCampaigns ?? 0 },
-    { icon: FiEye, label: 'Total Views', value: stats?.totalViews ?? 0 },
-    { icon: FiUnlock, label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0 },
     { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
   ];
 
@@ -140,6 +135,7 @@ export default function Profile() {
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
     { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' },
     { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
+    { icon: FiHeart, label: 'Grow Together', href: '/groweachother/grow-feed', highlight: true }, // ✅ New button added
   ];
 
   const exploreOptions = [
@@ -171,8 +167,8 @@ export default function Profile() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            {[1, 2, 3, 4].map(i => <div key={i} className="bg-white rounded-xl h-24 bg-gray-200 border border-gray-100" />)}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {[1, 2].map(i => <div key={i} className="bg-white rounded-xl h-24 bg-gray-200 border border-gray-100" />)}
           </div>
           <div className="bg-white rounded-2xl h-32 bg-gray-200 border border-gray-100" />
         </div>
@@ -267,9 +263,9 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* ── Stats Grid ── (only when logged in) ── */}
+          {/* ── Stats Grid (Cleaned up: only Campaigns & Referrals) ── */}
           {user && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
               {statsItems.map((stat, index) => (
                 <div key={index} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center hover:shadow-md transition">
                   <div className="flex justify-center mb-2.5">
@@ -284,7 +280,7 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── MT Coins Card ── (only when logged in) ── */}
+          {/* ── MT Coins Card ── */}
           {user && (
             <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-5 sm:p-6 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
               <div className="text-center sm:text-left w-full sm:w-auto">
@@ -310,7 +306,7 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── Daily Bonus Card ── (only when logged in) ── */}
+          {/* ── Daily Bonus Card ── */}
           {user && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 hover:shadow-md transition">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
@@ -368,22 +364,27 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── Quick Actions ── */}
+          {/* ── Quick Actions (Fixed alignment grid layout) ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {quickActions.map((action, index) => (
                 <Link key={index} href={action.href}>
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer border border-transparent hover:border-purple-200">
-                    <action.icon className="w-5 h-5 text-purple-600 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-gray-700">{action.label}</span>
+                  <div className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-colors cursor-pointer border ${
+                    action.highlight
+                      ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 shadow-sm'
+                      : 'bg-gray-50 border-transparent hover:border-purple-200 text-gray-700'
+                  }`}>
+                    <action.icon className={`w-5 h-5 flex-shrink-0 ${action.highlight ? 'text-purple-600' : 'text-purple-600'}`} />
+                    <span className="text-sm font-semibold flex-1">{action.label}</span>
+                    <FiChevronRight className="w-4 h-4 text-gray-400" />
                   </div>
                 </Link>
               ))}
             </div>
           </div>
 
-          {/* ── Refer & Affiliates ── (only when logged in) ── */}
+          {/* ── Refer & Affiliates ── */}
           {user && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Refer & Affiliates</h2>
@@ -406,7 +407,7 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── Explore & Legal (2 Column Grid on PC) ── */}
+          {/* ── Explore & Legal Grid ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             {/* Explore */}
@@ -519,3 +520,4 @@ export default function Profile() {
     </>
   );
 }
+
