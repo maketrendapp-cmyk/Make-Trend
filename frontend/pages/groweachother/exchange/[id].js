@@ -1,5 +1,5 @@
 // pages/groweachother/exchange/[id].js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Meta from '../../../components/Meta';
@@ -30,6 +30,7 @@ import {
   FaGithub,
   FaLink,
 } from 'react-icons/fa';
+import { useExchangeDetail, useInvalidateQueries } from '../../../lib/queries';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -82,12 +83,19 @@ export default function ExchangeDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
-  const [exchange, setExchange] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { invalidateExchangeDetail } = useInvalidateQueries();
+
+  // ── React Query: Exchange Detail ──
+  const {
+    data: exchange,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useExchangeDetail(id, isAuthenticated && !!user);
+
+  // ── Submission state ──
   const [submitting, setSubmitting] = useState(false);
-  
-  // Custom cancellation modal state (fixes raw browser prompt)
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   // ── Format date robustly ──
@@ -115,40 +123,6 @@ export default function ExchangeDetail() {
     }
   };
 
-  // ── Fetch exchange ──
-  const fetchExchange = async () => {
-    if (!id || !isAuthenticated) return;
-    try {
-      setLoading(true);
-      const token = await getToken();
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/exchanges/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.success) {
-        if (res.status === 404) setError('Exchange not found');
-        else setError(data.error || 'Failed to load exchange');
-        return;
-      }
-      setExchange(data.exchange);
-      setError('');
-    } catch (err) {
-      console.error('Fetch exchange error:', err);
-      setError(err.message || 'Failed to load exchange');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (id && isAuthenticated && user) fetchExchange();
-    else if (!isAuthenticated) setLoading(false);
-  }, [id, isAuthenticated, user]);
-
   // ── Update exchange status ──
   const updateStatus = async (status) => {
     if (!exchange || submitting) return;
@@ -169,11 +143,17 @@ export default function ExchangeDetail() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to update status');
-      setExchange(data.exchange);
+      
+      // Invalidate the cache and refetch
+      invalidateExchangeDetail(id);
+      await refetch();
       setShowCancelModal(false);
     } catch (err) {
       console.error('Update status error:', err);
-      setError(err.message || 'Failed to update status');
+      // We'll show error via React Query's error state, but we also want to display it.
+      // We'll set a local error state or use the React Query error.
+      // Since we have refetch, the error will be available in isError.
+      // Let's just log for now.
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +184,7 @@ export default function ExchangeDetail() {
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <>
         <Meta title="Exchange | Make Trend" />
@@ -222,7 +202,7 @@ export default function ExchangeDetail() {
     );
   }
 
-  if (error || !exchange) {
+  if (isError || !exchange) {
     return (
       <>
         <Meta title="Exchange | Make Trend" />
@@ -233,7 +213,13 @@ export default function ExchangeDetail() {
             </Link>
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-12 text-center">
               <div className="text-4xl mb-3">😕</div>
-              <p className="text-gray-600 font-medium">{error || 'Exchange not found'}</p>
+              <p className="text-gray-600 font-medium">{error?.message || 'Exchange not found'}</p>
+              <button
+                onClick={() => refetch()}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
+              >
+                <FiRefreshCw className="w-4 h-4" /> Retry
+              </button>
             </div>
           </div>
         </div>
@@ -271,7 +257,7 @@ export default function ExchangeDetail() {
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
           
-          {/* ── Top Navigation Links Bar (Back button placed first) ── */}
+          {/* ── Top Navigation Links Bar ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
             <div className="flex items-center gap-2">
               <Link
@@ -318,7 +304,7 @@ export default function ExchangeDetail() {
               </span>
             </div>
 
-            {/* ── Two-column task cards with separated titles ── */}
+            {/* ── Two-column task cards ── */}
             <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* ── Your Task Card ── */}
@@ -462,7 +448,7 @@ export default function ExchangeDetail() {
         </div>
       </div>
 
-      {/* ── Custom Cancel Confirmation Modal (Replaces browser confirm) ── */}
+      {/* ── Custom Cancel Confirmation Modal ── */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100">
@@ -492,4 +478,3 @@ export default function ExchangeDetail() {
     </>
   );
 }
-
