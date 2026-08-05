@@ -64,7 +64,6 @@ export default function MyExchanges() {
   const hasMore = hasNextPage;
 
   // ── Intersection Observer for infinite scroll ──
-  const loadingRef = useRef(false);
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -214,7 +213,6 @@ export default function MyExchanges() {
             </div>
             <button
               onClick={() => {
-                // Force refetch the first page only
                 refetch({ refetchPage: (page, index) => index === 0 });
               }}
               className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
@@ -270,6 +268,13 @@ export default function MyExchanges() {
 
           <div className="space-y-3">
             {exchanges.map((exchange) => {
+              // ── ✅ Safety: if exchange.id is missing, skip this item ──
+              if (!exchange?.id) {
+                // You can optionally log a warning for debugging
+                console.warn('Skipping exchange without id:', exchange);
+                return null;
+              }
+
               const otherUser = getUserDisplay(exchange, user?.uid);
               const userStatus = getUserStatus(exchange, user?.uid);
               const otherTask = getOtherTask(exchange, user?.uid);
