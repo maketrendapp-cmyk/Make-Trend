@@ -4534,7 +4534,6 @@ async function populateExchange(data) {
 // 1. CREATE SOCIAL TASK
 // ─────────────────────────────────────────────
 // 1. CREATE SOCIAL TASK
-// 1. CREATE SOCIAL TASK
 app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -4585,7 +4584,6 @@ app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     if (!(await checkRateLimit(uid, 'social-task-list', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
-    // ── Cache key format: social-tasks:uid:limit:lastId (or 'null' for none)
     const cacheKey = `social-tasks:${uid}:${limit}:${lastId || 'null'}`;
     console.log(`📦 GET social-tasks cache key: ${cacheKey}`);
     const result = await getOrSetCache(cacheKey, async () => {
@@ -4599,15 +4597,22 @@ app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
         if (lastDoc.exists) query = query.startAfter(lastDoc);
       }
       const snapshot = await query.get();
+      console.log(`📊 Query returned ${snapshot.size} documents`);
       const tasks = [];
       let hasMore = false;
       let nextId = null;
-      snapshot.forEach((doc, index) => {
-        if (index < limit) {
+      // Using a for loop instead of forEach for clarity
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i++) {
+        if (i < limit) {
+          const doc = docs[i];
           tasks.push({ id: doc.id, ...doc.data() });
           nextId = doc.id;
-        } else hasMore = true;
-      });
+        } else {
+          hasMore = true;
+        }
+      }
+      console.log(`✅ tasks: ${tasks.length}, hasMore: ${hasMore}, nextId: ${nextId}`);
       return { success: true, tasks, hasMore, lastId: nextId };
     });
     res.json(result);
