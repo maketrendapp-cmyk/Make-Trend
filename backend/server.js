@@ -4532,6 +4532,104 @@ async function populateExchange(data) {
   return result;
 }
 
+// ── Helper: Update a user's feed cache in‑place ──
+async function updateUserFeedCache(uid, updateFn) {
+  try {
+    const pattern = `grow-feed:${uid}:*`;
+    const keys = await redis.keys(pattern);
+    if (keys.length === 0) return;
+    for (const key of keys) {
+      const cached = await redis.get(key);
+      if (!cached) continue;
+      let data = JSON.parse(cached);
+      const newData = updateFn(data);
+      if (newData) {
+        await redis.set(key, JSON.stringify(newData));
+        console.log(`🔄 Updated feed cache: ${key}`);
+      }
+    }
+  } catch (error) {
+    console.warn(`⚠️ Failed to update feed cache for user ${uid}:`, error.message);
+  }
+}
+
+
+// ── Helper: Update a user's exchange cache in‑place ──
+async function updateUserExchangeCache(uid, updateFn) {
+  try {
+    const pattern = `exchanges:${uid}:*`;
+    const keys = await redis.keys(pattern);
+    if (keys.length === 0) return;
+    for (const key of keys) {
+      const cached = await redis.get(key);
+      if (!cached) continue;
+      let data = JSON.parse(cached);
+      const newData = updateFn(data);
+      if (newData) {
+        await redis.set(key, JSON.stringify(newData));
+        console.log(`🔄 Updated exchange cache: ${key}`);
+      }
+    }
+  } catch (error) {
+    console.warn(`⚠️ Failed to update exchange cache for user ${uid}:`, error.message);
+  }
+}
+
+
+// ── Helper: Update hasExchange flag for specific task IDs in a user's feed cache ──
+async function updateFeedCacheExchangeFlags(uid, taskIds, hasExchangeValue) {
+  // taskIds: array of task IDs (strings)
+  // hasExchangeValue: true or false
+  try {
+    const pattern = `grow-feed:${uid}:*`;
+    const keys = await redis.keys(pattern);
+    if (keys.length === 0) return;
+    for (const key of keys) {
+      const cached = await redis.get(key);
+      if (!cached) continue;
+      const data = JSON.parse(cached);
+      if (data.tasks) {
+        let updated = false;
+        data.tasks = data.tasks.map(task => {
+          if (taskIds.includes(task.id)) {
+            updated = true;
+            return { ...task, hasExchange: hasExchangeValue };
+          }
+          return task;
+        });
+        if (updated) {
+          await redis.set(key, JSON.stringify(data));
+          console.log(`🔄 Feed cache exchange flag updated for key: ${key}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`⚠️ Failed to update feed cache exchange flags for user ${uid}:`, error.message);
+  }
+}
+// ── Helper: Update a user's own task list cache in‑place ──
+async function updateUserTasksCache(uid, updateFn) {
+  try {
+    const pattern = `social-tasks:${uid}:*`;
+    const keys = await redis.keys(pattern);
+    if (keys.length === 0) return;
+    for (const key of keys) {
+      const cached = await redis.get(key);
+      if (!cached) continue;
+      let data = JSON.parse(cached);
+      const newData = updateFn(data);
+      if (newData) {
+        await redis.set(key, JSON.stringify(newData));
+        console.log(`🔄 Updated tasks cache: ${key}`);
+      }
+    }
+  } catch (error) {
+    console.warn(`⚠️ Failed to update tasks cache for user ${uid}:`, error.message);
+  }
+}
+
+
+
 // ─────────────────────────────────────────────
 // 1. CREATE SOCIAL TASK
 // ─────────────────────────────────────_____
@@ -4542,7 +4640,7 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     if (!(await checkRateLimit(uid, 'social-task-create', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
-    const { platform, url, taskType, title, description } = req.body; // ← ADD description
+    const { platform, url, taskType, title, description } = req.body;
     if (!platform || typeof platform !== 'string' || platform.trim().length === 0 || platform.trim().length > 50) {
       return res.status(400).json({ success: false, error: 'Platform is required (max 50 chars)' });
     }
@@ -4552,7 +4650,6 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     if (!taskType || typeof taskType !== 'string' || taskType.trim().length === 0 || taskType.trim().length > 50) {
       return res.status(400).json({ success: false, error: 'Task type is required (max 50 chars)' });
     }
-    // ── Validate description (optional, max 500 chars) ──
     let cleanDescription = '';
     if (description !== undefined && description !== null) {
       if (typeof description !== 'string' || description.length > 500) {
@@ -4567,17 +4664,34 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
       url: url.trim(),
       taskType: taskType.trim(),
       title: cleanTitle,
-      description: cleanDescription, // ← ADDED
+      description: cleanDescription,
       active: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     const docRef = await db.collection('socialTasks').add(taskData);
-    // ── Invalidate caches ──
-    await invalidatePattern(`grow-feed:*`);
-    await invalidatePattern(`social-tasks:${uid}:*`);
-    console.log(`✅ Task created and caches invalidated for user ${uid}`);
-    res.status(201).json({ success: true, task: { id: docRef.id, ...taskData } });
+    const newTask = { id: docRef.id, ...taskData };
+
+    // ── Update feed cache in‑place: add the new task to the first page ──
+    await updateUserFeedCache(uid, (data) => {
+      if (!data.tasks) return null;
+      if (data.tasks.length >= 25) {
+        data.tasks = data.tasks.slice(0, 24);
+      }
+      data.tasks = [{ id: docRef.id, ...taskData, owner: null, isOwn: true, hasExchange: false }, ...data.tasks];
+      return data;
+    });
+
+    // ── Update user's own task cache in‑place ──
+    await updateUserTasksCache(uid, (data) => {
+      if (!data.tasks) return null;
+      // Add to the beginning (most recent)
+      data.tasks = [{ id: docRef.id, ...taskData }, ...data.tasks];
+      return data;
+    });
+
+    console.log(`✅ Task created and cache updated for user ${uid}`);
+    res.status(201).json({ success: true, task: newTask });
   } catch (error) {
     console.error('Create social task error:', error);
     res.status(500).json({ success: false, error: 'Failed to create task' });
@@ -4641,7 +4755,7 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { id } = req.params;
-    const { platform, url, taskType, title, active, description } = req.body; // ← ADD description
+    const { platform, url, taskType, title, active, description } = req.body;
     if (!(await checkRateLimit(uid, 'social-task-update', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
@@ -4671,16 +4785,36 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
       if (typeof active !== 'boolean') return res.status(400).json({ success: false, error: 'Active must be boolean' });
       updateData.active = active;
     }
-    // ── Handle description update ──
     if (description !== undefined) {
       if (typeof description !== 'string' || description.length > 500) {
         return res.status(400).json({ success: false, error: 'Description must be a string of max 500 characters' });
       }
       updateData.description = description.trim();
     }
+
     await docRef.update(updateData);
-    await invalidatePattern(`social-tasks:${uid}:*`);
-    await invalidatePattern(`grow-feed:*`);
+
+    // ── Update user's own task cache in‑place ──
+    await updateUserTasksCache(uid, (data) => {
+      if (!data.tasks) return null;
+      data.tasks = data.tasks.map(task => 
+        task.id === id ? { ...task, ...updateData } : task
+      );
+      return data;
+    });
+
+    // ── Update feed cache in‑place: update the task in all pages ──
+    await updateUserFeedCache(uid, (data) => {
+      if (!data.tasks) return null;
+      data.tasks = data.tasks.map(task => {
+        if (task.id === id) {
+          return { ...task, ...updateData };
+        }
+        return task;
+      });
+      return data;
+    });
+
     const updatedDoc = await docRef.get();
     res.json({ success: true, task: { id: updatedDoc.id, ...updatedDoc.data() } });
   } catch (error) {
@@ -4692,6 +4826,7 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
 // ─────────────────────────────────────────────
 // 4. DELETE SOCIAL TASK
 // ─────────────────────────────────────────────
+// 4. DELETE SOCIAL TASK
 app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -4703,9 +4838,22 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
     const doc = await docRef.get();
     if (!doc.exists) return res.status(404).json({ success: false, error: 'Task not found' });
     if (doc.data().uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
+
+    // ── Update user's own task cache in‑place ──
+    await updateUserTasksCache(uid, (data) => {
+      if (!data.tasks) return null;
+      data.tasks = data.tasks.filter(task => task.id !== id);
+      return data;
+    });
+
+    // ── Remove task from feed cache in‑place ──
+    await updateUserFeedCache(uid, (data) => {
+      if (!data.tasks) return null;
+      data.tasks = data.tasks.filter(task => task.id !== id);
+      return data;
+    });
+
     await docRef.delete();
-    await invalidatePattern(`social-tasks:${uid}:*`);
-    await invalidatePattern(`grow-feed:*`);
     res.json({ success: true, message: 'Task deleted' });
   } catch (error) {
     console.error('Delete task error:', error);
@@ -4719,7 +4867,8 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
 app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    // ── Enforce fixed limit of 25 ──
+    const limit = 25;
     const lastTaskId = req.query.lastTaskId || null;
     if (!(await checkRateLimit(uid, 'grow-feed', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
@@ -4784,8 +4933,8 @@ app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
   }
 });
 
-// // // // ─────────────────────────────────────────────
-// 6. CREATE EXCHANGE (with duplicate prevention & feed cache invalidation)
+// ─────────────────────────────────────────────
+// 6. CREATE EXCHANGE (with duplicate prevention & in‑place cache updates)
 // ─────────────────────────────────────────────
 app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
   try {
@@ -4879,16 +5028,27 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     const exchangeRef = await db.collection('exchanges').add(exchangeData);
     const newExchange = { id: exchangeRef.id, ...exchangeData };
 
-    // ── Invalidate caches ──
-    await invalidateKey(`exchanges:${uid}`);
-    await invalidateKey(`exchanges:${targetTask.uid}`);
-    await invalidatePattern(`exchanges:*`);
-    // ── Only invalidate THIS user's feed cache (not global) ──
-    await invalidatePattern(`grow-feed:${uid}:*`);
-    console.log(`🗑️ Feed cache invalidated for user ${uid}`);
+    // ── Update exchange caches in‑place ──
+    const populatedNewExchange = await populateExchange(newExchange);
+    await updateUserExchangeCache(uid, (data) => {
+      if (!data.exchanges) return null;
+      data.exchanges = [populatedNewExchange, ...data.exchanges];
+      return data;
+    });
+    await updateUserExchangeCache(targetTask.uid, (data) => {
+      if (!data.exchanges) return null;
+      data.exchanges = [populatedNewExchange, ...data.exchanges];
+      return data;
+    });
 
-    const populated = await populateExchange(newExchange);
-    res.status(201).json({ success: true, exchange: populated });
+    // ── Update feed cache: mark the exchanged tasks ──
+    // For the initiator: mark the target task as exchanged
+    await updateFeedCacheExchangeFlags(uid, [targetTaskId], true);
+    // For the target user: mark the initiator's task as exchanged
+    await updateFeedCacheExchangeFlags(targetTask.uid, [yourTaskId], true);
+
+
+    res.status(201).json({ success: true, exchange: populatedNewExchange });
   } catch (error) {
     console.error('Create exchange error:', error);
     res.status(500).json({ success: false, error: 'Failed to create exchange' });
@@ -5011,11 +5171,32 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
       updateData.overallStatus = 'cancelled';
     }
     await docRef.update(updateData);
-    await invalidateKey(`exchanges:${data.userAUid}`);
-    await invalidateKey(`exchanges:${data.userBUid}`);
-    await invalidatePattern(`exchanges:*`);
     const updatedDoc = await docRef.get();
     const populated = await populateExchange(updatedDoc.data());
+    
+    // ── Update exchange caches in‑place ──
+    await updateUserExchangeCache(data.userAUid, (cacheData) => {
+      if (!cacheData.exchanges) return null;
+      cacheData.exchanges = cacheData.exchanges.map(ex => 
+        ex.id === id ? populated : ex
+      );
+      return cacheData;
+    });
+    await updateUserExchangeCache(data.userBUid, (cacheData) => {
+      if (!cacheData.exchanges) return null;
+      cacheData.exchanges = cacheData.exchanges.map(ex => 
+        ex.id === id ? populated : ex
+      );
+      return cacheData;
+    });
+
+    // ── If cancelled, update feed cache to remove the exchange flag ──
+    if (status === 'cancel') {
+      const taskIds = [data.userATaskId, data.userBTaskId];
+      await updateFeedCacheExchangeFlags(data.userAUid, taskIds, false);
+      await updateFeedCacheExchangeFlags(data.userBUid, taskIds, false);
+    }
+
     res.json({ success: true, exchange: populated });
   } catch (error) {
     console.error('Update exchange error:', error);
