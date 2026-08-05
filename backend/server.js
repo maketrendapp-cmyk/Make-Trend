@@ -4756,6 +4756,9 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     // ── Add to global feed cache ──
     await addTaskToGlobalFeed(taskWithOwner);
 
+    // ── Invalidate user's own tasks cache so it appears in "My Tasks" ──
+    await invalidatePattern(`social-tasks:${uid}:*`);
+
     console.log(`✅ Task created and global feed updated for user ${uid}`);
     res.status(201).json({ success: true, task: newTask });
   } catch (error) {
@@ -4881,6 +4884,9 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
       await updateTaskInGlobalFeed(id, updateData);
     }
 
+    // ── Invalidate user's own tasks cache so changes appear in "My Tasks" ──
+    await invalidatePattern(`social-tasks:${uid}:*`);
+
     res.json({ success: true, task: { id: updatedDoc.id, ...updatedData } });
   } catch (error) {
     console.error('Update task error:', error);
@@ -4936,6 +4942,9 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
 
     // ── Remove from global feed cache ──
     await removeTaskFromGlobalFeed(id);
+
+    // ── ✅ NEW: Clear the user's own tasks cache so the task disappears from "My Tasks" ──
+    await invalidatePattern(`social-tasks:${uid}:*`);
 
     // ── Delete the task document ──
     await docRef.delete();
