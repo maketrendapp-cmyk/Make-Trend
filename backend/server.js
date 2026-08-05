@@ -4521,13 +4521,15 @@ async function populateExchange(data) {
     getUserInfo(data.userAUid),
     getUserInfo(data.userBUid),
   ]);
-  return {
+  // Preserve the id if it exists (data.id)
+  const result = {
     ...data,
     userATask: userATask.exists ? { id: userATask.id, ...userATask.data() } : null,
     userBTask: userBTask.exists ? { id: userBTask.id, ...userBTask.data() } : null,
     userA,
     userB,
   };
+  return result;
 }
 
 // ─────────────────────────────────────────────
@@ -4935,7 +4937,8 @@ app.get('/api/exchanges/:id', verifyToken, checkBanned, async (req, res) => {
     if (data.userAUid !== uid && data.userBUid !== uid) {
       return res.status(403).json({ success: false, error: 'Not your exchange' });
     }
-    const populated = await populateExchange(data);
+    // ── Pass the document ID along with the data ──
+    const populated = await populateExchange({ id: doc.id, ...data });
     res.json({ success: true, exchange: populated });
   } catch (error) {
     console.error('Get exchange error:', error);
