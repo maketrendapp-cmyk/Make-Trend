@@ -15,7 +15,6 @@ import {
   FiExternalLink,
   FiCheck,
   FiX,
-  FiArrowRight,
   FiHeart,
 } from 'react-icons/fi';
 import {
@@ -72,7 +71,7 @@ const STATUS_ICONS = {
 
 const STATUS_LABELS = {
   waiting: 'Waiting',
-  done: 'Done',
+  done: 'Done ✅',
   cancelled: 'Cancelled',
   completed: 'Completed',
 };
@@ -258,7 +257,7 @@ export default function ExchangeDetail() {
 
             {/* ── Two‑column cards ── */}
             <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* ── Left: Your Task ── */}
+              {/* ── Your Task ── */}
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -266,7 +265,7 @@ export default function ExchangeDetail() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Your Task</p>
-                    <p className="text-xs text-gray-500">You need help with this</p>
+                    <p className="text-xs text-gray-500">Needs to be done by the other user</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -282,16 +281,16 @@ export default function ExchangeDetail() {
                       </a>
                     )}
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${MyStatusClass}`}>
-                    <MyStatusIcon className="w-3 h-3" /> {STATUS_LABELS[myStatus] || myStatus}
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${OtherStatusClass}`}>
+                    <OtherStatusIcon className="w-3 h-3" /> {STATUS_LABELS[otherStatus] || otherStatus}
                   </span>
                 </div>
                 <div className="mt-3 text-xs text-gray-400">
-                  {myStatus === 'done' ? '✅ Completed by opponent' : '⏳ Waiting for opponent'}
+                  {otherStatus === 'done' ? '✅ Completed by them' : '⏳ Waiting for them'}
                 </div>
               </div>
 
-              {/* ── Right: Their Task ── */}
+              {/* ── Their Task ── */}
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -299,7 +298,7 @@ export default function ExchangeDetail() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{otherUser?.fullname || otherUser?.username || 'User'}</p>
-                    <p className="text-xs text-gray-500">Needs help with this</p>
+                    <p className="text-xs text-gray-500">Needs to be done by you</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -315,12 +314,12 @@ export default function ExchangeDetail() {
                       </a>
                     )}
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${OtherStatusClass}`}>
-                    <OtherStatusIcon className="w-3 h-3" /> {STATUS_LABELS[otherStatus] || otherStatus}
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${MyStatusClass}`}>
+                    <MyStatusIcon className="w-3 h-3" /> {STATUS_LABELS[myStatus] || myStatus}
                   </span>
                 </div>
                 <div className="mt-3 text-xs text-gray-400">
-                  {otherStatus === 'done' ? '✅ Completed by you' : '⏳ Waiting for you'}
+                  {myStatus === 'done' ? '✅ Completed by you' : '⏳ Waiting for you'}
                 </div>
               </div>
             </div>
@@ -347,7 +346,7 @@ export default function ExchangeDetail() {
                         className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition shadow-sm disabled:opacity-50"
                       >
                         {submitting ? <FiLoader className="w-5 h-5 animate-spin" /> : <FiCheckCircle className="w-5 h-5" />}
-                        {submitting ? 'Updating...' : '✅ I Completed Their Task'}
+                        {submitting ? 'Updating...' : '✅ I Did Their Task'}
                       </button>
                       <button
                         onClick={() => { if (confirm('Are you sure you want to cancel this exchange?')) updateStatus('cancel'); }}
