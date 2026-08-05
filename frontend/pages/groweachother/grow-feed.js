@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
+import { getToken } from '../../lib/api';
 import {
   FiHeart,
   FiUser,
