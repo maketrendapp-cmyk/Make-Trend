@@ -44,14 +44,14 @@ const PLATFORM_ICONS = {
 };
 
 const PLATFORM_COLORS = {
-  youtube: 'text-red-600 bg-red-50 border-red-100',
-  instagram: 'text-pink-600 bg-pink-50 border-pink-100',
-  twitter: 'text-blue-400 bg-blue-50 border-blue-100',
-  facebook: 'text-blue-700 bg-blue-50 border-blue-100',
-  tiktok: 'text-black bg-gray-100 border-gray-200',
-  twitch: 'text-purple-600 bg-purple-50 border-purple-100',
-  linkedin: 'text-blue-600 bg-blue-50 border-blue-100',
-  github: 'text-gray-800 bg-gray-50 border-gray-200',
+  youtube: 'text-red-600',
+  instagram: 'text-pink-600',
+  twitter: 'text-blue-400',
+  facebook: 'text-blue-700',
+  tiktok: 'text-black',
+  twitch: 'text-purple-600',
+  linkedin: 'text-blue-600',
+  github: 'text-gray-800',
 };
 
 const PLATFORMS = ['YouTube', 'Instagram', 'Twitter', 'Facebook', 'TikTok', 'Twitch', 'LinkedIn', 'GitHub'];
@@ -75,6 +75,11 @@ export default function MyTasks() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
+
+  // ── Delete confirmation modal state ──
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // ── Fetch tasks ──
   const fetchTasks = async () => {
@@ -185,23 +190,33 @@ export default function MyTasks() {
     }
   };
 
-  // ── Delete task ──
-  const handleDelete = async (taskId) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+  // ── Delete task handlers ──
+  const confirmDelete = (task) => {
+    setTaskToDelete(task);
+    setShowDeleteModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!taskToDelete) return;
+    setDeleting(true);
 
     try {
       const token = await getToken();
       if (!token) return;
-      const res = await fetch(`${API_BASE}/social-tasks/${taskId}`, {
+      const res = await fetch(`${API_BASE}/social-tasks/${taskToDelete.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to delete task');
+      setShowDeleteModal(false);
+      setTaskToDelete(null);
       fetchTasks();
     } catch (err) {
       console.error('Delete task error:', err);
       setError(err.message || 'Failed to delete task');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -232,8 +247,8 @@ export default function MyTasks() {
     return Icon;
   };
 
-  const getPlatformStyle = (platform) => {
-    return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600 bg-purple-50 border-purple-100';
+  const getPlatformColor = (platform) => {
+    return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600';
   };
 
   if (!isAuthenticated) {
@@ -241,15 +256,15 @@ export default function MyTasks() {
       <>
         <Meta title="My Tasks | Make Trend" />
         <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
-            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FiPlus className="w-10 h-10 text-purple-600" />
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-lg p-8 text-center border border-gray-100">
+            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
+              <FiPlus className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">My Tasks</h2>
-            <p className="text-gray-500 mt-2 text-sm">Sign in to create and manage your social tasks.</p>
+            <h2 className="text-xl font-bold text-gray-900">My Tasks</h2>
+            <p className="text-gray-500 mt-1.5 text-sm">Sign in to create and manage your social tasks.</p>
             <button
               onClick={() => router.push('/login')}
-              className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition w-full shadow-sm"
+              className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition w-full shadow-sm text-sm"
             >
               Sign In
             </button>
@@ -266,16 +281,16 @@ export default function MyTasks() {
         <div className="min-h-screen bg-gray-50 py-8 px-4">
           <div className="max-w-3xl mx-auto animate-pulse">
             <div className="flex items-center justify-between mb-6">
-              <div className="h-8 w-32 bg-gray-200 rounded" />
+              <div className="h-7 w-32 bg-gray-200 rounded-lg" />
               <div className="h-10 w-28 bg-gray-200 rounded-xl" />
             </div>
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-white rounded-2xl p-5 mb-4 shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-200" />
+                  <div className="w-10 h-10 rounded-xl bg-gray-200" />
                   <div className="flex-1">
                     <div className="h-4 bg-gray-200 rounded w-32" />
-                    <div className="h-3 bg-gray-200 rounded w-48 mt-1" />
+                    <div className="h-3 bg-gray-200 rounded w-48 mt-1.5" />
                   </div>
                 </div>
               </div>
@@ -289,146 +304,140 @@ export default function MyTasks() {
   return (
     <>
       <Meta title="My Tasks | Make Trend" description="Manage your social tasks for Grow Together." />
-      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-50 via-gray-50 to-white py-6 px-4">
+      <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
           
-          {/* ── Navigation Quick Links ── */}
-          <div className="flex items-center justify-between gap-2 mb-6 bg-white/80 backdrop-blur-xl p-3 rounded-2xl border border-gray-200/60 shadow-sm overflow-x-auto">
+          {/* ── Top Navigation Links Bar ── */}
+          <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push('/groweachother/grow-feed')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl font-bold text-xs sm:text-sm transition-all border border-purple-100 whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-xl font-medium text-xs sm:text-sm transition border border-purple-100/60"
               >
                 <FiCompass className="w-4 h-4" /> Go to Feed
               </button>
               <button
                 onClick={() => router.push('/groweachother/my-exchanges')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs sm:text-sm transition-all border border-indigo-100 whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 rounded-xl font-medium text-xs sm:text-sm transition border border-indigo-100/60"
               >
                 <FiRepeat className="w-4 h-4" /> View Exchanges
               </button>
             </div>
             <button
               onClick={fetchTasks}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm text-gray-500 hover:text-gray-900 transition-colors"
-              title="Refresh Tasks"
+              className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
+              title="Refresh"
             >
               <FiRefreshCw className="w-4 h-4" />
             </button>
           </div>
 
           {/* ── Header ── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-white/80 backdrop-blur-xl p-6 rounded-3xl border border-gray-200/60 shadow-sm">
+          <div className="flex items-center justify-between mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center">
-                  <FiPlus className="w-5 h-5" />
-                </div>
-                My Social Tasks
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <FiPlus className="text-purple-600 w-5 h-5" />
+                My Tasks
               </h1>
-              <p className="text-sm text-gray-500 font-medium mt-1">Manage what tasks you want other members to complete</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Manage your social tasks for Grow Together</p>
             </div>
             <button
               onClick={openCreateModal}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold rounded-2xl hover:shadow-lg transition-all active:scale-95 shadow-md whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs sm:text-sm font-medium rounded-xl hover:shadow-md transition shadow-sm"
             >
-              <FiPlus className="w-5 h-5" />
-              Add New Task
+              <FiPlus className="w-4 h-4" />
+              Add Task
             </button>
           </div>
 
           {error && (
-            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-semibold shadow-sm">
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
               {error}
             </div>
           )}
 
           {/* ── Tasks List ── */}
           {tasks.length === 0 ? (
-            <div className="text-center py-20 bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm border border-gray-200/60 px-4">
-              <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">📋</div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">No tasks created yet</h3>
-              <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto font-medium">Create your first social task to start receiving engagement from the community!</p>
+            <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
+              <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">📋</div>
+              <h3 className="text-base font-bold text-gray-900 mb-1">No tasks yet</h3>
+              <p className="text-sm text-gray-400 mb-6 font-medium">Create your first social task to get started!</p>
               <button
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition text-sm shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
               >
                 <FiPlus className="w-4 h-4" />
-                Create First Task
+                Create Task
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {tasks.map((task) => {
                 const Icon = getPlatformIcon(task.platform);
-                const styleClass = getPlatformStyle(task.platform);
+                const color = getPlatformColor(task.platform);
                 return (
                   <div
                     key={task.id}
-                    className={`bg-white rounded-3xl shadow-sm border p-5 transition-all duration-300 hover:shadow-md ${
-                      task.active ? 'border-gray-200/60' : 'border-gray-200 bg-gray-50/60 opacity-75'
+                    className={`bg-white rounded-2xl shadow-sm border p-4 sm:p-5 hover:shadow-md transition-all ${
+                      task.active ? 'border-gray-100' : 'border-gray-200/80 bg-gray-50/60'
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       
-                      {/* Left Details */}
-                      <div className="flex items-start gap-4 flex-1 min-w-0">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border shadow-sm ${styleClass}`}>
-                          <Icon className="w-6 h-6" />
+                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                        <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-100/60 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <Icon className={`w-5 h-5 ${color}`} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="font-extrabold text-gray-900 text-base">
+                            <span className="font-bold text-gray-900 text-sm sm:text-base">
                               {task.platform || 'Unknown'}
                             </span>
-                            <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-full">
+                            <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md">
                               {task.taskType || 'Task'}
                             </span>
                             {!task.active && (
-                              <span className="text-xs font-semibold text-gray-500 bg-gray-200 px-2.5 py-0.5 rounded-full">
-                                Paused
+                              <span className="text-[11px] font-semibold text-gray-500 bg-gray-200/70 px-2 py-0.5 rounded-md">
+                                Inactive
                               </span>
                             )}
                           </div>
-
                           {task.title && (
-                            <p className="text-sm font-semibold text-gray-700 truncate mb-1">{task.title}</p>
+                            <p className="text-xs sm:text-sm text-gray-600 font-medium truncate mb-1">{task.title}</p>
                           )}
-
                           <a
                             href={task.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline truncate max-w-full"
+                            className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline truncate max-w-full font-medium"
                           >
-                            <FiExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                            <FiExternalLink className="w-3 h-3 flex-shrink-0" />
                             <span className="truncate">{task.url}</span>
                           </a>
                         </div>
                       </div>
 
-                      {/* Right Action Buttons */}
-                      <div className="flex items-center justify-end gap-2.5 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                      <div className="flex items-center justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                         <button
                           onClick={() => handleToggleActive(task)}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
                             task.active
-                              ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
-                              : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                              ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                              : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
                           }`}
                         >
-                          {task.active ? 'Active' : 'Activate'}
+                          {task.active ? 'Active' : 'Inactive'}
                         </button>
                         <button
                           onClick={() => openEditModal(task)}
-                          className="p-2.5 bg-gray-50 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition border border-gray-200/60 shadow-sm"
+                          className="p-2 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 transition border border-transparent hover:border-purple-100"
                           title="Edit Task"
                         >
                           <FiEdit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(task.id)}
-                          className="p-2.5 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl transition border border-red-200/60 shadow-sm"
+                          onClick={() => confirmDelete(task)}
+                          className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition border border-transparent hover:border-red-100"
                           title="Delete Task"
                         >
                           <FiTrash2 className="w-4 h-4" />
@@ -446,11 +455,11 @@ export default function MyTasks() {
 
       {/* ── Create/Edit Modal ── */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-gray-100 my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-gray-100">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-black text-gray-900">
-                {editingTask ? 'Edit Social Task' : 'Add New Social Task'}
+              <h2 className="text-lg font-bold text-gray-900">
+                {editingTask ? 'Edit Task' : 'Add New Task'}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
@@ -463,13 +472,13 @@ export default function MyTasks() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Platform */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
                   Platform <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.platform}
                   onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition cursor-pointer"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
                   required
                 >
                   <option value="">Select platform</option>
@@ -481,28 +490,28 @@ export default function MyTasks() {
 
               {/* URL */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-                  Target URL <span className="text-red-500">*</span>
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+                  URL <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="url"
                   value={formData.url}
                   onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
-                  placeholder="https://youtube.com/@channel"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                  placeholder="https://..."
                   required
                 />
               </div>
 
               {/* Task Type */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
                   Task Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.taskType}
                   onChange={(e) => setFormData({ ...formData, taskType: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition cursor-pointer"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
                   required
                 >
                   <option value="">Select task type</option>
@@ -512,55 +521,83 @@ export default function MyTasks() {
                 </select>
               </div>
 
-              {/* Title */}
+              {/* Title (optional) */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-                  Custom Label / Title (Optional)
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+                  Title (optional)
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
-                  placeholder="e.g. My Gaming Channel"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                  placeholder="e.g. My YouTube Channel"
                   maxLength={100}
                 />
-                <p className="mt-1 text-[11px] text-gray-400 font-medium text-right">{formData.title.length}/100 characters</p>
+                <p className="mt-1 text-[11px] text-gray-400 font-medium">{formData.title.length}/100 characters</p>
               </div>
 
               {modalError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-bold shadow-sm">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
                   {modalError}
                 </div>
               )}
 
-              <div className="flex gap-3 pt-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3.5 rounded-2xl font-bold text-sm hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-medium text-sm hover:shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
                 >
                   {submitting ? (
                     <>
-                      <FiLoader className="w-5 h-5 animate-spin" />
+                      <FiLoader className="w-4 h-4 animate-spin" />
                       Saving...
                     </>
                   ) : (
                     <>
-                      <FiCheck className="w-5 h-5" />
-                      {editingTask ? 'Update Task' : 'Create Task'}
+                      <FiCheck className="w-4 h-4" />
+                      {editingTask ? 'Update' : 'Create'}
                     </>
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-100 text-gray-700 py-3.5 rounded-2xl font-bold text-sm hover:bg-gray-200 transition-all"
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium text-sm hover:bg-gray-200 transition"
                 >
                   Cancel
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100">
+            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiTrash2 className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1.5">Delete Task</h3>
+            <p className="text-gray-500 text-xs sm:text-sm mb-6 leading-relaxed">Are you sure you want to delete this task? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {deleting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Delete'}
+              </button>
+              <button
+                onClick={() => { setShowDeleteModal(false); setTaskToDelete(null); }}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
