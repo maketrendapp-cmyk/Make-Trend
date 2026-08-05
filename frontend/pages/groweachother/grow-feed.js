@@ -389,29 +389,29 @@ export default function GrowFeed() {
                         <p className="text-xs text-gray-400 font-medium">@{task.owner?.username || 'user'}</p>
                       </div>
                     </div>
-                    <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    {/* Platform Badge on the Top Right */}
+                    <span className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full uppercase tracking-wider">
                       {task.platform || 'Social'}
                     </span>
                   </div>
 
-                  {/* Clean Post Card Layout (Replaced Raw URL) */}
-                  <div className="bg-gray-50/70 border border-gray-200/60 rounded-2xl p-4 mb-4 flex items-center justify-between gap-4">
+                  {/* Clean Separate Title & Action Card */}
+                  <div className="bg-gray-50/70 border border-gray-200/60 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200/50 shadow-sm ${colorClass}`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
-                            {task.platform || 'Platform'} Request
-                          </span>
-                          <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md">
+                        {/* SEPARATE TITLE & ACTION LABEL */}
+                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          <span className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
                             {task.taskType || 'Support'}
                           </span>
+                          <span className="text-xs text-gray-400 font-medium">on {task.platform || 'Platform'}</span>
                         </div>
-                        <p className="text-sm font-semibold text-gray-700 truncate">
+                        <h4 className="text-sm font-bold text-gray-900 truncate">
                           {task.title || `${task.taskType} my ${task.platform} profile`}
-                        </p>
+                        </h4>
                       </div>
                     </div>
 
@@ -419,9 +419,9 @@ export default function GrowFeed() {
                       href={task.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition shadow-sm flex-shrink-0"
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition shadow-sm flex-shrink-0"
                     >
-                      <span>Visit</span>
+                      <span>Visit Link</span>
                       <FiExternalLink className="w-3.5 h-3.5 text-gray-400" />
                     </a>
                   </div>
@@ -589,3 +589,4 @@ export default function GrowFeed() {
     </>
   );
 }
+
