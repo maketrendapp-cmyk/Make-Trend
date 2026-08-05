@@ -4695,7 +4695,7 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
 });
 
 // ─────────────────────────────────────────────
-// 5. GROW FEED – PUBLIC TASKS (paginated)
+// 5. GROW FEED – PUBLIC TASKS (paginated) with own tasks & exchange filter
 // ─────────────────────────────────────────────
 app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
   try {
@@ -4707,6 +4707,30 @@ app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
     }
     const cacheKey = `grow-feed:${uid}:${limit}:${lastTaskId || 'null'}`;
     const result = await getOrSetCache(cacheKey, async () => {
+      // ── Get all task IDs that are already in an exchange with this user (active or completed) ──
+      const [exchangesA, exchangesB] = await Promise.all([
+        db.collection('exchanges')
+          .where('overallStatus', 'in', ['active', 'completed'])
+          .where('userAUid', '==', uid)
+          .get(),
+        db.collection('exchanges')
+          .where('overallStatus', 'in', ['active', 'completed'])
+          .where('userBUid', '==', uid)
+          .get(),
+      ]);
+
+      const exchangedTaskIds = new Set();
+      exchangesA.forEach(doc => {
+        const data = doc.data();
+        exchangedTaskIds.add(data.userATaskId);
+        exchangedTaskIds.add(data.userBTaskId);
+      });
+      exchangesB.forEach(doc => {
+        const data = doc.data();
+        exchangedTaskIds.add(data.userATaskId);
+        exchangedTaskIds.add(data.userBTaskId);
+      });
+
       let query = db.collection('socialTasks')
         .where('active', '==', true)
         .orderBy('createdAt', 'desc')
@@ -4721,10 +4745,12 @@ app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
       let lastId = null;
       for (const doc of snapshot.docs) {
         const data = doc.data();
-        if (data.uid === uid) continue;
+        // ── Skip tasks that are already exchanged with this user ──
+        if (exchangedTaskIds.has(doc.id)) continue;
         if (tasks.length < limit) {
           const user = await getUserInfo(data.uid);
-          tasks.push({ id: doc.id, ...data, owner: user });
+          const isOwn = data.uid === uid;
+          tasks.push({ id: doc.id, ...data, owner: user, isOwn });
           lastId = doc.id;
         } else {
           hasMore = true;
@@ -4740,8 +4766,8 @@ app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────
-// 6. CREATE EXCHANGE
+// // ─────────────────────────────────────────────
+// 6. CREATE EXCHANGE (with duplicate prevention)
 // ─────────────────────────────────────────────
 app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
   try {
@@ -4765,15 +4791,61 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     if (yourTask.uid !== uid) return res.status(403).json({ success: false, error: 'Not your task' });
     if (!yourTask.active) return res.status(400).json({ success: false, error: 'Your task is inactive' });
 
-    const existing = await db.collection('exchanges')
+    // ── Check if the target task is already in an exchange with the current user (any direction) ──
+    const existingTarget = await db.collection('exchanges')
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .where('userBTaskId', '==', targetTaskId)
+      .where('userAUid', '==', uid)
+      .get();
+    if (!existingTarget.empty) {
+      return res.status(409).json({ success: false, error: 'This task is already in an exchange with you.' });
+    }
+    const existingTargetReverse = await db.collection('exchanges')
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .where('userATaskId', '==', targetTaskId)
+      .where('userBUid', '==', uid)
+      .get();
+    if (!existingTargetReverse.empty) {
+      return res.status(409).json({ success: false, error: 'This task is already in an exchange with you.' });
+    }
+
+    // ── Check if your task is already in an exchange with the target user ──
+    const existingYourTask = await db.collection('exchanges')
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .where('userATaskId', '==', yourTaskId)
+      .where('userBUid', '==', targetTask.uid)
+      .get();
+    if (!existingYourTask.empty) {
+      return res.status(409).json({ success: false, error: 'Your task is already in an exchange with this user.' });
+    }
+    const existingYourTaskReverse = await db.collection('exchanges')
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .where('userBTaskId', '==', yourTaskId)
+      .where('userAUid', '==', targetTask.uid)
+      .get();
+    if (!existingYourTaskReverse.empty) {
+      return res.status(409).json({ success: false, error: 'Your task is already in an exchange with this user.' });
+    }
+
+    // ── Also check the exact pair (prevents duplicate exchanges between the same two tasks) ──
+    const existingPair = await db.collection('exchanges')
       .where('userATaskId', '==', yourTaskId)
       .where('userBTaskId', '==', targetTaskId)
       .where('overallStatus', 'in', ['active', 'completed'])
       .get();
-    if (!existing.empty) {
-      return res.status(409).json({ success: false, error: 'Exchange already exists between these tasks' });
+    if (!existingPair.empty) {
+      return res.status(409).json({ success: false, error: 'Exchange already exists between these tasks.' });
+    }
+    const existingPairReverse = await db.collection('exchanges')
+      .where('userATaskId', '==', targetTaskId)
+      .where('userBTaskId', '==', yourTaskId)
+      .where('overallStatus', 'in', ['active', 'completed'])
+      .get();
+    if (!existingPairReverse.empty) {
+      return res.status(409).json({ success: false, error: 'Exchange already exists between these tasks.' });
     }
 
+    // ── Create exchange ──
     const exchangeData = {
       userAUid: uid,
       userBUid: targetTask.uid,
@@ -4790,6 +4862,7 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     await invalidateKey(`exchanges:${uid}`);
     await invalidateKey(`exchanges:${targetTask.uid}`);
     await invalidatePattern(`exchanges:*`);
+    await invalidatePattern(`grow-feed:*`);
     const populated = await populateExchange(newExchange);
     res.status(201).json({ success: true, exchange: populated });
   } catch (error) {
