@@ -380,6 +380,168 @@ export function useExchangeDetail(id, enabled = true) {
   });
 }
 
+// ── 🚀 PRODUCT TREND QUERIES ──
+
+// 1. Product Feed (infinite scroll with filters)
+export function useProductFeed(filters = {}, enabled = true) {
+  const queryKey = ['productFeed', filters];
+  return useInfiniteQuery({
+    queryKey,
+    queryFn: async ({ pageParam = null }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const params = new URLSearchParams({
+        limit: 20,
+        ...filters,
+        ...(pageParam && { lastId: pageParam }),
+      });
+      const url = `/productstrend/feed?${params.toString()}`;
+      const data = await apiRequest(url, {}, token);
+      return {
+        products: data.products || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
+    },
+    enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// 2. Product Detail
+export function useProductDetail(id, enabled = true) {
+  return useQuery({
+    queryKey: ['productDetail', id],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/productstrend/products/${id}`, {}, token);
+      return data.product;
+    },
+    enabled: !!id && enabled,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+// 3. My Products
+export function useMyProducts(enabled = true) {
+  return useQuery({
+    queryKey: ['myProducts'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return [];
+      const data = await apiRequest('/productstrend/my-products', {}, token);
+      return data.products || [];
+    },
+    enabled,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+// 4. Product Comments
+export function useProductComments(productId, enabled = true) {
+  return useQuery({
+    queryKey: ['productComments', productId],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return [];
+      const data = await apiRequest(`/productstrend/products/${productId}/comments`, {}, token);
+      return data.comments || [];
+    },
+    enabled: !!productId && enabled,
+    staleTime: 1 * 60 * 1000,
+  });
+}
+
+// 5. Launch Product Mutation
+export function useLaunchProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest('/productstrend/products', {
+        method: 'POST',
+        body: payload,
+      }, token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['myProducts']);
+      toast.success('Product launched successfully!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to launch product');
+    },
+  });
+}
+
+// 6. Upvote Product Mutation
+export function useUpvoteProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (productId) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/productstrend/products/${productId}/upvote`, {
+        method: 'POST',
+      }, token);
+      return data;
+    },
+    onSuccess: (data, productId) => {
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['productDetail', productId]);
+      queryClient.invalidateQueries(['myProducts']);
+    },
+  });
+}
+
+// 7. Add Product Comment Mutation
+export function useAddProductComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ productId, text }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/productstrend/products/${productId}/comments`, {
+        method: 'POST',
+        body: { text },
+      }, token);
+      return data;
+    },
+    onSuccess: (data, { productId }) => {
+      queryClient.invalidateQueries(['productComments', productId]);
+      queryClient.invalidateQueries(['productDetail', productId]);
+      queryClient.invalidateQueries(['productFeed']);
+    },
+  });
+}
+
+// 8. Delete Product Mutation
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (productId) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/productstrend/products/${productId}`, {
+        method: 'DELETE',
+      }, token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['myProducts']);
+      toast.success('Product deleted');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete product');
+    },
+  });
+}
+
 // ── Invalidation helper ──
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
@@ -401,6 +563,11 @@ export function useInvalidateQueries() {
     invalidateAvailableTasks: () => queryClient.invalidateQueries(['availableTasks']),
     invalidateMyExchanges: () => queryClient.invalidateQueries(['myExchanges']),
     invalidateExchangeDetail: (id) => queryClient.invalidateQueries(['exchangeDetail', id]),
+    // ProductTrend invalidation helpers
+    invalidateProductFeed: () => queryClient.invalidateQueries(['productFeed']),
+    invalidateProductDetail: (id) => queryClient.invalidateQueries(['productDetail', id]),
+    invalidateMyProducts: () => queryClient.invalidateQueries(['myProducts']),
+    invalidateProductComments: (id) => queryClient.invalidateQueries(['productComments', id]),
     invalidateAll: () => {
       queryClient.invalidateQueries(['profile']);
       queryClient.invalidateQueries(['stats']);
@@ -418,7 +585,9 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['myTasks']);
       queryClient.invalidateQueries(['availableTasks']);
       queryClient.invalidateQueries(['myExchanges']);
-      // exchangeDetail keys are dynamic, so skip here
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['myProducts']);
+      // productDetail and productComments keys are dynamic, so skip here
     },
   };
 }
