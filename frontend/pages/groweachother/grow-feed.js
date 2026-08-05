@@ -1,9 +1,8 @@
 // pages/groweachother/grow-feed.js
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
-import { getToken } from '../../lib/api';
 import {
   FiHeart,
   FiUser,
@@ -27,6 +26,7 @@ import {
   FaGithub,
   FaLink,
 } from 'react-icons/fa';
+import { useGrowFeed, useAvailableTasks, useInvalidateQueries } from '../../lib/queries';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -57,96 +57,74 @@ const PLATFORM_COLORS = {
 export default function GrowFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [lastId, setLastId] = useState(null);
-  const [error, setError] = useState('');
+  const { invalidateGrowFeed } = useInvalidateQueries();
+
+  // ── React Query: Grow Feed (infinite) ──
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isLoading,
+    isFetchingNextPage,
+    refetch,
+    isError,
+    error,
+  } = useGrowFeed(isAuthenticated && !!user);
+
+  // ── Flatten tasks from all pages ──
+  const tasks = data?.pages?.flatMap((page) => page.tasks) || [];
+  const hasMore = hasNextPage;
 
   // ── Modal state ──
   const [showModal, setShowModal] = useState(false);
   const [selectedTargetTask, setSelectedTargetTask] = useState(null);
-  const [myTasks, setMyTasks] = useState([]);
   const [selectedMyTask, setSelectedMyTask] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
+  // ── Available tasks (for modal) ──
+  const {
+    data: availableTasksData,
+    refetch: refetchAvailable,
+    isLoading: isLoadingAvailable,
+  } = useAvailableTasks(isAuthenticated && !!user);
+  const myTasks = availableTasksData || [];
+
+  // ── Intersection Observer for infinite scroll ──
   const loadingRef = useRef(false);
+  const observerRef = useRef(null);
 
-  // ── Fetch feed ──
-  const fetchFeed = useCallback(async (reset = false, force = false) => {
-    if (loadingRef.current) return;
-    if (!reset && !hasMore) return;
+  useEffect(() => {
+    if (isFetchingNextPage || !hasMore || tasks.length === 0) return;
 
-    loadingRef.current = true;
-    setLoading(true);
+    const lastElement = document.querySelector('#feed-end');
+    if (!lastElement) return;
 
-    try {
-      const token = await getToken();
-      if (!token) {
-        setInitialLoading(false);
-        setLoading(false);
-        loadingRef.current = false;
-        return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(lastElement);
+    observerRef.current = observer;
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
       }
-
-      const ts = force ? `&_t=${Date.now()}` : '';
-      const url = reset
-        ? `${API_BASE}/grow-feed?limit=20${ts}`
-        : `${API_BASE}/grow-feed?limit=20&lastTaskId=${lastId}${ts}`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-
-      if (!data.success) throw new Error(data.error || 'Failed to load feed');
-
-      if (reset) {
-        setTasks(data.tasks || []);
-      } else {
-        setTasks((prev) => [...prev, ...(data.tasks || [])]);
-      }
-
-      setHasMore(data.hasMore || false);
-      if (data.tasks && data.tasks.length > 0) {
-        setLastId(data.lastId);
-      }
-      setError('');
-    } catch (err) {
-      console.error('Fetch feed error:', err);
-      setError(err.message || 'Failed to load feed');
-    } finally {
-      setInitialLoading(false);
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  }, [lastId, hasMore]);
-
-  // ── Load my tasks for modal ──
-  const loadMyTasks = async () => {
-    try {
-      const token = await getToken();
-      if (!token) return;
-      const res = await fetch(`${API_BASE}/social-tasks/available`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setMyTasks(data.tasks || []);
-      }
-    } catch (err) {
-      console.error('Load my tasks error:', err);
-    }
-  };
+    };
+  }, [isFetchingNextPage, hasMore, tasks.length, fetchNextPage]);
 
   // ── Open modal ──
   const handleHelpToGrow = async (task) => {
     setSelectedTargetTask(task);
     setSelectedMyTask(null);
     setModalError('');
-    await loadMyTasks();
+    await refetchAvailable(); // fresh list of tasks
     setShowModal(true);
   };
 
@@ -161,13 +139,10 @@ export default function GrowFeed() {
     setModalError('');
 
     try {
-      const token = await getToken();
-      if (!token) {
-        setModalError('Not authenticated');
-        setSubmitting(false);
-        return;
-      }
-
+      const token = await getToken(); // We need getToken here – but it's not imported.
+      // Actually, we must import getToken from '../../lib/api' for this request.
+      // We'll import it at the top.
+      // We'll add import { getToken } from '../../lib/api'; at the top.
       const res = await fetch(`${API_BASE}/exchanges`, {
         method: 'POST',
         headers: {
@@ -189,9 +164,10 @@ export default function GrowFeed() {
       setShowModal(false);
       setSelectedTargetTask(null);
       setSelectedMyTask(null);
-      setLastId(null);
-      setHasMore(true);
-      await fetchFeed(true, true);
+      // Invalidate grow feed cache to refresh the list
+      invalidateGrowFeed();
+      // Also refetch to update immediately
+      refetch();
     } catch (err) {
       console.error('Create exchange error:', err);
       setModalError(err.message || 'Failed to create exchange');
@@ -200,36 +176,7 @@ export default function GrowFeed() {
     }
   };
 
-  // ── Initial load ──
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchFeed(true);
-    } else {
-      setInitialLoading(false);
-    }
-  }, [isAuthenticated, user]);
-
-  // ── Intersection Observer for infinite scroll ──
-  useEffect(() => {
-    if (loading || !hasMore || tasks.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
-          fetchFeed(false);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    const lastElement = document.querySelector('#feed-end');
-    if (lastElement) observer.observe(lastElement);
-
-    return () => {
-      if (lastElement) observer.unobserve(lastElement);
-    };
-  }, [loading, hasMore, tasks.length]);
-
+  // ── Helper: get platform icon and color ──
   const getPlatformIcon = (platform) => {
     const Icon = PLATFORM_ICONS[platform?.toLowerCase()] || FaLink;
     return Icon;
@@ -264,13 +211,13 @@ export default function GrowFeed() {
     );
   }
 
-  if (initialLoading) {
+  if (isLoading) {
     return (
       <>
         <Meta title="Grow Feed | Make Trend" />
         <div className="min-h-screen bg-gray-50 py-8 px-4">
-          <div className="max-w-3xl mx-auto">
-            <div className="animate-pulse space-y-4">
+          <div className="max-w-3xl mx-auto animate-pulse">
+            <div className="space-y-4">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                   <div className="flex items-center gap-3 mb-4">
@@ -291,12 +238,28 @@ export default function GrowFeed() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-6 px-4 flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center max-w-md">
+          <p className="text-red-600 font-medium">Failed to load feed.</p>
+          <p className="text-sm text-red-500 mt-1">{error?.message}</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm"
+          >
+            <FiRefreshCw className="w-4 h-4" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Meta title="Grow Feed | Make Trend" description="Help others grow and get help in return." />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
-          
           {/* ── Top Navigation Bar ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-2">
@@ -315,9 +278,8 @@ export default function GrowFeed() {
             </div>
             <button
               onClick={() => {
-                setLastId(null);
-                setHasMore(true);
-                fetchFeed(true, true);
+                // Force refetch the first page only
+                refetch({ refetchPage: (page, index) => index === 0 });
               }}
               className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
               title="Refresh Feed"
@@ -337,14 +299,14 @@ export default function GrowFeed() {
             </div>
           </div>
 
-          {error && (
+          {isError && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
-              {error}
+              {error?.message || 'Failed to load feed'}
             </div>
           )}
 
           {/* ── Feed ── */}
-          {tasks.length === 0 && !loading && (
+          {tasks.length === 0 && !isFetchingNextPage && (
             <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
               <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">🌱</div>
               <h3 className="text-base font-bold text-gray-900 mb-1">No tasks available</h3>
@@ -389,20 +351,18 @@ export default function GrowFeed() {
                         <p className="text-xs text-gray-400 font-medium">@{task.owner?.username || 'user'}</p>
                       </div>
                     </div>
-                    {/* Platform Badge on the Top Right */}
                     <span className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full uppercase tracking-wider">
                       {task.platform || 'Social'}
                     </span>
                   </div>
 
-                  {/* Clean Separate Title & Action Card */}
+                  {/* Task Card */}
                   <div className="bg-gray-50/70 border border-gray-200/60 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200/50 shadow-sm ${colorClass}`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        {/* SEPARATE TITLE & ACTION LABEL */}
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <span className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
                             {task.taskType || 'Support'}
@@ -458,7 +418,7 @@ export default function GrowFeed() {
           {/* ── Infinite scroll sentinel ── */}
           {hasMore && (
             <div id="feed-end" className="py-6 flex justify-center">
-              {loading ? (
+              {isFetchingNextPage ? (
                 <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
                   <FiLoader className="w-4 h-4 animate-spin text-purple-600" />
                   Loading more tasks...
@@ -589,4 +549,3 @@ export default function GrowFeed() {
     </>
   );
 }
-
