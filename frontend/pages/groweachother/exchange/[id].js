@@ -86,8 +86,11 @@ export default function ExchangeDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  
+  // Custom cancellation modal state (fixes raw browser prompt)
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
-  // ── Format date robustly (Fixed Invalid Date bug) ──
+  // ── Format date robustly ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Just now';
     try {
@@ -167,6 +170,7 @@ export default function ExchangeDetail() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to update status');
       setExchange(data.exchange);
+      setShowCancelModal(false);
     } catch (err) {
       console.error('Update status error:', err);
       setError(err.message || 'Failed to update status');
@@ -258,7 +262,6 @@ export default function ExchangeDetail() {
   const MyStatusClass = getStatusClass(myStatus);
   const OtherStatusClass = getStatusClass(otherStatus);
 
-  // Fixed Exchange ID format
   const fullId = exchange.id || id || '';
   const exchangeIdDisplay = fullId.length > 8 ? fullId.slice(-6).toUpperCase() : fullId.toUpperCase() || 'EXCHANGE';
 
@@ -268,9 +271,15 @@ export default function ExchangeDetail() {
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
           
-          {/* ── Top Navigation Links Bar (Linked to Feed, My Tasks, and Exchanges) ── */}
+          {/* ── Top Navigation Links Bar (Back button placed first) ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
             <div className="flex items-center gap-2">
+              <Link
+                href="/groweachother/my-exchanges"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium text-xs sm:text-sm transition whitespace-nowrap"
+              >
+                <FiArrowLeft className="w-4 h-4" /> Back to Exchanges
+              </Link>
               <button
                 onClick={() => router.push('/groweachother/grow-feed')}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-xl font-medium text-xs sm:text-sm transition border border-purple-100/60 whitespace-nowrap"
@@ -283,16 +292,13 @@ export default function ExchangeDetail() {
               >
                 <FiPlus className="w-4 h-4" /> My Tasks
               </button>
-              <button
-                onClick={() => router.push('/groweachother/my-exchanges')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 rounded-xl font-medium text-xs sm:text-sm transition border border-indigo-100/60 whitespace-nowrap"
-              >
-                <FiRepeat className="w-4 h-4" /> Exchanges
-              </button>
             </div>
-            <Link href="/groweachother/my-exchanges" className="text-xs font-semibold text-purple-600 hover:underline whitespace-nowrap">
-              &larr; Back
-            </Link>
+            <button
+              onClick={() => router.push('/groweachother/my-exchanges')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 rounded-xl font-medium text-xs sm:text-sm transition border border-indigo-100/60 whitespace-nowrap"
+            >
+              <FiRepeat className="w-4 h-4" /> Exchanges
+            </button>
           </div>
 
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -430,7 +436,7 @@ export default function ExchangeDetail() {
                         {submitting ? 'Updating...' : 'I Completed Their Task'}
                       </button>
                       <button
-                        onClick={() => { if (confirm('Are you sure you want to cancel this exchange?')) updateStatus('cancel'); }}
+                        onClick={() => setShowCancelModal(true)}
                         disabled={submitting}
                         className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white text-red-600 border border-red-200 rounded-xl font-bold text-sm hover:bg-red-50 transition shadow-sm disabled:opacity-50"
                       >
@@ -455,6 +461,34 @@ export default function ExchangeDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── Custom Cancel Confirmation Modal (Replaces browser confirm) ── */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100">
+            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiXCircle className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1.5">Cancel Exchange</h3>
+            <p className="text-gray-500 text-xs sm:text-sm mb-6 leading-relaxed">Are you sure you want to cancel this exchange? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => updateStatus('cancel')}
+                disabled={submitting}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {submitting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Yes, Cancel'}
+              </button>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-200 transition"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
