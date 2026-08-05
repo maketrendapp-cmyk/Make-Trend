@@ -2275,36 +2275,35 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
 
     const campaignId = docRef.id;
 
-    // ── ✅ IMMEDIATE RESPONSE (no waiting for cache updates) ──
+    // ── Synchronous cache updates (completed before response) ──
+    try {
+      // Fetch the newly created campaign with server timestamps
+      const docSnapshot = await docRef.get();
+      const actualCampaignData = docSnapshot.data();
+      const newCampaign = { id: campaignId, ...actualCampaignData };
+
+      // ── Update user's list cache (first page) ──
+      await addCampaignToUserListCache(uid, newCampaign);
+
+      // ── Invalidate user stats cache ──
+      await invalidateKey(`stats:user:${uid}`);
+
+      // ── Update template usage in cache (only affected template) ──
+      const updatedTemplateDoc = await templateRef.get();
+      const newUsageCount = updatedTemplateDoc.data().usageCount || 0;
+      await updateTemplateInAllCaches(templateId, { usageCount: newUsageCount });
+
+      console.log(`✅ Cache updates completed for campaign ${campaignId}`);
+    } catch (err) {
+      console.error('❌ Cache update error:', err);
+      // Continue even if cache fails – data is already in Firestore
+    }
+
+    // ── Respond to client ──
     res.status(201).json({
       success: true,
       campaignId,
       message: 'Campaign created successfully',
-    });
-
-    // ── BACKGROUND: Async cache updates (non‑blocking) ──
-    setImmediate(async () => {
-      try {
-        // Fetch the newly created campaign with server timestamps
-        const docSnapshot = await docRef.get();
-        const actualCampaignData = docSnapshot.data();
-        const newCampaign = { id: campaignId, ...actualCampaignData };
-
-        // ── Update user's list cache ──
-        await addCampaignToUserListCache(uid, newCampaign);
-
-        // ── Invalidate user stats cache ──
-        await invalidateKey(`stats:user:${uid}`);
-
-        // ── Update template usage in cache (only affected template) ──
-        const updatedTemplateDoc = await templateRef.get();
-        const newUsageCount = updatedTemplateDoc.data().usageCount || 0;
-        await updateTemplateInAllCaches(templateId, { usageCount: newUsageCount });
-
-        console.log(`✅ Background cache updates completed for campaign ${campaignId}`);
-      } catch (err) {
-        console.error('❌ Background cache update failed:', err);
-      }
     });
 
   } catch (error) {
