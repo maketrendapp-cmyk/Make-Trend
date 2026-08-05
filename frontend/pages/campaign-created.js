@@ -1,6 +1,7 @@
 // pages/campaign-created.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import Meta from '../components/Meta';
 import { getDeviceId } from '../utils/deviceId';
 import {
@@ -39,6 +40,11 @@ export default function CampaignCreated() {
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // ── Scroll to top on mount ──
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     if (id) {
       setLoading(true);
@@ -52,7 +58,7 @@ export default function CampaignCreated() {
       const res = await fetch(`${API_BASE}/campaigns/${id}`, {
         headers: {
           'Content-Type': 'application/json',
-          'x-device-id': deviceId, // ← Send device ID for tracking
+          'x-device-id': deviceId,
         },
       });
       if (!res.ok) {
@@ -242,13 +248,18 @@ export default function CampaignCreated() {
           {/* ── Main Card ── */}
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-200/30 overflow-hidden">
 
-            {/* ── Campaign Image ── */}
-            <div className="w-full aspect-video bg-slate-100 overflow-hidden">
+            {/* ── Campaign Image with Next.js Image (lazy loading) ── */}
+            <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
               {image ? (
-                <img
+                <Image
                   src={image}
-                  alt={title}
-                  className="w-full h-full object-cover object-center"
+                  alt={title || 'Campaign image'}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 672px"
+                  className="object-cover"
+                  loading="lazy"
+                  placeholder="blur"
+                  blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect width='100%25' height='100%25' fill='%23e2e8f0'/%3E%3C/svg%3E"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-6xl text-slate-300">
