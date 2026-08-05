@@ -73,9 +73,9 @@ const STATUS_ICONS = {
 
 const STATUS_LABELS = {
   waiting: 'Waiting',
-  done: 'Done',
+  done: 'Done ✅',
   cancelled: 'Cancelled',
-  completed: 'Completed',
+  completed: 'Completed 🎉',
   active: 'Active',
 };
 
@@ -88,10 +88,8 @@ export default function ExchangeDetail() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Fetch exchange ──
   const fetchExchange = async () => {
     if (!id || !isAuthenticated) return;
-
     try {
       setLoading(true);
       const token = await getToken();
@@ -99,21 +97,15 @@ export default function ExchangeDetail() {
         setLoading(false);
         return;
       }
-
       const res = await fetch(`${API_BASE}/exchanges/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-
       if (!data.success) {
-        if (res.status === 404) {
-          setError('Exchange not found');
-        } else {
-          setError(data.error || 'Failed to load exchange');
-        }
+        if (res.status === 404) setError('Exchange not found');
+        else setError(data.error || 'Failed to load exchange');
         return;
       }
-
       setExchange(data.exchange);
       setError('');
     } catch (err) {
@@ -125,17 +117,12 @@ export default function ExchangeDetail() {
   };
 
   useEffect(() => {
-    if (id && isAuthenticated && user) {
-      fetchExchange();
-    } else if (!isAuthenticated) {
-      setLoading(false);
-    }
+    if (id && isAuthenticated && user) fetchExchange();
+    else if (!isAuthenticated) setLoading(false);
   }, [id, isAuthenticated, user]);
 
-  // ── Update exchange status ──
   const updateStatus = async (status) => {
     if (!exchange || submitting) return;
-
     setSubmitting(true);
     try {
       const token = await getToken();
@@ -143,7 +130,6 @@ export default function ExchangeDetail() {
         setSubmitting(false);
         return;
       }
-
       const res = await fetch(`${API_BASE}/exchanges/${id}/status`, {
         method: 'PUT',
         headers: {
@@ -152,13 +138,8 @@ export default function ExchangeDetail() {
         },
         body: JSON.stringify({ status }),
       });
-
       const data = await res.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to update status');
-      }
-
+      if (!data.success) throw new Error(data.error || 'Failed to update status');
       setExchange(data.exchange);
     } catch (err) {
       console.error('Update status error:', err);
@@ -168,21 +149,9 @@ export default function ExchangeDetail() {
     }
   };
 
-  // ── Get platform icon ──
-  const getPlatformIcon = (platform) => {
-    const Icon = PLATFORM_ICONS[platform?.toLowerCase()] || FaLink;
-    return Icon;
-  };
-
-  const getPlatformColor = (platform) => {
-    return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600';
-  };
-
-  // ── Get status icon ──
-  const getStatusIcon = (status) => {
-    const Icon = STATUS_ICONS[status] || FiClock;
-    return Icon;
-  };
+  const getPlatformIcon = (platform) => PLATFORM_ICONS[platform?.toLowerCase()] || FaLink;
+  const getPlatformColor = (platform) => PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600';
+  const getStatusIcon = (status) => STATUS_ICONS[status] || FiClock;
 
   if (!isAuthenticated) {
     return (
@@ -229,8 +198,7 @@ export default function ExchangeDetail() {
         <div className="min-h-screen bg-gray-50 py-8 px-4">
           <div className="max-w-2xl mx-auto">
             <Link href="/groweachother/my-exchanges" className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition mb-4">
-              <FiArrowLeft className="w-4 h-4" />
-              Back to Exchanges
+              <FiArrowLeft className="w-4 h-4" /> Back to Exchanges
             </Link>
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
               <div className="text-5xl mb-3">😕</div>
@@ -266,13 +234,10 @@ export default function ExchangeDetail() {
       <Meta title={`Exchange ${exchange.id?.slice(-6) || ''} | Make Trend`} />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-2xl mx-auto">
-          {/* ── Back ── */}
           <Link href="/groweachother/my-exchanges" className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition mb-4">
-            <FiArrowLeft className="w-4 h-4" />
-            Back to Exchanges
+            <FiArrowLeft className="w-4 h-4" /> Back to Exchanges
           </Link>
 
-          {/* ── Exchange Card ── */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
@@ -280,29 +245,21 @@ export default function ExchangeDetail() {
                 <h1 className="text-xl font-bold text-gray-900">Exchange</h1>
                 <p className="text-sm text-gray-500">#{exchange.id?.slice(-6) || 'N/A'}</p>
               </div>
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border ${
-                  isCompleted
-                    ? 'text-blue-600 bg-blue-50 border-blue-200'
-                    : isCancelled
-                    ? 'text-red-600 bg-red-50 border-red-200'
-                    : 'text-purple-600 bg-purple-50 border-purple-200'
-                }`}
-              >
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border ${
+                isCompleted ? 'text-blue-600 bg-blue-50 border-blue-200' :
+                isCancelled ? 'text-red-600 bg-red-50 border-red-200' :
+                'text-purple-600 bg-purple-50 border-purple-200'
+              }`}>
                 {isCompleted ? <FiCheck className="w-4 h-4" /> : isCancelled ? <FiX className="w-4 h-4" /> : <FiClock className="w-4 h-4" />}
                 {isCompleted ? 'Completed' : isCancelled ? 'Cancelled' : 'Active'}
               </span>
             </div>
 
-            {/* ── Opponent's Task (What you need to do) ── */}
+            {/* ── Opponent's Task (you need to do this) ── */}
             <div className="p-5 border-b border-gray-100">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {otherUser?.avatar ? (
-                    <img src={otherUser.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <FiUser className="w-3 h-3 text-gray-500" />
-                  )}
+                  {otherUser?.avatar ? <img src={otherUser.avatar} alt="" className="w-full h-full object-cover" /> : <FiUser className="w-3 h-3 text-gray-500" />}
                 </div>
                 <p className="text-xs font-medium text-gray-500">
                   You need to do: <span className="text-gray-700">{otherUser?.fullname || otherUser?.username || 'User'}</span>
@@ -316,46 +273,29 @@ export default function ExchangeDetail() {
                   <p className="font-medium text-gray-900">
                     {otherTask?.platform || 'Task'} – {otherTask?.taskType || 'Action'}
                   </p>
-                  {otherTask?.title && (
-                    <p className="text-sm text-gray-500 truncate">{otherTask.title}</p>
-                  )}
+                  {otherTask?.title && <p className="text-sm text-gray-500 truncate">{otherTask.title}</p>}
                   {otherTask?.url && (
-                    <a
-                      href={otherTask.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline"
-                    >
-                      <FiExternalLink className="w-3 h-3" />
-                      Open
+                    <a href={otherTask.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline">
+                      <FiExternalLink className="w-3 h-3" /> Open
                     </a>
                   )}
                 </div>
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${
-                    STATUS_COLORS[myStatus] || STATUS_COLORS.waiting
-                  }`}
-                >
-                  <MyStatusIcon className="w-3 h-3" />
-                  {STATUS_LABELS[myStatus] || myStatus}
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${STATUS_COLORS[myStatus] || STATUS_COLORS.waiting}`}>
+                  <MyStatusIcon className="w-3 h-3" /> {STATUS_LABELS[myStatus] || myStatus}
                 </span>
               </div>
             </div>
 
-            {/* ── Exchange Arrow ── */}
+            {/* ── Arrow ── */}
             <div className="flex justify-center py-2 text-gray-300">
               <FiArrowRight className="w-6 h-6" />
             </div>
 
-            {/* ── Your Task (What opponent needs to do) ── */}
+            {/* ── Your Task (opponent needs to do this) ── */}
             <div className="p-5 border-b border-gray-100">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {user?.photoURL ? (
-                    <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <FiUser className="w-3 h-3 text-purple-600" />
-                  )}
+                  {user?.photoURL ? <img src={user.photoURL} alt="" className="w-full h-full object-cover" /> : <FiUser className="w-3 h-3 text-purple-600" />}
                 </div>
                 <p className="text-xs font-medium text-gray-500">
                   They need to do: <span className="text-gray-700">You</span>
@@ -369,28 +309,15 @@ export default function ExchangeDetail() {
                   <p className="font-medium text-gray-900">
                     {myTask?.platform || 'Task'} – {myTask?.taskType || 'Action'}
                   </p>
-                  {myTask?.title && (
-                    <p className="text-sm text-gray-500 truncate">{myTask.title}</p>
-                  )}
+                  {myTask?.title && <p className="text-sm text-gray-500 truncate">{myTask.title}</p>}
                   {myTask?.url && (
-                    <a
-                      href={myTask.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline"
-                    >
-                      <FiExternalLink className="w-3 h-3" />
-                      Open
+                    <a href={myTask.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline">
+                      <FiExternalLink className="w-3 h-3" /> Open
                     </a>
                   )}
                 </div>
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${
-                    STATUS_COLORS[otherStatus] || STATUS_COLORS.waiting
-                  }`}
-                >
-                  <OtherStatusIcon className="w-3 h-3" />
-                  {STATUS_LABELS[otherStatus] || otherStatus}
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${STATUS_COLORS[otherStatus] || STATUS_COLORS.waiting}`}>
+                  <OtherStatusIcon className="w-3 h-3" /> {STATUS_LABELS[otherStatus] || otherStatus}
                 </span>
               </div>
             </div>
@@ -399,66 +326,44 @@ export default function ExchangeDetail() {
             <div className="p-5 bg-gray-50">
               {isCompleted ? (
                 <div className="text-center py-2">
-                  <p className="text-green-600 font-medium flex items-center justify-center gap-2">
-                    <FiCheck className="w-5 h-5" />
-                    Exchange Completed!
-                  </p>
+                  <p className="text-green-600 font-medium flex items-center justify-center gap-2"><FiCheck className="w-5 h-5" /> Exchange Completed!</p>
                   <p className="text-sm text-gray-500">Both sides have completed their tasks.</p>
                 </div>
               ) : isCancelled ? (
                 <div className="text-center py-2">
-                  <p className="text-red-600 font-medium flex items-center justify-center gap-2">
-                    <FiX className="w-5 h-5" />
-                    Exchange Cancelled
-                  </p>
+                  <p className="text-red-600 font-medium flex items-center justify-center gap-2"><FiX className="w-5 h-5" /> Exchange Cancelled</p>
                   <p className="text-sm text-gray-500">This exchange has been cancelled.</p>
                 </div>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-3">
-                  {canAct && (
+                  {canAct ? (
                     <>
                       <button
                         onClick={() => updateStatus('done')}
                         disabled={submitting}
                         className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition shadow-sm disabled:opacity-50"
                       >
-                        {submitting ? (
-                          <FiLoader className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <FiCheckCircle className="w-5 h-5" />
-                        )}
+                        {submitting ? <FiLoader className="w-5 h-5 animate-spin" /> : <FiCheckCircle className="w-5 h-5" />}
                         {submitting ? 'Updating...' : 'Done'}
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to cancel this exchange?')) {
-                            updateStatus('cancel');
-                          }
-                        }}
+                        onClick={() => { if (confirm('Are you sure you want to cancel this exchange?')) updateStatus('cancel'); }}
                         disabled={submitting}
                         className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition shadow-sm disabled:opacity-50"
                       >
-                        <FiXCircle className="w-5 h-5" />
-                        Cancel
+                        <FiXCircle className="w-5 h-5" /> Cancel
                       </button>
                     </>
-                  )}
-                  {!canAct && isActive && myStatus === 'done' && (
+                  ) : (
                     <div className="text-center py-2 w-full">
-                      <p className="text-green-600 font-medium flex items-center justify-center gap-2">
-                        <FiCheckCircle className="w-5 h-5" />
-                        You've completed the opponent's task!
-                      </p>
-                      <p className="text-sm text-gray-500">Waiting for {otherUser?.fullname || otherUser?.username || 'the other user'} to complete yours.</p>
-                    </div>
-                  )}
-                  {!canAct && isActive && myStatus === 'waiting' && (
-                    <div className="text-center py-2 w-full">
-                      <p className="text-yellow-600 font-medium flex items-center justify-center gap-2">
-                        <FiClock className="w-5 h-5" />
-                        Waiting for you to complete the opponent's task.
-                      </p>
-                      <p className="text-sm text-gray-500">Open the link above and complete the action.</p>
+                      {myStatus === 'done' ? (
+                        <p className="text-green-600 font-medium flex items-center justify-center gap-2"><FiCheckCircle className="w-5 h-5" /> You've completed the opponent's task!</p>
+                      ) : (
+                        <p className="text-yellow-600 font-medium flex items-center justify-center gap-2"><FiClock className="w-5 h-5" /> Waiting for you to complete the opponent's task.</p>
+                      )}
+                      {myStatus === 'done' && otherStatus === 'waiting' && (
+                        <p className="text-sm text-gray-500">Waiting for {otherUser?.fullname || otherUser?.username || 'the other user'} to complete yours.</p>
+                      )}
                     </div>
                   )}
                 </div>
