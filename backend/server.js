@@ -4534,7 +4534,7 @@ async function populateExchange(data) {
 
 // ─────────────────────────────────────────────
 // 1. CREATE SOCIAL TASK
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────_____
 // 1. CREATE SOCIAL TASK
 app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
   try {
@@ -4542,7 +4542,7 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     if (!(await checkRateLimit(uid, 'social-task-create', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
-    const { platform, url, taskType, title } = req.body;
+    const { platform, url, taskType, title, description } = req.body; // ← ADD description
     if (!platform || typeof platform !== 'string' || platform.trim().length === 0 || platform.trim().length > 50) {
       return res.status(400).json({ success: false, error: 'Platform is required (max 50 chars)' });
     }
@@ -4552,6 +4552,14 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     if (!taskType || typeof taskType !== 'string' || taskType.trim().length === 0 || taskType.trim().length > 50) {
       return res.status(400).json({ success: false, error: 'Task type is required (max 50 chars)' });
     }
+    // ── Validate description (optional, max 500 chars) ──
+    let cleanDescription = '';
+    if (description !== undefined && description !== null) {
+      if (typeof description !== 'string' || description.length > 500) {
+        return res.status(400).json({ success: false, error: 'Description must be a string of max 500 characters' });
+      }
+      cleanDescription = description.trim();
+    }
     const cleanTitle = title ? title.trim().slice(0, 100) : '';
     const taskData = {
       uid,
@@ -4559,12 +4567,13 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
       url: url.trim(),
       taskType: taskType.trim(),
       title: cleanTitle,
+      description: cleanDescription, // ← ADDED
       active: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     const docRef = await db.collection('socialTasks').add(taskData);
-    // ── Invalidate both feed and user's own task cache ──
+    // ── Invalidate caches ──
     await invalidatePattern(`grow-feed:*`);
     await invalidatePattern(`social-tasks:${uid}:*`);
     console.log(`✅ Task created and caches invalidated for user ${uid}`);
@@ -4627,11 +4636,12 @@ app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
 // ─────────────────────────────────────────────
 // 3. UPDATE SOCIAL TASK
 // ─────────────────────────────────────────────
+// 3. UPDATE SOCIAL TASK
 app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { id } = req.params;
-    const { platform, url, taskType, title, active } = req.body;
+    const { platform, url, taskType, title, active, description } = req.body; // ← ADD description
     if (!(await checkRateLimit(uid, 'social-task-update', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
@@ -4660,6 +4670,13 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
     if (active !== undefined) {
       if (typeof active !== 'boolean') return res.status(400).json({ success: false, error: 'Active must be boolean' });
       updateData.active = active;
+    }
+    // ── Handle description update ──
+    if (description !== undefined) {
+      if (typeof description !== 'string' || description.length > 500) {
+        return res.status(400).json({ success: false, error: 'Description must be a string of max 500 characters' });
+      }
+      updateData.description = description.trim();
     }
     await docRef.update(updateData);
     await invalidatePattern(`social-tasks:${uid}:*`);
