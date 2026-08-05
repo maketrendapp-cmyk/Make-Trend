@@ -18,6 +18,7 @@ import {
   FiCompass,
   FiPlus,
   FiRepeat,
+  FiInfo,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -144,16 +145,11 @@ export default function ExchangeDetail() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to update status');
       
-      // Invalidate the cache and refetch
       invalidateExchangeDetail(id);
       await refetch();
       setShowCancelModal(false);
     } catch (err) {
       console.error('Update status error:', err);
-      // We'll show error via React Query's error state, but we also want to display it.
-      // We'll set a local error state or use the React Query error.
-      // Since we have refetch, the error will be available in isError.
-      // Let's just log for now.
     } finally {
       setSubmitting(false);
     }
@@ -251,6 +247,12 @@ export default function ExchangeDetail() {
   const fullId = exchange.id || id || '';
   const exchangeIdDisplay = fullId.length > 8 ? fullId.slice(-6).toUpperCase() : fullId.toUpperCase() || 'EXCHANGE';
 
+  // ── Helper to get user avatar ──
+  const getUserAvatar = (userObj) => {
+    if (!userObj) return null;
+    return userObj.avatar || userObj.photoURL || null;
+  };
+
   return (
     <>
       <Meta title={`Exchange #${exchangeIdDisplay} | Make Trend`} />
@@ -312,7 +314,16 @@ export default function ExchangeDetail() {
                 <div>
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200/50">
                     <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center overflow-hidden flex-shrink-0 font-bold text-xs shadow-sm">
-                      {user?.photoURL ? <img src={user.photoURL} alt="" className="w-full h-full object-cover" /> : <FiUser className="w-4 h-4" />}
+                      {/* Use user's own avatar from exchange data */}
+                      {getUserAvatar(userIsA ? exchange.userA : exchange.userB) ? (
+                        <img
+                          src={getUserAvatar(userIsA ? exchange.userA : exchange.userB)}
+                          alt="Your avatar"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <FiUser className="w-4 h-4" />
+                      )}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-900 uppercase tracking-wider">Your Task</p>
@@ -334,9 +345,23 @@ export default function ExchangeDetail() {
                       <h4 className="text-sm font-bold text-gray-900 truncate mb-1">
                         {myTask?.title || `${myTask?.taskType || 'Task'} request`}
                       </h4>
+                      {/* ── Description ── */}
+                      {myTask?.description && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-3 leading-relaxed">
+                          <FiInfo className="inline w-3 h-3 mr-1 text-gray-400" />
+                          {myTask.description}
+                        </p>
+                      )}
+                      {/* ── Open Link Button ── */}
                       {myTask?.url && (
-                        <a href={myTask.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium">
-                          <FiExternalLink className="w-3 h-3" /> Visit Link
+                        <a
+                          href={myTask.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-white hover:bg-gray-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-medium transition shadow-sm"
+                        >
+                          <FiExternalLink className="w-3 h-3" />
+                          Open in app
                         </a>
                       )}
                     </div>
@@ -356,7 +381,16 @@ export default function ExchangeDetail() {
                 <div>
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200/50">
                     <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 font-bold text-xs shadow-sm">
-                      {otherUser?.avatar ? <img src={otherUser.avatar} alt="" className="w-full h-full object-cover" /> : <FiUser className="w-4 h-4" />}
+                      {/* Use other user's avatar from exchange data */}
+                      {getUserAvatar(userIsA ? exchange.userB : exchange.userA) ? (
+                        <img
+                          src={getUserAvatar(userIsA ? exchange.userB : exchange.userA)}
+                          alt="Partner avatar"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <FiUser className="w-4 h-4" />
+                      )}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-900 uppercase tracking-wider">{otherUser?.fullname || otherUser?.username || 'Partner'}</p>
@@ -378,9 +412,23 @@ export default function ExchangeDetail() {
                       <h4 className="text-sm font-bold text-gray-900 truncate mb-1">
                         {otherTask?.title || `${otherTask?.taskType || 'Task'} request`}
                       </h4>
+                      {/* ── Description ── */}
+                      {otherTask?.description && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-3 leading-relaxed">
+                          <FiInfo className="inline w-3 h-3 mr-1 text-gray-400" />
+                          {otherTask.description}
+                        </p>
+                      )}
+                      {/* ── Open Link Button ── */}
                       {otherTask?.url && (
-                        <a href={otherTask.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium">
-                          <FiExternalLink className="w-3 h-3" /> Visit Link
+                        <a
+                          href={otherTask.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-white hover:bg-gray-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-medium transition shadow-sm"
+                        >
+                          <FiExternalLink className="w-3 h-3" />
+                          Open in app
                         </a>
                       )}
                     </div>
