@@ -1,5 +1,5 @@
 // pages/groweachother/my-tasks.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
@@ -27,6 +27,7 @@ import {
   FaLinkedin,
   FaGithub,
 } from 'react-icons/fa';
+import { useMyTasks, useInvalidateQueries } from '../../lib/queries';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -60,9 +61,16 @@ const TASK_TYPES = ['Subscribe', 'Follow', 'Like', 'Comment', 'Share', 'Watch', 
 export default function MyTasks() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { invalidateMyTasks } = useInvalidateQueries();
+
+  // ── React Query: My Tasks ──
+  const {
+    data: tasks = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useMyTasks(isAuthenticated && !!user);
 
   // ── Modal state ──
   const [showModal, setShowModal] = useState(false);
@@ -80,38 +88,6 @@ export default function MyTasks() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
-
-  // ── Fetch tasks ──
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      const token = await getToken();
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/social-tasks`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to load tasks');
-      setTasks(data.tasks || []);
-      setError('');
-    } catch (err) {
-      console.error('Fetch tasks error:', err);
-      setError(err.message || 'Failed to load tasks');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchTasks();
-    } else {
-      setLoading(false);
-    }
-  }, [isAuthenticated, user]);
 
   // ── Open modal for create/edit ──
   const openCreateModal = () => {
@@ -181,7 +157,9 @@ export default function MyTasks() {
       if (!data.success) throw new Error(data.error || 'Failed to save task');
 
       setShowModal(false);
-      fetchTasks();
+      // Invalidate cache to refetch
+      invalidateMyTasks();
+      await refetch(); // immediate update
     } catch (err) {
       console.error('Save task error:', err);
       setModalError(err.message || 'Failed to save task');
@@ -211,10 +189,13 @@ export default function MyTasks() {
       if (!data.success) throw new Error(data.error || 'Failed to delete task');
       setShowDeleteModal(false);
       setTaskToDelete(null);
-      fetchTasks();
+      invalidateMyTasks();
+      await refetch();
     } catch (err) {
       console.error('Delete task error:', err);
-      setError(err.message || 'Failed to delete task');
+      // We'll show error via the React Query error state, but we keep a local error?
+      // We'll handle it in a local error state.
+      setModalError(err.message || 'Failed to delete task');
     } finally {
       setDeleting(false);
     }
@@ -235,10 +216,11 @@ export default function MyTasks() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to update task');
-      fetchTasks();
+      invalidateMyTasks();
+      await refetch();
     } catch (err) {
       console.error('Toggle active error:', err);
-      setError(err.message || 'Failed to update task');
+      setModalError(err.message || 'Failed to update task');
     }
   };
 
@@ -274,7 +256,7 @@ export default function MyTasks() {
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <>
         <Meta title="My Tasks | Make Trend" />
@@ -301,6 +283,23 @@ export default function MyTasks() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-6 px-4 flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center max-w-md">
+          <p className="text-red-600 font-medium">Failed to load tasks.</p>
+          <p className="text-sm text-red-500 mt-1">{error?.message}</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm"
+          >
+            <FiRefreshCw className="w-4 h-4" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Meta title="My Tasks | Make Trend" description="Manage your social tasks for Grow Together." />
@@ -324,7 +323,7 @@ export default function MyTasks() {
               </button>
             </div>
             <button
-              onClick={fetchTasks}
+              onClick={() => refetch()}
               className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
               title="Refresh"
             >
@@ -350,9 +349,9 @@ export default function MyTasks() {
             </button>
           </div>
 
-          {error && (
+          {isError && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
-              {error}
+              {error?.message || 'Failed to load tasks'}
             </div>
           )}
 
@@ -604,4 +603,3 @@ export default function MyTasks() {
     </>
   );
 }
-
