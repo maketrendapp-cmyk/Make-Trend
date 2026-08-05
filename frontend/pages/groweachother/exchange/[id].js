@@ -327,7 +327,7 @@ export default function ExchangeDetail() {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-900 uppercase tracking-wider">Your Task</p>
-                      <p className="text-[11px] text-gray-500 font-medium">Fulfilled by community member</p>
+                      <p className="text-[11px] text-gray-500 font-medium">(Opponent Need To Do)</p>
                     </div>
                   </div>
 
@@ -394,7 +394,7 @@ export default function ExchangeDetail() {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-900 uppercase tracking-wider">{otherUser?.fullname || otherUser?.username || 'Partner'}</p>
-                      <p className="text-[11px] text-gray-500 font-medium">Fulfilled by you</p>
+                      <p className="text-[11px] text-gray-500 font-medium">(Your Need To Do)</p>
                     </div>
                   </div>
 
