@@ -57,7 +57,7 @@ const TOP_NAV_ONLY_PAGES = [
   '/contact',
   '/login',
   '/signup',
-'/groweachother/',
+'/groweachother',
 
 ];
 
