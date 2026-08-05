@@ -20,6 +20,7 @@ import {
   FiRepeat,
   FiInfo,
   FiAlertTriangle,
+  FiRefreshCw,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -87,14 +88,32 @@ export default function ExchangeDetail() {
   const { user, isAuthenticated } = useAuth();
   const { invalidateExchangeDetail } = useInvalidateQueries();
 
-  // ── React Query: Exchange Detail ──
+  // ── 🔥 GUARD: if id is undefined, show loading and wait ──
+  if (!id) {
+    return (
+      <>
+        <Meta title="Exchange | Make Trend" />
+        <div className="min-h-screen bg-gray-50 py-8 px-4">
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+              <div className="flex items-center justify-center py-16">
+                <FiLoader className="w-8 h-8 text-purple-600 animate-spin" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── Query always enabled because id is truthy ──
   const {
     data: exchange,
     isLoading,
     isError,
     error,
     refetch,
-  } = useExchangeDetail(id, isAuthenticated && !!user);
+  } = useExchangeDetail(id, isAuthenticated);
 
   // ── Submission state ──
   const [submitting, setSubmitting] = useState(false);
@@ -161,6 +180,7 @@ export default function ExchangeDetail() {
   const getStatusIcon = (status) => STATUS_ICONS[status] || FiClock;
   const getStatusClass = (status) => STATUS_BADGE_CLASSES[status] || 'bg-gray-100 text-gray-600 border-gray-200';
 
+  // ── If not authenticated, show login prompt ──
   if (!isAuthenticated) {
     return (
       <>
@@ -181,6 +201,7 @@ export default function ExchangeDetail() {
     );
   }
 
+  // ── Loading state ──
   if (isLoading) {
     return (
       <>
@@ -199,6 +220,7 @@ export default function ExchangeDetail() {
     );
   }
 
+  // ── Error state ──
   if (isError || !exchange) {
     return (
       <>
@@ -224,6 +246,7 @@ export default function ExchangeDetail() {
     );
   }
 
+  // ── Main render – data is available ──
   const userIsA = exchange.userA?.uid === user?.uid;
   const myTask = userIsA ? exchange.userATask : exchange.userBTask;
   const otherTask = userIsA ? exchange.userBTask : exchange.userATask;
@@ -235,18 +258,15 @@ export default function ExchangeDetail() {
   const isCancelled = exchange.overallStatus === 'cancelled';
   const isActive = exchange.overallStatus === 'active';
 
-  // ── Check if tasks are missing (deleted) ──
-  const isMyTaskMissing = !myTask || !myTask.id;
-  const isOtherTaskMissing = !otherTask || !otherTask.id;
-  const hasMissingTask = isMyTaskMissing || isOtherTaskMissing;
+  const myTaskMissing = !myTask || !myTask.id;
+  const otherTaskMissing = !otherTask || !otherTask.id;
 
-  // Can only act if exchange is active, user status is not done/cancelled, and NO missing tasks
-  const canAct = isActive && myStatus !== 'done' && myStatus !== 'cancelled' && !hasMissingTask;
+  const canAct = isActive && !myTaskMissing && !otherTaskMissing && myStatus !== 'done' && myStatus !== 'cancelled';
 
-  const MyIcon = getPlatformIcon(myTask?.platform);
-  const MyColor = getPlatformColor(myTask?.platform);
-  const OtherIcon = getPlatformIcon(otherTask?.platform);
-  const OtherColor = getPlatformColor(otherTask?.platform);
+  const MyIcon = myTaskMissing ? FiAlertTriangle : getPlatformIcon(myTask?.platform);
+  const MyColor = myTaskMissing ? 'text-red-600 bg-red-50 border-red-200' : getPlatformColor(myTask?.platform);
+  const OtherIcon = otherTaskMissing ? FiAlertTriangle : getPlatformIcon(otherTask?.platform);
+  const OtherColor = otherTaskMissing ? 'text-red-600 bg-red-50 border-red-200' : getPlatformColor(otherTask?.platform);
   const MyStatusIcon = getStatusIcon(myStatus);
   const OtherStatusIcon = getStatusIcon(otherStatus);
   const MyStatusClass = getStatusClass(myStatus);
@@ -255,7 +275,6 @@ export default function ExchangeDetail() {
   const fullId = exchange.id || id || '';
   const exchangeIdDisplay = fullId.length > 8 ? fullId.slice(-6).toUpperCase() : fullId.toUpperCase() || 'EXCHANGE';
 
-  // ── Helper to get user avatar ──
   const getUserAvatar = (userObj) => {
     if (!userObj) return null;
     return userObj.avatar || userObj.photoURL || null;
@@ -267,7 +286,7 @@ export default function ExchangeDetail() {
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
           
-          {/* ── Top Navigation Links Bar ── */}
+          {/* ── Top Navigation ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
             <div className="flex items-center gap-2">
               <Link
@@ -297,6 +316,17 @@ export default function ExchangeDetail() {
             </button>
           </div>
 
+          {/* ── Warning if task missing ── */}
+          {(myTaskMissing || otherTaskMissing) && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 px-5 py-3 rounded-2xl flex items-start gap-3 text-sm shadow-sm">
+              <FiAlertTriangle className="w-5 h-5 mt-0.5 text-amber-600 flex-shrink-0" />
+              <div>
+                <span className="font-bold">Attention:</span> One of the tasks in this exchange has been removed by its owner. 
+                The exchange cannot be completed. Please contact support if you need further assistance.
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             {/* ── Header ── */}
             <div className="p-5 sm:p-6 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-50/50">
@@ -314,24 +344,11 @@ export default function ExchangeDetail() {
               </span>
             </div>
 
-            {/* ── Missing Task Warning ── */}
-            {hasMissingTask && (
-              <div className="mx-5 sm:mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-                <FiAlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">One or both tasks have been deleted</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    This exchange can no longer be completed. Please contact support if you have questions.
-                  </p>
-                </div>
-              </div>
-            )}
-
             {/* ── Two-column task cards ── */}
             <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* ── Your Task Card ── */}
-              <div className="bg-gray-50/70 rounded-2xl p-5 border border-gray-200/60 flex flex-col justify-between">
+              <div className={`bg-gray-50/70 rounded-2xl p-5 border ${myTaskMissing ? 'border-red-300 bg-red-50/40' : 'border-gray-200/60'} flex flex-col justify-between`}>
                 <div>
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200/50">
                     <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center overflow-hidden flex-shrink-0 font-bold text-xs shadow-sm">
@@ -351,10 +368,10 @@ export default function ExchangeDetail() {
                     </div>
                   </div>
 
-                  {isMyTaskMissing ? (
-                    <div className="py-4 text-center text-gray-400">
-                      <FiAlertTriangle className="w-8 h-8 mx-auto mb-2 text-amber-400" />
-                      <p className="text-sm font-medium text-gray-500">This task has been deleted</p>
+                  {myTaskMissing ? (
+                    <div className="flex items-center gap-3 text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                      <FiAlertTriangle className="w-5 h-5 flex-shrink-0" />
+                      <span className="text-sm font-medium">This task has been removed.</span>
                     </div>
                   ) : (
                     <div className="flex items-start gap-3.5">
@@ -402,7 +419,7 @@ export default function ExchangeDetail() {
               </div>
 
               {/* ── Partner Task Card ── */}
-              <div className="bg-gray-50/70 rounded-2xl p-5 border border-gray-200/60 flex flex-col justify-between">
+              <div className={`bg-gray-50/70 rounded-2xl p-5 border ${otherTaskMissing ? 'border-red-300 bg-red-50/40' : 'border-gray-200/60'} flex flex-col justify-between`}>
                 <div>
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200/50">
                     <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 font-bold text-xs shadow-sm">
@@ -422,10 +439,10 @@ export default function ExchangeDetail() {
                     </div>
                   </div>
 
-                  {isOtherTaskMissing ? (
-                    <div className="py-4 text-center text-gray-400">
-                      <FiAlertTriangle className="w-8 h-8 mx-auto mb-2 text-amber-400" />
-                      <p className="text-sm font-medium text-gray-500">This task has been deleted</p>
+                  {otherTaskMissing ? (
+                    <div className="flex items-center gap-3 text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                      <FiAlertTriangle className="w-5 h-5 flex-shrink-0" />
+                      <span className="text-sm font-medium">This task has been removed.</span>
                     </div>
                   ) : (
                     <div className="flex items-start gap-3.5">
@@ -486,11 +503,6 @@ export default function ExchangeDetail() {
                   <p className="text-red-600 font-bold flex items-center justify-center gap-2 text-base"><FiX className="w-5 h-5" /> Exchange Cancelled</p>
                   <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">This exchange session has been closed.</p>
                 </div>
-              ) : hasMissingTask ? (
-                <div className="py-2">
-                  <p className="text-amber-600 font-bold flex items-center justify-center gap-2 text-base"><FiAlertTriangle className="w-5 h-5" /> Tasks Missing</p>
-                  <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">This exchange cannot be completed because one or both tasks are missing.</p>
-                </div>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
                   {canAct ? (
@@ -513,7 +525,11 @@ export default function ExchangeDetail() {
                     </>
                   ) : (
                     <div className="py-2 w-full">
-                      {myStatus === 'done' ? (
+                      {myTaskMissing || otherTaskMissing ? (
+                        <p className="text-amber-700 font-bold flex items-center justify-center gap-2 text-sm sm:text-base">
+                          <FiAlertTriangle className="w-5 h-5" /> Cannot complete – a task is missing.
+                        </p>
+                      ) : myStatus === 'done' ? (
                         <p className="text-emerald-700 font-bold flex items-center justify-center gap-2 text-sm sm:text-base"><FiCheckCircle className="w-5 h-5" /> You've marked their task as Done!</p>
                       ) : (
                         <p className="text-amber-700 font-bold flex items-center justify-center gap-2 text-sm sm:text-base"><FiClock className="w-5 h-5" /> Waiting for you to complete their task.</p>
@@ -530,7 +546,7 @@ export default function ExchangeDetail() {
         </div>
       </div>
 
-      {/* ── Custom Cancel Confirmation Modal ── */}
+      {/* ── Cancel Confirmation Modal ── */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100">
