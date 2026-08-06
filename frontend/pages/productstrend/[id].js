@@ -12,6 +12,7 @@ import {
   useAddProductComment,
   useInvalidateQueries,
 } from '../../lib/queries';
+import { getToken } from '../../lib/api';
 import {
   FiArrowLeft,
   FiHeart,
@@ -26,13 +27,16 @@ import {
   FiTrash2,
   FiShare2,
 } from 'react-icons/fi';
-import { toast } from 'react-hot-toast';
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = `${BACKEND_URL}/api`;
 
 export default function ProductDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
-  const { invalidateProductDetail } = useInvalidateQueries();
+  const { invalidateProductDetail, invalidateProductFeed, invalidateMyProducts } = useInvalidateQueries();
 
   const { data: product, isLoading, isError, refetch } = useProductDetail(id, isAuthenticated && !!id);
   const { data: comments = [], refetch: refetchComments } = useProductComments(id, isAuthenticated && !!id);
@@ -41,6 +45,7 @@ export default function ProductDetail() {
 
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const isMaker = product?.makerUid === user?.uid;
 
@@ -61,10 +66,40 @@ export default function ProductDetail() {
       setCommentText('');
       await refetchComments();
     } catch (err) {
-      toast.error('Failed to post comment');
+      // error handled by mutation
     } finally {
       setSubmittingComment(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this product?')) return;
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/productstrend/products/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        await invalidateProductDetail(id);
+        await invalidateProductFeed();
+        await invalidateMyProducts();
+        router.push('/productstrend/my-products');
+      } else {
+        alert(data.error || 'Delete failed');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Failed to delete product');
+    }
+  };
+
+  const handleShare = () => {
+    const url = `${window.location.origin}/productstrend/${id}`;
+    navigator.clipboard.writeText(url);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
   };
 
   const formatDate = (timestamp) => {
@@ -97,18 +132,21 @@ export default function ProductDetail() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse">
-        <div className="h-8 w-24 bg-slate-200 rounded-lg mb-6" />
-        <div className="w-full aspect-video bg-slate-200 rounded-2xl" />
-        <div className="mt-6 space-y-4">
-          <div className="h-8 w-64 bg-slate-200 rounded" />
-          <div className="h-5 w-full bg-slate-200 rounded" />
-          <div className="flex gap-4">
-            <div className="h-10 w-24 bg-slate-200 rounded-full" />
-            <div className="h-10 w-24 bg-slate-200 rounded-full" />
+      <>
+        <Meta title="Loading..." />
+        <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse">
+          <div className="h-8 w-24 bg-slate-200 rounded-lg mb-6" />
+          <div className="w-full aspect-video bg-slate-200 rounded-2xl" />
+          <div className="mt-6 space-y-4">
+            <div className="h-8 w-64 bg-slate-200 rounded" />
+            <div className="h-5 w-full bg-slate-200 rounded" />
+            <div className="flex gap-4">
+              <div className="h-10 w-24 bg-slate-200 rounded-full" />
+              <div className="h-10 w-24 bg-slate-200 rounded-full" />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -185,6 +223,12 @@ export default function ProductDetail() {
                     <FiExternalLink className="w-4 h-4" /> Visit
                   </a>
                 )}
+                <button
+                  onClick={handleShare}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition text-sm font-medium"
+                >
+                  {shareCopied ? 'Copied!' : <FiShare2 className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -218,18 +262,14 @@ export default function ProductDetail() {
             {/* Maker actions */}
             {isMaker && (
               <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100">
-                <button
-                  onClick={() => router.push(`/productstrend/edit/${product.id}`)}
+                <Link
+                  href={`/productstrend/edit/${product.id}`}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm hover:bg-slate-200 transition"
                 >
                   <FiEdit2 className="w-4 h-4" /> Edit
-                </button>
+                </Link>
                 <button
-                  onClick={() => {
-                    if (confirm('Delete this product?')) {
-                      // useDeleteProduct mutation here (we'll add soon)
-                    }
-                  }}
+                  onClick={handleDelete}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm hover:bg-red-100 transition"
                 >
                   <FiTrash2 className="w-4 h-4" /> Delete
