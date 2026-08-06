@@ -35,6 +35,7 @@ import {
   FiCalendar,
   FiVideo,
   FiList,
+  FiLock,
 } from 'react-icons/fi';
 import { FaRocket } from 'react-icons/fa';
 
@@ -63,8 +64,8 @@ export default function ProductDetail() {
   const { user, isAuthenticated } = useAuth();
   const { invalidateProductDetail, invalidateProductFeed, invalidateMyProducts } = useInvalidateQueries();
 
-  const { data: product, isLoading, isError, refetch } = useProductDetail(id, isAuthenticated && !!id);
-  const { data: comments = [], refetch: refetchComments } = useProductComments(id, isAuthenticated && !!id);
+  const { data: product, isLoading, isError, refetch } = useProductDetail(id, !!id);
+  const { data: comments = [], refetch: refetchComments } = useProductComments(id, true);
   const upvoteMutation = useUpvoteProduct();
   const addCommentMutation = useAddProductComment();
 
@@ -131,32 +132,11 @@ export default function ProductDetail() {
     if (!timestamp) return 'Recently';
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch { return 'Recently'; }
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return 'Recently';
+    }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Meta title="Product Detail" />
-        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-sm p-8 text-center border border-slate-100">
-            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
-              <FaRocket className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-1">Sign In Required</h2>
-            <p className="text-slate-500 text-sm mb-6">Please sign in to view this product.</p>
-            <button
-              onClick={() => router.push('/login?redirect=/productstrend/' + id)}
-              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition"
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -195,12 +175,14 @@ export default function ProductDetail() {
     <>
       <Meta title={`${product.name} – ProductTrend`} />
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Back button */}
         <Link href="/productstrend/feed" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-purple-600 transition mb-6">
           <FiArrowLeft className="w-4 h-4" /> Back to Feed
         </Link>
 
+        {/* Main Card */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* Image */}
+          {/* Product Image */}
           <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
             {product.imageUrl ? (
               <Image
@@ -216,13 +198,13 @@ export default function ProductDetail() {
             )}
           </div>
 
-          <div className="p-6">
-            {/* Header */}
+          <div className="p-6 md:p-8">
+            {/* Header: Name, tagline, badges, actions */}
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">{product.name}</h1>
-                <p className="text-sm text-slate-500 mt-1">{product.tagline}</p>
-                <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900">{product.name}</h1>
+                <p className="text-base text-slate-500 mt-1">{product.tagline}</p>
+                <div className="flex flex-wrap gap-2 mt-3">
                   {product.category && (
                     <span className="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
                       {product.category}
@@ -240,10 +222,12 @@ export default function ProductDetail() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+
+              {/* Actions (upvote & share) */}
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={handleUpvote}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition font-medium ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full border transition font-medium text-sm ${
                     product.userVoted
                       ? 'bg-purple-100 border-purple-300 text-purple-700'
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-purple-50 hover:border-purple-200'
@@ -255,7 +239,7 @@ export default function ProductDetail() {
                 </button>
                 <button
                   onClick={handleShare}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition text-sm font-medium"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition text-sm font-medium"
                 >
                   {shareCopied ? 'Copied!' : <FiShare2 className="w-4 h-4" />}
                 </button>
@@ -263,7 +247,7 @@ export default function ProductDetail() {
             </div>
 
             {/* Maker & meta */}
-            <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t border-slate-100 text-xs text-slate-500">
               <span className="flex items-center gap-1.5">
                 <FiUser className="w-4 h-4" />
                 {product.maker?.fullname || product.maker?.username || 'Anonymous'}
@@ -279,6 +263,11 @@ export default function ProductDetail() {
               {isMaker && (
                 <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">You are the maker</span>
               )}
+              {!isAuthenticated && (
+                <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <FiLock className="w-3 h-3" /> Sign in to upvote
+                </span>
+              )}
             </div>
 
             {/* Description */}
@@ -292,7 +281,7 @@ export default function ProductDetail() {
             {/* Features */}
             {product.features && product.features.length > 0 && (
               <div className="mt-6 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
-                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                   <FiList className="text-purple-600" /> Key Features
                 </h3>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -308,7 +297,7 @@ export default function ProductDetail() {
 
             {/* Target Audience */}
             {product.targetAudience && (
-              <div className="mt-4 p-3 bg-indigo-50/60 rounded-xl border border-indigo-100">
+              <div className="mt-4 p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
                   <FiUsers className="text-indigo-600" /> Target Audience
                 </h3>
@@ -318,7 +307,7 @@ export default function ProductDetail() {
 
             {/* Tech Stack */}
             {product.techStack && product.techStack.length > 0 && (
-              <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <FiCpu className="text-slate-600" /> Tech Stack
                 </h3>
@@ -335,7 +324,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Website Info */}
+            {/* Website & Links */}
             {(product.url || product.websiteTitle || product.websiteDescription || product.demoUrl || product.twitter) && (
               <div className="mt-6 p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
@@ -382,13 +371,13 @@ export default function ProductDetail() {
                 {product.releaseDate && (
                   <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
                     <FiCalendar className="w-3 h-3" />
-                    Released: {new Date(product.releaseDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    Released: {new Date(product.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Maker actions */}
+            {/* Maker actions (edit/delete) */}
             {isMaker && (
               <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100">
                 <Link
@@ -408,34 +397,45 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Comments section */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+        {/* Comments Section */}
+        <div className="mt-10">
+          <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
             <FiMessageCircle className="text-purple-600" />
             Comments ({comments.length})
           </h3>
 
+          {/* Comment form */}
           <form onSubmit={handleAddComment} className="mt-4 flex gap-3">
             <input
               type="text"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Add a comment..."
+              placeholder={isAuthenticated ? "Add a comment..." : "Sign in to comment"}
               className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-              disabled={submittingComment}
+              disabled={!isAuthenticated || submittingComment}
             />
             <button
               type="submit"
-              disabled={!commentText.trim() || submittingComment}
+              disabled={!isAuthenticated || !commentText.trim() || submittingComment}
               className="px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50 flex items-center gap-2 text-sm"
             >
               {submittingComment ? <FiLoader className="w-4 h-4 animate-spin" /> : <FiSend className="w-4 h-4" />}
             </button>
           </form>
+          {!isAuthenticated && (
+            <p className="mt-2 text-xs text-slate-400">
+              <Link href={`/login?redirect=/productstrend/${id}`} className="text-purple-600 hover:underline">
+                Sign in
+              </Link> to join the conversation.
+            </p>
+          )}
 
+          {/* Comments list */}
           <div className="mt-6 space-y-4">
             {comments.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-4">No comments yet. Be the first!</p>
+              <p className="text-sm text-slate-400 text-center py-6 bg-white rounded-xl border border-slate-100">
+                No comments yet. Be the first!
+              </p>
             ) : (
               comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
