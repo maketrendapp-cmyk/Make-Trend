@@ -1,5 +1,5 @@
 // pages/productstrend/feed.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -16,11 +16,9 @@ import {
   FiUser,
   FiChevronDown,
   FiSearch,
-  FiFilter,
   FiX,
   FiLoader,
   FiRefreshCw,
-  FiArrowUp,
   FiClock,
   FiMessageCircle,
   FiExternalLink,
@@ -34,10 +32,18 @@ export default function ProductTrendFeed() {
   const { invalidateProductFeed } = useInvalidateQueries();
 
   // ── Filter state ──
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // ── Debounce search input ──
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // ── Build filters object for query ──
   const filters = {};
@@ -45,7 +51,7 @@ export default function ProductTrendFeed() {
   if (category !== 'All') filters.category = category;
   if (sortBy) filters.sort = sortBy;
 
-  // ── React Query: Product Feed ──
+  // ── React Query: Product Feed (public, but uses auth for vote status) ──
   const {
     data,
     fetchNextPage,
@@ -55,12 +61,12 @@ export default function ProductTrendFeed() {
     refetch,
     isError,
     error,
-  } = useProductFeed(filters, isAuthenticated);
+  } = useProductFeed(filters, true); // always enabled (public feed)
 
   const products = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
 
-  // ── Upvote mutation ──
+  // ── Upvote mutation (only if authenticated) ──
   const upvoteMutation = useUpvoteProduct();
 
   // ── Intersection Observer ──
@@ -90,17 +96,17 @@ export default function ProductTrendFeed() {
   }, [isFetchingNextPage, hasMore, products.length, fetchNextPage]);
 
   // ── Scroll to top on filter change ──
-  const handleFilterChange = () => {
+  const handleFilterChange = useCallback(() => {
     window.scrollTo(0, 0);
     refetch({ refetchPage: (page, index) => index === 0 });
-  };
+  }, [refetch]);
 
   // ── Clear all filters ──
   const clearFilters = () => {
+    setSearchInput('');
     setSearchTerm('');
     setCategory('All');
     setSortBy('newest');
-    setIsFilterOpen(false);
     handleFilterChange();
   };
 
@@ -113,37 +119,30 @@ export default function ProductTrendFeed() {
     upvoteMutation.mutate(productId);
   };
 
-  // ── Format date ──
+  // ── Format date (handles Firestore Timestamp) ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      let date;
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } else if (timestamp.seconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+      } else if (timestamp._seconds !== undefined) {
+        date = new Date(timestamp._seconds * 1000);
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        date = new Date(timestamp);
+      }
+      if (isNaN(date.getTime())) return 'Recently';
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch { return 'Recently'; }
+    } catch {
+      return 'Recently';
+    }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Meta title="Product Feed – ProductTrend" />
-        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-sm p-8 text-center border border-slate-100">
-            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
-              <FiTrendingUp className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-1">Sign In Required</h2>
-            <p className="text-slate-500 text-sm mb-6">Join ProductTrend to explore and upvote products.</p>
-            <button
-              onClick={() => router.push('/login?redirect=/productstrend/feed')}
-              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition"
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -156,9 +155,9 @@ export default function ProductTrendFeed() {
             <div className="h-10 w-32 bg-slate-200 rounded-xl" />
             <div className="h-10 w-32 bg-slate-200 rounded-xl" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1,2,3,4,5,6].map(i => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 h-64" />
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-4 h-24" />
             ))}
           </div>
         </div>
@@ -190,18 +189,29 @@ export default function ProductTrendFeed() {
             Product Feed
           </h1>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push('/productstrend/launch')}
-              className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition shadow-sm text-sm"
-            >
-              Launch Product
-            </button>
-            <button
-              onClick={() => router.push('/productstrend/my-products')}
-              className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition text-sm"
-            >
-              My Products
-            </button>
+            {isAuthenticated ? (
+              <>
+                <button
+                  onClick={() => router.push('/productstrend/launch')}
+                  className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition shadow-sm text-sm"
+                >
+                  Launch Product
+                </button>
+                <button
+                  onClick={() => router.push('/productstrend/my-products')}
+                  className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition text-sm"
+                >
+                  My Products
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => router.push('/login?redirect=/productstrend/feed')}
+                className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition text-sm"
+              >
+                Sign In to Upvote
+              </button>
+            )}
           </div>
         </div>
 
@@ -212,8 +222,8 @@ export default function ProductTrendFeed() {
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); handleFilterChange(); }}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search products..."
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
               />
@@ -252,7 +262,7 @@ export default function ProductTrendFeed() {
                 {searchTerm && (
                   <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
                     Search: {searchTerm}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setSearchTerm('')} />
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSearchInput(''); setSearchTerm(''); }} />
                   </span>
                 )}
                 {category !== 'All' && (
@@ -275,68 +285,71 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* Products Grid */}
+        {/* Products List */}
         {products.length === 0 && !isFetchingNextPage ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">🔍</div>
             <h3 className="text-lg font-semibold text-slate-900">No products found</h3>
             <p className="text-slate-500 text-sm">Try adjusting your filters or launch a new product.</p>
-            <button
-              onClick={() => router.push('/productstrend/launch')}
-              className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
-            >
-              Launch Product
-            </button>
+            {isAuthenticated && (
+              <button
+                onClick={() => router.push('/productstrend/launch')}
+                className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+              >
+                Launch Product
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             {products.map((product) => (
               <div
                 key={product.id}
-                className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col"
+                className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
               >
-                <Link href={`/productstrend/${product.id}`} className="block">
-                  <div className="aspect-video bg-slate-100 overflow-hidden relative">
-                    {product.imageUrl ? (
-                      <Image
-                        src={product.imageUrl}
-                        alt={product.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">
-                        🚀
-                      </div>
-                    )}
-                  </div>
+                {/* Square Image */}
+                <Link href={`/productstrend/${product.id}`} className="flex-shrink-0 w-24 h-24 md:w-28 md:h-28 bg-slate-100 rounded-xl overflow-hidden relative">
+                  {product.imageUrl ? (
+                    <Image
+                      src={product.imageUrl}
+                      alt={product.name}
+                      fill
+                      sizes="120px"
+                      className="object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-3xl text-slate-300">
+                      🚀
+                    </div>
+                  )}
                 </Link>
-                <div className="p-5 flex-1 flex flex-col">
-                  <div className="flex items-start justify-between">
-                    <Link href={`/productstrend/${product.id}`} className="flex-1">
-                      <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition line-clamp-1">
+
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <Link href={`/productstrend/${product.id}`} className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition truncate">
                         {product.name}
                       </h3>
                     </Link>
                     <button
                       onClick={() => handleUpvote(product.id)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition text-xs font-medium ${
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition text-xs font-medium flex-shrink-0 ${
                         product.userVoted
                           ? 'bg-purple-100 border-purple-300 text-purple-700'
                           : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-purple-50 hover:border-purple-200'
                       }`}
-                      disabled={upvoteMutation.isLoading}
+                      disabled={upvoteMutation.isLoading || !isAuthenticated}
                     >
                       <FiHeart className={`w-3.5 h-3.5 ${product.userVoted ? 'fill-purple-600 text-purple-600' : ''}`} />
                       {product.upvotes || 0}
                     </button>
                   </div>
-                  <p className="text-sm text-slate-500 line-clamp-2 mt-1 flex-1">
+                  <p className="text-sm text-slate-500 line-clamp-2 mt-1">
                     {product.tagline}
                   </p>
-                  <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400">
+                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
                     <span className="flex items-center gap-1">
                       <FiUser className="w-3 h-3" />
                       {product.maker?.username || 'Anonymous'}
@@ -345,16 +358,16 @@ export default function ProductTrendFeed() {
                       <FiClock className="w-3 h-3" />
                       {formatDate(product.createdAt)}
                     </span>
-                    <span className="flex items-center gap-1 ml-auto">
+                    <span className="flex items-center gap-1">
                       <FiMessageCircle className="w-3 h-3" />
                       {product.commentsCount || 0}
                     </span>
+                    {product.category && (
+                      <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                        {product.category}
+                      </span>
+                    )}
                   </div>
-                  {product.category && (
-                    <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full self-start mt-2">
-                      {product.category}
-                    </span>
-                  )}
                 </div>
               </div>
             ))}
