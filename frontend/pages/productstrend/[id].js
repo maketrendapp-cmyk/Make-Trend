@@ -97,18 +97,28 @@ export default function ProductDetail() {
       userVoted: newUserVoted,
     };
 
-    // Update detail cache
+    // Update detail cache optimistically
     queryClient.setQueryData(['productDetail', id], optimisticProduct);
 
-    // Also update feed cache if possible (optional)
-    // We'll skip to keep simple; feed will be updated when user navigates back
-
     upvoteMutation.mutate(id, {
+      onSuccess: (data) => {
+        // Sync with server response to ensure exact count
+        const current = queryClient.getQueryData(['productDetail', id]);
+        if (current) {
+          queryClient.setQueryData(['productDetail', id], {
+            ...current,
+            upvotes: data.upvotes,
+            userVoted: data.action === 'added',
+          });
+        }
+        // Optionally update feed cache for the product
+        // We can also update feed cache, but not required for detail page
+      },
       onError: (error) => {
+        // Revert to previous state
         queryClient.setQueryData(['productDetail', id], currentProduct);
         toast.error(error.message || 'Failed to upvote');
       },
-      // No onSuccess – keep optimistic
     });
   };
 
@@ -143,10 +153,8 @@ export default function ProductDetail() {
 
     try {
       await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
-      // On success, we keep the optimistic comment; no refetch needed.
-      // But we should update the product's comment count? We can update product detail cache too.
-      // Since we don't get the updated count from the backend, we can increment locally.
-      // We'll update the product detail cache's commentsCount.
+      // On success, keep the optimistic comment; no refetch needed.
+      // Update the product's commentsCount locally.
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
         queryClient.setQueryData(['productDetail', id], {
