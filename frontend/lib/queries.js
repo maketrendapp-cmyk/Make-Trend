@@ -511,7 +511,6 @@ export function useAddProductComment() {
     onSuccess: (data, { productId }) => {
       queryClient.invalidateQueries(['productComments', productId]);
       queryClient.invalidateQueries(['productDetail', productId]);
-      queryClient.invalidateQueries(['productFeed']);
     },
   });
 }
