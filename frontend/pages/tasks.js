@@ -109,10 +109,11 @@ function CampaignTasks({ campaign: initialCampaign }) {
   const [countdown, setCountdown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStickyAd, setShowStickyAd] = useState(true);
+  const [hasRedirected, setHasRedirected] = useState(false); // ── prevent double redirect
 
   const timerRef = useRef(null);
   const intervalRef = useRef(null);
-  const viewTrackedRef = useRef(false); // ── NEW: prevent multiple view calls
+  const viewTrackedRef = useRef(false);
 
   // ── React Query ──
   const { data: campaign, isLoading } = useQuery({
@@ -125,47 +126,61 @@ function CampaignTasks({ campaign: initialCampaign }) {
     enabled: !!id,
   });
 
-  // ── Track view with 2‑second delay ──
+  // ── Unified effect: track view and handle redirect if no tasks ──
   useEffect(() => {
-    if (!campaign?.id || viewTrackedRef.current) return;
+    if (!campaign?.id || viewTrackedRef.current || hasRedirected) return;
 
-    const timer = setTimeout(async () => {
+    const performActions = async () => {
+      // 1. Record view (with 2s delay, but we'll do it immediately for no‑tasks case)
       try {
         const deviceId = await refreshDeviceId();
-        if (!deviceId) return;
-        await fetch(`${BACKEND_URL}/api/campaigns/${campaign.id}/view`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId }),
-        });
-        viewTrackedRef.current = true;
-        console.log(`📊 View recorded for campaign ${campaign.id}`);
+        if (deviceId) {
+          await fetch(`${BACKEND_URL}/api/campaigns/${campaign.id}/view`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId }),
+          });
+          console.log(`📊 View recorded for campaign ${campaign.id}`);
+        }
       } catch (e) {
         console.warn('View tracking failed:', e);
       }
-    }, 2000); // ── 2‑second delay
 
-    return () => clearTimeout(timer);
-  }, [campaign]);
+      // 2. Mark as tracked
+      viewTrackedRef.current = true;
 
-  // ── Redirect if no tasks ──
-  useEffect(() => {
-    if (campaign && (!campaign.tasks || campaign.tasks.length === 0)) {
-      router.push(`/share?id=${id}`);
-    }
-  }, [campaign, id]);
-
-  // ── Refresh fingerprint on mount ──
-  useEffect(() => {
-    const refreshFingerprint = async () => {
-      try {
-        await refreshDeviceId();
-      } catch (e) {
-        console.warn('Fingerprint refresh failed');
+      // 3. If no tasks, redirect to share page
+      if (!campaign.tasks || campaign.tasks.length === 0) {
+        setHasRedirected(true);
+        router.push(`/share?id=${id}`);
       }
     };
-    refreshFingerprint();
-  }, []);
+
+    // ── If there are tasks, we can use the old delayed approach ──
+    if (campaign.tasks && campaign.tasks.length > 0) {
+      // Delayed view tracking (2s) as before
+      const timer = setTimeout(async () => {
+        try {
+          const deviceId = await refreshDeviceId();
+          if (deviceId) {
+            await fetch(`${BACKEND_URL}/api/campaigns/${campaign.id}/view`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ deviceId }),
+            });
+            viewTrackedRef.current = true;
+            console.log(`📊 View recorded for campaign ${campaign.id}`);
+          }
+        } catch (e) {
+          console.warn('View tracking failed:', e);
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else {
+      // No tasks → immediate view + redirect
+      performActions();
+    }
+  }, [campaign, id, router, hasRedirected]);
 
   // ── Cleanup timers ──
   useEffect(() => {
