@@ -74,7 +74,6 @@ export default function ProductTrendFeed() {
   const rawProducts = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
 
-  // Client-side filtered preview
   const clientFilteredProducts = useMemo(() => {
     let result = rawProducts;
 
@@ -96,7 +95,6 @@ export default function ProductTrendFeed() {
     return result;
   }, [rawProducts, searchInput, category, sortBy]);
 
-  // Determine which products to show
   const displayProducts = isFetching ? clientFilteredProducts : rawProducts;
   const isPreview = isFetching &&
     (searchInput.trim() || category !== 'All' || sortBy !== 'newest');
@@ -164,7 +162,7 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Optimistic upvote (no refetch on success) ──
+  // ── Optimistic upvote with toggle ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
@@ -193,15 +191,19 @@ export default function ProductTrendFeed() {
       return;
     }
 
+    // Toggle
     const prevUpvotes = currentProduct.upvotes || 0;
     const prevUserVoted = currentProduct.userVoted || false;
+    const newUserVoted = !prevUserVoted;
+    const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
 
     const updatedProduct = {
       ...currentProduct,
-      upvotes: prevUserVoted ? prevUpvotes - 1 : prevUpvotes + 1,
-      userVoted: !prevUserVoted,
+      upvotes: newUpvotes,
+      userVoted: newUserVoted,
     };
 
+    // Update feed cache
     const newPages = data.pages.map((page, idx) => {
       if (idx === pageIndex) {
         return {
@@ -242,7 +244,6 @@ export default function ProductTrendFeed() {
         queryClient.setQueryData(['productDetail', productId], currentProduct);
         toast.error(error.message || 'Failed to upvote');
       },
-      // ── No onSuccess invalidation – keep the optimistic update ──
     });
   };
 
@@ -341,9 +342,9 @@ export default function ProductTrendFeed() {
           </div>
         </div>
 
-        {/* Search & Filters */}
+        {/* Search & Filters – No horizontal scroll */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
-          <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex flex-col gap-3">
             <div className="relative flex-1">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -363,7 +364,7 @@ export default function ProductTrendFeed() {
                 </button>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={triggerSearch}
                 className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5"
