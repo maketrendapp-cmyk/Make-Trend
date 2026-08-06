@@ -17,7 +17,8 @@ import {
   FaCheckCircle,
   FaClock,
   FaExternalLinkAlt,
-  FaTimes
+  FaTimes,
+  FaArrowRight,
 } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -33,7 +34,7 @@ const defaultMeta = {
 
 const campaignQueryKey = (id) => ['campaign', id];
 
-// ─── AD COMPONENTS ───
+// ─── AD COMPONENTS (unchanged) ──────────────────────────────
 const IframeAd = ({ adKey, width, height }) => {
   const srcDoc = `
     <!DOCTYPE html>
@@ -97,7 +98,7 @@ const NativeAd = () => {
   );
 };
 
-// ─── MAIN COMPONENT ───
+// ─── MAIN COMPONENT ──────────────────────────────────────────
 
 function CampaignTasks({ campaign: initialCampaign }) {
   const router = useRouter();
@@ -109,7 +110,7 @@ function CampaignTasks({ campaign: initialCampaign }) {
   const [countdown, setCountdown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStickyAd, setShowStickyAd] = useState(true);
-  const [hasRedirected, setHasRedirected] = useState(false); // ── prevent double redirect
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   const timerRef = useRef(null);
   const intervalRef = useRef(null);
@@ -126,12 +127,11 @@ function CampaignTasks({ campaign: initialCampaign }) {
     enabled: !!id,
   });
 
-  // ── Unified effect: track view and handle redirect if no tasks ──
+  // ── Unified effect: track view ──
   useEffect(() => {
     if (!campaign?.id || viewTrackedRef.current || hasRedirected) return;
 
-    const performActions = async () => {
-      // 1. Record view (with 2s delay, but we'll do it immediately for no‑tasks case)
+    const performView = async () => {
       try {
         const deviceId = await refreshDeviceId();
         if (deviceId) {
@@ -145,42 +145,18 @@ function CampaignTasks({ campaign: initialCampaign }) {
       } catch (e) {
         console.warn('View tracking failed:', e);
       }
-
-      // 2. Mark as tracked
       viewTrackedRef.current = true;
-
-      // 3. If no tasks, redirect to share page
-      if (!campaign.tasks || campaign.tasks.length === 0) {
-        setHasRedirected(true);
-        router.push(`/share?id=${id}`);
-      }
     };
 
-    // ── If there are tasks, we can use the old delayed approach ──
     if (campaign.tasks && campaign.tasks.length > 0) {
-      // Delayed view tracking (2s) as before
-      const timer = setTimeout(async () => {
-        try {
-          const deviceId = await refreshDeviceId();
-          if (deviceId) {
-            await fetch(`${BACKEND_URL}/api/campaigns/${campaign.id}/view`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ deviceId }),
-            });
-            viewTrackedRef.current = true;
-            console.log(`📊 View recorded for campaign ${campaign.id}`);
-          }
-        } catch (e) {
-          console.warn('View tracking failed:', e);
-        }
-      }, 2000);
+      // With tasks: delay 2s to allow user to see page
+      const timer = setTimeout(performView, 2000);
       return () => clearTimeout(timer);
     } else {
-      // No tasks → immediate view + redirect
-      performActions();
+      // No tasks: record view immediately and then redirect (but we'll handle redirect in UI)
+      performView();
     }
-  }, [campaign, id, router, hasRedirected]);
+  }, [campaign, id, hasRedirected]);
 
   // ── Cleanup timers ──
   useEffect(() => {
@@ -228,11 +204,9 @@ function CampaignTasks({ campaign: initialCampaign }) {
     startCountdown(index);
   };
 
-  const handleContinueToShare = async () => {
-    const tasks = campaign?.tasks || [];
-    const allCompleted = completedIndices.length === tasks.length;
-    if (!allCompleted) return;
-
+  // ── Common unlock + redirect ──
+  const handleUnlockAndRedirect = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const deviceId = await refreshDeviceId();
@@ -248,6 +222,18 @@ function CampaignTasks({ campaign: initialCampaign }) {
       setIsSubmitting(false);
       router.push(`/share?id=${id}`);
     }
+  };
+
+  const handleContinueToShare = async () => {
+    const tasks = campaign?.tasks || [];
+    const allCompleted = tasks.length > 0 && completedIndices.length === tasks.length;
+    if (!allCompleted) return;
+    await handleUnlockAndRedirect();
+  };
+
+  const handleContinueWithoutTasks = async () => {
+    // No tasks – proceed directly
+    await handleUnlockAndRedirect();
   };
 
   const getPlatformIcon = (url) => {
@@ -289,7 +275,7 @@ function CampaignTasks({ campaign: initialCampaign }) {
 
   const tasks = campaign?.tasks || [];
   const allCompleted = tasks.length > 0 && completedIndices.length === tasks.length;
-  const progress = tasks.length > 0 ? (completedIndices.length / tasks.length) * 100 : 0;
+  const progress = tasks.length > 0 ? (completedIndices.length / tasks.length) * 100 : 100;
 
   return (
     <>
@@ -348,27 +334,64 @@ function CampaignTasks({ campaign: initialCampaign }) {
                     🎁 {campaign.reward}
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
-                  📋 {completedIndices.length}/{tasks.length} tasks
-                </span>
+                {tasks.length > 0 ? (
+                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200">
+                    📋 {completedIndices.length}/{tasks.length} tasks
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">
+                    ✅ No tasks required
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Tasks List */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 transition-all hover:shadow-md">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <span>📋</span> Complete Tasks To Claim
-              </h2>
-              <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                {completedIndices.length}/{tasks.length}
-              </span>
+          {/* Tasks Section or Continue Button */}
+          {tasks.length === 0 ? (
+            // ── No tasks: show a clean "Continue" card ──
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-7 text-center transition-all hover:shadow-md">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-3xl">
+                  🎉
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">No tasks required!</h2>
+                <p className="text-gray-500 text-sm">
+                  You can proceed directly to share this campaign and claim your reward.
+                </p>
+                <button
+                  onClick={handleContinueWithoutTasks}
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    <>
+                      Continue to Reward <FaArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
+          ) : (
+            // ── Tasks exist: show task list ──
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 sm:p-7 transition-all hover:shadow-md">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <span>📋</span> Complete Tasks To Claim
+                </h2>
+                <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  {completedIndices.length}/{tasks.length}
+                </span>
+              </div>
 
-            {tasks.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">No tasks to complete.</div>
-            ) : (
               <div className="space-y-4">
                 {tasks.map((task, index) => {
                   const isCompleted = completedIndices.includes(index);
@@ -439,32 +462,32 @@ function CampaignTasks({ campaign: initialCampaign }) {
                   );
                 })}
               </div>
-            )}
 
-            <div className="mt-8">
-              <button
-                onClick={handleContinueToShare}
-                disabled={!allCompleted || isSubmitting}
-                className={`w-full inline-flex items-center justify-center px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
-                  allCompleted && !isSubmitting
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Processing...
-                  </span>
-                ) : (
-                  '🎁 Claim Reward'
-                )}
-              </button>
+              <div className="mt-8">
+                <button
+                  onClick={handleContinueToShare}
+                  disabled={!allCompleted || isSubmitting}
+                  className={`w-full inline-flex items-center justify-center px-6 py-3.5 font-semibold rounded-2xl transition-all duration-300 shadow-sm ${
+                    allCompleted && !isSubmitting
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-md hover:scale-[1.01] active:scale-[0.98]'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    '🎁 Claim Reward'
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
