@@ -85,38 +85,30 @@ export default function ProductDetail() {
       return;
     }
 
-    // Get current product from cache (or use the `product` variable)
     const currentProduct = product;
     const prevUpvotes = currentProduct?.upvotes || 0;
     const prevUserVoted = currentProduct?.userVoted || false;
+    const newUserVoted = !prevUserVoted;
+    const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
 
-    // Optimistically update the cache
     const optimisticProduct = {
       ...currentProduct,
-      upvotes: prevUserVoted ? prevUpvotes - 1 : prevUpvotes + 1,
-      userVoted: !prevUserVoted,
+      upvotes: newUpvotes,
+      userVoted: newUserVoted,
     };
 
-    // Update the product detail cache
+    // Update detail cache
     queryClient.setQueryData(['productDetail', id], optimisticProduct);
 
-    // Also update the feed cache (if product appears in feed)
-    // We can invalidate feed later, but for immediate UI we'll update the feed cache too? Not necessary for detail page.
+    // Also update feed cache if possible (optional)
+    // We'll skip to keep simple; feed will be updated when user navigates back
 
-    // Call the mutation
     upvoteMutation.mutate(id, {
       onError: (error) => {
-        // Revert on error
         queryClient.setQueryData(['productDetail', id], currentProduct);
         toast.error(error.message || 'Failed to upvote');
       },
-      onSuccess: () => {
-        // Refetch to ensure consistency (optional, but good)
-        // Invalidate product detail and feed caches
-        queryClient.invalidateQueries(['productDetail', id]);
-        queryClient.invalidateQueries(['productFeed']);
-        // Also invalidate myProducts if the user is the maker? Not needed.
-      },
+      // No onSuccess – keep optimistic
     });
   };
 
@@ -131,7 +123,6 @@ export default function ProductDetail() {
 
     setSubmittingComment(true);
 
-    // Create optimistic comment
     const optimisticComment = {
       id: `temp-${Date.now()}`,
       text: commentText.trim(),
@@ -139,31 +130,37 @@ export default function ProductDetail() {
       user: {
         username: user?.username || 'You',
         fullname: user?.fullname || 'You',
+        avatar: user?.avatar || null,
       },
       createdAt: new Date().toISOString(),
     };
 
-    // Update comments cache optimistically
     const currentComments = queryClient.getQueryData(['productComments', id]) || [];
     queryClient.setQueryData(['productComments', id], [optimisticComment, ...currentComments]);
 
-    // Clear input immediately
+    const textToSend = commentText.trim();
     setCommentText('');
 
     try {
-      // Call the mutation
-      await addCommentMutation.mutateAsync({ productId: id, text: optimisticComment.text });
-      // On success, the cache is invalidated and refetched, but we can also just keep the optimistic comment.
-      // We'll rely on the invalidation to keep it consistent.
+      await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
+      // On success, we keep the optimistic comment; no refetch needed.
+      // But we should update the product's comment count? We can update product detail cache too.
+      // Since we don't get the updated count from the backend, we can increment locally.
+      // We'll update the product detail cache's commentsCount.
+      const currentProduct = queryClient.getQueryData(['productDetail', id]);
+      if (currentProduct) {
+        queryClient.setQueryData(['productDetail', id], {
+          ...currentProduct,
+          commentsCount: (currentProduct.commentsCount || 0) + 1,
+        });
+      }
     } catch (error) {
       // Revert on error
       queryClient.setQueryData(['productComments', id], currentComments);
       toast.error(error.message || 'Failed to post comment');
-      setCommentText(optimisticComment.text); // Restore text
+      setCommentText(optimisticComment.text);
     } finally {
       setSubmittingComment(false);
-      // Refetch to ensure consistency (optional)
-      await refetchComments();
     }
   };
 
@@ -197,10 +194,25 @@ export default function ProductDetail() {
     setTimeout(() => setShareCopied(false), 2000);
   };
 
+  // ── Robust date formatter ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      let date;
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } else if (timestamp.seconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+      } else if (timestamp._seconds !== undefined) {
+        date = new Date(timestamp._seconds * 1000);
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        date = new Date(timestamp);
+      }
+      if (isNaN(date.getTime())) return 'Recently';
       return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch {
       return 'Recently';
@@ -310,27 +322,43 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t border-slate-100 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <FiUser className="w-4 h-4" />
-                {product.maker?.fullname || product.maker?.username || 'Anonymous'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <FiClock className="w-4 h-4" />
-                Launched on {formatDate(product.createdAt)}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <FiMessageCircle className="w-4 h-4" />
-                {product.commentsCount || 0} comments
-              </span>
-              {isMaker && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">You are the maker</span>
-              )}
-              {!isAuthenticated && (
-                <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <FiLock className="w-3 h-3" /> Sign in to upvote
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-purple-100 overflow-hidden flex-shrink-0">
+                {product.maker?.avatar ? (
+                  <Image
+                    src={product.maker.avatar}
+                    alt={product.maker.fullname || 'User'}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-purple-600">
+                    <FiUser className="w-4 h-4" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <span className="font-medium text-slate-700">
+                  {product.maker?.fullname || product.maker?.username || 'Anonymous'}
                 </span>
-              )}
+                <span className="flex items-center gap-1.5">
+                  <FiClock className="w-3.5 h-3.5" />
+                  Launched {formatDate(product.createdAt)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <FiMessageCircle className="w-3.5 h-3.5" />
+                  {product.commentsCount || 0} comments
+                </span>
+                {isMaker && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">You are the maker</span>
+                )}
+                {!isAuthenticated && (
+                  <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <FiLock className="w-3 h-3" /> Sign in to upvote
+                  </span>
+                )}
+              </div>
             </div>
 
             {product.description && (
@@ -494,8 +522,20 @@ export default function ProductDetail() {
             ) : (
               comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
-                  <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 flex-shrink-0">
-                    {comment.user?.fullname?.[0] || comment.user?.username?.[0] || 'U'}
+                  <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                    {comment.user?.avatar ? (
+                      <Image
+                        src={comment.user.avatar}
+                        alt={comment.user.fullname || 'User'}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-600">
+                        {comment.user?.fullname?.[0] || comment.user?.username?.[0] || 'U'}
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-slate-700">
