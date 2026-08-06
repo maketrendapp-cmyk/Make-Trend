@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import {
@@ -13,6 +14,7 @@ import {
   useInvalidateQueries,
 } from '../../lib/queries';
 import { getToken } from '../../lib/api';
+import toast from 'react-hot-toast';
 import {
   FiArrowLeft,
   FiHeart,
@@ -62,6 +64,7 @@ export default function ProductDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const { invalidateProductDetail, invalidateProductFeed, invalidateMyProducts } = useInvalidateQueries();
 
   const { data: product, isLoading, isError, refetch } = useProductDetail(id, !!id);
@@ -75,26 +78,92 @@ export default function ProductDetail() {
 
   const isMaker = product?.makerUid === user?.uid;
 
+  // ── Optimistic upvote handler ──
   const handleUpvote = () => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/' + id);
       return;
     }
-    upvoteMutation.mutate(id);
+
+    // Get current product from cache (or use the `product` variable)
+    const currentProduct = product;
+    const prevUpvotes = currentProduct?.upvotes || 0;
+    const prevUserVoted = currentProduct?.userVoted || false;
+
+    // Optimistically update the cache
+    const optimisticProduct = {
+      ...currentProduct,
+      upvotes: prevUserVoted ? prevUpvotes - 1 : prevUpvotes + 1,
+      userVoted: !prevUserVoted,
+    };
+
+    // Update the product detail cache
+    queryClient.setQueryData(['productDetail', id], optimisticProduct);
+
+    // Also update the feed cache (if product appears in feed)
+    // We can invalidate feed later, but for immediate UI we'll update the feed cache too? Not necessary for detail page.
+
+    // Call the mutation
+    upvoteMutation.mutate(id, {
+      onError: (error) => {
+        // Revert on error
+        queryClient.setQueryData(['productDetail', id], currentProduct);
+        toast.error(error.message || 'Failed to upvote');
+      },
+      onSuccess: () => {
+        // Refetch to ensure consistency (optional, but good)
+        // Invalidate product detail and feed caches
+        queryClient.invalidateQueries(['productDetail', id]);
+        queryClient.invalidateQueries(['productFeed']);
+        // Also invalidate myProducts if the user is the maker? Not needed.
+      },
+    });
   };
 
+  // ── Optimistic comment handler ──
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/productstrend/' + id);
+      return;
+    }
+
     setSubmittingComment(true);
+
+    // Create optimistic comment
+    const optimisticComment = {
+      id: `temp-${Date.now()}`,
+      text: commentText.trim(),
+      userId: user?.uid,
+      user: {
+        username: user?.username || 'You',
+        fullname: user?.fullname || 'You',
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    // Update comments cache optimistically
+    const currentComments = queryClient.getQueryData(['productComments', id]) || [];
+    queryClient.setQueryData(['productComments', id], [optimisticComment, ...currentComments]);
+
+    // Clear input immediately
+    setCommentText('');
+
     try {
-      await addCommentMutation.mutateAsync({ productId: id, text: commentText.trim() });
-      setCommentText('');
-      await refetchComments();
-    } catch (err) {
-      // error handled by mutation
+      // Call the mutation
+      await addCommentMutation.mutateAsync({ productId: id, text: optimisticComment.text });
+      // On success, the cache is invalidated and refetched, but we can also just keep the optimistic comment.
+      // We'll rely on the invalidation to keep it consistent.
+    } catch (error) {
+      // Revert on error
+      queryClient.setQueryData(['productComments', id], currentComments);
+      toast.error(error.message || 'Failed to post comment');
+      setCommentText(optimisticComment.text); // Restore text
     } finally {
       setSubmittingComment(false);
+      // Refetch to ensure consistency (optional)
+      await refetchComments();
     }
   };
 
@@ -175,14 +244,11 @@ export default function ProductDetail() {
     <>
       <Meta title={`${product.name} – ProductTrend`} />
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Back button */}
         <Link href="/productstrend/feed" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-purple-600 transition mb-6">
           <FiArrowLeft className="w-4 h-4" /> Back to Feed
         </Link>
 
-        {/* Main Card */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* Product Image */}
           <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
             {product.imageUrl ? (
               <Image
@@ -199,7 +265,6 @@ export default function ProductDetail() {
           </div>
 
           <div className="p-6 md:p-8">
-            {/* Header: Name, tagline, badges, actions */}
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900">{product.name}</h1>
@@ -223,7 +288,6 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* Actions (upvote & share) */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={handleUpvote}
@@ -246,7 +310,6 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* Maker & meta */}
             <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t border-slate-100 text-xs text-slate-500">
               <span className="flex items-center gap-1.5">
                 <FiUser className="w-4 h-4" />
@@ -270,7 +333,6 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Description */}
             {product.description && (
               <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-1">Description</h3>
@@ -278,7 +340,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Features */}
             {product.features && product.features.length > 0 && (
               <div className="mt-6 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
@@ -295,7 +356,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Target Audience */}
             {product.targetAudience && (
               <div className="mt-4 p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
@@ -305,7 +365,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Tech Stack */}
             {product.techStack && product.techStack.length > 0 && (
               <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
@@ -324,7 +383,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Website & Links */}
             {(product.url || product.websiteTitle || product.websiteDescription || product.demoUrl || product.twitter) && (
               <div className="mt-6 p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
@@ -377,7 +435,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Maker actions (edit/delete) */}
             {isMaker && (
               <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100">
                 <Link
@@ -404,7 +461,6 @@ export default function ProductDetail() {
             Comments ({comments.length})
           </h3>
 
-          {/* Comment form */}
           <form onSubmit={handleAddComment} className="mt-4 flex gap-3">
             <input
               type="text"
@@ -430,7 +486,6 @@ export default function ProductDetail() {
             </p>
           )}
 
-          {/* Comments list */}
           <div className="mt-6 space-y-4">
             {comments.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-6 bg-white rounded-xl border border-slate-100">
