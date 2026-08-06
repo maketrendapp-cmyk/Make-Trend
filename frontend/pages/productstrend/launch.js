@@ -7,7 +7,6 @@ import { useAuth } from '../../components/AuthScreen';
 import { useLaunchProduct, useInvalidateQueries } from '../../lib/queries';
 import {
   FiArrowLeft,
-  FiRocket,
   FiCheck,
   FiLoader,
   FiX,
@@ -16,6 +15,7 @@ import {
   FiTag,
   FiFileText,
 } from 'react-icons/fi';
+import { FaRocket } from 'react-icons/fa';
 
 const CATEGORIES = [
   'Tech',
@@ -131,7 +131,7 @@ export default function LaunchProduct() {
         <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50">
           <div className="max-w-md w-full bg-white rounded-3xl shadow-sm p-8 text-center border border-slate-100">
             <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
-              <FiRocket className="w-8 h-8" />
+              <FaRocket className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-1">Sign In Required</h2>
             <p className="text-slate-500 text-sm mb-6">Please sign in to launch a product.</p>
@@ -158,7 +158,7 @@ export default function LaunchProduct() {
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
-              <FiRocket className="w-6 h-6" />
+              <FaRocket className="w-6 h-6" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Launch a Product</h1>
@@ -303,7 +303,7 @@ export default function LaunchProduct() {
                 </>
               ) : (
                 <>
-                  <FiRocket className="w-5 h-5" />
+                  <FaRocket className="w-5 h-5" />
                   Launch Product
                 </>
               )}
