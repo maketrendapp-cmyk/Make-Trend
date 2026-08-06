@@ -476,9 +476,8 @@ export function useLaunchProduct() {
   });
 }
 
-// 6. Upvote Product Mutation
+// 6. Upvote Product Mutation – Optimistic, no invalidations
 export function useUpvoteProduct() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (productId) => {
       const token = await getToken();
@@ -488,16 +487,12 @@ export function useUpvoteProduct() {
       }, token);
       return data;
     },
-    onSuccess: (data, productId) => {
-      queryClient.invalidateQueries(['productDetail', productId]);
-      queryClient.invalidateQueries(['myProducts']);
-    },
+    // No onSuccess – component handles cache updates with server response
   });
 }
 
-// 7. Add Product Comment Mutation
+// 7. Add Product Comment Mutation – Optimistic, no invalidations
 export function useAddProductComment() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ productId, text }) => {
       const token = await getToken();
@@ -508,10 +503,7 @@ export function useAddProductComment() {
       }, token);
       return data;
     },
-    onSuccess: (data, { productId }) => {
-      queryClient.invalidateQueries(['productComments', productId]);
-      queryClient.invalidateQueries(['productDetail', productId]);
-    },
+    // No onSuccess – component handles cache updates
   });
 }
 
