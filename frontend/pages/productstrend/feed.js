@@ -1,5 +1,5 @@
 // pages/productstrend/feed.js
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -36,25 +36,17 @@ export default function ProductTrendFeed() {
 
   // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); // actual search term sent to backend
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
-  // ── Debounce search input ──
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchTerm(searchInput);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
   // ── Build filters object for query ──
   const filters = {};
-  if (searchTerm.trim()) filters.search = searchTerm.trim();
+  if (searchQuery.trim()) filters.search = searchQuery.trim();
   if (category !== 'All') filters.category = category;
   if (sortBy) filters.sort = sortBy;
 
-  // ── React Query: Product Feed (public) ──
+  // ── React Query: Product Feed (public) with keepPreviousData ──
   const {
     data,
     fetchNextPage,
@@ -64,7 +56,7 @@ export default function ProductTrendFeed() {
     refetch,
     isError,
     error,
-  } = useProductFeed(filters, true);
+  } = useProductFeed(filters, true, { keepPreviousData: true });
 
   const products = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
@@ -75,7 +67,7 @@ export default function ProductTrendFeed() {
   // ── Intersection Observer ──
   const observerRef = useRef(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isFetchingNextPage || !hasMore || products.length === 0) return;
 
     const lastElement = document.querySelector('#feed-end');
@@ -98,7 +90,7 @@ export default function ProductTrendFeed() {
     };
   }, [isFetchingNextPage, hasMore, products.length, fetchNextPage]);
 
-  // ── Scroll to top on filter change ──
+  // ── Scroll to top on filter change (category/sort) ──
   const handleFilterChange = useCallback(() => {
     window.scrollTo(0, 0);
     refetch({ refetchPage: (page, index) => index === 0 });
@@ -107,10 +99,25 @@ export default function ProductTrendFeed() {
   // ── Clear all filters ──
   const clearFilters = () => {
     setSearchInput('');
-    setSearchTerm('');
+    setSearchQuery('');
     setCategory('All');
     setSortBy('newest');
     handleFilterChange();
+  };
+
+  // ── Trigger search on Enter key or button click ──
+  const triggerSearch = () => {
+    setSearchQuery(searchInput);
+    // No need to call refetch; React Query will detect the key change and refetch
+    // But we want to scroll to top
+    window.scrollTo(0, 0);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      triggerSearch();
+    }
   };
 
   // ── Optimistic upvote handler ──
@@ -125,7 +132,6 @@ export default function ProductTrendFeed() {
     let pageIndex = -1;
     let productIndex = -1;
 
-    // We need to find the product in the infinite query data
     if (data?.pages) {
       for (let i = 0; i < data.pages.length; i++) {
         const page = data.pages[i];
@@ -147,14 +153,13 @@ export default function ProductTrendFeed() {
     const prevUpvotes = currentProduct.upvotes || 0;
     const prevUserVoted = currentProduct.userVoted || false;
 
-    // Optimistically update the product in the cache
     const updatedProduct = {
       ...currentProduct,
       upvotes: prevUserVoted ? prevUpvotes - 1 : prevUpvotes + 1,
       userVoted: !prevUserVoted,
     };
 
-    // Update the feed cache (all pages) – we'll update the specific page
+    // Update feed cache
     const newPages = data.pages.map((page, idx) => {
       if (idx === pageIndex) {
         return {
@@ -167,20 +172,17 @@ export default function ProductTrendFeed() {
       return page;
     });
 
-    // Set the updated data in the query cache
     queryClient.setQueryData(['productFeed', filters], {
       pages: newPages,
       pageParams: data.pageParams,
     });
 
-    // Also update the product detail cache for consistency
+    // Update product detail cache
     queryClient.setQueryData(['productDetail', productId], updatedProduct);
 
-    // Call the mutation
     upvoteMutation.mutate(productId, {
       onError: (error) => {
         // Revert on error
-        // Restore the previous product
         const revertPages = data.pages.map((page, idx) => {
           if (idx === pageIndex) {
             return {
@@ -200,15 +202,13 @@ export default function ProductTrendFeed() {
         toast.error(error.message || 'Failed to upvote');
       },
       onSuccess: () => {
-        // Optionally refetch to ensure consistency, but not necessary
-        // Invalidate feed to ensure future refetches are fresh
         queryClient.invalidateQueries(['productFeed']);
         queryClient.invalidateQueries(['productDetail', productId]);
       },
     });
   };
 
-  // ── Format date (handles Firestore Timestamp) ──
+  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
@@ -233,7 +233,7 @@ export default function ProductTrendFeed() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !products.length) {
     return (
       <>
         <Meta title="Product Feed – ProductTrend" />
@@ -254,7 +254,7 @@ export default function ProductTrendFeed() {
     );
   }
 
-  if (isError) {
+  if (isError && !products.length) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
@@ -313,11 +313,26 @@ export default function ProductTrendFeed() {
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Search products..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
               />
+              {searchInput && (
+                <button
+                  onClick={() => setSearchInput('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={triggerSearch}
+                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5"
+              >
+                <FiSearch className="w-4 h-4" /> Search
+              </button>
               <div className="relative">
                 <select
                   value={category}
@@ -345,13 +360,13 @@ export default function ProductTrendFeed() {
               </div>
             </div>
           </div>
-          {(searchTerm || category !== 'All' || sortBy !== 'newest') && (
+          {(searchQuery || category !== 'All' || sortBy !== 'newest') && (
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
               <div className="flex flex-wrap gap-2">
-                {searchTerm && (
+                {searchQuery && (
                   <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                    Search: {searchTerm}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSearchInput(''); setSearchTerm(''); }} />
+                    Search: {searchQuery}
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSearchInput(''); setSearchQuery(''); }} />
                   </span>
                 )}
                 {category !== 'All' && (
