@@ -88,7 +88,9 @@ export default function MyProducts() {
       <div className="max-w-6xl mx-auto px-4 py-8 animate-pulse">
         <div className="h-8 w-48 bg-slate-200 rounded-lg mb-6" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 h-56" />)}
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 h-56" />
+          ))}
         </div>
       </div>
     );
@@ -99,7 +101,10 @@ export default function MyProducts() {
       <div className="max-w-6xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <p className="text-red-600 font-medium">Failed to load products.</p>
-          <button onClick={() => refetch()} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
+          <button
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
+          >
             <FiRefreshCw className="w-4 h-4" /> Retry
           </button>
         </div>
@@ -194,6 +199,8 @@ export default function MyProducts() {
                       {formatDate(product.createdAt)}
                     </span>
                   </div>
+
+                  {/* ── Actions: View, Edit, Delete ── */}
                   <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
                     <Link
                       href={`/productstrend/${product.id}`}
@@ -201,12 +208,12 @@ export default function MyProducts() {
                     >
                       View
                     </Link>
-                    <button
-                      onClick={() => router.push(`/productstrend/edit/${product.id}`)}
+                    <Link
+                      href={`/productstrend/edit/${product.id}`}
                       className="flex-1 text-center text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
                     >
                       <FiEdit2 className="inline w-3 h-3 mr-1" /> Edit
-                    </button>
+                    </Link>
                     <button
                       onClick={() => handleDelete(product.id)}
                       disabled={deletingId === product.id}
