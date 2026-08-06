@@ -382,21 +382,20 @@ export function useExchangeDetail(id, enabled = true) {
 
 // ── 🚀 PRODUCT TREND QUERIES ──
 
-// 1. Product Feed (infinite scroll with filters)
+// 1. Product Feed (infinite scroll with filters) – PUBLIC
 export function useProductFeed(filters = {}, enabled = true) {
   const queryKey = ['productFeed', filters];
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam = null }) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
+      // Feed is public; no token required
       const params = new URLSearchParams({
         limit: 20,
         ...filters,
         ...(pageParam && { lastId: pageParam }),
       });
       const url = `/productstrend/feed?${params.toString()}`;
-      const data = await apiRequest(url, {}, token);
+      const data = await apiRequest(url, {}, null);
       return {
         products: data.products || [],
         nextCursor: data.hasMore ? data.lastId : null,
@@ -409,14 +408,13 @@ export function useProductFeed(filters = {}, enabled = true) {
   });
 }
 
-// 2. Product Detail
+// 2. Product Detail – PUBLIC
 export function useProductDetail(id, enabled = true) {
   return useQuery({
     queryKey: ['productDetail', id],
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      const data = await apiRequest(`/productstrend/products/${id}`, {}, token);
+      // Detail is public; no token required
+      const data = await apiRequest(`/productstrend/products/${id}`, {}, null);
       return data.product;
     },
     enabled: !!id && enabled,
@@ -439,14 +437,13 @@ export function useMyProducts(enabled = true) {
   });
 }
 
-// 4. Product Comments
+// 4. Product Comments – PUBLIC
 export function useProductComments(productId, enabled = true) {
   return useQuery({
     queryKey: ['productComments', productId],
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) return [];
-      const data = await apiRequest(`/productstrend/products/${productId}/comments`, {}, token);
+      // Comments are public; no token required
+      const data = await apiRequest(`/productstrend/products/${productId}/comments`, {}, null);
       return data.comments || [];
     },
     enabled: !!productId && enabled,
