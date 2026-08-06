@@ -1,5 +1,5 @@
 // pages/productstrend/feed.js
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -28,6 +28,22 @@ import {
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
+// ── Client‑side sorting helpers ──
+const sortProducts = (products, sortBy) => {
+  const copy = [...products];
+  switch (sortBy) {
+    case 'oldest':
+      return copy.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    case 'most-upvoted':
+      return copy.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+    case 'most-commented':
+      return copy.sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0));
+    case 'newest':
+    default:
+      return copy.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  }
+};
+
 export default function ProductTrendFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
@@ -36,30 +52,62 @@ export default function ProductTrendFeed() {
 
   // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState(''); // actual search term sent to backend
+  const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
-  // ── Build filters object for query ──
-  const filters = {};
-  if (searchQuery.trim()) filters.search = searchQuery.trim();
-  if (category !== 'All') filters.category = category;
-  if (sortBy) filters.sort = sortBy;
+  // ── Build filters object for backend ──
+  const backendFilters = {};
+  if (searchQuery.trim()) backendFilters.search = searchQuery.trim();
+  if (category !== 'All') backendFilters.category = category;
+  if (sortBy) backendFilters.sort = sortBy;
 
-  // ── React Query: Product Feed (public) with keepPreviousData ──
+  // ── React Query: Product Feed (public) ──
   const {
     data,
     fetchNextPage,
     hasNextPage,
     isLoading,
+    isFetching,
     isFetchingNextPage,
     refetch,
     isError,
     error,
-  } = useProductFeed(filters, true, { keepPreviousData: true });
+  } = useProductFeed(backendFilters, true);
 
-  const products = data?.pages?.flatMap((page) => page.products) || [];
+  const rawProducts = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
+
+  // ── Client‑side filtered products (instant preview) ──
+  const clientFilteredProducts = useMemo(() => {
+    let result = rawProducts;
+
+    // 1. Client‑side search (on already loaded data)
+    if (searchInput.trim()) {
+      const term = searchInput.trim().toLowerCase();
+      result = result.filter((p) =>
+        p.name?.toLowerCase().includes(term) ||
+        p.tagline?.toLowerCase().includes(term) ||
+        p.description?.toLowerCase().includes(term)
+      );
+    }
+
+    // 2. Client‑side category filter
+    if (category !== 'All') {
+      result = result.filter((p) => p.category === category);
+    }
+
+    // 3. Client‑side sort
+    result = sortProducts(result, sortBy);
+
+    return result;
+  }, [rawProducts, searchInput, category, sortBy]);
+
+  // ── Determine which products to display ──
+  // While fetching (backend request in progress), show client‑filtered preview.
+  // When not fetching, show the raw data (which is already backend‑filtered).
+  const displayProducts = isFetching ? clientFilteredProducts : rawProducts;
+  const isPreview = isFetching && displayProducts.length > 0;
 
   // ── Upvote mutation ──
   const upvoteMutation = useUpvoteProduct();
@@ -68,7 +116,7 @@ export default function ProductTrendFeed() {
   const observerRef = useRef(null);
 
   React.useEffect(() => {
-    if (isFetchingNextPage || !hasMore || products.length === 0) return;
+    if (isFetchingNextPage || !hasMore || displayProducts.length === 0) return;
 
     const lastElement = document.querySelector('#feed-end');
     if (!lastElement) return;
@@ -88,13 +136,12 @@ export default function ProductTrendFeed() {
     return () => {
       if (observerRef.current) observerRef.current.disconnect();
     };
-  }, [isFetchingNextPage, hasMore, products.length, fetchNextPage]);
+  }, [isFetchingNextPage, hasMore, displayProducts.length, fetchNextPage]);
 
-  // ── Scroll to top on filter change (category/sort) ──
-  const handleFilterChange = useCallback(() => {
-    window.scrollTo(0, 0);
-    refetch({ refetchPage: (page, index) => index === 0 });
-  }, [refetch]);
+  // ── Scroll to top ──
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // ── Clear all filters ──
   const clearFilters = () => {
@@ -102,15 +149,15 @@ export default function ProductTrendFeed() {
     setSearchQuery('');
     setCategory('All');
     setSortBy('newest');
-    handleFilterChange();
+    scrollToTop();
   };
 
-  // ── Trigger search on Enter key or button click ──
+  // ── Trigger search (backend) ──
   const triggerSearch = () => {
-    setSearchQuery(searchInput);
-    // No need to call refetch; React Query will detect the key change and refetch
-    // But we want to scroll to top
-    window.scrollTo(0, 0);
+    if (searchInput.trim() !== searchQuery.trim()) {
+      setSearchQuery(searchInput);
+      scrollToTop();
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -120,14 +167,24 @@ export default function ProductTrendFeed() {
     }
   };
 
-  // ── Optimistic upvote handler ──
+  // ── Category/Sort change ──
+  const handleCategoryChange = (val) => {
+    setCategory(val);
+    scrollToTop();
+  };
+
+  const handleSortChange = (val) => {
+    setSortBy(val);
+    scrollToTop();
+  };
+
+  // ── Optimistic upvote ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
       return;
     }
 
-    // Find the product in the cache
     let currentProduct = null;
     let pageIndex = -1;
     let productIndex = -1;
@@ -159,7 +216,6 @@ export default function ProductTrendFeed() {
       userVoted: !prevUserVoted,
     };
 
-    // Update feed cache
     const newPages = data.pages.map((page, idx) => {
       if (idx === pageIndex) {
         return {
@@ -172,17 +228,15 @@ export default function ProductTrendFeed() {
       return page;
     });
 
-    queryClient.setQueryData(['productFeed', filters], {
+    queryClient.setQueryData(['productFeed', backendFilters], {
       pages: newPages,
       pageParams: data.pageParams,
     });
 
-    // Update product detail cache
     queryClient.setQueryData(['productDetail', productId], updatedProduct);
 
     upvoteMutation.mutate(productId, {
       onError: (error) => {
-        // Revert on error
         const revertPages = data.pages.map((page, idx) => {
           if (idx === pageIndex) {
             return {
@@ -194,7 +248,7 @@ export default function ProductTrendFeed() {
           }
           return page;
         });
-        queryClient.setQueryData(['productFeed', filters], {
+        queryClient.setQueryData(['productFeed', backendFilters], {
           pages: revertPages,
           pageParams: data.pageParams,
         });
@@ -233,7 +287,7 @@ export default function ProductTrendFeed() {
     }
   };
 
-  if (isLoading && !products.length) {
+  if (isLoading && !rawProducts.length) {
     return (
       <>
         <Meta title="Product Feed – ProductTrend" />
@@ -254,7 +308,7 @@ export default function ProductTrendFeed() {
     );
   }
 
-  if (isError && !products.length) {
+  if (isError && !rawProducts.length) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
@@ -336,7 +390,7 @@ export default function ProductTrendFeed() {
               <div className="relative">
                 <select
                   value={category}
-                  onChange={(e) => { setCategory(e.target.value); handleFilterChange(); }}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
                 >
                   {CATEGORIES.map((cat) => (
@@ -348,7 +402,7 @@ export default function ProductTrendFeed() {
               <div className="relative">
                 <select
                   value={sortBy}
-                  onChange={(e) => { setSortBy(e.target.value); handleFilterChange(); }}
+                  onChange={(e) => handleSortChange(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
                 >
                   <option value="newest">Newest</option>
@@ -389,12 +443,24 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
+        {/* Preview indicator */}
+        {isPreview && (
+          <div className="mb-4 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-2">
+            <FiLoader className="w-4 h-4 animate-spin" />
+            Showing filtered preview from current feed – searching server...
+          </div>
+        )}
+
         {/* Products List */}
-        {products.length === 0 && !isFetchingNextPage ? (
+        {displayProducts.length === 0 && !isFetchingNextPage ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">🔍</div>
             <h3 className="text-lg font-semibold text-slate-900">No products found</h3>
-            <p className="text-slate-500 text-sm">Try adjusting your filters or launch a new product.</p>
+            <p className="text-slate-500 text-sm">
+              {searchInput || category !== 'All' || sortBy !== 'newest'
+                ? 'No matches in current feed. Searching the server...'
+                : 'Try adjusting your filters or launch a new product.'}
+            </p>
             {isAuthenticated && (
               <button
                 onClick={() => router.push('/productstrend/launch')}
@@ -406,7 +472,7 @@ export default function ProductTrendFeed() {
           </div>
         ) : (
           <div className="space-y-4">
-            {products.map((product) => (
+            {displayProducts.map((product) => (
               <div
                 key={product.id}
                 className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
@@ -489,7 +555,7 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
-        {!hasMore && products.length > 0 && (
+        {!hasMore && displayProducts.length > 0 && (
           <p className="text-center text-xs text-slate-400 py-6">
             You've reached the end 🎉
           </p>
