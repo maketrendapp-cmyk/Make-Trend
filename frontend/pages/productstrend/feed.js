@@ -28,6 +28,7 @@ import {
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
+// ── Client‑side sort helpers ──
 const sortProducts = (products, sortBy) => {
   const copy = [...products];
   switch (sortBy) {
@@ -49,16 +50,19 @@ export default function ProductTrendFeed() {
   const queryClient = useQueryClient();
   const { invalidateProductFeed } = useInvalidateQueries();
 
+  // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
+  // ── Backend filters (sent to API) ──
   const backendFilters = {};
   if (searchQuery.trim()) backendFilters.search = searchQuery.trim();
   if (category !== 'All') backendFilters.category = category;
   if (sortBy) backendFilters.sort = sortBy;
 
+  // ── React Query feed ──
   const {
     data,
     fetchNextPage,
@@ -74,9 +78,11 @@ export default function ProductTrendFeed() {
   const rawProducts = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
 
+  // ── Client‑side filtered preview (instant, no backend wait) ──
   const clientFilteredProducts = useMemo(() => {
     let result = rawProducts;
 
+    // 1. Search (local)
     if (searchInput.trim()) {
       const term = searchInput.trim().toLowerCase();
       result = result.filter((p) =>
@@ -86,21 +92,25 @@ export default function ProductTrendFeed() {
       );
     }
 
+    // 2. Category (local)
     if (category !== 'All') {
       result = result.filter((p) => p.category === category);
     }
 
+    // 3. Sort (local)
     result = sortProducts(result, sortBy);
 
     return result;
   }, [rawProducts, searchInput, category, sortBy]);
 
-  const displayProducts = isFetching ? clientFilteredProducts : rawProducts;
-  const isPreview = isFetching &&
-    (searchInput.trim() || category !== 'All' || sortBy !== 'newest');
+  // ── Always show local filter when searchInput is active, otherwise show raw (backend‑filtered) ──
+  const displayProducts = searchInput.trim() ? clientFilteredProducts : rawProducts;
+  const isPreview = isFetching && searchQuery.trim();
 
+  // ── Upvote mutation ──
   const upvoteMutation = useUpvoteProduct();
 
+  // ── Intersection Observer ──
   const observerRef = useRef(null);
 
   React.useEffect(() => {
@@ -126,10 +136,12 @@ export default function ProductTrendFeed() {
     };
   }, [isFetchingNextPage, hasMore, displayProducts.length, fetchNextPage]);
 
+  // ── Scroll to top ──
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // ── Clear all filters ──
   const clearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -138,6 +150,7 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
+  // ── Trigger backend search ──
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
@@ -162,7 +175,7 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Optimistic upvote with toggle ──
+  // ── Optimistic upvote toggle ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
@@ -173,6 +186,7 @@ export default function ProductTrendFeed() {
     let pageIndex = -1;
     let productIndex = -1;
 
+    // Find the product in the current pages
     if (data?.pages) {
       for (let i = 0; i < data.pages.length; i++) {
         const page = data.pages[i];
@@ -203,7 +217,7 @@ export default function ProductTrendFeed() {
       userVoted: newUserVoted,
     };
 
-    // Update feed cache
+    // Update feed cache (all pages)
     const newPages = data.pages.map((page, idx) => {
       if (idx === pageIndex) {
         return {
@@ -221,8 +235,10 @@ export default function ProductTrendFeed() {
       pageParams: data.pageParams,
     });
 
+    // Also update product detail cache for consistency
     queryClient.setQueryData(['productDetail', productId], updatedProduct);
 
+    // Call the mutation – no onSuccess invalidation
     upvoteMutation.mutate(productId, {
       onError: (error) => {
         // Revert on error
@@ -247,6 +263,7 @@ export default function ProductTrendFeed() {
     });
   };
 
+  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
@@ -342,9 +359,9 @@ export default function ProductTrendFeed() {
           </div>
         </div>
 
-        {/* Search & Filters – No horizontal scroll */}
+        {/* Search & Filters – horizontal on desktop */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -442,7 +459,7 @@ export default function ProductTrendFeed() {
             <h3 className="text-lg font-semibold text-slate-900">No products found</h3>
             <p className="text-slate-500 text-sm">
               {searchInput || category !== 'All' || sortBy !== 'newest'
-                ? 'No matches in current feed. Searching the server...'
+                ? 'No matches in current feed. Try adjusting your search or wait for server results.'
                 : 'Try adjusting your filters or launch a new product.'}
             </p>
             {isAuthenticated && (
@@ -461,6 +478,7 @@ export default function ProductTrendFeed() {
                 key={product.id}
                 className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
               >
+                {/* Image */}
                 <Link href={`/productstrend/${product.id}`} className="flex-shrink-0 w-24 h-24 md:w-28 md:h-28 bg-slate-100 rounded-xl overflow-hidden relative">
                   {product.imageUrl ? (
                     <Image
@@ -478,6 +496,7 @@ export default function ProductTrendFeed() {
                   )}
                 </Link>
 
+                {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <Link href={`/productstrend/${product.id}`} className="flex-1 min-w-0">
@@ -502,9 +521,24 @@ export default function ProductTrendFeed() {
                     {product.tagline}
                   </p>
                   <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-                    <span className="flex items-center gap-1">
-                      <FiUser className="w-3 h-3" />
-                      {product.maker?.username || 'Anonymous'}
+                    {/* Creator avatar + name */}
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                        {product.maker?.avatar ? (
+                          <Image
+                            src={product.maker.avatar}
+                            alt={product.maker.username || 'User'}
+                            width={20}
+                            height={20}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <FiUser className="w-3 h-3 text-slate-500 mx-auto mt-0.5" />
+                        )}
+                      </span>
+                      <span className="font-medium text-slate-600">
+                        {product.maker?.username || 'Anonymous'}
+                      </span>
                     </span>
                     <span className="flex items-center gap-1">
                       <FiClock className="w-3 h-3" />
