@@ -489,7 +489,6 @@ export function useUpvoteProduct() {
       return data;
     },
     onSuccess: (data, productId) => {
-      queryClient.invalidateQueries(['productFeed']);
       queryClient.invalidateQueries(['productDetail', productId]);
       queryClient.invalidateQueries(['myProducts']);
     },
