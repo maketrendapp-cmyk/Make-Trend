@@ -26,12 +26,36 @@ import {
   FiEdit2,
   FiTrash2,
   FiShare2,
+  FiGlobe,
+  FiInfo,
+  FiDollarSign,
+  FiUsers,
+  FiCpu,
+  FiTwitter,
+  FiCalendar,
+  FiVideo,
+  FiList,
 } from 'react-icons/fi';
 import { FaRocket } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
+
+const PRICING_COLORS = {
+  Free: 'text-green-600 bg-green-50 border-green-200',
+  Freemium: 'text-blue-600 bg-blue-50 border-blue-200',
+  Paid: 'text-amber-600 bg-amber-50 border-amber-200',
+  Enterprise: 'text-purple-600 bg-purple-50 border-purple-200',
+  'Contact for Pricing': 'text-slate-600 bg-slate-50 border-slate-200',
+};
+
+const STATUS_COLORS = {
+  Live: 'text-green-600 bg-green-50 border-green-200',
+  Beta: 'text-blue-600 bg-blue-50 border-blue-200',
+  'Coming Soon': 'text-amber-600 bg-amber-50 border-amber-200',
+  'In Development': 'text-slate-600 bg-slate-50 border-slate-200',
+};
 
 export default function ProductDetail() {
   const router = useRouter();
@@ -198,11 +222,23 @@ export default function ProductDetail() {
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">{product.name}</h1>
                 <p className="text-sm text-slate-500 mt-1">{product.tagline}</p>
-                {product.category && (
-                  <span className="inline-block mt-2 text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
-                    {product.category}
-                  </span>
-                )}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {product.category && (
+                    <span className="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+                      {product.category}
+                    </span>
+                  )}
+                  {product.pricing && (
+                    <span className={`text-xs font-medium px-3 py-1 rounded-full border ${PRICING_COLORS[product.pricing] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                      {product.pricing}
+                    </span>
+                  )}
+                  {product.productStatus && (
+                    <span className={`text-xs font-medium px-3 py-1 rounded-full border ${STATUS_COLORS[product.productStatus] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                      {product.productStatus}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -217,16 +253,6 @@ export default function ProductDetail() {
                   <FiHeart className={`w-4 h-4 ${product.userVoted ? 'fill-purple-600 text-purple-600' : ''}`} />
                   <span>{product.upvotes || 0}</span>
                 </button>
-                {product.url && (
-                  <a
-                    href={product.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition text-sm font-medium"
-                  >
-                    <FiExternalLink className="w-4 h-4" /> Visit
-                  </a>
-                )}
                 <button
                   onClick={handleShare}
                   className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition text-sm font-medium"
@@ -260,6 +286,105 @@ export default function ProductDetail() {
               <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-1">Description</h3>
                 <p className="text-sm text-slate-600 whitespace-pre-wrap">{product.description}</p>
+              </div>
+            )}
+
+            {/* Features */}
+            {product.features && product.features.length > 0 && (
+              <div className="mt-6 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <FiList className="text-purple-600" /> Key Features
+                </h3>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {product.features.map((feature, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm text-slate-700">
+                      <span className="text-purple-500">•</span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Target Audience */}
+            {product.targetAudience && (
+              <div className="mt-4 p-3 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                  <FiUsers className="text-indigo-600" /> Target Audience
+                </h3>
+                <p className="text-sm text-slate-600">{product.targetAudience}</p>
+              </div>
+            )}
+
+            {/* Tech Stack */}
+            {product.techStack && product.techStack.length > 0 && (
+              <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <FiCpu className="text-slate-600" /> Tech Stack
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.techStack.map((tech, index) => (
+                    <span
+                      key={index}
+                      className="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Website Info */}
+            {(product.url || product.websiteTitle || product.websiteDescription || product.demoUrl || product.twitter) && (
+              <div className="mt-6 p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <FiGlobe className="text-emerald-600" /> Website & Links
+                </h3>
+                {product.websiteTitle && (
+                  <p className="text-sm text-slate-800 font-medium">{product.websiteTitle}</p>
+                )}
+                {product.websiteDescription && (
+                  <p className="text-sm text-slate-600 mt-1">{product.websiteDescription}</p>
+                )}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {product.url && (
+                    <a
+                      href={product.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition text-xs font-medium"
+                    >
+                      <FiExternalLink className="w-3 h-3" /> Website
+                    </a>
+                  )}
+                  {product.demoUrl && (
+                    <a
+                      href={product.demoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition text-xs font-medium"
+                    >
+                      <FiVideo className="w-3 h-3" /> Demo
+                    </a>
+                  )}
+                  {product.twitter && (
+                    <a
+                      href={`https://twitter.com/${product.twitter.replace('@', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-sky-500 border border-sky-200 rounded-lg hover:bg-sky-50 transition text-xs font-medium"
+                    >
+                      <FiTwitter className="w-3 h-3" /> {product.twitter}
+                    </a>
+                  )}
+                </div>
+                {product.releaseDate && (
+                  <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
+                    <FiCalendar className="w-3 h-3" />
+                    Released: {new Date(product.releaseDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </p>
+                )}
               </div>
             )}
 
