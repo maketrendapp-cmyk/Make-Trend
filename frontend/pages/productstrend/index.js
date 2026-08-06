@@ -11,6 +11,7 @@ import {
   FiGrid,
   FiUsers,
   FiHeart,
+FiRocket,
   FiExternalLink,
   FiArrowRight,
 } from 'react-icons/fi';
