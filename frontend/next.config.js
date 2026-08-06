@@ -65,6 +65,17 @@ const nextConfig = {
 
   async rewrites() {
     return [
+      // ── ✅ Exclude ProductTrend from rewrites ──
+      {
+        source: '/productstrend/:path*',
+        destination: '/productstrend/:path*',
+      },
+      // ── ✅ Exclude Grow Together from rewrites ──
+      {
+        source: '/groweachother/:path*',
+        destination: '/groweachother/:path*',
+      },
+      // ── Existing catch‑all rules ──
       {
         source: '/:slug',
         destination: '/templates/:slug',
