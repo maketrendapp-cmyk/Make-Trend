@@ -5345,20 +5345,37 @@ async function invalidateProductCaches(productId, makerUid) {
 // ─────────────────────────────────────────────
 // 1. GET PRODUCT FEED (paginated, filtered, cached)
 // ─────────────────────────────────────────────
-app.get('/api/productstrend/feed', verifyToken, checkBanned, async (req, res) => {
+// ─────────────────────────────────────────────
+// 1. GET PRODUCT FEED (public, global cache)
+// ─────────────────────────────────────────────
+app.get('/api/productstrend/feed', async (req, res) => {
   try {
-    const uid = req.user.uid;
     const limit = parseInt(req.query.limit) || 20;
     const lastId = req.query.lastId || null;
     const search = req.query.search || '';
     const category = req.query.category || '';
     const sort = req.query.sort || 'newest';
+    const ip = getClientIp(req);
 
-    if (!(await checkRateLimit(uid, 'product-feed', 30, 60))) {
+    // ── Rate limit by IP ──
+    if (!(await checkRateLimit(ip, 'product-feed', 30, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
-    const cacheKey = `productstrend:feed:${uid}:${limit}:${lastId || 'null'}:${search}:${category}:${sort}`;
+    // ── Try to get authenticated user ID (optional) ──
+    let uid = null;
+    let deviceId = req.headers['x-device-id'] || null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        uid = decoded.uid;
+      } catch (e) { /* ignore */ }
+    }
+
+    // ── Global cache key (no uid) ──
+    const cacheKey = `productstrend:feed:global:${limit}:${lastId || 'null'}:${search}:${category}:${sort}`;
 
     let result = null;
     try {
@@ -5422,13 +5439,43 @@ app.get('/api/productstrend/feed', verifyToken, checkBanned, async (req, res) =>
       }
       result = { products, hasMore, lastId: lastProductId };
       await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
-      console.log(`💾 Product feed cached: ${cacheKey}`);
+      console.log(`💾 Global feed cached: ${cacheKey}`);
     }
 
-    const deviceId = req.headers['x-device-id'] || null;
-    const productsWithVote = await Promise.all(result.products.map(async (product) => {
-      const userVoted = await getUserVoteStatus(product.id, uid, deviceId);
-      return { ...product, userVoted };
+    // ── Compute user vote status ──
+    let userVotedSet = new Set();
+    if (uid) {
+      const voteCacheKey = `user:votes:${uid}`;
+      try {
+        const cachedVotes = await redisGet(voteCacheKey);
+        if (cachedVotes) {
+          userVotedSet = new Set(JSON.parse(cachedVotes));
+        } else {
+          // Fetch from Firestore
+          const voteSnapshot = await db.collection('productVotes')
+            .where('userId', '==', uid)
+            .select('productId')
+            .get();
+          const votedIds = voteSnapshot.docs.map(d => d.data().productId);
+          userVotedSet = new Set(votedIds);
+          await redis.set(voteCacheKey, JSON.stringify(Array.from(userVotedSet)), 'EX', 300);
+        }
+      } catch (e) {
+        console.warn('Vote cache error:', e);
+      }
+    } else if (deviceId) {
+      // For device-based votes, we could also cache, but we'll compute on the fly
+      const voteSnapshot = await db.collection('productVotes')
+        .where('deviceId', '==', deviceId)
+        .select('productId')
+        .get();
+      const votedIds = voteSnapshot.docs.map(d => d.data().productId);
+      userVotedSet = new Set(votedIds);
+    }
+
+    const productsWithVote = result.products.map(product => ({
+      ...product,
+      userVoted: userVotedSet.has(product.id),
     }));
 
     res.json({
@@ -5446,14 +5493,28 @@ app.get('/api/productstrend/feed', verifyToken, checkBanned, async (req, res) =>
 // ─────────────────────────────────────────────
 // 2. GET SINGLE PRODUCT
 // ─────────────────────────────────────────────
-app.get('/api/productstrend/products/:id', verifyToken, checkBanned, async (req, res) => {
+// ─────────────────────────────────────────────
+// 2. GET SINGLE PRODUCT (public, global cache)
+// ─────────────────────────────────────────────
+app.get('/api/productstrend/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const uid = req.user.uid;
-    const deviceId = req.headers['x-device-id'] || null;
+    const ip = getClientIp(req);
 
-    if (!(await checkRateLimit(uid, 'product-detail', 30, 60))) {
+    if (!(await checkRateLimit(ip, 'product-detail', 30, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    // ── Optional auth ──
+    let uid = null;
+    let deviceId = req.headers['x-device-id'] || null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        uid = decoded.uid;
+      } catch (e) { /* ignore */ }
     }
 
     const cacheKey = `productstrend:product:${id}`;
@@ -5474,7 +5535,26 @@ app.get('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       await redis.set(cacheKey, JSON.stringify(product), 'EX', 300);
     }
 
-    const userVoted = await getUserVoteStatus(id, uid, deviceId);
+    // ── Compute user vote status ──
+    let userVoted = false;
+    if (uid) {
+      const voteCacheKey = `user:votes:${uid}`;
+      try {
+        const cachedVotes = await redisGet(voteCacheKey);
+        if (cachedVotes) {
+          const votedIds = JSON.parse(cachedVotes);
+          userVoted = votedIds.includes(id);
+        } else {
+          const voteDoc = await db.collection('productVotes').doc(`${id}_user_${uid}`).get();
+          userVoted = voteDoc.exists;
+        }
+      } catch (e) {
+        console.warn('Vote check error:', e);
+      }
+    } else if (deviceId) {
+      const voteDoc = await db.collection('productVotes').doc(`${id}_device_${deviceId}`).get();
+      userVoted = voteDoc.exists;
+    }
     product.userVoted = userVoted;
 
     res.json({ success: true, product });
@@ -5528,7 +5608,10 @@ app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, 
 app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const { name, tagline, description, url, imageUrl, category } = req.body;
+    const { 
+      name, tagline, description, url, imageUrl, category,
+      features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate
+    } = req.body;
 
     if (!(await checkRateLimit(uid, 'launch-product', 5, 3600))) {
       return res.status(429).json({ success: false, error: 'Too many product launches. Please wait an hour.' });
@@ -5553,6 +5636,36 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       return res.status(400).json({ success: false, error: 'Category must be a string' });
     }
 
+    // ── Validate new fields ──
+    if (features !== undefined) {
+      if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
+        return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
+      }
+    }
+    if (pricing !== undefined && typeof pricing !== 'string') {
+      return res.status(400).json({ success: false, error: 'Pricing must be a string' });
+    }
+    if (productStatus !== undefined && typeof productStatus !== 'string') {
+      return res.status(400).json({ success: false, error: 'Product status must be a string' });
+    }
+    if (targetAudience !== undefined && typeof targetAudience !== 'string') {
+      return res.status(400).json({ success: false, error: 'Target audience must be a string' });
+    }
+    if (demoUrl !== undefined && demoUrl && !isValidUrl(demoUrl.trim())) {
+      return res.status(400).json({ success: false, error: 'Invalid demo URL' });
+    }
+    if (twitter !== undefined && typeof twitter !== 'string') {
+      return res.status(400).json({ success: false, error: 'Twitter handle must be a string' });
+    }
+    if (techStack !== undefined) {
+      if (!Array.isArray(techStack) || techStack.some(t => typeof t !== 'string')) {
+        return res.status(400).json({ success: false, error: 'Tech stack must be an array of strings' });
+      }
+    }
+    if (releaseDate !== undefined && typeof releaseDate !== 'string') {
+      return res.status(400).json({ success: false, error: 'Release date must be a string' });
+    }
+
     const productData = {
       name: name.trim(),
       tagline: tagline.trim(),
@@ -5564,6 +5677,15 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       status: 'approved',
       upvotes: 0,
       commentsCount: 0,
+      // ── New fields ──
+      features: features || [],
+      pricing: pricing || 'Free',
+      productStatus: productStatus || 'Live',
+      targetAudience: targetAudience || '',
+      demoUrl: demoUrl || '',
+      twitter: twitter || '',
+      techStack: techStack || [],
+      releaseDate: releaseDate || '',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -5589,7 +5711,10 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
   try {
     const { id } = req.params;
     const uid = req.user.uid;
-    const { name, tagline, description, url, imageUrl, category, status } = req.body;
+    const { 
+      name, tagline, description, url, imageUrl, category, status,
+      features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate
+    } = req.body;
 
     const docRef = db.collection('products').doc(id);
     const doc = await docRef.get();
@@ -5643,6 +5768,57 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       }
       updateData.status = status;
     }
+
+    // ── New fields ──
+    if (features !== undefined) {
+      if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
+        return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
+      }
+      updateData.features = features.map(f => f.trim()).filter(Boolean);
+    }
+    if (pricing !== undefined) {
+      if (typeof pricing !== 'string') {
+        return res.status(400).json({ success: false, error: 'Pricing must be a string' });
+      }
+      updateData.pricing = pricing;
+    }
+    if (productStatus !== undefined) {
+      if (typeof productStatus !== 'string') {
+        return res.status(400).json({ success: false, error: 'Product status must be a string' });
+      }
+      updateData.productStatus = productStatus;
+    }
+    if (targetAudience !== undefined) {
+      if (typeof targetAudience !== 'string') {
+        return res.status(400).json({ success: false, error: 'Target audience must be a string' });
+      }
+      updateData.targetAudience = targetAudience;
+    }
+    if (demoUrl !== undefined) {
+      if (demoUrl && !isValidUrl(demoUrl.trim())) {
+        return res.status(400).json({ success: false, error: 'Invalid demo URL' });
+      }
+      updateData.demoUrl = demoUrl.trim();
+    }
+    if (twitter !== undefined) {
+      if (typeof twitter !== 'string') {
+        return res.status(400).json({ success: false, error: 'Twitter handle must be a string' });
+      }
+      updateData.twitter = twitter.trim();
+    }
+    if (techStack !== undefined) {
+      if (!Array.isArray(techStack) || techStack.some(t => typeof t !== 'string')) {
+        return res.status(400).json({ success: false, error: 'Tech stack must be an array of strings' });
+      }
+      updateData.techStack = techStack.map(t => t.trim()).filter(Boolean);
+    }
+    if (releaseDate !== undefined) {
+      if (typeof releaseDate !== 'string') {
+        return res.status(400).json({ success: false, error: 'Release date must be a string' });
+      }
+      updateData.releaseDate = releaseDate;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ success: false, error: 'No fields to update' });
     }
@@ -5750,6 +5926,11 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
 
     await invalidateProductCaches(id, null);
 
+    // ── ✅ Invalidate user's vote cache ──
+    if (uid) {
+      await invalidateKey(`user:votes:${uid}`);
+    }
+
     res.json({
       success: true,
       action: result.action,
@@ -5764,12 +5945,15 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
 // ─────────────────────────────────────────────
 // 8. GET PRODUCT COMMENTS
 // ─────────────────────────────────────────────
-app.get('/api/productstrend/products/:id/comments', verifyToken, checkBanned, async (req, res) => {
+// ─────────────────────────────────────────────
+// 8. GET PRODUCT COMMENTS (public)
+// ─────────────────────────────────────────────
+app.get('/api/productstrend/products/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
-    const uid = req.user.uid;
+    const ip = getClientIp(req);
 
-    if (!(await checkRateLimit(uid, 'product-comments', 30, 60))) {
+    if (!(await checkRateLimit(ip, 'product-comments', 30, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
