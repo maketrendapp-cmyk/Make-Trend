@@ -27,6 +27,7 @@ import {
   FiTrash2,
   FiShare2,
 } from 'react-icons/fi';
+import { FaRocket } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -116,6 +117,9 @@ export default function ProductDetail() {
         <Meta title="Product Detail" />
         <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50">
           <div className="max-w-md w-full bg-white rounded-3xl shadow-sm p-8 text-center border border-slate-100">
+            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
+              <FaRocket className="w-8 h-8" />
+            </div>
             <h2 className="text-xl font-bold text-slate-900 mb-1">Sign In Required</h2>
             <p className="text-slate-500 text-sm mb-6">Please sign in to view this product.</p>
             <button
