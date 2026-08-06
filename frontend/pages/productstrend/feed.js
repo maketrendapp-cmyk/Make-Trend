@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import {
@@ -10,6 +11,7 @@ import {
   useUpvoteProduct,
   useInvalidateQueries,
 } from '../../lib/queries';
+import toast from 'react-hot-toast';
 import {
   FiTrendingUp,
   FiHeart,
@@ -29,6 +31,7 @@ const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 
 export default function ProductTrendFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const { invalidateProductFeed } = useInvalidateQueries();
 
   // ── Filter state ──
@@ -51,7 +54,7 @@ export default function ProductTrendFeed() {
   if (category !== 'All') filters.category = category;
   if (sortBy) filters.sort = sortBy;
 
-  // ── React Query: Product Feed (public, but uses auth for vote status) ──
+  // ── React Query: Product Feed (public) ──
   const {
     data,
     fetchNextPage,
@@ -61,12 +64,12 @@ export default function ProductTrendFeed() {
     refetch,
     isError,
     error,
-  } = useProductFeed(filters, true); // always enabled (public feed)
+  } = useProductFeed(filters, true);
 
   const products = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
 
-  // ── Upvote mutation (only if authenticated) ──
+  // ── Upvote mutation ──
   const upvoteMutation = useUpvoteProduct();
 
   // ── Intersection Observer ──
@@ -110,13 +113,99 @@ export default function ProductTrendFeed() {
     handleFilterChange();
   };
 
-  // ── Upvote handler ──
+  // ── Optimistic upvote handler ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
       return;
     }
-    upvoteMutation.mutate(productId);
+
+    // Find the product in the cache
+    let currentProduct = null;
+    let pageIndex = -1;
+    let productIndex = -1;
+
+    // We need to find the product in the infinite query data
+    if (data?.pages) {
+      for (let i = 0; i < data.pages.length; i++) {
+        const page = data.pages[i];
+        const idx = page.products.findIndex(p => p.id === productId);
+        if (idx !== -1) {
+          currentProduct = page.products[idx];
+          pageIndex = i;
+          productIndex = idx;
+          break;
+        }
+      }
+    }
+
+    if (!currentProduct) {
+      toast.error('Product not found in cache');
+      return;
+    }
+
+    const prevUpvotes = currentProduct.upvotes || 0;
+    const prevUserVoted = currentProduct.userVoted || false;
+
+    // Optimistically update the product in the cache
+    const updatedProduct = {
+      ...currentProduct,
+      upvotes: prevUserVoted ? prevUpvotes - 1 : prevUpvotes + 1,
+      userVoted: !prevUserVoted,
+    };
+
+    // Update the feed cache (all pages) – we'll update the specific page
+    const newPages = data.pages.map((page, idx) => {
+      if (idx === pageIndex) {
+        return {
+          ...page,
+          products: page.products.map((p, pIdx) =>
+            pIdx === productIndex ? updatedProduct : p
+          ),
+        };
+      }
+      return page;
+    });
+
+    // Set the updated data in the query cache
+    queryClient.setQueryData(['productFeed', filters], {
+      pages: newPages,
+      pageParams: data.pageParams,
+    });
+
+    // Also update the product detail cache for consistency
+    queryClient.setQueryData(['productDetail', productId], updatedProduct);
+
+    // Call the mutation
+    upvoteMutation.mutate(productId, {
+      onError: (error) => {
+        // Revert on error
+        // Restore the previous product
+        const revertPages = data.pages.map((page, idx) => {
+          if (idx === pageIndex) {
+            return {
+              ...page,
+              products: page.products.map((p, pIdx) =>
+                pIdx === productIndex ? currentProduct : p
+              ),
+            };
+          }
+          return page;
+        });
+        queryClient.setQueryData(['productFeed', filters], {
+          pages: revertPages,
+          pageParams: data.pageParams,
+        });
+        queryClient.setQueryData(['productDetail', productId], currentProduct);
+        toast.error(error.message || 'Failed to upvote');
+      },
+      onSuccess: () => {
+        // Optionally refetch to ensure consistency, but not necessary
+        // Invalidate feed to ensure future refetches are fresh
+        queryClient.invalidateQueries(['productFeed']);
+        queryClient.invalidateQueries(['productDetail', productId]);
+      },
+    });
   };
 
   // ── Format date (handles Firestore Timestamp) ──
@@ -307,7 +396,6 @@ export default function ProductTrendFeed() {
                 key={product.id}
                 className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
               >
-                {/* Square Image */}
                 <Link href={`/productstrend/${product.id}`} className="flex-shrink-0 w-24 h-24 md:w-28 md:h-28 bg-slate-100 rounded-xl overflow-hidden relative">
                   {product.imageUrl ? (
                     <Image
@@ -325,7 +413,6 @@ export default function ProductTrendFeed() {
                   )}
                 </Link>
 
-                {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <Link href={`/productstrend/${product.id}`} className="flex-1 min-w-0">
@@ -374,7 +461,6 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
-        {/* Infinite scroll sentinel */}
         {hasMore && (
           <div id="feed-end" className="py-8 flex justify-center">
             {isFetchingNextPage ? (
