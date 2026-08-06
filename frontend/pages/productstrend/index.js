@@ -5,7 +5,6 @@ import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import {
-  FiRocket,
   FiTrendingUp,
   FiPlusCircle,
   FiGrid,
@@ -14,6 +13,7 @@ import {
   FiExternalLink,
   FiArrowRight,
 } from 'react-icons/fi';
+import { FaRocket } from 'react-icons/fa';
 
 export default function ProductTrendIndex() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function ProductTrendIndex() {
           {/* ── Hero Section ── */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 text-xs font-semibold px-4 py-2 rounded-full border border-purple-200 shadow-sm mb-4">
-              <FiRocket className="w-4 h-4" />
+              <FaRocket className="w-4 h-4" />
               <span>New Feature – ProductTrend</span>
             </div>
             <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
@@ -94,7 +94,7 @@ export default function ProductTrendIndex() {
             {/* Card 2: Launch a Product */}
             <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group">
               <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-                <FiRocket className="w-6 h-6" />
+                <FaRocket className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-1">Launch Your Product</h3>
               <p className="text-sm text-slate-500 leading-relaxed mb-4">
@@ -126,7 +126,7 @@ export default function ProductTrendIndex() {
             </div>
           </div>
 
-          {/* ── Community Stats (Placeholder / future) ── */}
+          {/* ── Community Stats (Placeholder) ── */}
           <div className="mt-12 pt-8 border-t border-slate-200/60 text-center text-sm text-slate-400">
             <span className="inline-flex items-center gap-2">
               <FiUsers className="w-4 h-4" />
