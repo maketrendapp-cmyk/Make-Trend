@@ -28,7 +28,6 @@ import {
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
-// ── Client‑side sorting helpers ──
 const sortProducts = (products, sortBy) => {
   const copy = [...products];
   switch (sortBy) {
@@ -50,19 +49,16 @@ export default function ProductTrendFeed() {
   const queryClient = useQueryClient();
   const { invalidateProductFeed } = useInvalidateQueries();
 
-  // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
-  // ── Build filters object for backend ──
   const backendFilters = {};
   if (searchQuery.trim()) backendFilters.search = searchQuery.trim();
   if (category !== 'All') backendFilters.category = category;
   if (sortBy) backendFilters.sort = sortBy;
 
-  // ── React Query: Product Feed (public) ──
   const {
     data,
     fetchNextPage,
@@ -78,11 +74,10 @@ export default function ProductTrendFeed() {
   const rawProducts = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
 
-  // ── Client‑side filtered products (instant preview) ──
+  // Client-side filtered preview
   const clientFilteredProducts = useMemo(() => {
     let result = rawProducts;
 
-    // 1. Client‑side search (on already loaded data)
     if (searchInput.trim()) {
       const term = searchInput.trim().toLowerCase();
       result = result.filter((p) =>
@@ -92,27 +87,22 @@ export default function ProductTrendFeed() {
       );
     }
 
-    // 2. Client‑side category filter
     if (category !== 'All') {
       result = result.filter((p) => p.category === category);
     }
 
-    // 3. Client‑side sort
     result = sortProducts(result, sortBy);
 
     return result;
   }, [rawProducts, searchInput, category, sortBy]);
 
-  // ── Determine which products to display ──
-  // While fetching (backend request in progress), show client‑filtered preview.
-  // When not fetching, show the raw data (which is already backend‑filtered).
+  // Determine which products to show
   const displayProducts = isFetching ? clientFilteredProducts : rawProducts;
-  const isPreview = isFetching && displayProducts.length > 0;
+  const isPreview = isFetching &&
+    (searchInput.trim() || category !== 'All' || sortBy !== 'newest');
 
-  // ── Upvote mutation ──
   const upvoteMutation = useUpvoteProduct();
 
-  // ── Intersection Observer ──
   const observerRef = useRef(null);
 
   React.useEffect(() => {
@@ -138,12 +128,10 @@ export default function ProductTrendFeed() {
     };
   }, [isFetchingNextPage, hasMore, displayProducts.length, fetchNextPage]);
 
-  // ── Scroll to top ──
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // ── Clear all filters ──
   const clearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -152,7 +140,6 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Trigger search (backend) ──
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
@@ -167,7 +154,6 @@ export default function ProductTrendFeed() {
     }
   };
 
-  // ── Category/Sort change ──
   const handleCategoryChange = (val) => {
     setCategory(val);
     scrollToTop();
@@ -178,7 +164,7 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Optimistic upvote ──
+  // ── Optimistic upvote (no refetch on success) ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
@@ -237,6 +223,7 @@ export default function ProductTrendFeed() {
 
     upvoteMutation.mutate(productId, {
       onError: (error) => {
+        // Revert on error
         const revertPages = data.pages.map((page, idx) => {
           if (idx === pageIndex) {
             return {
@@ -255,14 +242,10 @@ export default function ProductTrendFeed() {
         queryClient.setQueryData(['productDetail', productId], currentProduct);
         toast.error(error.message || 'Failed to upvote');
       },
-      onSuccess: () => {
-        queryClient.invalidateQueries(['productFeed']);
-        queryClient.invalidateQueries(['productDetail', productId]);
-      },
+      // ── No onSuccess invalidation – keep the optimistic update ──
     });
   };
 
-  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
