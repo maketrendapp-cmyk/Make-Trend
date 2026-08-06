@@ -5722,8 +5722,8 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       return res.status(404).json({ success: false, error: 'Product not found' });
     }
     const data = doc.data();
-    const isAdmin = await isAdmin(uid);
-    if (data.makerUid !== uid && !isAdmin) {
+    const userIsAdmin = await isAdmin(uid);
+    if (data.makerUid !== uid && !userIsAdmin) {
       return res.status(403).json({ success: false, error: 'Not authorized to edit this product' });
     }
 
@@ -5761,7 +5761,7 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
     if (category !== undefined) {
       updateData.category = category;
     }
-    if (isAdmin && status !== undefined) {
+    if (userIsAdmin && status !== undefined) {
       const validStatuses = ['pending', 'approved', 'rejected'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ success: false, error: 'Invalid status' });
@@ -5854,8 +5854,8 @@ app.delete('/api/productstrend/products/:id', verifyToken, checkBanned, async (r
       return res.status(404).json({ success: false, error: 'Product not found' });
     }
     const data = doc.data();
-    const isAdmin = await isAdmin(uid);
-    if (data.makerUid !== uid && !isAdmin) {
+    const userIsAdmin = await isAdmin(uid);
+    if (data.makerUid !== uid && !userIsAdmin) {
       return res.status(403).json({ success: false, error: 'Not authorized to delete this product' });
     }
 
