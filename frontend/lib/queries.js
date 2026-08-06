@@ -383,12 +383,12 @@ export function useExchangeDetail(id, enabled = true) {
 // ── 🚀 PRODUCT TREND QUERIES ──
 
 // 1. Product Feed (infinite scroll with filters) – PUBLIC
+// 1. Product Feed (infinite scroll with filters) – PUBLIC
 export function useProductFeed(filters = {}, enabled = true) {
   const queryKey = ['productFeed', filters];
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam = null }) => {
-      // Feed is public; no token required
       const params = new URLSearchParams({
         limit: 20,
         ...filters,
@@ -405,6 +405,7 @@ export function useProductFeed(filters = {}, enabled = true) {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+    keepPreviousData: true, // ⬅️ Keeps old data while fetching new
   });
 }
 
