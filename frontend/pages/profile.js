@@ -136,7 +136,7 @@ export default function Profile() {
     { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' },
     { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
     { icon: FaRocket, label: 'Launch Products', href: '/productstrend' },
-    { icon: FiHeart, label: 'Grow Together', href: '/groweachother/grow-feed', highlight: true },
+    { icon: FiHeart, label: 'Grow Together', href: '/groweachother', highlight: true },
   ];
 
   const exploreOptions = [
