@@ -563,7 +563,7 @@ export default function CommunityFeed() {
                 >
                   {/* ── Post Header ── */}
                   <div className="flex items-start gap-3">
-                    <Link href={`/community/profile/${post.userId}`} className="flex-shrink-0">
+                    <Link href={`/userinfo/${post.userId}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
                         {post.user?.avatar ? (
                           <Image
@@ -583,7 +583,7 @@ export default function CommunityFeed() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center flex-wrap gap-2">
                         <Link
-                          href={`/community/profile/${post.userId}`}
+                          href={`/userinfo/${post.userId}`}
                           className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm"
                         >
                           {post.user?.fullname || post.user?.username || 'Anonymous'}
