@@ -6459,6 +6459,558 @@ app.post('/api/admin/system-notifications', verifyToken, checkBanned, async (req
 });
 
 // ============================================================
+// 24. COMMUNITY – POSTS, COMMENTS, LIKES, PROFILES
+// ============================================================
+
+// ── 1. GET FEED (public, with category filter, pagination, caching) ──
+app.get('/api/posts', async (req, res) => {
+  try {
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'posts-get', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    let limit = parseInt(req.query.limit) || 20;
+    const MAX_LIMIT = 50;
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
+
+    const category = req.query.category || null;
+    const lastId = req.query.lastId || null;
+
+    const cacheKey = `posts:feed:${category || 'all'}:${limit}:${lastId || 'null'}`;
+
+    let result = null;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) result = JSON.parse(cached);
+    } catch (e) { /* ignore */ }
+
+    if (!result) {
+      let query = db.collection('posts')
+        .where('status', '==', 'active')
+        .orderBy('createdAt', 'desc')
+        .limit(limit + 1);
+
+      if (category && category !== 'all') {
+        query = query.where('category', '==', category);
+      }
+      if (lastId) {
+        const lastDoc = await db.collection('posts').doc(lastId).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      }
+
+      const snapshot = await query.get();
+      const posts = [];
+      let hasMore = false;
+      let lastPostId = null;
+
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i++) {
+        if (i >= limit) {
+          hasMore = true;
+          break;
+        }
+        const doc = docs[i];
+        const data = doc.data();
+        const user = await getUserInfo(data.userId);
+        
+        // Check if authenticated user liked this post
+        let userLiked = false;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          try {
+            const token = authHeader.split(' ')[1];
+            const decoded = await admin.auth().verifyIdToken(token);
+            const likeDoc = await db.collection('postLikes')
+              .doc(`${doc.id}_user_${decoded.uid}`)
+              .get();
+            userLiked = likeDoc.exists;
+          } catch (e) { /* ignore */ }
+        }
+
+        posts.push({
+          id: doc.id,
+          ...data,
+          user,
+          userLiked,
+        });
+        lastPostId = doc.id;
+      }
+
+      result = { posts, hasMore, lastId: lastPostId };
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 60); // 1 min cache
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('❌ Get posts error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 2. GET SINGLE POST (public, with caching) ──
+app.get('/api/posts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'post-get', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const cacheKey = `post:${id}`;
+    let post = null;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) post = JSON.parse(cached);
+    } catch (e) { /* ignore */ }
+
+    if (!post) {
+      const doc = await db.collection('posts').doc(id).get();
+      if (!doc.exists) {
+        return res.status(404).json({ success: false, error: 'Post not found' });
+      }
+      const data = doc.data();
+      if (data.status === 'deleted') {
+        return res.status(404).json({ success: false, error: 'Post not found' });
+      }
+      const user = await getUserInfo(data.userId);
+      post = { id: doc.id, ...data, user };
+      await redis.set(cacheKey, JSON.stringify(post), 'EX', 60);
+    }
+
+    // Check if authenticated user liked this post
+    let userLiked = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        const likeDoc = await db.collection('postLikes')
+          .doc(`${id}_user_${decoded.uid}`)
+          .get();
+        userLiked = likeDoc.exists;
+      } catch (e) { /* ignore */ }
+    }
+    post.userLiked = userLiked;
+
+    res.json({ success: true, post });
+  } catch (error) {
+    console.error('❌ Get post error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 3. CREATE POST (authenticated) ──
+app.post('/api/posts', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    if (!(await checkRateLimit(uid, 'create-post', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many posts. Please wait.' });
+    }
+
+    const { type, title, description, category, imageUrl, videoUrl, ctaText, ctaUrl } = req.body;
+
+    const validTypes = ['general', 'launch', 'update', 'job', 'question', 'event', 'promotional'];
+    if (!type || !validTypes.includes(type)) {
+      return res.status(400).json({ success: false, error: 'Invalid post type' });
+    }
+    if (!title || title.trim().length < 1 || title.trim().length > 100) {
+      return res.status(400).json({ success: false, error: 'Title must be 1-100 characters' });
+    }
+    if (!description || description.trim().length < 1 || description.trim().length > 500) {
+      return res.status(400).json({ success: false, error: 'Description must be 1-500 characters' });
+    }
+
+    const validCategories = ['general', 'web-dev', 'design', 'ai', 'gaming', 'content', 'startup', 'social', 'coding', 'marketing', 'other'];
+    if (category && !validCategories.includes(category)) {
+      return res.status(400).json({ success: false, error: 'Invalid category' });
+    }
+
+    if (videoUrl && !isValidUrl(videoUrl)) {
+      return res.status(400).json({ success: false, error: 'Invalid video URL' });
+    }
+    if (imageUrl && !validateImageUrl(imageUrl)) {
+      return res.status(400).json({ success: false, error: 'Invalid image URL' });
+    }
+    if (ctaText && ctaText.trim().length > 50) {
+      return res.status(400).json({ success: false, error: 'CTA text must be less than 50 characters' });
+    }
+    if (ctaUrl && !isValidUrl(ctaUrl)) {
+      return res.status(400).json({ success: false, error: 'Invalid CTA URL' });
+    }
+
+    const postData = {
+      userId: uid,
+      type: type,
+      title: title.trim(),
+      description: description.trim(),
+      category: category || 'general',
+      imageUrl: imageUrl || '',
+      videoUrl: videoUrl || '',
+      ctaText: ctaText || '',
+      ctaUrl: ctaUrl || '',
+      likes: 0,
+      commentsCount: 0,
+      views: 0,
+      status: 'active',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('posts').add(postData);
+    await invalidatePattern('posts:feed:*');
+
+    res.status(201).json({
+      success: true,
+      postId: docRef.id,
+      message: 'Post created successfully',
+    });
+  } catch (error) {
+    console.error('❌ Create post error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 4. UPDATE POST (authenticated, owner only) ──
+app.put('/api/posts/:id', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+
+    if (!(await checkRateLimit(uid, 'edit-post', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many edits. Please wait.' });
+    }
+
+    const { type, title, description, category, imageUrl, videoUrl, ctaText, ctaUrl } = req.body;
+
+    const postRef = db.collection('posts').doc(id);
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+
+    const postData = postDoc.data();
+    if (postData.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'Not your post' });
+    }
+
+    const updateData = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+
+    if (type !== undefined) {
+      const validTypes = ['general', 'launch', 'update', 'job', 'question', 'event', 'promotional'];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({ success: false, error: 'Invalid post type' });
+      }
+      updateData.type = type;
+    }
+    if (title !== undefined) {
+      if (title.trim().length < 1 || title.trim().length > 100) {
+        return res.status(400).json({ success: false, error: 'Title must be 1-100 characters' });
+      }
+      updateData.title = title.trim();
+    }
+    if (description !== undefined) {
+      if (description.trim().length < 1 || description.trim().length > 500) {
+        return res.status(400).json({ success: false, error: 'Description must be 1-500 characters' });
+      }
+      updateData.description = description.trim();
+    }
+    if (category !== undefined) {
+      const validCategories = ['general', 'web-dev', 'design', 'ai', 'gaming', 'content', 'startup', 'social', 'coding', 'marketing', 'other'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ success: false, error: 'Invalid category' });
+      }
+      updateData.category = category;
+    }
+    if (imageUrl !== undefined) {
+      if (imageUrl && !validateImageUrl(imageUrl)) {
+        return res.status(400).json({ success: false, error: 'Invalid image URL' });
+      }
+      updateData.imageUrl = imageUrl || '';
+    }
+    if (videoUrl !== undefined) {
+      if (videoUrl && !isValidUrl(videoUrl)) {
+        return res.status(400).json({ success: false, error: 'Invalid video URL' });
+      }
+      updateData.videoUrl = videoUrl || '';
+    }
+    if (ctaText !== undefined) {
+      if (ctaText && ctaText.trim().length > 50) {
+        return res.status(400).json({ success: false, error: 'CTA text must be less than 50 characters' });
+      }
+      updateData.ctaText = ctaText || '';
+    }
+    if (ctaUrl !== undefined) {
+      if (ctaUrl && !isValidUrl(ctaUrl)) {
+        return res.status(400).json({ success: false, error: 'Invalid CTA URL' });
+      }
+      updateData.ctaUrl = ctaUrl || '';
+    }
+
+    await postRef.update(updateData);
+    await invalidatePattern('posts:feed:*');
+    await invalidateKey(`post:${id}`);
+
+    res.json({ success: true, message: 'Post updated successfully' });
+  } catch (error) {
+    console.error('❌ Edit post error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 5. DELETE POST (soft-delete, authenticated, owner only) ──
+app.delete('/api/posts/:id', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+
+    if (!(await checkRateLimit(uid, 'delete-post', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many deletions. Please wait.' });
+    }
+
+    const postRef = db.collection('posts').doc(id);
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+
+    const postData = postDoc.data();
+    if (postData.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'Not your post' });
+    }
+
+    await postRef.update({
+      status: 'deleted',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await invalidatePattern('posts:feed:*');
+    await invalidateKey(`post:${id}`);
+
+    res.json({ success: true, message: 'Post deleted' });
+  } catch (error) {
+    console.error('❌ Delete post error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 6. TOGGLE LIKE (authenticated) ──
+app.post('/api/posts/:id/like', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+
+    if (!(await checkRateLimit(uid, 'like-post', 20, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many likes. Please wait.' });
+    }
+
+    const postRef = db.collection('posts').doc(id);
+    const likeRef = db.collection('postLikes').doc(`${id}_user_${uid}`);
+
+    const result = await db.runTransaction(async (transaction) => {
+      const postDoc = await transaction.get(postRef);
+      if (!postDoc.exists) {
+        throw new Error('Post not found');
+      }
+      const postData = postDoc.data();
+
+      const likeDoc = await transaction.get(likeRef);
+      const isLiked = likeDoc.exists;
+
+      if (isLiked) {
+        transaction.delete(likeRef);
+        transaction.update(postRef, {
+          likes: postData.likes - 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { action: 'removed', likes: postData.likes - 1 };
+      } else {
+        transaction.set(likeRef, {
+          postId: id,
+          userId: uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        transaction.update(postRef, {
+          likes: postData.likes + 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { action: 'added', likes: postData.likes + 1 };
+      }
+    });
+
+    await invalidatePattern('posts:feed:*');
+    await invalidateKey(`post:${id}`);
+
+    res.json({ success: true, action: result.action, likes: result.likes });
+  } catch (error) {
+    console.error('❌ Like error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 7. ADD COMMENT (authenticated) ──
+app.post('/api/posts/:id/comments', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const { content } = req.body;
+
+    if (!content || content.trim().length < 1 || content.trim().length > 300) {
+      return res.status(400).json({ success: false, error: 'Comment must be 1-300 characters' });
+    }
+
+    if (!(await checkRateLimit(uid, 'comment-post', 10, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many comments. Please wait.' });
+    }
+
+    const postRef = db.collection('posts').doc(id);
+    const commentData = {
+      postId: id,
+      userId: uid,
+      content: content.trim(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.runTransaction(async (transaction) => {
+      const postDoc = await transaction.get(postRef);
+      if (!postDoc.exists) {
+        throw new Error('Post not found');
+      }
+      transaction.update(postRef, {
+        commentsCount: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(db.collection('postComments').doc(), commentData);
+    });
+
+    await invalidatePattern('posts:feed:*');
+    await invalidateKey(`post:${id}`);
+    await invalidatePattern(`posts:comments:${id}:*`);
+
+    res.status(201).json({ success: true, message: 'Comment added' });
+  } catch (error) {
+    console.error('❌ Add comment error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 8. GET COMMENTS (public, paginated, cached) ──
+app.get('/api/posts/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'comments-get', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const lastId = req.query.lastId || null;
+
+    const cacheKey = `posts:comments:${id}:${limit}:${lastId || 'null'}`;
+
+    let result = null;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) result = JSON.parse(cached);
+    } catch (e) { /* ignore */ }
+
+    if (!result) {
+      let query = db.collection('postComments')
+        .where('postId', '==', id)
+        .orderBy('createdAt', 'desc')
+        .limit(limit + 1);
+
+      if (lastId) {
+        const lastDoc = await db.collection('postComments').doc(lastId).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      }
+
+      const snapshot = await query.get();
+      const comments = [];
+      let hasMore = false;
+      let lastCommentId = null;
+
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i++) {
+        if (i >= limit) {
+          hasMore = true;
+          break;
+        }
+        const doc = docs[i];
+        const data = doc.data();
+        const user = await getUserInfo(data.userId);
+        comments.push({
+          id: doc.id,
+          ...data,
+          user,
+        });
+        lastCommentId = doc.id;
+      }
+
+      result = { comments, hasMore, lastId: lastCommentId };
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('❌ Get comments error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── 9. GET USER PROFILE (public) ──
+app.get('/api/users/:uid/profile', async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, 'profile-view', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = userDoc.data();
+
+    // ── Get user's posts (latest 50) ──
+    const postsSnapshot = await db.collection('posts')
+      .where('userId', '==', uid)
+      .where('status', '==', 'active')
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+      .get();
+
+    const posts = [];
+    postsSnapshot.forEach(doc => {
+      posts.push({ id: doc.id, ...doc.data() });
+    });
+
+    res.json({
+      success: true,
+      user: {
+        uid,
+        username: userData.username || '',
+        fullname: userData.fullname || '',
+        avatar: userData.avatar || '',
+        bio: userData.bio || '',
+        createdAt: userData.createdAt || null,
+      },
+      posts,
+    });
+  } catch (error) {
+    console.error('❌ Profile view error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
 // 18. GLOBAL ERROR HANDLER (renumbered from 18 to 24)
 // ============================================================
 app.use((err, req, res, next) => {
