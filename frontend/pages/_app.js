@@ -59,6 +59,7 @@ const TOP_NAV_ONLY_PAGES = [
   '/signup',
 '/groweachother',
 '/productstrend',
+'/community',
 
 ];
 
