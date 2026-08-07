@@ -5612,14 +5612,17 @@ app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, 
 });
 
 // ─────────────────────────────────────────────
-// 4. CREATE PRODUCT (Launch)
+// 4. CREATE PRODUCT (Launch) – UPDATED
 // ─────────────────────────────────────────────
 app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { 
       name, tagline, description, url, imageUrl, category,
-      features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate
+      features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate,
+      // ── NEW FIELDS ──
+      logo, thumbnail, socialLinks, referralCode,
+      websiteTitle, websiteDescription, websiteImage
     } = req.body;
 
     if (!(await checkRateLimit(uid, 'launch-product', 5, 3600))) {
@@ -5645,7 +5648,7 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       return res.status(400).json({ success: false, error: 'Category must be a string' });
     }
 
-    // ── Validate new fields ──
+    // ── Validate existing fields ──
     if (features !== undefined) {
       if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
         return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
@@ -5675,6 +5678,61 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       return res.status(400).json({ success: false, error: 'Release date must be a string' });
     }
 
+    // ── NEW: Validate new fields ──
+    if (logo !== undefined && logo && !validateImageUrl(logo)) {
+      return res.status(400).json({ success: false, error: 'Invalid logo URL' });
+    }
+    if (thumbnail !== undefined && thumbnail && !validateImageUrl(thumbnail)) {
+      return res.status(400).json({ success: false, error: 'Invalid thumbnail URL' });
+    }
+    if (websiteTitle !== undefined) {
+      if (typeof websiteTitle !== 'string') {
+        return res.status(400).json({ success: false, error: 'Website title must be a string' });
+      }
+      if (websiteTitle.length > 200) {
+        return res.status(400).json({ success: false, error: 'Website title must be less than 200 characters' });
+      }
+    }
+    if (websiteDescription !== undefined) {
+      if (typeof websiteDescription !== 'string') {
+        return res.status(400).json({ success: false, error: 'Website description must be a string' });
+      }
+      if (websiteDescription.length > 500) {
+        return res.status(400).json({ success: false, error: 'Website description must be less than 500 characters' });
+      }
+    }
+    if (websiteImage !== undefined && websiteImage && !validateImageUrl(websiteImage)) {
+      return res.status(400).json({ success: false, error: 'Invalid website image URL' });
+    }
+    if (referralCode !== undefined) {
+      if (typeof referralCode !== 'string') {
+        return res.status(400).json({ success: false, error: 'Referral code must be a string' });
+      }
+      if (referralCode.length > 50) {
+        return res.status(400).json({ success: false, error: 'Referral code must be less than 50 characters' });
+      }
+    }
+    if (socialLinks !== undefined) {
+      if (!Array.isArray(socialLinks)) {
+        return res.status(400).json({ success: false, error: 'Social links must be an array' });
+      }
+      if (socialLinks.length > 20) {
+        return res.status(400).json({ success: false, error: 'Maximum 20 social links allowed' });
+      }
+      for (let i = 0; i < socialLinks.length; i++) {
+        const link = socialLinks[i];
+        if (!link || typeof link !== 'object') {
+          return res.status(400).json({ success: false, error: `Social link at index ${i} is invalid` });
+        }
+        if (!link.platform || typeof link.platform !== 'string' || link.platform.trim().length === 0 || link.platform.trim().length > 50) {
+          return res.status(400).json({ success: false, error: `Social link ${i}: platform is required and must be 1-50 chars` });
+        }
+        if (!link.url || typeof link.url !== 'string' || !isValidUrl(link.url.trim())) {
+          return res.status(400).json({ success: false, error: `Social link ${i}: URL is invalid` });
+        }
+      }
+    }
+
     const productData = {
       name: name.trim(),
       tagline: tagline.trim(),
@@ -5686,7 +5744,7 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       status: 'approved',
       upvotes: 0,
       commentsCount: 0,
-      // ── New fields ──
+      // ── Existing fields ──
       features: features || [],
       pricing: pricing || 'Free',
       productStatus: productStatus || 'Live',
@@ -5695,6 +5753,14 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       twitter: twitter || '',
       techStack: techStack || [],
       releaseDate: releaseDate || '',
+      // ── NEW fields ──
+      logo: logo || '',
+      thumbnail: thumbnail || '',
+      socialLinks: socialLinks || [],
+      referralCode: referralCode || '',
+      websiteTitle: websiteTitle || '',
+      websiteDescription: websiteDescription || '',
+      websiteImage: websiteImage || '',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -5714,7 +5780,7 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
 });
 
 // ─────────────────────────────────────────────
-// 5. UPDATE PRODUCT (maker or admin only)
+// 5. UPDATE PRODUCT (maker or admin only) – UPDATED
 // ─────────────────────────────────────────────
 app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req, res) => {
   try {
@@ -5722,7 +5788,10 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
     const uid = req.user.uid;
     const { 
       name, tagline, description, url, imageUrl, category, status,
-      features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate
+      features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate,
+      // ── NEW FIELDS ──
+      logo, thumbnail, socialLinks, referralCode,
+      websiteTitle, websiteDescription, websiteImage
     } = req.body;
 
     const docRef = db.collection('products').doc(id);
@@ -5737,6 +5806,8 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
     }
 
     const updateData = {};
+
+    // ── Existing field validations (unchanged) ──
     if (name !== undefined) {
       if (name.trim().length < 1 || name.trim().length > 100) {
         return res.status(400).json({ success: false, error: 'Name must be 1-100 characters' });
@@ -5778,7 +5849,7 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       updateData.status = status;
     }
 
-    // ── New fields ──
+    // ── Existing new fields (features, pricing, etc.) ──
     if (features !== undefined) {
       if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
         return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
@@ -5826,6 +5897,74 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
         return res.status(400).json({ success: false, error: 'Release date must be a string' });
       }
       updateData.releaseDate = releaseDate;
+    }
+
+    // ── NEW: Validate and add new fields ──
+    if (logo !== undefined) {
+      if (logo && !validateImageUrl(logo)) {
+        return res.status(400).json({ success: false, error: 'Invalid logo URL' });
+      }
+      updateData.logo = logo || '';
+    }
+    if (thumbnail !== undefined) {
+      if (thumbnail && !validateImageUrl(thumbnail)) {
+        return res.status(400).json({ success: false, error: 'Invalid thumbnail URL' });
+      }
+      updateData.thumbnail = thumbnail || '';
+    }
+    if (websiteTitle !== undefined) {
+      if (typeof websiteTitle !== 'string') {
+        return res.status(400).json({ success: false, error: 'Website title must be a string' });
+      }
+      if (websiteTitle.length > 200) {
+        return res.status(400).json({ success: false, error: 'Website title must be less than 200 characters' });
+      }
+      updateData.websiteTitle = websiteTitle || '';
+    }
+    if (websiteDescription !== undefined) {
+      if (typeof websiteDescription !== 'string') {
+        return res.status(400).json({ success: false, error: 'Website description must be a string' });
+      }
+      if (websiteDescription.length > 500) {
+        return res.status(400).json({ success: false, error: 'Website description must be less than 500 characters' });
+      }
+      updateData.websiteDescription = websiteDescription || '';
+    }
+    if (websiteImage !== undefined) {
+      if (websiteImage && !validateImageUrl(websiteImage)) {
+        return res.status(400).json({ success: false, error: 'Invalid website image URL' });
+      }
+      updateData.websiteImage = websiteImage || '';
+    }
+    if (referralCode !== undefined) {
+      if (typeof referralCode !== 'string') {
+        return res.status(400).json({ success: false, error: 'Referral code must be a string' });
+      }
+      if (referralCode.length > 50) {
+        return res.status(400).json({ success: false, error: 'Referral code must be less than 50 characters' });
+      }
+      updateData.referralCode = referralCode || '';
+    }
+    if (socialLinks !== undefined) {
+      if (!Array.isArray(socialLinks)) {
+        return res.status(400).json({ success: false, error: 'Social links must be an array' });
+      }
+      if (socialLinks.length > 20) {
+        return res.status(400).json({ success: false, error: 'Maximum 20 social links allowed' });
+      }
+      for (let i = 0; i < socialLinks.length; i++) {
+        const link = socialLinks[i];
+        if (!link || typeof link !== 'object') {
+          return res.status(400).json({ success: false, error: `Social link at index ${i} is invalid` });
+        }
+        if (!link.platform || typeof link.platform !== 'string' || link.platform.trim().length === 0 || link.platform.trim().length > 50) {
+          return res.status(400).json({ success: false, error: `Social link ${i}: platform is required and must be 1-50 chars` });
+        }
+        if (!link.url || typeof link.url !== 'string' || !isValidUrl(link.url.trim())) {
+          return res.status(400).json({ success: false, error: `Social link ${i}: URL is invalid` });
+        }
+      }
+      updateData.socialLinks = socialLinks;
     }
 
     if (Object.keys(updateData).length === 0) {
