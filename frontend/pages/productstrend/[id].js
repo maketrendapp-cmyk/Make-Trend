@@ -50,6 +50,7 @@ import {
   FiTelegram,
   FiCode,
   FiShoppingBag,
+  FiPlay,
 } from 'react-icons/fi';
 import { FaRocket } from 'react-icons/fa';
 
@@ -87,7 +88,31 @@ const setLocalVote = (productId, voted, upvotes) => {
   } catch (e) {}
 };
 
-// ── Social media icon mapping ──
+// ── Cloudinary image optimization ──
+const getOptimizedUrl = (url, width = 1200, height = 675) => {
+  if (!url) return url;
+  if (url.includes('res.cloudinary.com')) {
+    const base = url.split('/upload/')[0] + '/upload/';
+    const rest = url.split('/upload/')[1] || '';
+    const cleanRest = rest.replace(/^[^/]+_/g, '');
+    return `${base}w_${width},h_${height},c_limit,q_auto,f_auto/${cleanRest}`;
+  }
+  return url;
+};
+
+// ── Video embed detection ──
+const getVideoEmbedUrl = (url) => {
+  if (!url) return null;
+  // YouTube
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  // Vimeo
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  return null;
+};
+
+// ── Social media icon mapping (with fallback) ──
 const SOCIAL_ICONS = {
   twitter: FiTwitter,
   facebook: FiFacebook,
@@ -100,6 +125,28 @@ const SOCIAL_ICONS = {
   telegram: FiTelegram,
   twitch: FiTwitch,
   other: FiLink,
+};
+
+const getSocialIcon = (platform) => {
+  const Icon = SOCIAL_ICONS[platform?.toLowerCase()] || FiLink;
+  return Icon;
+};
+
+// ── Detect link type for icon ──
+const getLinkIcon = (url) => {
+  if (!url) return FiLink;
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return FiYoutube;
+  if (url.includes('vimeo.com')) return FiVideo;
+  if (url.includes('twitter.com') || url.includes('x.com')) return FiTwitter;
+  if (url.includes('github.com')) return FiGithub;
+  if (url.includes('instagram.com')) return FiInstagram;
+  if (url.includes('facebook.com')) return FiFacebook;
+  if (url.includes('linkedin.com')) return FiLinkedin;
+  if (url.includes('tiktok.com')) return FiTiktok;
+  if (url.includes('discord.gg') || url.includes('discord.com')) return FiDiscord;
+  if (url.includes('telegram.org') || url.includes('t.me')) return FiTelegram;
+  if (url.includes('twitch.tv')) return FiTwitch;
+  return FiLink;
 };
 
 export default function ProductDetail() {
@@ -293,12 +340,6 @@ export default function ProductDetail() {
     }
   };
 
-  // ── Get social icon component ──
-  const getSocialIcon = (platform) => {
-    const Icon = SOCIAL_ICONS[platform?.toLowerCase()] || FiLink;
-    return Icon;
-  };
-
   if (isLoading) {
     return (
       <>
@@ -332,6 +373,10 @@ export default function ProductDetail() {
     );
   }
 
+  // ── Detect video embed ──
+  const videoEmbedUrl = getVideoEmbedUrl(product.demoUrl);
+  const isVideoLink = !!videoEmbedUrl;
+
   return (
     <>
       <Meta title={`${product.name} – ProductTrend`} />
@@ -341,16 +386,17 @@ export default function ProductDetail() {
         </Link>
 
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* ── HERO IMAGE: use thumbnail (16:9) if available, else imageUrl ── */}
+          {/* ── Hero Image (thumbnail) ── */}
           <div className="w-full aspect-[16/9] bg-slate-100 overflow-hidden relative">
             {(product.thumbnail || product.imageUrl) ? (
               <Image
-                src={product.thumbnail || product.imageUrl}
+                src={getOptimizedUrl(product.thumbnail || product.imageUrl, 1200, 675)}
                 alt={product.name}
                 fill
-                sizes="(max-width: 768px) 100vw, 80vw"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 70vw"
                 className="object-contain"
                 priority
+                quality={90}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl text-slate-300">🚀</div>
@@ -358,26 +404,28 @@ export default function ProductDetail() {
           </div>
 
           <div className="p-6 md:p-8">
-            {/* ── Product header with logo (circle) ── */}
+            {/* ── Product header with logo ── */}
             <div className="flex items-start gap-4 mb-4">
               {product.logo ? (
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border-2 border-slate-200 shadow-sm flex-shrink-0">
                   <Image
-                    src={product.logo}
+                    src={getOptimizedUrl(product.logo, 200, 200)}
                     alt={product.name}
                     width={80}
                     height={80}
                     className="w-full h-full object-cover"
+                    quality={90}
                   />
                 </div>
               ) : product.imageUrl ? (
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
                   <Image
-                    src={product.imageUrl}
+                    src={getOptimizedUrl(product.imageUrl, 200, 200)}
                     alt={product.name}
                     width={80}
                     height={80}
                     className="w-full h-full object-cover"
+                    quality={90}
                   />
                 </div>
               ) : (
@@ -435,7 +483,7 @@ export default function ProductDetail() {
                   {shareCopied ? 'Copied!' : <FiShare2 className="w-4 h-4" />}
                 </button>
               </div>
-              <div className="flex items-center gap-3 text-xs text-slate-500">
+              <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
                 <span className="flex items-center gap-1.5">
                   <FiClock className="w-3.5 h-3.5" />
                   Launched {formatDate(product.createdAt)}
@@ -485,6 +533,22 @@ export default function ProductDetail() {
               </div>
             )}
 
+            {/* ── Video embed (if demoUrl is YouTube/Vimeo) ── */}
+            {isVideoLink && (
+              <div className="mt-6 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+                <div className="relative w-full aspect-video bg-black">
+                  <iframe
+                    src={videoEmbedUrl}
+                    title={`${product.name} – Demo`}
+                    className="absolute top-0 left-0 w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* ── Features ── */}
             {product.features && product.features.length > 0 && (
               <div className="mt-6 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
@@ -517,11 +581,12 @@ export default function ProductDetail() {
                 {product.websiteImage && (
                   <div className="mt-2 w-32 h-20 rounded-lg overflow-hidden border border-slate-200">
                     <Image
-                      src={product.websiteImage}
+                      src={getOptimizedUrl(product.websiteImage, 200, 120)}
                       alt="Website preview"
                       width={128}
                       height={80}
                       className="w-full h-full object-cover"
+                      quality={80}
                     />
                   </div>
                 )}
@@ -536,7 +601,7 @@ export default function ProductDetail() {
                       <FiExternalLink className="w-3 h-3" /> Website
                     </a>
                   )}
-                  {product.demoUrl && (
+                  {product.demoUrl && !isVideoLink && (
                     <a
                       href={product.demoUrl}
                       target="_blank"
