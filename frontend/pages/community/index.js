@@ -13,7 +13,6 @@ import {
   FiTrendingUp,
   FiGrid,
   FiUserPlus,
-  FiRocket,
   FiBriefcase,
   FiHelpCircle,
   FiCalendar,
@@ -24,7 +23,7 @@ import { FaRocket } from 'react-icons/fa';
 
 const FEATURES = [
   {
-    icon: <FiRocket className="w-6 h-6" />,
+    icon: <FaRocket className="w-6 h-6" />,
     title: 'Launch Products',
     description: 'Share your latest creations with the community. Get feedback, gain traction, and find your first users.',
     color: 'text-purple-600 bg-purple-50 border-purple-200',
