@@ -881,16 +881,18 @@ export function usePostComments(postId, enabled = true) {
   });
 }
 
-// 9. Get user profile (public)
-export function useUserProfile(uid, enabled = true) {
+// 9. Get current user's posts (authenticated, for "My Posts" page)
+export function useMyPosts(enabled = true) {
   return useQuery({
-    queryKey: ['userProfile', uid],
+    queryKey: ['myPosts'],
     queryFn: async () => {
-      const data = await apiRequest(`/users/${uid}/profile`, {}, null);
-      return data;
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest('/my-posts', {}, token);
+      return data.posts || [];
     },
-    enabled: !!uid && enabled,
-    staleTime: 5 * 60 * 1000, // 5 min – profile doesn't change often
+    enabled,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 }
@@ -1035,7 +1037,7 @@ export function useInvalidateQueries() {
     invalidatePost: (id) => queryClient.invalidateQueries(['post', id]),
     invalidatePosts: () => queryClient.invalidateQueries(['posts']),
     invalidatePostComments: (postId) => queryClient.invalidateQueries(['postComments', postId]),
-    invalidateUserProfile: (uid) => queryClient.invalidateQueries(['userProfile', uid]),
+    invalidateMyPosts: () => queryClient.invalidateQueries(['myPosts']),
     invalidateAll: () => {
       queryClient.invalidateQueries(['profile']);
       queryClient.invalidateQueries(['stats']);
@@ -1058,6 +1060,8 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['notifications']);
       queryClient.invalidateQueries(['systemNotifications']);
       queryClient.invalidateQueries(['posts']);
+      // Inside invalidateAll
+      queryClient.invalidateQueries(['myPosts']);
       // productDetail, productComments, post, postComments, userProfile keys are dynamic, so skip here
     },
   };
