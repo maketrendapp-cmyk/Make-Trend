@@ -621,9 +621,8 @@ export function useUpdatePost() {
   });
 }
 
-// 5. Like/unlike a post – OPTIMISTIC: updates cache directly, no invalidation
+// 5. Like/unlike a post – Simple mutation, UI updates handled by components
 export function useLikePost() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (postId) => {
       const token = await getToken();
@@ -633,102 +632,25 @@ export function useLikePost() {
       }, token);
       return data;
     },
-    onMutate: async (postId) => {
-      // Cancel ongoing queries to prevent overwrite
-      await queryClient.cancelQueries(['posts']);
-      await queryClient.cancelQueries(['post', postId]);
+  });
+}
 
-      // Snapshot previous values
-      const previousPosts = queryClient.getQueryData(['posts']);
-      const previousPost = queryClient.getQueryData(['post', postId]);
-
-      // Optimistic update for feed
-      if (previousPosts) {
-        const optimisticPages = previousPosts.pages.map(page => ({
-          ...page,
-          posts: page.posts.map(p => {
-            if (p.id === postId) {
-              const newLiked = !p.userLiked;
-              return {
-                ...p,
-                likes: newLiked ? p.likes + 1 : p.likes - 1,
-                userLiked: newLiked,
-              };
-            }
-            return p;
-          }),
-        }));
-        queryClient.setQueryData(['posts'], {
-          ...previousPosts,
-          pages: optimisticPages,
-        });
-      }
-
-      // Optimistic update for single post
-      if (previousPost) {
-        const newLiked = !previousPost.userLiked;
-        queryClient.setQueryData(['post', postId], {
-          ...previousPost,
-          likes: newLiked ? previousPost.likes + 1 : previousPost.likes - 1,
-          userLiked: newLiked,
-        });
-      }
-
-      return { previousPosts, previousPost };
-    },
-    onSuccess: (data, postId, context) => {
-      // Sync with server result
-      const serverLikes = data.likes;
-      const serverAction = data.action; // 'added' or 'removed'
-
-      // Update feed with server values
-      const currentPosts = queryClient.getQueryData(['posts']);
-      if (currentPosts) {
-        const syncedPages = currentPosts.pages.map(page => ({
-          ...page,
-          posts: page.posts.map(p => {
-            if (p.id === postId) {
-              return {
-                ...p,
-                likes: serverLikes,
-                userLiked: serverAction === 'added',
-              };
-            }
-            return p;
-          }),
-        }));
-        queryClient.setQueryData(['posts'], {
-          ...currentPosts,
-          pages: syncedPages,
-        });
-      }
-
-      // Update single post with server values
-      const currentPost = queryClient.getQueryData(['post', postId]);
-      if (currentPost) {
-        queryClient.setQueryData(['post', postId], {
-          ...currentPost,
-          likes: serverLikes,
-          userLiked: serverAction === 'added',
-        });
-      }
-    },
-    onError: (error, postId, context) => {
-      // Revert on error
-      if (context?.previousPosts) {
-        queryClient.setQueryData(['posts'], context.previousPosts);
-      }
-      if (context?.previousPost) {
-        queryClient.setQueryData(['post', postId], context.previousPost);
-      }
-      toast.error(error.message || 'Failed to like');
+// 5. Like/unlike a post – simple mutation, UI updates handled by components
+export function useLikePost() {
+  return useMutation({
+    mutationFn: async (postId) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/posts/${postId}/like`, {
+        method: 'POST',
+      }, token);
+      return data;
     },
   });
 }
 
-// 6. Add a comment – OPTIMISTIC: updates cache directly, no invalidation
+// 6. Add a comment – simple mutation, UI updates handled by components
 export function useAddComment() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ postId, content }) => {
       const token = await getToken();
@@ -738,100 +660,6 @@ export function useAddComment() {
         body: { content },
       }, token);
       return data;
-    },
-    onMutate: async ({ postId, content }) => {
-      await queryClient.cancelQueries(['posts']);
-      await queryClient.cancelQueries(['post', postId]);
-      await queryClient.cancelQueries(['postComments', postId]);
-
-      // Snapshot
-      const previousPosts = queryClient.getQueryData(['posts']);
-      const previousPost = queryClient.getQueryData(['post', postId]);
-      const previousComments = queryClient.getQueryData(['postComments', postId]);
-
-      // Optimistic update for feed
-      if (previousPosts) {
-        const optimisticPages = previousPosts.pages.map(page => ({
-          ...page,
-          posts: page.posts.map(p => {
-            if (p.id === postId) {
-              return {
-                ...p,
-                commentsCount: (p.commentsCount || 0) + 1,
-              };
-            }
-            return p;
-          }),
-        }));
-        queryClient.setQueryData(['posts'], {
-          ...previousPosts,
-          pages: optimisticPages,
-        });
-      }
-
-      // Optimistic update for single post
-      if (previousPost) {
-        queryClient.setQueryData(['post', postId], {
-          ...previousPost,
-          commentsCount: (previousPost.commentsCount || 0) + 1,
-        });
-      }
-
-      // Optimistic update for comments list (add temp comment)
-      if (previousComments) {
-        const optimisticComments = {
-          pages: previousComments.pages.map((page, idx) => {
-            if (idx === 0) {
-              return {
-                ...page,
-                comments: [
-                  {
-                    id: `temp-${Date.now()}`,
-                    postId,
-                    content,
-                    userId: auth.currentUser?.uid,
-                    user: {
-                      username: auth.currentUser?.username || 'You',
-                      fullname: auth.currentUser?.fullname || 'You',
-                      avatar: auth.currentUser?.avatar || null,
-                    },
-                    createdAt: new Date().toISOString(),
-                  },
-                  ...page.comments,
-                ],
-              };
-            }
-            return page;
-          }),
-          pageParams: previousComments.pageParams,
-        };
-        queryClient.setQueryData(['postComments', postId], optimisticComments);
-      }
-
-      return { previousPosts, previousPost, previousComments };
-    },
-    onSuccess: (data, variables, context) => {
-      // On success, refetch comments to sync with server (but keep optimistic feed/post updates)
-      queryClient.invalidateQueries(['postComments', variables.postId]);
-      // Invalidate feed and post to update commentsCount (though we already incremented)
-      // We'll just invalidate comments and keep feed/post as they are (already updated)
-      // Optionally, invalidate feed/post to be safe
-      queryClient.invalidateQueries(['posts']);
-      queryClient.invalidateQueries(['post', variables.postId]);
-      toast.success('Comment added!');
-    },
-    onError: (error, variables, context) => {
-      // Revert
-      if (context?.previousPosts) {
-        queryClient.setQueryData(['posts'], context.previousPosts);
-      }
-      if (context?.previousPost) {
-        queryClient.setQueryData(['post', variables.postId], context.previousPost);
-      }
-      if (context?.previousComments) {
-        queryClient.setQueryData(['postComments', variables.postId], context.previousComments);
-      }
-      toast.error(error.message || 'Failed to add comment');
     },
   });
 }
