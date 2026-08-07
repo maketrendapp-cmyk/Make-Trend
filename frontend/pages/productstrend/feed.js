@@ -28,6 +28,21 @@ import {
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
+// ── localStorage helpers (shared with product detail) ──
+const getLocalVote = (productId) => {
+  try {
+    const raw = localStorage.getItem(`upvote_${productId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+};
+
+const setLocalVote = (productId, voted, upvotes) => {
+  try {
+    localStorage.setItem(`upvote_${productId}`, JSON.stringify({ voted, upvotes }));
+  } catch (e) {}
+};
+
 // ── Client‑side sort helpers ──
 const sortProducts = (products, sortBy) => {
   const copy = [...products];
@@ -175,7 +190,7 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Optimistic upvote toggle ──
+  // ── Optimistic upvote toggle with localStorage ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
@@ -217,7 +232,10 @@ export default function ProductTrendFeed() {
       userVoted: newUserVoted,
     };
 
-    // Update feed cache (all pages)
+    // ── Update localStorage ──
+    setLocalVote(productId, newUserVoted, newUpvotes);
+
+    // ── Update feed cache ──
     const newPages = data.pages.map((page, idx) => {
       if (idx === pageIndex) {
         return {
@@ -238,10 +256,45 @@ export default function ProductTrendFeed() {
     // Also update product detail cache for consistency
     queryClient.setQueryData(['productDetail', productId], updatedProduct);
 
-    // Call the mutation – no onSuccess invalidation
+    // ── Call the mutation ──
     upvoteMutation.mutate(productId, {
+      onSuccess: (data) => {
+        // Sync with server response
+        const serverVoted = data.action === 'added';
+        const serverUpvotes = data.upvotes;
+        // Update cache with server values
+        const currentPages = queryClient.getQueryData(['productFeed', backendFilters]);
+        if (currentPages) {
+          const updatedPages = currentPages.pages.map((page, idx) => {
+            if (idx === pageIndex) {
+              return {
+                ...page,
+                products: page.products.map((p, pIdx) =>
+                  pIdx === productIndex ? { ...p, upvotes: serverUpvotes, userVoted: serverVoted } : p
+                ),
+              };
+            }
+            return page;
+          });
+          queryClient.setQueryData(['productFeed', backendFilters], {
+            pages: updatedPages,
+            pageParams: currentPages.pageParams,
+          });
+        }
+        // Update detail cache
+        const currentDetail = queryClient.getQueryData(['productDetail', productId]);
+        if (currentDetail) {
+          queryClient.setQueryData(['productDetail', productId], {
+            ...currentDetail,
+            upvotes: serverUpvotes,
+            userVoted: serverVoted,
+          });
+        }
+        // Update localStorage with server values
+        setLocalVote(productId, serverVoted, serverUpvotes);
+      },
       onError: (error) => {
-        // Revert on error
+        // Revert to previous state
         const revertPages = data.pages.map((page, idx) => {
           if (idx === pageIndex) {
             return {
@@ -258,6 +311,8 @@ export default function ProductTrendFeed() {
           pageParams: data.pageParams,
         });
         queryClient.setQueryData(['productDetail', productId], currentProduct);
+        // Revert localStorage
+        setLocalVote(productId, prevUserVoted, prevUpvotes);
         toast.error(error.message || 'Failed to upvote');
       },
     });
@@ -359,35 +414,40 @@ export default function ProductTrendFeed() {
           </div>
         </div>
 
-        {/* Search & Filters – horizontal on desktop */}
+        {/* ── Search & Filters – improved horizontal layout ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Search products..."
-                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-              />
-              {searchInput && (
-                <button
-                  onClick={() => setSearchInput('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <FiX className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Search input with button inside */}
+            <div className="flex flex-1 gap-2">
+              <div className="relative flex-1">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Search products..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                />
+                {searchInput && (
+                  <button
+                    onClick={() => setSearchInput('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               <button
                 onClick={triggerSearch}
-                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap"
               >
                 <FiSearch className="w-4 h-4" /> Search
               </button>
+            </div>
+
+            {/* Dropdowns inline */}
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <select
                   value={category}
@@ -415,6 +475,8 @@ export default function ProductTrendFeed() {
               </div>
             </div>
           </div>
+
+          {/* Active filters chips */}
           {(searchQuery || category !== 'All' || sortBy !== 'newest') && (
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
               <div className="flex flex-wrap gap-2">
@@ -478,7 +540,7 @@ export default function ProductTrendFeed() {
                 key={product.id}
                 className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
               >
-                {/* Image */}
+                {/* ── Image with object-contain ── */}
                 <Link href={`/productstrend/${product.id}`} className="flex-shrink-0 w-24 h-24 md:w-28 md:h-28 bg-slate-100 rounded-xl overflow-hidden relative">
                   {product.imageUrl ? (
                     <Image
@@ -486,7 +548,7 @@ export default function ProductTrendFeed() {
                       alt={product.name}
                       fill
                       sizes="120px"
-                      className="object-cover"
+                      className="object-contain"
                       loading="lazy"
                     />
                   ) : (
