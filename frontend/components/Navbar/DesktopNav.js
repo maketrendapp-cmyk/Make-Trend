@@ -1,7 +1,7 @@
 // components/Navbar/DesktopNav.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FiHome, FiUser, FiLogOut } from 'react-icons/fi';
+import { FiHome, FiUser, FiLogOut, FiBell } from 'react-icons/fi';
 import { useState, useRef, useEffect } from 'react';
 import { FaCrown } from 'react-icons/fa';
 
@@ -14,6 +14,7 @@ export default function DesktopNav({
   firstLetter,
   isPro,
   handleLogout,
+  unreadCount = 0, // optional, for badge
 }) {
   const router = useRouter();
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -30,7 +31,6 @@ export default function DesktopNav({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Reset avatar error when URL changes
   useEffect(() => {
     setAvatarError(false);
   }, [avatarUrl]);
@@ -54,7 +54,29 @@ export default function DesktopNav({
         <span>Home</span>
       </Link>
 
-      {/* ── Get Started / User Avatar ── */}
+      {/* ── Notification Icon (only if authenticated) ── */}
+      {isAuthenticated && (
+        <Link
+          href="/notifications"
+          className={`
+            relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200
+            ${isActive('/notifications')
+              ? 'bg-purple-100 text-purple-700 shadow-sm'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            }
+          `}
+          aria-label="Notifications"
+        >
+          <FiBell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Link>
+      )}
+
+      {/* ── User Avatar / Dropdown ── */}
       {isAuthenticated ? (
         <div className="relative" ref={dropdownRef}>
           <button
