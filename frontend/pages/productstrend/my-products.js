@@ -24,6 +24,7 @@ import {
   FiSearch,
   FiX,
   FiExternalLink,
+  FiUser,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -49,7 +50,7 @@ export default function MyProducts() {
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // ── Local search: filter products by name, tagline, or category ──
+  // ── Local search ──
   const filteredProducts = useMemo(() => {
     if (!searchTerm.trim()) return products;
     const term = searchTerm.trim().toLowerCase();
@@ -73,7 +74,6 @@ export default function MyProducts() {
     }
   };
 
-  // ── Safe date formatter ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
@@ -98,6 +98,60 @@ export default function MyProducts() {
     }
   };
 
+  // ── Skeleton loader ──
+  if (isLoading) {
+    return (
+      <>
+        <Meta title="My Products – ProductTrend" />
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-between mb-6 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 bg-slate-200 rounded-full" />
+              <div className="h-8 w-48 bg-slate-200 rounded-lg" />
+            </div>
+            <div className="h-10 w-32 bg-slate-200 rounded-xl" />
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6 animate-pulse">
+            <div className="h-10 w-full bg-slate-200 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden animate-pulse">
+                <div className="aspect-video bg-slate-200" />
+                <div className="p-5 space-y-3">
+                  <div className="h-5 bg-slate-200 rounded w-3/4" />
+                  <div className="h-4 bg-slate-200 rounded w-full" />
+                  <div className="h-4 bg-slate-200 rounded w-2/3" />
+                  <div className="flex justify-between pt-3 border-t border-slate-100">
+                    <div className="h-8 bg-slate-200 rounded w-16" />
+                    <div className="h-8 bg-slate-200 rounded w-16" />
+                    <div className="h-8 bg-slate-200 rounded w-16" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8 text-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <p className="text-red-600 font-medium">Failed to load products.</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
+          >
+            <FiRefreshCw className="w-4 h-4" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <>
@@ -121,66 +175,40 @@ export default function MyProducts() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8 animate-pulse">
-        <div className="h-8 w-48 bg-slate-200 rounded-lg mb-6" />
-        <div className="flex flex-wrap gap-3 mb-6">
-          <div className="h-10 w-56 bg-slate-200 rounded-xl" />
-          <div className="h-10 w-32 bg-slate-200 rounded-xl" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 h-56" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8 text-center">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <p className="text-red-600 font-medium">Failed to load products.</p>
-          <button
-            onClick={() => refetch()}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
-          >
-            <FiRefreshCw className="w-4 h-4" /> Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <Meta title="My Products – ProductTrend" />
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
+        {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <Link href="/productstrend" className="text-slate-400 hover:text-slate-600 transition">
+            <Link
+              href="/productstrend/feed"
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              title="Back to Feed"
+            >
               <FiArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <FiGrid className="text-purple-600" />
-              My Products
-              <span className="text-sm font-normal text-slate-400 ml-2">
-                ({filteredProducts.length})
-              </span>
-            </h1>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <FiGrid className="text-purple-600" />
+                My Products
+                <span className="text-sm font-normal text-slate-400 ml-2">
+                  ({filteredProducts.length})
+                </span>
+              </h1>
+              <p className="text-sm text-slate-400">Manage your launched products</p>
+            </div>
           </div>
           <button
             onClick={() => router.push('/productstrend/launch')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition shadow-sm text-sm font-medium"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition shadow-sm text-sm font-medium hover:scale-105 active:scale-95"
           >
             <FiPlus className="w-4 h-4" /> Launch New
           </button>
         </div>
 
-        {/* Search Bar */}
+        {/* ── Search ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -194,7 +222,7 @@ export default function MyProducts() {
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
               >
                 <FiX className="w-4 h-4" />
               </button>
@@ -207,17 +235,17 @@ export default function MyProducts() {
           )}
         </div>
 
-        {/* Products Grid */}
+        {/* ── Products Grid ── */}
         {products.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
-            <div className="text-5xl mb-4">🚀</div>
-            <h3 className="text-lg font-semibold text-slate-900">You haven't launched any products yet</h3>
-            <p className="text-slate-500 text-sm">Create your first product launch now.</p>
+            <div className="text-6xl mb-4">🚀</div>
+            <h3 className="text-xl font-semibold text-slate-900">No products launched yet</h3>
+            <p className="text-slate-500 text-sm mt-1">Share your creation with the community</p>
             <button
               onClick={() => router.push('/productstrend/launch')}
-              className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+              className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition shadow-sm"
             >
-              Launch Product
+              <FiPlus className="w-4 h-4" /> Launch Your First Product
             </button>
           </div>
         ) : filteredProducts.length === 0 ? (
@@ -237,12 +265,16 @@ export default function MyProducts() {
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col"
+                className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
               >
-                <Link href={`/productstrend/${product.id}`} className="block relative aspect-video bg-slate-100 overflow-hidden">
-                  {product.imageUrl ? (
+                {/* ── Image / Logo Area ── */}
+                <Link
+                  href={`/productstrend/${product.id}`}
+                  className="block relative aspect-video bg-slate-100 overflow-hidden"
+                >
+                  {product.thumbnail || product.imageUrl ? (
                     <Image
-                      src={product.imageUrl}
+                      src={product.thumbnail || product.imageUrl}
                       alt={product.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -250,42 +282,70 @@ export default function MyProducts() {
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl text-slate-300">🚀</div>
+                    <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">
+                      🚀
+                    </div>
                   )}
-                </Link>
-                <div className="p-5 flex flex-col flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <Link href={`/productstrend/${product.id}`} className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition truncate">
-                        {product.name}
-                      </h3>
-                    </Link>
+                  {/* ── Status badge overlay ── */}
+                  <div className="absolute top-3 right-3">
                     <span
-                      className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                      className={`text-[10px] font-medium px-2.5 py-1 rounded-full border shadow-sm ${
                         STATUS_BADGE[product.status] || 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}
                     >
                       {STATUS_LABELS[product.status] || product.status || 'Pending'}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-500 line-clamp-2 mt-1 flex-1">{product.tagline}</p>
-                  <div className="flex items-center gap-4 mt-3 text-xs text-slate-400">
+                </Link>
+
+                {/* ── Content ── */}
+                <div className="p-5 flex flex-col flex-1">
+                  <Link
+                    href={`/productstrend/${product.id}`}
+                    className="block group-hover:text-purple-600 transition-colors"
+                  >
+                    <h3 className="font-semibold text-slate-900 text-base line-clamp-1">
+                      {product.name}
+                    </h3>
+                  </Link>
+                  <p className="text-sm text-slate-500 line-clamp-2 mt-1 flex-1">
+                    {product.tagline}
+                  </p>
+
+                  {/* ── Logo (circle) if available ── */}
+                  {product.logo && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+                        <Image
+                          src={product.logo}
+                          alt="Logo"
+                          width={24}
+                          height={24}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium">Logo</span>
+                    </div>
+                  )}
+
+                  {/* ── Stats ── */}
+                  <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400">
                     <span className="flex items-center gap-1">
-                      <FiHeart className="w-3 h-3" />
+                      <FiHeart className="w-3.5 h-3.5" />
                       {product.upvotes || 0}
                     </span>
                     <span className="flex items-center gap-1">
-                      <FiMessageCircle className="w-3 h-3" />
+                      <FiMessageCircle className="w-3.5 h-3.5" />
                       {product.commentsCount || 0}
                     </span>
                     <span className="flex items-center gap-1 ml-auto">
-                      <FiClock className="w-3 h-3" />
+                      <FiClock className="w-3.5 h-3.5" />
                       {formatDate(product.createdAt)}
                     </span>
                   </div>
 
                   {/* ── Actions ── */}
-                  <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
+                  <div className="flex gap-2 mt-3 pt-2 border-t border-slate-100">
                     <Link
                       href={`/productstrend/${product.id}`}
                       className="flex-1 text-center text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition"
