@@ -46,13 +46,11 @@ import {
   FiTwitch,
   FiLinkedin,
   FiTiktok,
-  FiDiscord,
-  FiTelegram,
   FiCode,
   FiShoppingBag,
   FiPlay,
 } from 'react-icons/fi';
-import { FaRocket } from 'react-icons/fa';
+import { FaRocket, FaDiscord, FaTelegram } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
