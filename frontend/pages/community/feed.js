@@ -3,7 +3,6 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import { usePosts, useLikePost } from '../../lib/queries';
@@ -15,8 +14,6 @@ import {
   FiRefreshCw,
   FiFilter,
   FiX,
-  FiUser,
-  FiClock,
   FiExternalLink,
   FiPlay,
 } from 'react-icons/fi';
@@ -73,7 +70,6 @@ const POST_TYPE_LABELS = {
 export default function CommunityFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const queryClient = useQueryClient();
 
   // ── Filter state ──
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -95,7 +91,6 @@ export default function CommunityFeed() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    isFetching,
   } = usePosts(
     appliedCategory === 'all' ? null : appliedCategory,
     appliedType === 'all' ? null : appliedType,
@@ -419,7 +414,7 @@ export default function CommunityFeed() {
                 >
                   {/* ── Post Header ── */}
                   <div className="flex items-start gap-3">
-                    <Link href={`/profile/${post.userId}`} className="flex-shrink-0">
+                    <Link href={`/community/profile/${post.userId}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
                         {post.user?.avatar ? (
                           <Image
@@ -438,7 +433,7 @@ export default function CommunityFeed() {
                     </Link>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center flex-wrap gap-2">
-                        <Link href={`/profile/${post.userId}`} className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm">
+                        <Link href={`/community/profile/${post.userId}`} className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm">
                           {post.user?.fullname || post.user?.username || 'Anonymous'}
                         </Link>
                         <span className="text-xs text-slate-400">· {formatDate(post.createdAt)}</span>
