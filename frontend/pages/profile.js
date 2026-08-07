@@ -18,7 +18,7 @@ import {
   FiBook, FiShield, FiUsers, FiTrendingUp, FiCopy,
   FiGift, FiCheckCircle, FiChevronRight, FiHeart
 } from 'react-icons/fi';
-import { FaCrown, FaWallet, FaCoins, FaClock } from 'react-icons/fa';
+import { FaCrown, FaWallet, FaCoins, FaClock, FaRocket } from 'react-icons/fa';
 import Meta from '../components/Meta';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -135,7 +135,8 @@ export default function Profile() {
     { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
     { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' },
     { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
-    { icon: FiHeart, label: 'Grow Together', href: '/groweachother/grow-feed', highlight: true }, // ✅ New button added
+    { icon: FaRocket, label: 'Launch Products', href: '/productstrend' },
+    { icon: FiHeart, label: 'Grow Together', href: '/groweachother/grow-feed', highlight: true },
   ];
 
   const exploreOptions = [
@@ -364,7 +365,7 @@ export default function Profile() {
             </div>
           )}
 
-          {/* ── Quick Actions (Fixed alignment grid layout) ── */}
+          {/* ── Quick Actions ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -520,4 +521,3 @@ export default function Profile() {
     </>
   );
 }
-
