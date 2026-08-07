@@ -1,5 +1,5 @@
 // pages/community/feed.js
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -85,7 +85,7 @@ export default function CommunityFeed() {
   // ── Like mutation (optimistic) ──
   const likeMutation = useLikePost();
 
-  // ── Fetch posts ──
+  // ── Fetch posts with backend filtering ──
   const {
     data,
     isLoading,
@@ -96,22 +96,18 @@ export default function CommunityFeed() {
     hasNextPage,
     isFetchingNextPage,
     isFetching,
-  } = usePosts(appliedCategory === 'all' ? null : appliedCategory, true);
+  } = usePosts(
+    appliedCategory === 'all' ? null : appliedCategory,
+    appliedType === 'all' ? null : appliedType,
+    true
+  );
 
-  const allPosts = data?.pages?.flatMap((page) => page.posts) || [];
-
-  // ── Client‑side type filtering ──
-  const posts = useMemo(() => {
-    if (appliedType === 'all') return allPosts;
-    return allPosts.filter((post) => post.type === appliedType);
-  }, [allPosts, appliedType]);
+  const posts = data?.pages?.flatMap((page) => page.posts) || [];
 
   // ── Apply filters ──
   const applyFilters = () => {
     setAppliedCategory(selectedCategory);
     setAppliedType(selectedType);
-    // Reset pagination – infinite query will refetch with new category
-    // We'll just set the state, the query key changes automatically.
     setIsFilterOpen(false);
   };
 
