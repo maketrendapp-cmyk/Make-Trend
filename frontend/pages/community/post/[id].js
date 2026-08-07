@@ -1,5 +1,5 @@
 // pages/community/post/[id].js
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -24,6 +24,7 @@ import {
   FiClock,
   FiExternalLink,
   FiPlay,
+  FiChevronUp,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -62,6 +63,21 @@ const CATEGORIES = [
   { value: 'other', label: '📌 Other' },
 ];
 
+// ── localStorage helpers for like status ──
+const getLocalVote = (postId) => {
+  try {
+    const raw = localStorage.getItem(`community_like_${postId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+};
+
+const setLocalVote = (postId, voted, likes) => {
+  try {
+    localStorage.setItem(`community_like_${postId}`, JSON.stringify({ voted, likes }));
+  } catch (e) {}
+};
+
 export default function PostDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -69,6 +85,7 @@ export default function PostDetail() {
   const queryClient = useQueryClient();
 
   const [commentText, setCommentText] = useState('');
+  const [expanded, setExpanded] = useState(false);
 
   // ── Fetch post and comments ──
   const { data: post, isLoading: postLoading, isError: postError, refetch: refetchPost } = usePost(id, !!id);
@@ -104,13 +121,41 @@ export default function PostDetail() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler (optimistic) ──
+  // ── Like handler with localStorage ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
       return;
     }
-    likeMutation.mutate(id);
+
+    // Get current post from cache
+    const currentPost = queryClient.getQueryData(['post', id]);
+    if (!currentPost) {
+      toast.error('Post not found');
+      return;
+    }
+
+    // Optimistic UI: update localStorage and cache via mutation
+    const newVoted = !currentPost.userLiked;
+    const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
+    setLocalVote(id, newVoted, newLikes);
+
+    likeMutation.mutate(id, {
+      onSuccess: (data) => {
+        // Sync localStorage with server
+        const serverVoted = data.action === 'added';
+        const serverLikes = data.likes;
+        setLocalVote(id, serverVoted, serverLikes);
+      },
+      onError: (error) => {
+        // Revert localStorage to previous state
+        const revertedPost = queryClient.getQueryData(['post', id]);
+        if (revertedPost) {
+          setLocalVote(id, revertedPost.userLiked, revertedPost.likes);
+        }
+        toast.error(error.message || 'Failed to like');
+      },
+    });
   };
 
   // ── Comment submit ──
@@ -232,6 +277,13 @@ export default function PostDetail() {
   const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
   const hasCTA = post.ctaText && post.ctaUrl;
 
+  // ── Read more logic ──
+  const titleLength = post.title?.length || 0;
+  const descLength = post.description?.length || 0;
+  const truncateTitle = titleLength > 150;
+  const truncateDesc = descLength > 400;
+  const needsExpand = truncateTitle || truncateDesc;
+
   return (
     <>
       <Meta title={`${post.title} – Make Trend Community`} />
@@ -296,10 +348,46 @@ export default function PostDetail() {
             </div>
           </div>
 
-          {/* Content */}
+          {/* Content with Read more */}
           <div className="mt-4">
-            <h2 className="text-2xl font-bold text-slate-900">{post.title}</h2>
-            <p className="text-slate-600 mt-2 text-base whitespace-pre-wrap">{post.description}</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {truncateTitle && !expanded ? (
+                <>
+                  {post.title.slice(0, 150)}...
+                  <span
+                    onClick={() => setExpanded(true)}
+                    className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
+                  >
+                    Read more
+                  </span>
+                </>
+              ) : (
+                post.title
+              )}
+            </h2>
+            <p className="text-slate-600 mt-2 text-base whitespace-pre-wrap">
+              {truncateDesc && !expanded ? (
+                <>
+                  {post.description.slice(0, 400)}...
+                  <span
+                    onClick={() => setExpanded(true)}
+                    className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
+                  >
+                    Read more
+                  </span>
+                </>
+              ) : (
+                post.description
+              )}
+            </p>
+            {needsExpand && expanded && (
+              <button
+                onClick={() => setExpanded(false)}
+                className="text-xs text-purple-600 hover:underline mt-2 flex items-center gap-0.5"
+              >
+                Show less <FiChevronUp className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
           {/* Image */}
