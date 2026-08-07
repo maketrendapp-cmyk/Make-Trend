@@ -1,5 +1,5 @@
 // pages/productstrend/[id].js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -60,6 +60,21 @@ const STATUS_COLORS = {
   'In Development': 'text-slate-600 bg-slate-50 border-slate-200',
 };
 
+// ── localStorage helpers ──
+const getLocalVote = (productId) => {
+  try {
+    const raw = localStorage.getItem(`upvote_${productId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+};
+
+const setLocalVote = (productId, voted, upvotes) => {
+  try {
+    localStorage.setItem(`upvote_${productId}`, JSON.stringify({ voted, upvotes }));
+  } catch (e) {}
+};
+
 export default function ProductDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -77,6 +92,32 @@ export default function ProductDetail() {
   const [shareCopied, setShareCopied] = useState(false);
 
   const isMaker = product?.makerUid === user?.uid;
+
+  // ── Local state for upvote (initialised from localStorage if server data not yet loaded) ──
+  const [localUpvote, setLocalUpvote] = useState(null);
+  useEffect(() => {
+    if (id && !product) {
+      const stored = getLocalVote(id);
+      if (stored) setLocalUpvote(stored);
+    }
+  }, [id, product]);
+
+  // When product loads from server, use that as source of truth and update localStorage if needed.
+  useEffect(() => {
+    if (product && product.userVoted !== undefined) {
+      // Sync localStorage with server state (in case it changed from another tab)
+      const stored = getLocalVote(id);
+      if (!stored || stored.voted !== product.userVoted || stored.upvotes !== product.upvotes) {
+        setLocalVote(id, product.userVoted, product.upvotes);
+        setLocalUpvote({ voted: product.userVoted, upvotes: product.upvotes });
+      }
+    }
+  }, [product, id]);
+
+  // ── Determine the final upvote state ──
+  const currentUpvote = product ? { voted: product.userVoted, upvotes: product.upvotes } : localUpvote;
+  const userVoted = currentUpvote?.voted ?? false;
+  const upvotes = currentUpvote?.upvotes ?? 0;
 
   // ── Optimistic upvote handler ──
   const handleUpvote = () => {
@@ -100,23 +141,36 @@ export default function ProductDetail() {
     // Update detail cache optimistically
     queryClient.setQueryData(['productDetail', id], optimisticProduct);
 
+    // Update localStorage optimistically
+    setLocalVote(id, newUserVoted, newUpvotes);
+    setLocalUpvote({ voted: newUserVoted, upvotes: newUpvotes });
+
     upvoteMutation.mutate(id, {
       onSuccess: (data) => {
-        // Sync with server response to ensure exact count
+        // Sync with server response
+        const serverVoted = data.action === 'added';
+        const serverUpvotes = data.upvotes;
+        // Update cache
         const current = queryClient.getQueryData(['productDetail', id]);
         if (current) {
           queryClient.setQueryData(['productDetail', id], {
             ...current,
-            upvotes: data.upvotes,
-            userVoted: data.action === 'added',
+            upvotes: serverUpvotes,
+            userVoted: serverVoted,
           });
         }
-        // Optionally update feed cache for the product
-        // We can also update feed cache, but not required for detail page
+        // Update localStorage with server values
+        setLocalVote(id, serverVoted, serverUpvotes);
+        setLocalUpvote({ voted: serverVoted, upvotes: serverUpvotes });
       },
       onError: (error) => {
         // Revert to previous state
         queryClient.setQueryData(['productDetail', id], currentProduct);
+        // Revert localStorage
+        if (currentProduct) {
+          setLocalVote(id, currentProduct.userVoted, currentProduct.upvotes);
+          setLocalUpvote({ voted: currentProduct.userVoted, upvotes: currentProduct.upvotes });
+        }
         toast.error(error.message || 'Failed to upvote');
       },
     });
@@ -260,6 +314,9 @@ export default function ProductDetail() {
     );
   }
 
+  // Now we have product and we use the userVoted/upvotes from the product directly,
+  // but we also keep localStorage in sync. We'll display using product values.
+
   return (
     <>
       <Meta title={`${product.name} – ProductTrend`} />
@@ -269,14 +326,15 @@ export default function ProductDetail() {
         </Link>
 
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="w-full aspect-video bg-slate-100 overflow-hidden relative">
+          {/* ── IMAGE: now uses object-contain inside a 16:9 container ── */}
+          <div className="w-full aspect-[16/9] bg-slate-100 overflow-hidden relative">
             {product.imageUrl ? (
               <Image
                 src={product.imageUrl}
                 alt={product.name}
                 fill
                 sizes="(max-width: 768px) 100vw, 80vw"
-                className="object-cover"
+                className="object-contain"
                 priority
               />
             ) : (
