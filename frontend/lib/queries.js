@@ -530,7 +530,113 @@ export function useDeleteProduct() {
   });
 }
 
-// ── Invalidation helper ──
+// ── 🔔 NOTIFICATION QUERIES ──
+
+// 1. Personal notifications (infinite scroll)
+export function useNotifications(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ['notifications'],
+    queryFn: async ({ pageParam = null }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const url = pageParam
+        ? `/notifications?limit=20&lastId=${pageParam}`
+        : '/notifications?limit=20';
+      const data = await apiRequest(url, {}, token);
+      return {
+        notifications: data.notifications || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
+    },
+    enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// 2. System notifications (global, read once per user)
+export function useSystemNotifications(enabled = true) {
+  return useQuery({
+    queryKey: ['systemNotifications'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) return { notifications: [], unreadCount: 0 };
+      const data = await apiRequest('/notifications/system', {}, token);
+      return { notifications: data.notifications || [], unreadCount: data.unreadCount || 0 };
+    },
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// 3. Mark a single notification as read
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/notifications/${id}/read`, {
+        method: 'PUT',
+      }, token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['notifications']);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to mark as read');
+    },
+  });
+}
+
+// 4. Mark all personal notifications as read
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest('/notifications/read-all', {
+        method: 'PUT',
+      }, token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['notifications']);
+      toast.success('All notifications marked as read');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to mark all as read');
+    },
+  });
+}
+
+// 5. Mark all system notifications as read
+export function useMarkSystemNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest('/notifications/system/read', {
+        method: 'POST',
+      }, token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['systemNotifications']);
+      toast.success('All system notifications marked as read');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to mark system notifications as read');
+    },
+  });
+}
+
+// ── Invalidation helper (updated) ──
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
   return {
@@ -556,6 +662,13 @@ export function useInvalidateQueries() {
     invalidateProductDetail: (id) => queryClient.invalidateQueries(['productDetail', id]),
     invalidateMyProducts: () => queryClient.invalidateQueries(['myProducts']),
     invalidateProductComments: (id) => queryClient.invalidateQueries(['productComments', id]),
+    // ── NEW: Notification invalidation ──
+    invalidateNotifications: () => queryClient.invalidateQueries(['notifications']),
+    invalidateSystemNotifications: () => queryClient.invalidateQueries(['systemNotifications']),
+    invalidateAllNotifications: () => {
+      queryClient.invalidateQueries(['notifications']);
+      queryClient.invalidateQueries(['systemNotifications']);
+    },
     invalidateAll: () => {
       queryClient.invalidateQueries(['profile']);
       queryClient.invalidateQueries(['stats']);
@@ -575,6 +688,8 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['myExchanges']);
       queryClient.invalidateQueries(['productFeed']);
       queryClient.invalidateQueries(['myProducts']);
+      queryClient.invalidateQueries(['notifications']);
+      queryClient.invalidateQueries(['systemNotifications']);
       // productDetail and productComments keys are dynamic, so skip here
     },
   };
