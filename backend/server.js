@@ -3798,7 +3798,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalUnlocks += data.unlockCount || 0;
     });
 
-    // ── MT Coins = minimum of all four ──
+    // ── MT Coins from stats = minimum of all four ──
     const earnedFromStats = Math.min(
       totalViews,
       totalShares,
@@ -3815,8 +3815,9 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
     const data = userDoc.data();
     let mtCoinsEarned = data.mtCoinsEarned || 0;
     let mtCoinsSpent = data.mtCoinsSpent || 0;
+    let statsEarned = data.statsEarned ?? 0;   // new field
 
-    // ── 3. MIGRATION: Initialize if missing ──
+    // ── 3. MIGRATION: Initialize if mtCoinsEarned is missing ──
     if (data.mtCoinsEarned === undefined && data.mtCoinsSpent === undefined) {
       const withdrawSnapshot = await db.collection('withdrawals')
         .where('userId', '==', uid)
@@ -3830,21 +3831,29 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
 
       const currentAvailable = data.mtCoins || 0;
       mtCoinsSpent = totalWithdrawn;
+      // Set initial mtCoinsEarned to at least stats + withdrawals + current balance
       mtCoinsEarned = Math.max(earnedFromStats, totalWithdrawn + currentAvailable);
+      statsEarned = earnedFromStats;   // baseline
 
       await db.collection('users').doc(uid).update({
         mtCoinsEarned,
         mtCoinsSpent,
+        statsEarned: statsEarned,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      if (earnedFromStats > mtCoinsEarned) {
-        mtCoinsEarned = earnedFromStats;
+      // ── 4. Normal delta update ──
+      const delta = earnedFromStats - statsEarned;
+      if (delta > 0) {
+        mtCoinsEarned += delta;
+        statsEarned = earnedFromStats;
         await db.collection('users').doc(uid).update({
           mtCoinsEarned,
+          statsEarned,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
+      // If delta <= 0, do nothing – stats haven't increased
     }
 
     const available = mtCoinsEarned - mtCoinsSpent;
