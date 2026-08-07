@@ -484,7 +484,7 @@ export default function CommunityFeed() {
 
                   {/* ── Video ── */}
                   {isVideo && (
-                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
+                    <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
                       <video
                         src={post.videoUrl}
                         controls
@@ -492,7 +492,7 @@ export default function CommunityFeed() {
                         poster={post.imageUrl || undefined}
                         playsInline
                       />
-                    </div>
+                    </Link>
                   )}
 
                   {/* ── CTA Button ── */}
@@ -529,7 +529,7 @@ export default function CommunityFeed() {
                     </button>
 
                     <Link
-                      href={`/community/comments/${post.id}`}
+                      href={`/community/post/${post.id}`}
                       className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition"
                     >
                       <FiMessageCircle className="w-4 h-4" />
