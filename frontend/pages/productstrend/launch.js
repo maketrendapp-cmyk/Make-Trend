@@ -34,8 +34,16 @@ import {
   FiCpu,
   FiCalendar,
   FiVideo,
+  FiChevronDown,
+  FiChevronUp,
+  FiLink2,
+  FiCode,
+  FiBriefcase,
+  FiShare2,
+  FiAtSign,
+  FiShoppingBag,
 } from 'react-icons/fi';
-import { FaRocket } from 'react-icons/fa';
+import { FaRocket, FaTwitter as FaTwitterBrand } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -60,6 +68,19 @@ const CATEGORIES = [
 const PRICING_OPTIONS = ['Free', 'Freemium', 'Paid', 'Enterprise', 'Contact for Pricing'];
 const STATUS_OPTIONS = ['Live', 'Beta', 'Coming Soon', 'In Development'];
 
+const SOCIAL_PLATFORMS = [
+  { value: 'twitter', label: 'Twitter' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'github', label: 'GitHub' },
+  { value: 'discord', label: 'Discord' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function LaunchProduct() {
   const router = useRouter();
   const { id } = router.query;
@@ -75,17 +96,18 @@ export default function LaunchProduct() {
     isEditing && !!id
   );
 
+  // ── Form state ──
   const [formData, setFormData] = useState({
     name: '',
     tagline: '',
     description: '',
     url: '',
-    imageUrl: '',
+    logo: '',
+    thumbnail: '',
     category: '',
     websiteTitle: '',
     websiteDescription: '',
     websiteImage: '',
-    // ── NEW FIELDS ──
     features: [],
     pricing: 'Free',
     productStatus: 'Live',
@@ -94,18 +116,25 @@ export default function LaunchProduct() {
     twitter: '',
     techStack: [],
     releaseDate: '',
+    socialLinks: [],
+    referralCode: '',
   });
+
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   const [metaFetched, setMetaFetched] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [imagePreview, setImagePreview] = useState('');
+  const [logoPreview, setLogoPreview] = useState('');
+  const [thumbnailPreview, setThumbnailPreview] = useState('');
   const [newFeature, setNewFeature] = useState('');
   const [newTech, setNewTech] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [newSocial, setNewSocial] = useState({ platform: '', url: '' });
 
-  const fileInputRef = useRef(null);
+  const logoInputRef = useRef(null);
+  const thumbnailInputRef = useRef(null);
 
   useEffect(() => {
     if (existingProduct) {
@@ -114,7 +143,8 @@ export default function LaunchProduct() {
         tagline: existingProduct.tagline || '',
         description: existingProduct.description || '',
         url: existingProduct.url || '',
-        imageUrl: existingProduct.imageUrl || '',
+        logo: existingProduct.logo || '',
+        thumbnail: existingProduct.thumbnail || '',
         category: existingProduct.category || '',
         websiteTitle: existingProduct.websiteTitle || '',
         websiteDescription: existingProduct.websiteDescription || '',
@@ -127,10 +157,11 @@ export default function LaunchProduct() {
         twitter: existingProduct.twitter || '',
         techStack: existingProduct.techStack || [],
         releaseDate: existingProduct.releaseDate || '',
+        socialLinks: existingProduct.socialLinks || [],
+        referralCode: existingProduct.referralCode || '',
       });
-      if (existingProduct.imageUrl) {
-        setImagePreview(existingProduct.imageUrl);
-      }
+      if (existingProduct.logo) setLogoPreview(existingProduct.logo);
+      if (existingProduct.thumbnail) setThumbnailPreview(existingProduct.thumbnail);
     }
   }, [existingProduct]);
 
@@ -144,19 +175,6 @@ export default function LaunchProduct() {
     try {
       const parsed = new URL(url);
       return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  const isValidImageUrl = (url) => {
-    if (!url) return true;
-    try {
-      const parsed = new URL(url);
-      return (
-        parsed.protocol === 'https:' &&
-        /\.(jpg|jpeg|png|webp|gif|svg|bmp|ico)(\?.*)?$/i.test(parsed.pathname)
-      );
     } catch {
       return false;
     }
@@ -176,8 +194,11 @@ export default function LaunchProduct() {
     if (formData.url && !isValidUrl(formData.url.trim())) {
       newErrors.url = 'Please enter a valid URL (e.g., https://example.com)';
     }
-    if (formData.imageUrl && !isValidImageUrl(formData.imageUrl.trim())) {
-      newErrors.imageUrl = 'Please enter a valid image URL (HTTPS)';
+    if (formData.logo && !isValidUrl(formData.logo.trim())) {
+      newErrors.logo = 'Please enter a valid HTTPS URL';
+    }
+    if (formData.thumbnail && !isValidUrl(formData.thumbnail.trim())) {
+      newErrors.thumbnail = 'Please enter a valid HTTPS URL';
     }
     if (formData.demoUrl && !isValidUrl(formData.demoUrl.trim())) {
       newErrors.demoUrl = 'Please enter a valid demo URL';
@@ -185,11 +206,16 @@ export default function LaunchProduct() {
     if (formData.twitter && !formData.twitter.startsWith('@') && formData.twitter.trim()) {
       newErrors.twitter = 'Twitter handle should start with @';
     }
+    formData.socialLinks.forEach((link, idx) => {
+      if (link.url && !isValidUrl(link.url.trim())) {
+        newErrors[`social_${idx}`] = 'Invalid URL';
+      }
+    });
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ── FRONTEND META FETCH ──
+  // ── Meta fetch ──
   const fetchWebsiteMeta = async () => {
     const url = formData.url.trim();
     if (!url || !isValidUrl(url)) {
@@ -208,8 +234,6 @@ export default function LaunchProduct() {
       ];
 
       let html = null;
-      let lastError = null;
-
       for (const proxyUrl of proxies) {
         try {
           const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
@@ -217,15 +241,12 @@ export default function LaunchProduct() {
             html = await response.text();
             break;
           }
-        } catch (e) {
-          lastError = e;
+        } catch {
           continue;
         }
       }
 
-      if (!html) {
-        throw new Error(lastError?.message || 'All proxy attempts failed');
-      }
+      if (!html) throw new Error('Could not fetch website');
 
       const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
       const title = titleMatch ? titleMatch[1].trim() : '';
@@ -244,7 +265,7 @@ export default function LaunchProduct() {
         try {
           const parsedUrl = new URL(url);
           image = `${parsedUrl.origin}${image}`;
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
@@ -269,9 +290,9 @@ export default function LaunchProduct() {
     const updates = {};
     if (websiteTitle && !formData.name) updates.name = websiteTitle;
     if (websiteDescription && !formData.description) updates.description = websiteDescription;
-    if (websiteImage && !formData.imageUrl) {
-      updates.imageUrl = websiteImage;
-      setImagePreview(websiteImage);
+    if (websiteImage && !formData.logo) {
+      updates.logo = websiteImage;
+      setLogoPreview(websiteImage);
     }
     if (Object.keys(updates).length > 0) {
       setFormData((prev) => ({ ...prev, ...updates }));
@@ -279,44 +300,40 @@ export default function LaunchProduct() {
     setMetaFetched(false);
   };
 
-  // ── Features handlers ──
-  const addFeature = () => {
-    if (newFeature.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        features: [...prev.features, newFeature.trim()],
-      }));
-      setNewFeature('');
-    }
-  };
-
-  const removeFeature = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      features: prev.features.filter((_, i) => i !== index),
-    }));
-  };
-
-  // ── Tech Stack handlers ──
-  const addTech = () => {
-    if (newTech.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        techStack: [...prev.techStack, newTech.trim()],
-      }));
-      setNewTech('');
-    }
-  };
-
-  const removeTech = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      techStack: prev.techStack.filter((_, i) => i !== index),
-    }));
-  };
-
   // ── Image upload ──
-  const handleImageUpload = async (e) => {
+  const uploadImage = async (file, folder = 'productstrend') => {
+    const formDataUpload = new FormData();
+    formDataUpload.append('image', file);
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/upload?folder=${folder}`, true);
+
+      getToken().then(token => {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error('Invalid response'));
+            }
+          } else {
+            reject(new Error('Upload failed'));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(formDataUpload);
+      }).catch(reject);
+    });
+  };
+
+  const handleImageUpload = async (e, type) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -335,43 +352,17 @@ export default function LaunchProduct() {
     setErrors((prev) => ({ ...prev, imageUpload: '' }));
 
     try {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-
-      const formDataUpload = new FormData();
-      formDataUpload.append('image', file);
-
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API_BASE}/upload?folder=productstrend`, true);
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      const result = await uploadImage(file, 'productstrend');
+      if (result.success && result.url) {
+        if (type === 'logo') {
+          setFormData(prev => ({ ...prev, logo: result.url }));
+          setLogoPreview(result.url);
+        } else {
+          setFormData(prev => ({ ...prev, thumbnail: result.url }));
+          setThumbnailPreview(result.url);
         }
-      };
-
-      const response = await new Promise((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(JSON.parse(xhr.responseText));
-            } catch {
-              reject(new Error('Invalid response'));
-            }
-          } else {
-            reject(new Error('Upload failed'));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.send(formDataUpload);
-      });
-
-      if (response.success && response.url) {
-        setFormData((prev) => ({ ...prev, imageUrl: response.url }));
-        setImagePreview(response.url);
       } else {
-        throw new Error(response.error || 'Upload failed');
+        throw new Error(result.error || 'Upload failed');
       }
     } catch (err) {
       console.error('Upload error:', err);
@@ -379,15 +370,76 @@ export default function LaunchProduct() {
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (type === 'logo' && logoInputRef.current) logoInputRef.current.value = '';
+      if (type === 'thumbnail' && thumbnailInputRef.current) thumbnailInputRef.current.value = '';
     }
   };
 
-  const removeImage = () => {
-    setFormData((prev) => ({ ...prev, imageUrl: '' }));
-    setImagePreview('');
+  const removeImage = (type) => {
+    if (type === 'logo') {
+      setFormData(prev => ({ ...prev, logo: '' }));
+      setLogoPreview('');
+    } else {
+      setFormData(prev => ({ ...prev, thumbnail: '' }));
+      setThumbnailPreview('');
+    }
   };
 
+  // ── Features ──
+  const addFeature = () => {
+    if (newFeature.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        features: [...prev.features, newFeature.trim()],
+      }));
+      setNewFeature('');
+    }
+  };
+
+  const removeFeature = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      features: prev.features.filter((_, i) => i !== index),
+    }));
+  };
+
+  // ── Tech Stack ──
+  const addTech = () => {
+    if (newTech.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        techStack: [...prev.techStack, newTech.trim()],
+      }));
+      setNewTech('');
+    }
+  };
+
+  const removeTech = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      techStack: prev.techStack.filter((_, i) => i !== index),
+    }));
+  };
+
+  // ── Social Links ──
+  const addSocial = () => {
+    if (newSocial.platform && newSocial.url.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        socialLinks: [...prev.socialLinks, { platform: newSocial.platform, url: newSocial.url.trim() }],
+      }));
+      setNewSocial({ platform: '', url: '' });
+    }
+  };
+
+  const removeSocial = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      socialLinks: prev.socialLinks.filter((_, i) => i !== index),
+    }));
+  };
+
+  // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -401,12 +453,12 @@ export default function LaunchProduct() {
         tagline: formData.tagline.trim(),
         description: formData.description.trim(),
         url: formData.url.trim(),
-        imageUrl: formData.imageUrl.trim(),
+        logo: formData.logo.trim(),
+        thumbnail: formData.thumbnail.trim(),
         category: formData.category || 'Other',
         websiteTitle: formData.websiteTitle?.trim() || '',
         websiteDescription: formData.websiteDescription?.trim() || '',
         websiteImage: formData.websiteImage?.trim() || '',
-        // ── NEW FIELDS ──
         features: formData.features || [],
         pricing: formData.pricing || 'Free',
         productStatus: formData.productStatus || 'Live',
@@ -415,6 +467,8 @@ export default function LaunchProduct() {
         twitter: formData.twitter?.trim() || '',
         techStack: formData.techStack || [],
         releaseDate: formData.releaseDate || '',
+        socialLinks: formData.socialLinks || [],
+        referralCode: formData.referralCode?.trim() || '',
       };
 
       let result;
@@ -523,14 +577,13 @@ export default function LaunchProduct() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* ── Basic Info Section ── */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* ── Basic Info ── */}
             <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <FiInfo className="text-purple-500" /> Basic Information
               </h3>
 
-              {/* Product Name */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Product Name <span className="text-red-500">*</span>
@@ -548,7 +601,6 @@ export default function LaunchProduct() {
                 <p className="mt-1 text-xs text-slate-400">{formData.name.length}/100 characters</p>
               </div>
 
-              {/* Tagline */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Tagline <span className="text-red-500">*</span>
@@ -558,7 +610,7 @@ export default function LaunchProduct() {
                   name="tagline"
                   value={formData.tagline}
                   onChange={handleChange}
-                  placeholder="A short, catchy description"
+                  placeholder="A short, catchy description (max 200 chars)"
                   className={`w-full border ${errors.tagline ? 'border-red-300' : 'border-slate-200'} rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition`}
                   maxLength="200"
                 />
@@ -566,7 +618,6 @@ export default function LaunchProduct() {
                 <p className="mt-1 text-xs text-slate-400">{formData.tagline.length}/200 characters</p>
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Description <span className="text-slate-400 text-xs">(optional)</span>
@@ -585,16 +636,16 @@ export default function LaunchProduct() {
               </div>
             </div>
 
-            {/* ── Links & Media Section ── */}
+            {/* ── Media ── */}
             <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <FiLink className="text-purple-500" /> Links & Media
+                <FiImage className="text-purple-500" /> Media & Links
               </h3>
 
-              {/* Product URL */}
+              {/* URL and Meta Fetch */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Product URL <span className="text-slate-400 text-xs">(optional)</span>
+                  Product Website URL
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -623,113 +674,171 @@ export default function LaunchProduct() {
                   </button>
                 </div>
                 {errors.url && <p className="mt-1 text-sm text-red-600">{errors.url}</p>}
-              </div>
-
-              {/* Meta data preview */}
-              {metaFetched && (
-                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl animate-slideDown">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-emerald-700 flex items-center gap-2">
-                      <FiCheck className="w-4 h-4" /> Website info fetched
-                    </p>
-                    <button
-                      type="button"
-                      onClick={applyMetaData}
-                      className="text-xs font-medium text-emerald-600 hover:text-emerald-800 transition"
-                    >
-                      Apply to form →
-                    </button>
-                  </div>
-                  <div className="space-y-1 text-xs text-emerald-600">
-                    {formData.websiteTitle && <p>Title: {formData.websiteTitle}</p>}
-                    {formData.websiteDescription && (
-                      <p className="line-clamp-2">Description: {formData.websiteDescription}</p>
-                    )}
-                    {formData.websiteImage && (
-                      <p className="truncate">Image: {formData.websiteImage}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {errors.meta && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
-                  {errors.meta}
-                </div>
-              )}
-
-              {/* Image Upload */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Product Image <span className="text-slate-400 text-xs">(optional)</span>
-                </label>
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="flex-1 px-4 py-2.5 border-2 border-dashed border-slate-300 hover:border-purple-400 rounded-xl text-sm text-slate-600 hover:text-purple-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isUploading ? (
-                        <>
-                          <FiLoader className="w-4 h-4 animate-spin" />
-                          Uploading... {uploadProgress}%
-                        </>
-                      ) : (
-                        <>
-                          <FiUpload className="w-4 h-4" />
-                          Upload Image
-                        </>
-                      )}
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                    {formData.imageUrl && (
+                {metaFetched && (
+                  <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                        <FiCheck className="w-4 h-4" /> Website info fetched
+                      </p>
                       <button
                         type="button"
-                        onClick={removeImage}
-                        className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-medium transition"
+                        onClick={applyMetaData}
+                        className="text-xs font-medium text-emerald-600 hover:text-emerald-800 transition"
                       >
-                        <FiX className="w-4 h-4" />
+                        Apply to form →
                       </button>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <FiImage className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      name="imageUrl"
-                      value={formData.imageUrl}
-                      onChange={handleChange}
-                      placeholder="https://example.com/image.png"
-                      className={`w-full border ${errors.imageUrl ? 'border-red-300' : 'border-slate-200'} rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition`}
-                    />
-                  </div>
-                  {errors.imageUpload && (
-                    <p className="text-sm text-red-600">{errors.imageUpload}</p>
-                  )}
-                  {errors.imageUrl && <p className="text-sm text-red-600">{errors.imageUrl}</p>}
-                </div>
-
-                {imagePreview && (
-                  <div className="mt-3 relative w-40 h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                    <Image
-                      src={imagePreview}
-                      alt="Preview"
-                      fill
-                      className="object-cover"
-                      sizes="160px"
-                    />
+                    </div>
+                    <div className="space-y-1 text-xs text-emerald-600">
+                      {formData.websiteTitle && <p>Title: {formData.websiteTitle}</p>}
+                      {formData.websiteDescription && (
+                        <p className="line-clamp-2">Description: {formData.websiteDescription}</p>
+                      )}
+                      {formData.websiteImage && (
+                        <p className="truncate">Image: {formData.websiteImage}</p>
+                      )}
+                    </div>
                   </div>
                 )}
+              </div>
+
+              {/* Logo */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Logo <span className="text-slate-400 text-xs">(square, shown as circle in feed)</span>
+                </label>
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="flex-1 px-4 py-2.5 border-2 border-dashed border-slate-300 hover:border-purple-400 rounded-xl text-sm text-slate-600 hover:text-purple-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isUploading ? (
+                          <>
+                            <FiLoader className="w-4 h-4 animate-spin" />
+                            Uploading... {uploadProgress}%
+                          </>
+                        ) : (
+                          <>
+                            <FiUpload className="w-4 h-4" />
+                            Upload Logo
+                          </>
+                        )}
+                      </button>
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={(e) => handleImageUpload(e, 'logo')}
+                        className="hidden"
+                      />
+                    </div>
+                    <div className="relative">
+                      <FiImage className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        name="logo"
+                        value={formData.logo}
+                        onChange={handleChange}
+                        placeholder="https://example.com/logo.png"
+                        className={`w-full border ${errors.logo ? 'border-red-300' : 'border-slate-200'} rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition`}
+                      />
+                    </div>
+                    {errors.logo && <p className="mt-1 text-sm text-red-600">{errors.logo}</p>}
+                  </div>
+                  {logoPreview && (
+                    <div className="flex-shrink-0">
+                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-200 bg-white shadow-sm">
+                        <Image
+                          src={logoPreview}
+                          alt="Logo preview"
+                          width={80}
+                          height={80}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeImage('logo')}
+                        className="mt-1 text-xs text-red-500 hover:text-red-700 transition"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Thumbnail */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Thumbnail / Hero Image <span className="text-slate-400 text-xs">(16:9, shown in detail page)</span>
+                </label>
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => thumbnailInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="flex-1 px-4 py-2.5 border-2 border-dashed border-slate-300 hover:border-purple-400 rounded-xl text-sm text-slate-600 hover:text-purple-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isUploading ? (
+                          <>
+                            <FiLoader className="w-4 h-4 animate-spin" />
+                            Uploading... {uploadProgress}%
+                          </>
+                        ) : (
+                          <>
+                            <FiUpload className="w-4 h-4" />
+                            Upload Thumbnail
+                          </>
+                        )}
+                      </button>
+                      <input
+                        ref={thumbnailInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={(e) => handleImageUpload(e, 'thumbnail')}
+                        className="hidden"
+                      />
+                    </div>
+                    <div className="relative">
+                      <FiImage className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        name="thumbnail"
+                        value={formData.thumbnail}
+                        onChange={handleChange}
+                        placeholder="https://example.com/thumbnail.png"
+                        className={`w-full border ${errors.thumbnail ? 'border-red-300' : 'border-slate-200'} rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition`}
+                      />
+                    </div>
+                    {errors.thumbnail && <p className="mt-1 text-sm text-red-600">{errors.thumbnail}</p>}
+                  </div>
+                  {thumbnailPreview && (
+                    <div className="flex-shrink-0">
+                      <div className="w-32 h-18 rounded-lg overflow-hidden border border-slate-200 bg-white shadow-sm aspect-video">
+                        <Image
+                          src={thumbnailPreview}
+                          alt="Thumbnail preview"
+                          width={128}
+                          height={72}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeImage('thumbnail')}
+                        className="mt-1 text-xs text-red-500 hover:text-red-700 transition block text-center"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Demo URL */}
@@ -752,13 +861,12 @@ export default function LaunchProduct() {
               </div>
             </div>
 
-            {/* ── Product Details Section ── */}
+            {/* ── Product Details ── */}
             <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <FiList className="text-purple-500" /> Product Details
+                <FiTag className="text-purple-500" /> Product Details
               </h3>
 
-              {/* Category */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Category <span className="text-slate-400 text-xs">(optional)</span>
@@ -781,48 +889,7 @@ export default function LaunchProduct() {
                 </div>
               </div>
 
-              {/* Pricing */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Pricing <span className="text-slate-400 text-xs">(optional)</span>
-                </label>
-                <div className="relative">
-                  <FiDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <select
-                    name="pricing"
-                    value={formData.pricing}
-                    onChange={handleChange}
-                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition appearance-none bg-white"
-                  >
-                    {PRICING_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Product Status */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Product Status <span className="text-slate-400 text-xs">(optional)</span>
-                </label>
-                <div className="relative">
-                  <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <select
-                    name="productStatus"
-                    value={formData.productStatus}
-                    onChange={handleChange}
-                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition appearance-none bg-white"
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Target Audience */}
-              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Target Audience <span className="text-slate-400 text-xs">(optional)</span>
                 </label>
@@ -840,137 +907,250 @@ export default function LaunchProduct() {
               </div>
             </div>
 
-            {/* ── Features & Tech Stack ── */}
-            <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <FiList className="text-purple-500" /> Features & Tech Stack
-              </h3>
+            {/* ── Advanced Options (collapsible) ── */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="w-full flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-50 transition text-left"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <FiList className="text-purple-500" /> Advanced Options
+                </span>
+                {showAdvanced ? <FiChevronUp className="text-slate-400" /> : <FiChevronDown className="text-slate-400" />}
+              </button>
+              {showAdvanced && (
+                <div className="p-4 space-y-4 border-t border-slate-100">
+                  {/* Pricing */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Pricing <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <FiDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <select
+                        name="pricing"
+                        value={formData.pricing}
+                        onChange={handleChange}
+                        className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition appearance-none bg-white"
+                      >
+                        {PRICING_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              {/* Features */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Key Features <span className="text-slate-400 text-xs">(optional)</span>
-                </label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={newFeature}
-                    onChange={(e) => setNewFeature(e.target.value)}
-                    placeholder="Add a feature..."
-                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
-                  />
-                  <button
-                    type="button"
-                    onClick={addFeature}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
-                  >
-                    <FiPlus className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.features.map((feature, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg text-xs border border-purple-200"
-                    >
-                      {feature}
+                  {/* Product Status */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Product Status <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <select
+                        name="productStatus"
+                        value={formData.productStatus}
+                        onChange={handleChange}
+                        className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition appearance-none bg-white"
+                      >
+                        {STATUS_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Twitter Handle */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Twitter Handle <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <FiTwitter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        name="twitter"
+                        value={formData.twitter}
+                        onChange={handleChange}
+                        placeholder="@yourhandle"
+                        className={`w-full border ${errors.twitter ? 'border-red-300' : 'border-slate-200'} rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition`}
+                      />
+                    </div>
+                    {errors.twitter && <p className="mt-1 text-sm text-red-600">{errors.twitter}</p>}
+                  </div>
+
+                  {/* Release Date */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Release Date <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="date"
+                        name="releaseDate"
+                        value={formData.releaseDate}
+                        onChange={handleChange}
+                        className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Key Features <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={newFeature}
+                        onChange={(e) => setNewFeature(e.target.value)}
+                        placeholder="Add a feature..."
+                        className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
+                      />
                       <button
                         type="button"
-                        onClick={() => removeFeature(index)}
-                        className="hover:text-red-500 transition"
+                        onClick={addFeature}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
                       >
-                        <FiX className="w-3 h-3" />
+                        <FiPlus className="w-4 h-4" />
                       </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.features.map((feature, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg text-xs border border-purple-200"
+                        >
+                          {feature}
+                          <button
+                            type="button"
+                            onClick={() => removeFeature(index)}
+                            className="hover:text-red-500 transition"
+                          >
+                            <FiX className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Tech Stack */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Tech Stack <span className="text-slate-400 text-xs">(optional)</span>
-                </label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={newTech}
-                    onChange={(e) => setNewTech(e.target.value)}
-                    placeholder="e.g., React, Node.js, Python"
-                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTech())}
-                  />
-                  <button
-                    type="button"
-                    onClick={addTech}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
-                  >
-                    <FiPlus className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.techStack.map((tech, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs border border-indigo-200"
-                    >
-                      <FiCpu className="w-3 h-3" />
-                      {tech}
+                  {/* Tech Stack */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Tech Stack <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={newTech}
+                        onChange={(e) => setNewTech(e.target.value)}
+                        placeholder="e.g., React, Node.js, Python"
+                        className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTech())}
+                      />
                       <button
                         type="button"
-                        onClick={() => removeTech(index)}
-                        className="hover:text-red-500 transition"
+                        onClick={addTech}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm"
                       >
-                        <FiX className="w-3 h-3" />
+                        <FiPlus className="w-4 h-4" />
                       </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.techStack.map((tech, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs border border-indigo-200"
+                        >
+                          <FiCpu className="w-3 h-3" />
+                          {tech}
+                          <button
+                            type="button"
+                            onClick={() => removeTech(index)}
+                            className="hover:text-red-500 transition"
+                          >
+                            <FiX className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-            {/* ── Social & Release ── */}
-            <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <FiGlobe className="text-purple-500" /> Social & Release
-              </h3>
+                  {/* Social Links */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Social Links <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="flex gap-2 mb-2 flex-wrap">
+                      <select
+                        value={newSocial.platform}
+                        onChange={(e) => setNewSocial({ ...newSocial, platform: e.target.value })}
+                        className="border border-slate-200 rounded-xl px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-white"
+                      >
+                        <option value="">Platform</option>
+                        {SOCIAL_PLATFORMS.map((p) => (
+                          <option key={p.value} value={p.value}>{p.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="url"
+                        value={newSocial.url}
+                        onChange={(e) => setNewSocial({ ...newSocial, url: e.target.value })}
+                        placeholder="https://..."
+                        className="flex-1 min-w-[150px] border border-slate-200 rounded-xl px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={addSocial}
+                        disabled={!newSocial.platform || !newSocial.url}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm disabled:opacity-50"
+                      >
+                        <FiPlus className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.socialLinks.map((link, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs border border-blue-200"
+                        >
+                          <FiLink2 className="w-3 h-3" />
+                          {link.platform}: <a href={link.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-800">{link.url}</a>
+                          <button
+                            type="button"
+                            onClick={() => removeSocial(index)}
+                            className="hover:text-red-500 transition"
+                          >
+                            <FiX className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Twitter */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Twitter Handle <span className="text-slate-400 text-xs">(optional)</span>
-                </label>
-                <div className="relative">
-                  <FiTwitter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    name="twitter"
-                    value={formData.twitter}
-                    onChange={handleChange}
-                    placeholder="@yourhandle"
-                    className={`w-full border ${errors.twitter ? 'border-red-300' : 'border-slate-200'} rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition`}
-                  />
+                  {/* Referral Code */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Referral / Affiliate Code <span className="text-slate-400 text-xs">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <FiAtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        name="referralCode"
+                        value={formData.referralCode}
+                        onChange={handleChange}
+                        placeholder="e.g., MAKETREND2024"
+                        className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                      />
+                    </div>
+                  </div>
                 </div>
-                {errors.twitter && <p className="mt-1 text-sm text-red-600">{errors.twitter}</p>}
-              </div>
-
-              {/* Release Date */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Release Date <span className="text-slate-400 text-xs">(optional)</span>
-                </label>
-                <div className="relative">
-                  <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="date"
-                    name="releaseDate"
-                    value={formData.releaseDate}
-                    onChange={handleChange}
-                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
             {/* ── Submit ── */}
@@ -1000,14 +1180,6 @@ export default function LaunchProduct() {
           </form>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-slideDown { animation: slideDown 0.3s ease-out; }
-      `}</style>
     </>
   );
 }
