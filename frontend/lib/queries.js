@@ -383,7 +383,6 @@ export function useExchangeDetail(id, enabled = true) {
 // ── 🚀 PRODUCT TREND QUERIES ──
 
 // 1. Product Feed (infinite scroll with filters) – PUBLIC
-// 1. Product Feed (infinite scroll with filters) – PUBLIC
 export function useProductFeed(filters = {}, enabled = true) {
   const queryKey = ['productFeed', filters];
   return useInfiniteQuery({
@@ -405,7 +404,7 @@ export function useProductFeed(filters = {}, enabled = true) {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    keepPreviousData: true, // ⬅️ Keeps old data while fetching new
+    keepPreviousData: true,
   });
 }
 
@@ -414,7 +413,6 @@ export function useProductDetail(id, enabled = true) {
   return useQuery({
     queryKey: ['productDetail', id],
     queryFn: async () => {
-      // Detail is public; no token required
       const data = await apiRequest(`/productstrend/products/${id}`, {}, null);
       return data.product;
     },
@@ -443,7 +441,6 @@ export function useProductComments(productId, enabled = true) {
   return useQuery({
     queryKey: ['productComments', productId],
     queryFn: async () => {
-      // Comments are public; no token required
       const data = await apiRequest(`/productstrend/products/${productId}/comments`, {}, null);
       return data.comments || [];
     },
@@ -487,7 +484,6 @@ export function useUpvoteProduct() {
       }, token);
       return data;
     },
-    // No onSuccess – component handles cache updates with server response
   });
 }
 
@@ -503,7 +499,6 @@ export function useAddProductComment() {
       }, token);
       return data;
     },
-    // No onSuccess – component handles cache updates
   });
 }
 
@@ -527,6 +522,372 @@ export function useDeleteProduct() {
     onError: (error) => {
       toast.error(error.message || 'Failed to delete product');
     },
+  });
+}
+
+// ── 🌍 COMMUNITY POSTS QUERIES ──
+
+// 1. Fetch posts feed (infinite scroll, public, with category filter)
+// StaleTime: 2 min to reduce refetches
+export function usePosts(category = null, enabled = true) {
+  const queryKey = ['posts', category || 'all'];
+  return useInfiniteQuery({
+    queryKey,
+    queryFn: async ({ pageParam = null }) => {
+      let url = '/posts?limit=20';
+      if (category && category !== 'all') {
+        url += `&category=${category}`;
+      }
+      if (pageParam) {
+        url += `&lastId=${pageParam}`;
+      }
+      const data = await apiRequest(url, {}, null);
+      return {
+        posts: data.posts || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
+    },
+    enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 2 * 60 * 1000, // 2 minutes – reduces reads
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
+  });
+}
+
+// 2. Fetch a single post (public)
+export function usePost(id, enabled = true) {
+  return useQuery({
+    queryKey: ['post', id],
+    queryFn: async () => {
+      const data = await apiRequest(`/posts/${id}`, {}, null);
+      return data.post;
+    },
+    enabled: !!id && enabled,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+// 3. Create a post (authenticated) – invalidates feed only
+export function useCreatePost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest('/posts', {
+        method: 'POST',
+        body: payload,
+      }, token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['posts']);
+      toast.success('Post created successfully!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to create post');
+    },
+  });
+}
+
+// 4. Update a post – invalidates feed + single post
+export function useUpdatePost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/posts/${id}`, {
+        method: 'PUT',
+        body: payload,
+      }, token);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['post', variables.id]);
+      toast.success('Post updated successfully!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update post');
+    },
+  });
+}
+
+// 5. Like/unlike a post – OPTIMISTIC: updates cache directly, no invalidation
+export function useLikePost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/posts/${postId}/like`, {
+        method: 'POST',
+      }, token);
+      return data;
+    },
+    onMutate: async (postId) => {
+      // Cancel ongoing queries to prevent overwrite
+      await queryClient.cancelQueries(['posts']);
+      await queryClient.cancelQueries(['post', postId]);
+
+      // Snapshot previous values
+      const previousPosts = queryClient.getQueryData(['posts']);
+      const previousPost = queryClient.getQueryData(['post', postId]);
+
+      // Optimistic update for feed
+      if (previousPosts) {
+        const optimisticPages = previousPosts.pages.map(page => ({
+          ...page,
+          posts: page.posts.map(p => {
+            if (p.id === postId) {
+              const newLiked = !p.userLiked;
+              return {
+                ...p,
+                likes: newLiked ? p.likes + 1 : p.likes - 1,
+                userLiked: newLiked,
+              };
+            }
+            return p;
+          }),
+        }));
+        queryClient.setQueryData(['posts'], {
+          ...previousPosts,
+          pages: optimisticPages,
+        });
+      }
+
+      // Optimistic update for single post
+      if (previousPost) {
+        const newLiked = !previousPost.userLiked;
+        queryClient.setQueryData(['post', postId], {
+          ...previousPost,
+          likes: newLiked ? previousPost.likes + 1 : previousPost.likes - 1,
+          userLiked: newLiked,
+        });
+      }
+
+      return { previousPosts, previousPost };
+    },
+    onSuccess: (data, postId, context) => {
+      // Sync with server result
+      const serverLikes = data.likes;
+      const serverAction = data.action; // 'added' or 'removed'
+
+      // Update feed with server values
+      const currentPosts = queryClient.getQueryData(['posts']);
+      if (currentPosts) {
+        const syncedPages = currentPosts.pages.map(page => ({
+          ...page,
+          posts: page.posts.map(p => {
+            if (p.id === postId) {
+              return {
+                ...p,
+                likes: serverLikes,
+                userLiked: serverAction === 'added',
+              };
+            }
+            return p;
+          }),
+        }));
+        queryClient.setQueryData(['posts'], {
+          ...currentPosts,
+          pages: syncedPages,
+        });
+      }
+
+      // Update single post with server values
+      const currentPost = queryClient.getQueryData(['post', postId]);
+      if (currentPost) {
+        queryClient.setQueryData(['post', postId], {
+          ...currentPost,
+          likes: serverLikes,
+          userLiked: serverAction === 'added',
+        });
+      }
+    },
+    onError: (error, postId, context) => {
+      // Revert on error
+      if (context?.previousPosts) {
+        queryClient.setQueryData(['posts'], context.previousPosts);
+      }
+      if (context?.previousPost) {
+        queryClient.setQueryData(['post', postId], context.previousPost);
+      }
+      toast.error(error.message || 'Failed to like');
+    },
+  });
+}
+
+// 6. Add a comment – OPTIMISTIC: updates cache directly, no invalidation
+export function useAddComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ postId, content }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/posts/${postId}/comments`, {
+        method: 'POST',
+        body: { content },
+      }, token);
+      return data;
+    },
+    onMutate: async ({ postId, content }) => {
+      await queryClient.cancelQueries(['posts']);
+      await queryClient.cancelQueries(['post', postId]);
+      await queryClient.cancelQueries(['postComments', postId]);
+
+      // Snapshot
+      const previousPosts = queryClient.getQueryData(['posts']);
+      const previousPost = queryClient.getQueryData(['post', postId]);
+      const previousComments = queryClient.getQueryData(['postComments', postId]);
+
+      // Optimistic update for feed
+      if (previousPosts) {
+        const optimisticPages = previousPosts.pages.map(page => ({
+          ...page,
+          posts: page.posts.map(p => {
+            if (p.id === postId) {
+              return {
+                ...p,
+                commentsCount: (p.commentsCount || 0) + 1,
+              };
+            }
+            return p;
+          }),
+        }));
+        queryClient.setQueryData(['posts'], {
+          ...previousPosts,
+          pages: optimisticPages,
+        });
+      }
+
+      // Optimistic update for single post
+      if (previousPost) {
+        queryClient.setQueryData(['post', postId], {
+          ...previousPost,
+          commentsCount: (previousPost.commentsCount || 0) + 1,
+        });
+      }
+
+      // Optimistic update for comments list (add temp comment)
+      if (previousComments) {
+        const optimisticComments = {
+          pages: previousComments.pages.map((page, idx) => {
+            if (idx === 0) {
+              return {
+                ...page,
+                comments: [
+                  {
+                    id: `temp-${Date.now()}`,
+                    postId,
+                    content,
+                    userId: auth.currentUser?.uid,
+                    user: {
+                      username: auth.currentUser?.username || 'You',
+                      fullname: auth.currentUser?.fullname || 'You',
+                      avatar: auth.currentUser?.avatar || null,
+                    },
+                    createdAt: new Date().toISOString(),
+                  },
+                  ...page.comments,
+                ],
+              };
+            }
+            return page;
+          }),
+          pageParams: previousComments.pageParams,
+        };
+        queryClient.setQueryData(['postComments', postId], optimisticComments);
+      }
+
+      return { previousPosts, previousPost, previousComments };
+    },
+    onSuccess: (data, variables, context) => {
+      // On success, refetch comments to sync with server (but keep optimistic feed/post updates)
+      queryClient.invalidateQueries(['postComments', variables.postId]);
+      // Invalidate feed and post to update commentsCount (though we already incremented)
+      // We'll just invalidate comments and keep feed/post as they are (already updated)
+      // Optionally, invalidate feed/post to be safe
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['post', variables.postId]);
+      toast.success('Comment added!');
+    },
+    onError: (error, variables, context) => {
+      // Revert
+      if (context?.previousPosts) {
+        queryClient.setQueryData(['posts'], context.previousPosts);
+      }
+      if (context?.previousPost) {
+        queryClient.setQueryData(['post', variables.postId], context.previousPost);
+      }
+      if (context?.previousComments) {
+        queryClient.setQueryData(['postComments', variables.postId], context.previousComments);
+      }
+      toast.error(error.message || 'Failed to add comment');
+    },
+  });
+}
+
+// 7. Delete a post – invalidates feed + single post
+export function useDeletePost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/posts/${postId}`, {
+        method: 'DELETE',
+      }, token);
+      return data;
+    },
+    onSuccess: (data, postId) => {
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['post', postId]);
+      toast.success('Post deleted');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete post');
+    },
+  });
+}
+
+// 8. Get post comments (infinite scroll, public)
+export function usePostComments(postId, enabled = true) {
+  const queryKey = ['postComments', postId];
+  return useInfiniteQuery({
+    queryKey,
+    queryFn: async ({ pageParam = null }) => {
+      let url = `/posts/${postId}/comments?limit=20`;
+      if (pageParam) {
+        url += `&lastId=${pageParam}`;
+      }
+      const data = await apiRequest(url, {}, null);
+      return {
+        comments: data.comments || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
+    },
+    enabled: !!postId && enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
+  });
+}
+
+// 9. Get user profile (public)
+export function useUserProfile(uid, enabled = true) {
+  return useQuery({
+    queryKey: ['userProfile', uid],
+    queryFn: async () => {
+      const data = await apiRequest(`/users/${uid}/profile`, {}, null);
+      return data;
+    },
+    enabled: !!uid && enabled,
+    staleTime: 5 * 60 * 1000, // 5 min – profile doesn't change often
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -636,7 +997,7 @@ export function useMarkSystemNotificationsRead() {
   });
 }
 
-// ── Invalidation helper (updated) ──
+// ── Invalidation helper ──
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
   return {
@@ -657,18 +1018,20 @@ export function useInvalidateQueries() {
     invalidateAvailableTasks: () => queryClient.invalidateQueries(['availableTasks']),
     invalidateMyExchanges: () => queryClient.invalidateQueries(['myExchanges']),
     invalidateExchangeDetail: (id) => queryClient.invalidateQueries(['exchangeDetail', id]),
-    // ProductTrend invalidation helpers
     invalidateProductFeed: () => queryClient.invalidateQueries(['productFeed']),
     invalidateProductDetail: (id) => queryClient.invalidateQueries(['productDetail', id]),
     invalidateMyProducts: () => queryClient.invalidateQueries(['myProducts']),
     invalidateProductComments: (id) => queryClient.invalidateQueries(['productComments', id]),
-    // ── NEW: Notification invalidation ──
     invalidateNotifications: () => queryClient.invalidateQueries(['notifications']),
     invalidateSystemNotifications: () => queryClient.invalidateQueries(['systemNotifications']),
     invalidateAllNotifications: () => {
       queryClient.invalidateQueries(['notifications']);
       queryClient.invalidateQueries(['systemNotifications']);
     },
+    invalidatePost: (id) => queryClient.invalidateQueries(['post', id]),
+    invalidatePosts: () => queryClient.invalidateQueries(['posts']),
+    invalidatePostComments: (postId) => queryClient.invalidateQueries(['postComments', postId]),
+    invalidateUserProfile: (uid) => queryClient.invalidateQueries(['userProfile', uid]),
     invalidateAll: () => {
       queryClient.invalidateQueries(['profile']);
       queryClient.invalidateQueries(['stats']);
@@ -690,7 +1053,8 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['myProducts']);
       queryClient.invalidateQueries(['notifications']);
       queryClient.invalidateQueries(['systemNotifications']);
-      // productDetail and productComments keys are dynamic, so skip here
+      queryClient.invalidateQueries(['posts']);
+      // productDetail, productComments, post, postComments, userProfile keys are dynamic, so skip here
     },
   };
 }
