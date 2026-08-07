@@ -50,7 +50,6 @@ import {
   FiTelegram,
   FiCode,
   FiShoppingBag,
-FiTelegram,
   FiPlay,
 } from 'react-icons/fi';
 import { FaRocket } from 'react-icons/fa';
