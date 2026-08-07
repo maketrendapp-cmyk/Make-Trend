@@ -540,19 +540,32 @@ export default function ProductTrendFeed() {
                 key={product.id}
                 className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
               >
-                {/* ── Image with object-contain ── */}
-                <Link href={`/productstrend/${product.id}`} className="flex-shrink-0 w-24 h-24 md:w-28 md:h-28 bg-slate-100 rounded-xl overflow-hidden relative">
-                  {product.imageUrl ? (
-                    <Image
-                      src={product.imageUrl}
-                      alt={product.name}
-                      fill
-                      sizes="120px"
-                      className="object-contain"
-                      loading="lazy"
-                    />
+                {/* ── Logo / Image – circle if logo exists, else square ── */}
+                <Link href={`/productstrend/${product.id}`} className="flex-shrink-0">
+                  {product.logo ? (
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
+                      <Image
+                        src={product.logo}
+                        alt={product.name}
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  ) : product.imageUrl ? (
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
+                      <Image
+                        src={product.imageUrl}
+                        alt={product.name}
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-3xl text-slate-300">
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-100 flex items-center justify-center text-2xl text-slate-300 border border-slate-200">
                       🚀
                     </div>
                   )}
@@ -576,7 +589,7 @@ export default function ProductTrendFeed() {
                       disabled={upvoteMutation.isLoading || !isAuthenticated}
                     >
                       <FiHeart className={`w-3.5 h-3.5 ${product.userVoted ? 'fill-purple-600 text-purple-600' : ''}`} />
-                      {product.upvotes || 0}
+                      <span>{product.upvotes || 0}</span>
                     </button>
                   </div>
                   <p className="text-sm text-slate-500 line-clamp-2 mt-1">
