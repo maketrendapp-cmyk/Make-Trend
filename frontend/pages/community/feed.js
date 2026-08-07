@@ -1,5 +1,5 @@
 // pages/community/feed.js
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -17,7 +17,6 @@ import {
   FiX,
   FiExternalLink,
   FiPlay,
-  FiChevronDown,
   FiChevronUp,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
@@ -123,7 +122,8 @@ export default function CommunityFeed() {
 
   // ── Helper to get post from cache ──
   const getPostFromCache = (postId) => {
-    const allPosts = queryClient.getQueryData(['posts', appliedCategory === 'all' ? 'all' : appliedCategory, appliedType === 'all' ? 'all' : appliedType]);
+    const queryKey = ['posts', appliedCategory === 'all' ? 'all' : appliedCategory, appliedType === 'all' ? 'all' : appliedType];
+    const allPosts = queryClient.getQueryData(queryKey);
     if (!allPosts) return null;
     for (const page of allPosts.pages) {
       const found = page.posts.find(p => p.id === postId);
@@ -165,33 +165,35 @@ export default function CommunityFeed() {
 
   // ── Like handler with localStorage ──
   const handleLike = (postId) => {
+    console.log('Like clicked for post:', postId, 'Authenticated:', isAuthenticated);
+    
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
 
-    // Get current post from cache to know current state
+    // Get current post from cache
     const currentPost = getPostFromCache(postId);
     if (!currentPost) {
+      console.warn('Post not found in cache:', postId);
       toast.error('Post not found');
       return;
     }
 
-    // Optimistic UI: update localStorage and cache is already handled by the mutation's onMutate.
-    // But we also want to update localStorage here for immediate feedback.
+    // Optimistic UI: update localStorage and call mutation
     const newVoted = !currentPost.userLiked;
     const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
     setLocalVote(postId, newVoted, newLikes);
 
-    // Call the mutation
     likeMutation.mutate(postId, {
       onSuccess: (data) => {
-        // Sync localStorage with server
+        console.log('Like mutation success:', data);
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
         setLocalVote(postId, serverVoted, serverLikes);
       },
       onError: (error) => {
+        console.error('Like mutation error:', error);
         // Revert localStorage to previous state
         const revertedPost = getPostFromCache(postId);
         if (revertedPost) {
@@ -624,7 +626,10 @@ export default function CommunityFeed() {
                   {/* ── Actions with box styling ── */}
                   <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
                     <button
-                      onClick={() => handleLike(post.id)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleLike(post.id);
+                      }}
                       disabled={!isAuthenticated}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition ${
                         isLiked
