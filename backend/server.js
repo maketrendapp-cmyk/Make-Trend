@@ -7010,6 +7010,57 @@ app.get('/api/my-posts', verifyToken, checkBanned, async (req, res) => {
   }
 });
 
+// ── GET public user profile ──
+app.get('/api/users/:uid', async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const ip = getClientIp(req);
+
+    // Rate limit: 30 requests per minute per IP
+    if (!(await checkRateLimit(ip, 'public-profile', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const cacheKey = `public-user:${uid}`;
+    let result;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) result = JSON.parse(cached);
+    } catch (e) { /* ignore */ }
+
+    if (!result) {
+      const doc = await db.collection('users').doc(uid).get();
+      if (!doc.exists) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+      const data = doc.data();
+
+      // Only public fields – safe to share
+      const publicProfile = {
+        uid: doc.id,
+        username: data.username || '',
+        fullname: data.fullname || '',
+        avatar: data.avatar || '',
+        bio: data.bio || '',
+        country: data.country || '',
+        gender: data.gender || '',
+        skills: Array.isArray(data.skills) ? data.skills : [],
+        socialLinks: Array.isArray(data.socialLinks) ? data.socialLinks : [],
+        websites: Array.isArray(data.websites) ? data.websites : [],
+        createdAt: data.createdAt || null,
+      };
+
+      result = { success: true, user: publicProfile };
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 300); // 5 min cache
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Public profile error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch profile' });
+  }
+});
+
 // ============================================================
 // 18. GLOBAL ERROR HANDLER (renumbered from 18 to 24)
 // ============================================================
