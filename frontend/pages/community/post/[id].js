@@ -1,9 +1,8 @@
 // pages/community/post/[id].js
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../../components/Meta';
 import { useAuth } from '../../../components/AuthScreen';
 import {
@@ -18,16 +17,27 @@ import {
   FiMessageCircle,
   FiShare2,
   FiLoader,
-  FiRefreshCw,
   FiSend,
-  FiUser,
-  FiClock,
   FiExternalLink,
-  FiPlay,
   FiChevronUp,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+
+// ── localStorage helpers ──
+const getLocalVote = (postId) => {
+  try {
+    const raw = localStorage.getItem(`community_like_${postId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+};
+
+const setLocalVote = (postId, voted, likes) => {
+  try {
+    localStorage.setItem(`community_like_${postId}`, JSON.stringify({ voted, likes }));
+  } catch (e) {}
+};
 
 const POST_TYPE_ICONS = {
   general: '📌',
@@ -63,49 +73,35 @@ const CATEGORIES = [
   { value: 'other', label: '📌 Other' },
 ];
 
-// ── localStorage helpers ──
-const getLocalVote = (postId) => {
-  try {
-    const raw = localStorage.getItem(`community_like_${postId}`);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return null;
-};
-
-const setLocalVote = (postId, voted, likes) => {
-  try {
-    localStorage.setItem(`community_like_${postId}`, JSON.stringify({ voted, likes }));
-  } catch (e) {}
-};
-
 export default function PostDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
-  const queryClient = useQueryClient();
 
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [isLiking, setIsLiking] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [expanded, setExpanded] = useState(false);
 
-  // ── Fetch post and comments ──
   const { data: post, isLoading: postLoading, isError: postError, refetch: refetchPost } = usePost(id, !!id);
   const {
     data: commentsData,
     isLoading: commentsLoading,
-    isError: commentsError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     refetch: refetchComments,
   } = usePostComments(id, !!id);
 
-  const comments = commentsData?.pages?.flatMap((page) => page.comments) || [];
+  // ── SAFE: ensure comments is always an array ──
+  const comments = Array.isArray(commentsData?.pages)
+    ? commentsData.pages.flatMap((page) => page.comments || [])
+    : [];
 
-  // ── Mutations ──
   const likeMutation = useLikePost();
   const addCommentMutation = useAddComment();
 
-  // ── Infinite scroll observer ──
   const observerRef = useRef(null);
   const lastElementRef = useCallback(
     (node) => {
@@ -121,103 +117,57 @@ export default function PostDetail() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler (optimistic + API call) ──
+  useEffect(() => {
+    if (post) {
+      const local = getLocalVote(id);
+      if (local) {
+        setIsLiked(local.voted);
+        setLikesCount(local.likes);
+      } else {
+        setIsLiked(post.userLiked || false);
+        setLikesCount(post.likes || 0);
+      }
+    }
+  }, [post, id]);
+
+  // ── Simple like handler ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
       return;
     }
+    if (isLiking) return;
 
-    const currentPost = queryClient.getQueryData(['post', id]);
-    if (!currentPost) {
-      toast.error('Post not found');
-      return;
-    }
+    const newVoted = !isLiked;
+    const newCount = newVoted ? likesCount + 1 : likesCount - 1;
 
-    // Optimistic update
-    const newVoted = !currentPost.userLiked;
-    const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
-    const updatedPost = { ...currentPost, userLiked: newVoted, likes: newLikes };
+    setIsLiked(newVoted);
+    setLikesCount(newCount);
+    setLocalVote(id, newVoted, newCount);
+    setIsLiking(true);
 
-    // Update caches immediately
-    queryClient.setQueryData(['post', id], updatedPost);
-    const feedQueries = queryClient.getQueryCache().findAll(['posts']);
-    for (const query of feedQueries) {
-      const data = query.state.data;
-      if (data && data.pages) {
-        const newPages = data.pages.map((page) => ({
-          ...page,
-          posts: page.posts.map((p) => {
-            if (p.id === id) {
-              return { ...p, userLiked: newVoted, likes: newLikes };
-            }
-            return p;
-          }),
-        }));
-        queryClient.setQueryData(query.queryKey, { ...data, pages: newPages });
-      }
-    }
-
-    setLocalVote(id, newVoted, newLikes);
-
-    // ── API Call: mutate with callbacks ──
-    console.log('📤 Sending like API request for post:', id);
     likeMutation.mutate(id, {
       onSuccess: (data) => {
-        console.log('✅ Like API success:', data);
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
-
-        // Sync caches with server
-        const current = queryClient.getQueryData(['post', id]);
-        if (current) {
-          queryClient.setQueryData(['post', id], { ...current, userLiked: serverVoted, likes: serverLikes });
+        if (serverVoted !== newVoted || serverLikes !== newCount) {
+          setIsLiked(serverVoted);
+          setLikesCount(serverLikes);
+          setLocalVote(id, serverVoted, serverLikes);
         }
-        const feedQueries2 = queryClient.getQueryCache().findAll(['posts']);
-        for (const query of feedQueries2) {
-          const data2 = query.state.data;
-          if (data2 && data2.pages) {
-            const newPages2 = data2.pages.map((page) => ({
-              ...page,
-              posts: page.posts.map((p) => {
-                if (p.id === id) {
-                  return { ...p, userLiked: serverVoted, likes: serverLikes };
-                }
-                return p;
-              }),
-            }));
-            queryClient.setQueryData(query.queryKey, { ...data2, pages: newPages2 });
-          }
-        }
-        setLocalVote(id, serverVoted, serverLikes);
+        setIsLiking(false);
       },
       onError: (error) => {
-        console.error('❌ Like API error:', error);
-        // Revert optimistic update
-        queryClient.setQueryData(['post', id], currentPost);
-        const feedQueries3 = queryClient.getQueryCache().findAll(['posts']);
-        for (const query of feedQueries3) {
-          const data3 = query.state.data;
-          if (data3 && data3.pages) {
-            const newPages3 = data3.pages.map((page) => ({
-              ...page,
-              posts: page.posts.map((p) => {
-                if (p.id === id) {
-                  return { ...p, userLiked: currentPost.userLiked, likes: currentPost.likes };
-                }
-                return p;
-              }),
-            }));
-            queryClient.setQueryData(query.queryKey, { ...data3, pages: newPages3 });
-          }
-        }
-        setLocalVote(id, currentPost.userLiked, currentPost.likes);
+        setIsLiked(!newVoted);
+        setLikesCount(newVoted ? newCount - 1 : newCount + 1);
+        setLocalVote(id, !newVoted, newVoted ? newCount - 1 : newCount + 1);
+        setIsLiking(false);
         toast.error(error.message || 'Failed to like');
       },
     });
   };
 
-  // ── Comment handler (optimistic + refetch) ──
+  // ── Comment handler ──
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || !isAuthenticated) return;
@@ -225,74 +175,14 @@ export default function PostDetail() {
     const text = commentText.trim();
     setCommentText('');
 
-    // Optimistic comment
-    const optimisticComment = {
-      id: `temp-${Date.now()}`,
-      content: text,
-      userId: user?.uid,
-      user: {
-        username: user?.username || 'You',
-        fullname: user?.fullname || 'You',
-        avatar: user?.avatar || null,
-      },
-      createdAt: new Date().toISOString(),
-    };
-
-    const currentComments = queryClient.getQueryData(['postComments', id]);
-    if (currentComments) {
-      const newPages = currentComments.pages.map((page, idx) => {
-        if (idx === 0) {
-          return {
-            ...page,
-            comments: [optimisticComment, ...page.comments],
-          };
-        }
-        return page;
-      });
-      queryClient.setQueryData(['postComments', id], {
-        ...currentComments,
-        pages: newPages,
-      });
-    }
-
-    const currentPost = queryClient.getQueryData(['post', id]);
-    if (currentPost) {
-      queryClient.setQueryData(['post', id], {
-        ...currentPost,
-        commentsCount: (currentPost.commentsCount || 0) + 1,
-      });
-    }
-
-    // API call
     addCommentMutation.mutate(
       { postId: id, content: text },
       {
         onSuccess: () => {
-          console.log('✅ Comment added, refetching...');
           refetchComments();
           refetchPost();
         },
         onError: (error) => {
-          console.error('❌ Comment error:', error);
-          // Revert optimistic comment
-          const revertComments = queryClient.getQueryData(['postComments', id]);
-          if (revertComments) {
-            const revertPages = revertComments.pages.map((page) => ({
-              ...page,
-              comments: page.comments.filter((c) => c.id !== optimisticComment.id),
-            }));
-            queryClient.setQueryData(['postComments', id], {
-              ...revertComments,
-              pages: revertPages,
-            });
-          }
-          const revertPost = queryClient.getQueryData(['post', id]);
-          if (revertPost) {
-            queryClient.setQueryData(['post', id], {
-              ...revertPost,
-              commentsCount: (revertPost.commentsCount || 0) - 1,
-            });
-          }
           setCommentText(text);
           toast.error(error.message || 'Failed to add comment');
         },
@@ -300,7 +190,6 @@ export default function PostDetail() {
     );
   };
 
-  // ── Share handler ──
   const handleShare = async () => {
     const url = `${window.location.origin}/community/post/${id}`;
     try {
@@ -317,7 +206,6 @@ export default function PostDetail() {
     }
   };
 
-  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Just now';
     try {
@@ -348,7 +236,6 @@ export default function PostDetail() {
     }
   };
 
-  // ── Loading state ──
   if (postLoading || commentsLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
@@ -380,7 +267,6 @@ export default function PostDetail() {
     );
   }
 
-  // ── Error state ──
   if (postError || !post) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 text-center">
@@ -397,7 +283,6 @@ export default function PostDetail() {
     );
   }
 
-  const isLiked = post.userLiked || false;
   const postTypeIcon = POST_TYPE_ICONS[post.type] || '📌';
   const postTypeLabel = POST_TYPE_LABELS[post.type] || 'General';
   const isVideo = post.videoUrl && post.videoUrl.trim() !== '';
@@ -414,13 +299,9 @@ export default function PostDetail() {
     <>
       <Meta title={`${post.title} – Make Trend Community`} />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Link
-              href="/community/feed"
-              className="text-slate-400 hover:text-slate-600 transition"
-            >
+            <Link href="/community/feed" className="text-slate-400 hover:text-slate-600 transition">
               <FiArrowLeft className="w-5 h-5" />
             </Link>
             <h1 className="text-xl font-bold text-slate-900">Post</h1>
@@ -433,7 +314,6 @@ export default function PostDetail() {
           </button>
         </div>
 
-        {/* ── Full Post ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
           {/* Header */}
           <div className="flex items-start gap-3">
@@ -474,7 +354,7 @@ export default function PostDetail() {
             </div>
           </div>
 
-          {/* Content with Read more */}
+          {/* Content */}
           <div className="mt-4">
             <h2 className="text-2xl font-bold text-slate-900">
               {truncateTitle && !expanded ? (
@@ -563,19 +443,15 @@ export default function PostDetail() {
           <div className="flex items-center gap-6 mt-5 pt-4 border-t border-slate-100">
             <button
               onClick={handleLike}
-              disabled={!isAuthenticated}
+              disabled={!isAuthenticated || isLiking}
               className={`flex items-center gap-2 text-sm transition ${
                 isLiked
                   ? 'text-purple-600 font-semibold'
                   : 'text-slate-500 hover:text-purple-600'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {isLiked ? (
-                <FaHeart className="w-5 h-5 text-purple-600" />
-              ) : (
-                <FiHeart className="w-5 h-5" />
-              )}
-              <span>{post.likes || 0}</span>
+              {isLiked ? <FaHeart className="w-5 h-5 text-purple-600" /> : <FiHeart className="w-5 h-5" />}
+              <span>{likesCount}</span>
             </button>
             <button
               onClick={handleShare}
@@ -595,7 +471,6 @@ export default function PostDetail() {
           </h3>
         </div>
 
-        {/* Comment Form */}
         {isAuthenticated ? (
           <form onSubmit={handleSubmitComment} className="flex gap-3 mb-6">
             <input
@@ -626,12 +501,12 @@ export default function PostDetail() {
           </div>
         )}
 
-        {/* Comments List */}
+        {/* ── SAFE Comments List ── */}
         <div className="space-y-4">
-          {comments.length === 0 && !isFetchingNextPage ? (
+          {(!Array.isArray(comments) || comments.length === 0) && !isFetchingNextPage ? (
             <p className="text-center text-sm text-slate-400 py-8">No comments yet. Be the first!</p>
           ) : (
-            comments.map((comment, index) => (
+            Array.isArray(comments) && comments.map((comment, index) => (
               <div
                 key={comment.id}
                 className="flex gap-3"
@@ -680,7 +555,7 @@ export default function PostDetail() {
           </div>
         )}
 
-        {!hasNextPage && comments.length > 0 && (
+        {!hasNextPage && Array.isArray(comments) && comments.length > 0 && (
           <p className="text-center text-xs text-slate-400 py-4">End of comments</p>
         )}
       </div>
