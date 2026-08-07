@@ -2760,14 +2760,14 @@ app.post('/api/campaigns/:id/share', async (req, res) => {
     if (campaignData.userId) {
       await updateCampaignInUserListCache(campaignData.userId, id, { shares: result.shares });
 
-      // ── Update stats cache (increment totalShares) ──
+      // ── Update stats cache (increment totalShares by shareCount) ──
       try {
         const statsCacheKey = `stats:user:${campaignData.userId}`;
         const statsCached = await redis.get(statsCacheKey);
         if (statsCached) {
           const stats = JSON.parse(statsCached);
           if (stats.stats && typeof stats.stats.totalShares === 'number') {
-            stats.stats.totalShares += 1;
+            stats.stats.totalShares += result.shareCount; // increment by the share count value
             const ttl = await redis.ttl(statsCacheKey);
             await redis.set(statsCacheKey, JSON.stringify(stats), 'EX', ttl > 0 ? ttl : 86400);
           }
