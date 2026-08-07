@@ -121,7 +121,7 @@ export default function PostDetail() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler with localStorage ──
+  // ── Like handler with localStorage and manual cache update ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
@@ -135,24 +135,89 @@ export default function PostDetail() {
       return;
     }
 
-    // Optimistic UI: update localStorage and cache via mutation
+    // Optimistic update
     const newVoted = !currentPost.userLiked;
     const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
+    const updatedPost = { ...currentPost, userLiked: newVoted, likes: newLikes };
+
+    // Update single post cache
+    queryClient.setQueryData(['post', id], updatedPost);
+
+    // Also update feed cache for consistency (if it exists)
+    const feedQueryKeys = queryClient.getQueryCache().findAll(['posts']);
+    for (const query of feedQueryKeys) {
+      const data = query.state.data;
+      if (data && data.pages) {
+        const newPages = data.pages.map((page) => ({
+          ...page,
+          posts: page.posts.map((p) => {
+            if (p.id === id) {
+              return { ...p, userLiked: newVoted, likes: newLikes };
+            }
+            return p;
+          }),
+        }));
+        queryClient.setQueryData(query.queryKey, { ...data, pages: newPages });
+      }
+    }
+
+    // Update localStorage
     setLocalVote(id, newVoted, newLikes);
 
+    // Call mutation
     likeMutation.mutate(id, {
       onSuccess: (data) => {
-        // Sync localStorage with server
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
+
+        // Sync single post cache
+        const current = queryClient.getQueryData(['post', id]);
+        if (current) {
+          queryClient.setQueryData(['post', id], { ...current, userLiked: serverVoted, likes: serverLikes });
+        }
+
+        // Sync feed caches
+        const feedQueries = queryClient.getQueryCache().findAll(['posts']);
+        for (const query of feedQueries) {
+          const data = query.state.data;
+          if (data && data.pages) {
+            const newPages = data.pages.map((page) => ({
+              ...page,
+              posts: page.posts.map((p) => {
+                if (p.id === id) {
+                  return { ...p, userLiked: serverVoted, likes: serverLikes };
+                }
+                return p;
+              }),
+            }));
+            queryClient.setQueryData(query.queryKey, { ...data, pages: newPages });
+          }
+        }
+
+        // Update localStorage
         setLocalVote(id, serverVoted, serverLikes);
       },
       onError: (error) => {
-        // Revert localStorage to previous state
-        const revertedPost = queryClient.getQueryData(['post', id]);
-        if (revertedPost) {
-          setLocalVote(id, revertedPost.userLiked, revertedPost.likes);
+        // Revert
+        queryClient.setQueryData(['post', id], currentPost);
+        // Revert feed caches
+        const feedQueries = queryClient.getQueryCache().findAll(['posts']);
+        for (const query of feedQueries) {
+          const data = query.state.data;
+          if (data && data.pages) {
+            const newPages = data.pages.map((page) => ({
+              ...page,
+              posts: page.posts.map((p) => {
+                if (p.id === id) {
+                  return { ...p, userLiked: currentPost.userLiked, likes: currentPost.likes };
+                }
+                return p;
+              }),
+            }));
+            queryClient.setQueryData(query.queryKey, { ...data, pages: newPages });
+          }
         }
+        setLocalVote(id, currentPost.userLiked, currentPost.likes);
         toast.error(error.message || 'Failed to like');
       },
     });
