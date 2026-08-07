@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import { usePosts, useLikePost } from '../../lib/queries';
@@ -21,7 +20,7 @@ import {
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ── localStorage helpers for like status ──
+// ── localStorage helpers ──
 const getLocalVote = (postId) => {
   try {
     const raw = localStorage.getItem(`community_like_${postId}`);
@@ -86,7 +85,6 @@ const POST_TYPE_LABELS = {
 export default function CommunityFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const queryClient = useQueryClient();
 
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
@@ -118,10 +116,6 @@ export default function CommunityFeed() {
 
   const posts = data?.pages?.flatMap((page) => page.posts) || [];
 
-  const getFeedQueryKey = () => {
-    return ['posts', appliedCategory === 'all' ? 'all' : appliedCategory, appliedType === 'all' ? 'all' : appliedType];
-  };
-
   const applyFilters = () => {
     setAppliedCategory(selectedCategory);
     setAppliedType(selectedType);
@@ -151,44 +145,55 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Initialize like states from localStorage or post data ──
+  // ── Sync like states with localStorage and server data ──
   useEffect(() => {
-    if (posts.length > 0) {
-      const newStates = {};
+    if (posts.length === 0) return;
+    setLikeStates((prev) => {
+      const newStates = { ...prev };
       posts.forEach((post) => {
+        // Skip posts that are currently being liked (keep optimistic)
+        if (likingIds.has(post.id)) return;
+
         const local = getLocalVote(post.id);
         if (local) {
+          // Always trust localStorage (it's the single source of truth)
           newStates[post.id] = { isLiked: local.voted, likesCount: local.likes };
         } else {
-          newStates[post.id] = {
-            isLiked: post.userLiked || false,
-            likesCount: post.likes || 0,
-          };
+          // No localStorage: fallback to server data, but only if we don't have a state yet
+          if (!prev[post.id]) {
+            newStates[post.id] = {
+              isLiked: post.userLiked || false,
+              likesCount: post.likes || 0,
+            };
+          }
+          // If we already have a state (from previous load), keep it
         }
       });
-      setLikeStates((prev) => ({ ...prev, ...newStates }));
-    }
-  }, [posts]);
+      return newStates;
+    });
+  }, [posts, likingIds]); // Re‑sync whenever posts or liking status changes
 
-  // ── Like handler (same as detail page) ──
+  // ── Like handler (identical to detail page) ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
-
-    const current = likeStates[postId];
-    if (!current) return;
     if (likingIds.has(postId)) return;
 
-    const newVoted = !current.isLiked;
-    const newCount = newVoted ? current.likesCount + 1 : current.likesCount - 1;
+    let newVoted, newCount;
 
-    // Optimistic update
-    setLikeStates((prev) => ({
-      ...prev,
-      [postId]: { isLiked: newVoted, likesCount: newCount },
-    }));
+    setLikeStates((prev) => {
+      const current = prev[postId];
+      if (!current) return prev;
+      newVoted = !current.isLiked;
+      newCount = newVoted ? current.likesCount + 1 : current.likesCount - 1;
+      return {
+        ...prev,
+        [postId]: { isLiked: newVoted, likesCount: newCount },
+      };
+    });
+
     setLikingIds((prev) => new Set(prev).add(postId));
     setLocalVote(postId, newVoted, newCount);
 
@@ -196,13 +201,11 @@ export default function CommunityFeed() {
       onSuccess: (data) => {
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
-        if (serverVoted !== newVoted || serverLikes !== newCount) {
-          setLikeStates((prev) => ({
-            ...prev,
-            [postId]: { isLiked: serverVoted, likesCount: serverLikes },
-          }));
-          setLocalVote(postId, serverVoted, serverLikes);
-        }
+        setLikeStates((prev) => ({
+          ...prev,
+          [postId]: { isLiked: serverVoted, likesCount: serverLikes },
+        }));
+        setLocalVote(postId, serverVoted, serverLikes);
         setLikingIds((prev) => {
           const newSet = new Set(prev);
           newSet.delete(postId);
@@ -210,7 +213,7 @@ export default function CommunityFeed() {
         });
       },
       onError: (error) => {
-        // Revert
+        // Revert to previous values (before optimistic update)
         setLikeStates((prev) => ({
           ...prev,
           [postId]: { isLiked: !newVoted, likesCount: newVoted ? newCount - 1 : newCount + 1 },
@@ -648,7 +651,7 @@ export default function CommunityFeed() {
                     </div>
                   )}
 
-                  {/* ── Actions (like button now matches detail page) ── */}
+                  {/* ── Actions (matches detail page) ── */}
                   <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => handleLike(post.id)}
