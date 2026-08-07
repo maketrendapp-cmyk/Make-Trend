@@ -38,6 +38,18 @@ import {
   FiVideo,
   FiList,
   FiLock,
+  FiLink,
+  FiGithub,
+  FiInstagram,
+  FiFacebook,
+  FiYoutube,
+  FiTwitch,
+  FiLinkedin,
+  FiTiktok,
+  FiDiscord,
+  FiTelegram,
+  FiCode,
+  FiShoppingBag,
 } from 'react-icons/fi';
 import { FaRocket } from 'react-icons/fa';
 
@@ -75,6 +87,21 @@ const setLocalVote = (productId, voted, upvotes) => {
   } catch (e) {}
 };
 
+// ── Social media icon mapping ──
+const SOCIAL_ICONS = {
+  twitter: FiTwitter,
+  facebook: FiFacebook,
+  instagram: FiInstagram,
+  linkedin: FiLinkedin,
+  youtube: FiYoutube,
+  tiktok: FiTiktok,
+  github: FiGithub,
+  discord: FiDiscord,
+  telegram: FiTelegram,
+  twitch: FiTwitch,
+  other: FiLink,
+};
+
 export default function ProductDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -93,7 +120,7 @@ export default function ProductDetail() {
 
   const isMaker = product?.makerUid === user?.uid;
 
-  // ── Local state for upvote (initialised from localStorage if server data not yet loaded) ──
+  // ── Local upvote state ──
   const [localUpvote, setLocalUpvote] = useState(null);
   useEffect(() => {
     if (id && !product) {
@@ -102,10 +129,8 @@ export default function ProductDetail() {
     }
   }, [id, product]);
 
-  // When product loads from server, use that as source of truth and update localStorage if needed.
   useEffect(() => {
     if (product && product.userVoted !== undefined) {
-      // Sync localStorage with server state (in case it changed from another tab)
       const stored = getLocalVote(id);
       if (!stored || stored.voted !== product.userVoted || stored.upvotes !== product.upvotes) {
         setLocalVote(id, product.userVoted, product.upvotes);
@@ -114,12 +139,11 @@ export default function ProductDetail() {
     }
   }, [product, id]);
 
-  // ── Determine the final upvote state ──
   const currentUpvote = product ? { voted: product.userVoted, upvotes: product.upvotes } : localUpvote;
   const userVoted = currentUpvote?.voted ?? false;
   const upvotes = currentUpvote?.upvotes ?? 0;
 
-  // ── Optimistic upvote handler ──
+  // ── Optimistic upvote ──
   const handleUpvote = () => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/' + id);
@@ -138,19 +162,14 @@ export default function ProductDetail() {
       userVoted: newUserVoted,
     };
 
-    // Update detail cache optimistically
     queryClient.setQueryData(['productDetail', id], optimisticProduct);
-
-    // Update localStorage optimistically
     setLocalVote(id, newUserVoted, newUpvotes);
     setLocalUpvote({ voted: newUserVoted, upvotes: newUpvotes });
 
     upvoteMutation.mutate(id, {
       onSuccess: (data) => {
-        // Sync with server response
         const serverVoted = data.action === 'added';
         const serverUpvotes = data.upvotes;
-        // Update cache
         const current = queryClient.getQueryData(['productDetail', id]);
         if (current) {
           queryClient.setQueryData(['productDetail', id], {
@@ -159,14 +178,11 @@ export default function ProductDetail() {
             userVoted: serverVoted,
           });
         }
-        // Update localStorage with server values
         setLocalVote(id, serverVoted, serverUpvotes);
         setLocalUpvote({ voted: serverVoted, upvotes: serverUpvotes });
       },
       onError: (error) => {
-        // Revert to previous state
         queryClient.setQueryData(['productDetail', id], currentProduct);
-        // Revert localStorage
         if (currentProduct) {
           setLocalVote(id, currentProduct.userVoted, currentProduct.upvotes);
           setLocalUpvote({ voted: currentProduct.userVoted, upvotes: currentProduct.upvotes });
@@ -176,7 +192,7 @@ export default function ProductDetail() {
     });
   };
 
-  // ── Optimistic comment handler ──
+  // ── Comment handler ──
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
@@ -207,8 +223,6 @@ export default function ProductDetail() {
 
     try {
       await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
-      // On success, keep the optimistic comment; no refetch needed.
-      // Update the product's commentsCount locally.
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
         queryClient.setQueryData(['productDetail', id], {
@@ -217,7 +231,6 @@ export default function ProductDetail() {
         });
       }
     } catch (error) {
-      // Revert on error
       queryClient.setQueryData(['productComments', id], currentComments);
       toast.error(error.message || 'Failed to post comment');
       setCommentText(optimisticComment.text);
@@ -256,7 +269,6 @@ export default function ProductDetail() {
     setTimeout(() => setShareCopied(false), 2000);
   };
 
-  // ── Robust date formatter ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
@@ -279,6 +291,12 @@ export default function ProductDetail() {
     } catch {
       return 'Recently';
     }
+  };
+
+  // ── Get social icon component ──
+  const getSocialIcon = (platform) => {
+    const Icon = SOCIAL_ICONS[platform?.toLowerCase()] || FiLink;
+    return Icon;
   };
 
   if (isLoading) {
@@ -314,9 +332,6 @@ export default function ProductDetail() {
     );
   }
 
-  // Now we have product and we use the userVoted/upvotes from the product directly,
-  // but we also keep localStorage in sync. We'll display using product values.
-
   return (
     <>
       <Meta title={`${product.name} – ProductTrend`} />
@@ -326,11 +341,11 @@ export default function ProductDetail() {
         </Link>
 
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* ── IMAGE: now uses object-contain inside a 16:9 container ── */}
+          {/* ── HERO IMAGE: use thumbnail (16:9) if available, else imageUrl ── */}
           <div className="w-full aspect-[16/9] bg-slate-100 overflow-hidden relative">
-            {product.imageUrl ? (
+            {(product.thumbnail || product.imageUrl) ? (
               <Image
-                src={product.imageUrl}
+                src={product.thumbnail || product.imageUrl}
                 alt={product.name}
                 fill
                 sizes="(max-width: 768px) 100vw, 80vw"
@@ -343,7 +358,33 @@ export default function ProductDetail() {
           </div>
 
           <div className="p-6 md:p-8">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            {/* ── Product header with logo (circle) ── */}
+            <div className="flex items-start gap-4 mb-4">
+              {product.logo ? (
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border-2 border-slate-200 shadow-sm flex-shrink-0">
+                  <Image
+                    src={product.logo}
+                    alt={product.name}
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : product.imageUrl ? (
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+                  <Image
+                    src={product.imageUrl}
+                    alt={product.name}
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-100 flex items-center justify-center text-4xl text-slate-300 border border-slate-200 flex-shrink-0">
+                  🚀
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900">{product.name}</h1>
                 <p className="text-base text-slate-500 mt-1">{product.tagline}</p>
@@ -363,10 +404,18 @@ export default function ProductDetail() {
                       {product.productStatus}
                     </span>
                   )}
+                  {product.referralCode && (
+                    <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full">
+                      🔗 {product.referralCode}
+                    </span>
+                  )}
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
+            {/* ── Upvote & Share buttons ── */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-2 mb-4">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={handleUpvote}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full border transition font-medium text-sm ${
@@ -386,9 +435,28 @@ export default function ProductDetail() {
                   {shareCopied ? 'Copied!' : <FiShare2 className="w-4 h-4" />}
                 </button>
               </div>
+              <div className="flex items-center gap-3 text-xs text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <FiClock className="w-3.5 h-3.5" />
+                  Launched {formatDate(product.createdAt)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <FiMessageCircle className="w-3.5 h-3.5" />
+                  {product.commentsCount || 0} comments
+                </span>
+                {isMaker && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Maker</span>
+                )}
+                {!isAuthenticated && (
+                  <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <FiLock className="w-3 h-3" /> Sign in to upvote
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100">
+            {/* ── Maker info ── */}
+            <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
               <div className="w-8 h-8 rounded-full bg-purple-100 overflow-hidden flex-shrink-0">
                 {product.maker?.avatar ? (
                   <Image
@@ -404,29 +472,12 @@ export default function ProductDetail() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span className="font-medium text-slate-700">
-                  {product.maker?.fullname || product.maker?.username || 'Anonymous'}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <FiClock className="w-3.5 h-3.5" />
-                  Launched {formatDate(product.createdAt)}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <FiMessageCircle className="w-3.5 h-3.5" />
-                  {product.commentsCount || 0} comments
-                </span>
-                {isMaker && (
-                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">You are the maker</span>
-                )}
-                {!isAuthenticated && (
-                  <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <FiLock className="w-3 h-3" /> Sign in to upvote
-                  </span>
-                )}
-              </div>
+              <span className="font-medium text-slate-700 text-sm">
+                {product.maker?.fullname || product.maker?.username || 'Anonymous'}
+              </span>
             </div>
 
+            {/* ── Description ── */}
             {product.description && (
               <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-1">Description</h3>
@@ -434,6 +485,7 @@ export default function ProductDetail() {
               </div>
             )}
 
+            {/* ── Features ── */}
             {product.features && product.features.length > 0 && (
               <div className="mt-6 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
@@ -450,34 +502,8 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {product.targetAudience && (
-              <div className="mt-4 p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
-                <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
-                  <FiUsers className="text-indigo-600" /> Target Audience
-                </h3>
-                <p className="text-sm text-slate-600">{product.targetAudience}</p>
-              </div>
-            )}
-
-            {product.techStack && product.techStack.length > 0 && (
-              <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <FiCpu className="text-slate-600" /> Tech Stack
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {product.techStack.map((tech, index) => (
-                    <span
-                      key={index}
-                      className="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full"
-                    >
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(product.url || product.websiteTitle || product.websiteDescription || product.demoUrl || product.twitter) && (
+            {/* ── Website & Links ── */}
+            {(product.url || product.websiteTitle || product.websiteDescription || product.websiteImage || product.demoUrl || product.twitter || product.referralCode) && (
               <div className="mt-6 p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <FiGlobe className="text-emerald-600" /> Website & Links
@@ -488,7 +514,18 @@ export default function ProductDetail() {
                 {product.websiteDescription && (
                   <p className="text-sm text-slate-600 mt-1">{product.websiteDescription}</p>
                 )}
-                <div className="flex flex-wrap gap-2 mt-2">
+                {product.websiteImage && (
+                  <div className="mt-2 w-32 h-20 rounded-lg overflow-hidden border border-slate-200">
+                    <Image
+                      src={product.websiteImage}
+                      alt="Website preview"
+                      width={128}
+                      height={80}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 mt-3">
                   {product.url && (
                     <a
                       href={product.url}
@@ -519,6 +556,11 @@ export default function ProductDetail() {
                       <FiTwitter className="w-3 h-3" /> {product.twitter}
                     </a>
                   )}
+                  {product.referralCode && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium">
+                      <FiLink className="w-3 h-3" /> Referral: {product.referralCode}
+                    </span>
+                  )}
                 </div>
                 {product.releaseDate && (
                   <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
@@ -529,6 +571,62 @@ export default function ProductDetail() {
               </div>
             )}
 
+            {/* ── Social Links ── */}
+            {product.socialLinks && product.socialLinks.length > 0 && (
+              <div className="mt-6 p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <FiUsers className="text-indigo-600" /> Social Links
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {product.socialLinks.map((link, index) => {
+                    const Icon = getSocialIcon(link.platform);
+                    return (
+                      <a
+                        key={index}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition text-xs font-medium"
+                      >
+                        <Icon className="w-3.5 h-3.5 text-indigo-600" />
+                        {link.platform}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Target Audience ── */}
+            {product.targetAudience && (
+              <div className="mt-6 p-4 bg-cyan-50/60 rounded-xl border border-cyan-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                  <FiUsers className="text-cyan-600" /> Target Audience
+                </h3>
+                <p className="text-sm text-slate-600">{product.targetAudience}</p>
+              </div>
+            )}
+
+            {/* ── Tech Stack ── */}
+            {product.techStack && product.techStack.length > 0 && (
+              <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <FiCpu className="text-slate-600" /> Tech Stack
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.techStack.map((tech, index) => (
+                    <span
+                      key={index}
+                      className="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Maker actions ── */}
             {isMaker && (
               <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100">
                 <Link
@@ -548,7 +646,7 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Comments Section */}
+        {/* ── Comments Section ── */}
         <div className="mt-10">
           <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
             <FiMessageCircle className="text-purple-600" />
