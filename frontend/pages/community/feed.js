@@ -1,5 +1,5 @@
 // pages/community/feed.js
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -16,7 +16,6 @@ import {
   FiFilter,
   FiX,
   FiExternalLink,
-  FiPlay,
   FiChevronUp,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
@@ -96,6 +95,10 @@ export default function CommunityFeed() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [expandedPosts, setExpandedPosts] = useState(new Set());
 
+  // ── Local like state per post ──
+  const [likeStates, setLikeStates] = useState({});
+  const [likingIds, setLikingIds] = useState(new Set());
+
   const likeMutation = useLikePost();
 
   const {
@@ -148,115 +151,76 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler: optimistic update + localStorage ──
+  // ── Initialize like states from localStorage or post data ──
+  useEffect(() => {
+    if (posts.length > 0) {
+      const newStates = {};
+      posts.forEach((post) => {
+        const local = getLocalVote(post.id);
+        if (local) {
+          newStates[post.id] = { isLiked: local.voted, likesCount: local.likes };
+        } else {
+          newStates[post.id] = {
+            isLiked: post.userLiked || false,
+            likesCount: post.likes || 0,
+          };
+        }
+      });
+      setLikeStates((prev) => ({ ...prev, ...newStates }));
+    }
+  }, [posts]);
+
+  // ── Like handler (same as detail page) ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
 
-    const queryKey = getFeedQueryKey();
-    const currentData = queryClient.getQueryData(queryKey);
-    if (!currentData) {
-      toast.error('Post not found');
-      return;
-    }
+    const current = likeStates[postId];
+    if (!current) return;
+    if (likingIds.has(postId)) return;
 
-    // Find the post
-    let foundPost = null;
-    let pageIndex = -1;
-    let postIndex = -1;
-    for (let i = 0; i < currentData.pages.length; i++) {
-      const page = currentData.pages[i];
-      const idx = page.posts.findIndex(p => p.id === postId);
-      if (idx !== -1) {
-        foundPost = page.posts[idx];
-        pageIndex = i;
-        postIndex = idx;
-        break;
-      }
-    }
-
-    if (!foundPost) {
-      toast.error('Post not found');
-      return;
-    }
+    const newVoted = !current.isLiked;
+    const newCount = newVoted ? current.likesCount + 1 : current.likesCount - 1;
 
     // Optimistic update
-    const newVoted = !foundPost.userLiked;
-    const newLikes = newVoted ? foundPost.likes + 1 : foundPost.likes - 1;
-    const updatedPost = { ...foundPost, userLiked: newVoted, likes: newLikes };
+    setLikeStates((prev) => ({
+      ...prev,
+      [postId]: { isLiked: newVoted, likesCount: newCount },
+    }));
+    setLikingIds((prev) => new Set(prev).add(postId));
+    setLocalVote(postId, newVoted, newCount);
 
-    // Update feed cache
-    const newPages = currentData.pages.map((page, idx) => {
-      if (idx === pageIndex) {
-        return {
-          ...page,
-          posts: page.posts.map((p, pIdx) => (pIdx === postIndex ? updatedPost : p)),
-        };
-      }
-      return page;
-    });
-    queryClient.setQueryData(queryKey, { ...currentData, pages: newPages });
-
-    // Update single post cache
-    queryClient.setQueryData(['post', postId], updatedPost);
-
-    // Save to localStorage
-    setLocalVote(postId, newVoted, newLikes);
-
-    // Call mutation to sync with backend
     likeMutation.mutate(postId, {
       onSuccess: (data) => {
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
-
-        // Sync feed cache with server values
-        const currentDataAfter = queryClient.getQueryData(queryKey);
-        if (currentDataAfter) {
-          const syncedPages = currentDataAfter.pages.map((page, idx) => {
-            if (idx === pageIndex) {
-              return {
-                ...page,
-                posts: page.posts.map((p, pIdx) => {
-                  if (pIdx === postIndex) {
-                    return { ...p, userLiked: serverVoted, likes: serverLikes };
-                  }
-                  return p;
-                }),
-              };
-            }
-            return page;
-          });
-          queryClient.setQueryData(queryKey, { ...currentDataAfter, pages: syncedPages });
+        if (serverVoted !== newVoted || serverLikes !== newCount) {
+          setLikeStates((prev) => ({
+            ...prev,
+            [postId]: { isLiked: serverVoted, likesCount: serverLikes },
+          }));
+          setLocalVote(postId, serverVoted, serverLikes);
         }
-
-        // Sync single post cache
-        const currentPost = queryClient.getQueryData(['post', postId]);
-        if (currentPost) {
-          queryClient.setQueryData(['post', postId], { ...currentPost, userLiked: serverVoted, likes: serverLikes });
-        }
-
-        // Sync localStorage
-        setLocalVote(postId, serverVoted, serverLikes);
+        setLikingIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
       },
       onError: (error) => {
-        // Revert optimistic update
-        const revertData = queryClient.getQueryData(queryKey);
-        if (revertData) {
-          const revertPages = revertData.pages.map((page, idx) => {
-            if (idx === pageIndex) {
-              return {
-                ...page,
-                posts: page.posts.map((p, pIdx) => (pIdx === postIndex ? foundPost : p)),
-              };
-            }
-            return page;
-          });
-          queryClient.setQueryData(queryKey, { ...revertData, pages: revertPages });
-        }
-        queryClient.setQueryData(['post', postId], foundPost);
-        setLocalVote(postId, foundPost.userLiked, foundPost.likes);
+        // Revert
+        setLikeStates((prev) => ({
+          ...prev,
+          [postId]: { isLiked: !newVoted, likesCount: newVoted ? newCount - 1 : newCount + 1 },
+        }));
+        setLocalVote(postId, !newVoted, newVoted ? newCount - 1 : newCount + 1);
+        setLikingIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
         toast.error(error.message || 'Failed to like');
       },
     });
@@ -309,7 +273,7 @@ export default function CommunityFeed() {
   };
 
   const toggleExpand = (postId) => {
-    setExpandedPosts(prev => {
+    setExpandedPosts((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(postId)) {
         newSet.delete(postId);
@@ -475,7 +439,7 @@ export default function CommunityFeed() {
             <span className="text-xs text-slate-500 font-medium">Active filters:</span>
             {appliedCategory !== 'all' && (
               <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                Category: {CATEGORIES.find(c => c.value === appliedCategory)?.label || appliedCategory}
+                Category: {CATEGORIES.find((c) => c.value === appliedCategory)?.label || appliedCategory}
                 <button
                   onClick={() => {
                     setSelectedCategory('all');
@@ -489,7 +453,7 @@ export default function CommunityFeed() {
             )}
             {appliedType !== 'all' && (
               <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                Type: {POST_TYPES.find(t => t.value === appliedType)?.label || appliedType}
+                Type: {POST_TYPES.find((t) => t.value === appliedType)?.label || appliedType}
                 <button
                   onClick={() => {
                     setSelectedType('all');
@@ -532,13 +496,13 @@ export default function CommunityFeed() {
         ) : (
           <div className="space-y-5">
             {posts.map((post, index) => {
-              const isLiked = post.userLiked || false;
               const postTypeIcon = POST_TYPE_ICONS[post.type] || '📌';
               const postTypeLabel = POST_TYPE_LABELS[post.type] || 'General';
               const isVideo = post.videoUrl && post.videoUrl.trim() !== '';
               const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
               const hasCTA = post.ctaText && post.ctaUrl;
               const isExpanded = expandedPosts.has(post.id);
+              const likeState = likeStates[post.id] || { isLiked: false, likesCount: 0 };
 
               const titleLength = post.title?.length || 0;
               const descLength = post.description?.length || 0;
@@ -586,7 +550,7 @@ export default function CommunityFeed() {
                         </span>
                         {post.category && post.category !== 'general' && (
                           <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">
-                            {CATEGORIES.find(c => c.value === post.category)?.label || post.category}
+                            {CATEGORIES.find((c) => c.value === post.category)?.label || post.category}
                           </span>
                         )}
                       </div>
@@ -595,13 +559,15 @@ export default function CommunityFeed() {
 
                   {/* ── Post Content ── */}
                   <Link href={`/community/post/${post.id}`} className="block mt-3">
-                    {/* Title with "Read more" */}
                     <h2 className="text-lg font-bold text-slate-900 hover:text-purple-600 transition">
                       {truncateTitle && !isExpanded ? (
                         <>
                           {post.title.slice(0, 150)}...
                           <span
-                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              toggleExpand(post.id);
+                            }}
                             className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
                           >
                             Read more
@@ -611,13 +577,15 @@ export default function CommunityFeed() {
                         post.title
                       )}
                     </h2>
-                    {/* Description with "Read more" */}
                     <p className="text-slate-600 mt-1 text-sm whitespace-pre-wrap">
                       {truncateDesc && !isExpanded ? (
                         <>
                           {post.description.slice(0, 400)}...
                           <span
-                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              toggleExpand(post.id);
+                            }}
                             className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
                           >
                             Read more
@@ -680,39 +648,39 @@ export default function CommunityFeed() {
                     </div>
                   )}
 
-                  {/* ── Actions with border styling ── */}
-                  <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
+                  {/* ── Actions (like button now matches detail page) ── */}
+                  <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => handleLike(post.id)}
-                      disabled={!isAuthenticated}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition ${
-                        isLiked
-                          ? 'border-purple-300 bg-purple-50 text-purple-600'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200'
+                      disabled={!isAuthenticated || likingIds.has(post.id)}
+                      className={`flex items-center gap-2 text-sm transition ${
+                        likeState.isLiked
+                          ? 'text-purple-600 font-semibold'
+                          : 'text-slate-500 hover:text-purple-600'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      {isLiked ? (
-                        <FaHeart className="w-4 h-4 text-purple-600" />
+                      {likeState.isLiked ? (
+                        <FaHeart className="w-5 h-5 text-purple-600" />
                       ) : (
-                        <FiHeart className="w-4 h-4" />
+                        <FiHeart className="w-5 h-5" />
                       )}
-                      <span>{post.likes || 0}</span>
+                      <span>{likeState.likesCount}</span>
                     </button>
 
                     <Link
                       href={`/community/post/${post.id}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm"
+                      className="flex items-center gap-2 text-sm text-slate-500 hover:text-purple-600 transition"
                     >
-                      <FiMessageCircle className="w-4 h-4" />
+                      <FiMessageCircle className="w-5 h-5" />
                       <span>{post.commentsCount || 0}</span>
                     </Link>
 
                     <button
                       onClick={() => handleShare(post.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm ml-auto"
+                      className="flex items-center gap-2 text-sm text-slate-500 hover:text-purple-600 transition ml-auto"
                     >
-                      <FiShare2 className="w-4 h-4" />
-                      <span>Share</span>
+                      <FiShare2 className="w-5 h-5" />
+                      Share
                     </button>
                   </div>
                 </div>
