@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
-import { useUserProfile, useLikePost } from '../../lib/queries';
+import { useProfile, useMyPosts, useLikePost } from '../../lib/queries';
 import {
   FiHeart,
   FiMessageCircle,
@@ -15,7 +15,6 @@ import {
   FiUser,
   FiClock,
   FiExternalLink,
-  FiPlay,
   FiPlus,
   FiArrowLeft,
 } from 'react-icons/fi';
@@ -61,15 +60,11 @@ export default function MyPosts() {
   const { user, isAuthenticated } = useAuth();
   const likeMutation = useLikePost();
 
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useUserProfile(user?.uid, isAuthenticated && !!user);
+  // ── Fetch profile and posts ──
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+  const { data: posts, isLoading: postsLoading, isError, refetch: refetchPosts } = useMyPosts(isAuthenticated);
 
-  const posts = data?.posts || [];
-  const profileUser = data?.user;
+  const isLoading = profileLoading || postsLoading;
 
   // ── Like handler (optimistic) ──
   const handleLike = (postId) => {
@@ -177,7 +172,7 @@ export default function MyPosts() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <p className="text-red-600 font-medium">Failed to load your posts.</p>
           <button
-            onClick={() => refetch()}
+            onClick={() => refetchPosts()}
             className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
           >
             <FiRefreshCw className="w-4 h-4" /> Retry
@@ -203,7 +198,7 @@ export default function MyPosts() {
             <div>
               <h1 className="text-2xl font-bold text-slate-900">My Posts</h1>
               <p className="text-sm text-slate-400">
-                {profileUser?.fullname || profileUser?.username || 'Your'} posts
+                {profile?.fullname || profile?.username || 'Your'} posts
               </p>
             </div>
           </div>
@@ -216,30 +211,30 @@ export default function MyPosts() {
         </div>
 
         {/* ── User info card ── */}
-        {profileUser && (
+        {profile && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-slate-200 overflow-hidden">
-              {profileUser.avatar ? (
+              {profile.avatar ? (
                 <Image
-                  src={profileUser.avatar}
-                  alt={profileUser.fullname || 'User'}
+                  src={profile.avatar}
+                  alt={profile.fullname || 'User'}
                   width={56}
                   height={56}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-600 text-lg font-bold">
-                  {profileUser.fullname?.[0] || profileUser.username?.[0] || 'U'}
+                  {profile.fullname?.[0] || profile.username?.[0] || 'U'}
                 </div>
               )}
             </div>
             <div>
-              <p className="font-semibold text-slate-900">{profileUser.fullname || profileUser.username || 'Anonymous'}</p>
-              <p className="text-sm text-slate-500">@{profileUser.username || 'user'}</p>
-              {profileUser.bio && <p className="text-sm text-slate-600 mt-1">{profileUser.bio}</p>}
-              {profileUser.createdAt && (
+              <p className="font-semibold text-slate-900">{profile.fullname || profile.username || 'Anonymous'}</p>
+              <p className="text-sm text-slate-500">@{profile.username || 'user'}</p>
+              {profile.bio && <p className="text-sm text-slate-600 mt-1">{profile.bio}</p>}
+              {profile.createdAt && (
                 <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                  <FiClock className="w-3 h-3" /> Joined {formatDate(profileUser.createdAt)}
+                  <FiClock className="w-3 h-3" /> Joined {formatDate(profile.createdAt)}
                 </p>
               )}
             </div>
@@ -247,7 +242,7 @@ export default function MyPosts() {
         )}
 
         {/* ── Posts List ── */}
-        {posts.length === 0 ? (
+        {posts && posts.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">📝</div>
             <h3 className="text-lg font-semibold text-slate-900">No posts yet</h3>
