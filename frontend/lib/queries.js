@@ -587,6 +587,7 @@ export function useCreatePost() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['myPosts']); // Add this line
       toast.success('Post created successfully!');
     },
     onError: (error) => {
@@ -611,6 +612,7 @@ export function useUpdatePost() {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(['posts']);
       queryClient.invalidateQueries(['post', variables.id]);
+      queryClient.invalidateQueries(['myPosts']); // Add this line
       toast.success('Post updated successfully!');
     },
     onError: (error) => {
@@ -849,6 +851,7 @@ export function useDeletePost() {
     onSuccess: (data, postId) => {
       queryClient.invalidateQueries(['posts']);
       queryClient.invalidateQueries(['post', postId]);
+      queryClient.invalidateQueries(['myPosts']); // Add this line
       toast.success('Post deleted');
     },
     onError: (error) => {
