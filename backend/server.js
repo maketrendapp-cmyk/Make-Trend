@@ -6463,6 +6463,7 @@ app.post('/api/admin/system-notifications', verifyToken, checkBanned, async (req
 // ============================================================
 
 // ── 1. GET FEED (public, with category filter, pagination, caching) ──
+// ── Get posts (public feed, with category & type filters, pagination, caching) ──
 app.get('/api/posts', async (req, res) => {
   try {
     const ip = getClientIp(req);
@@ -6475,9 +6476,11 @@ app.get('/api/posts', async (req, res) => {
     if (limit > MAX_LIMIT) limit = MAX_LIMIT;
 
     const category = req.query.category || null;
+    const type = req.query.type || null;
     const lastId = req.query.lastId || null;
 
-    const cacheKey = `posts:feed:${category || 'all'}:${limit}:${lastId || 'null'}`;
+    // ── Cache key includes category, type, and pagination ──
+    const cacheKey = `posts:feed:${category || 'all'}:${type || 'all'}:${limit}:${lastId || 'null'}`;
 
     let result = null;
     try {
@@ -6493,6 +6496,9 @@ app.get('/api/posts', async (req, res) => {
 
       if (category && category !== 'all') {
         query = query.where('category', '==', category);
+      }
+      if (type && type !== 'all') {
+        query = query.where('type', '==', type);
       }
       if (lastId) {
         const lastDoc = await db.collection('posts').doc(lastId).get();
@@ -6964,48 +6970,42 @@ app.get('/api/posts/:id/comments', async (req, res) => {
   }
 });
 
-// ── 9. GET USER PROFILE (public) ──
-app.get('/api/users/:uid/profile', async (req, res) => {
+// ── Get current user's posts (authenticated, optimized for "My Posts" page) ──
+app.get('/api/my-posts', verifyToken, checkBanned, async (req, res) => {
   try {
-    const { uid } = req.params;
-    const ip = getClientIp(req);
-    if (!(await checkRateLimit(ip, 'profile-view', 30, 60))) {
+    const uid = req.user.uid;
+
+    if (!(await checkRateLimit(uid, 'my-posts', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+    const cacheKey = `my-posts:${uid}`;
+    let posts = null;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) posts = JSON.parse(cached);
+    } catch (e) { /* ignore */ }
+
+    if (!posts) {
+      const snapshot = await db.collection('posts')
+        .where('userId', '==', uid)
+        .where('status', '==', 'active')
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get();
+
+      posts = [];
+      snapshot.forEach(doc => {
+        posts.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Cache for 2 minutes – invalidated on create/update/delete
+      await redis.set(cacheKey, JSON.stringify(posts), 'EX', 120);
     }
-    const userData = userDoc.data();
 
-    // ── Get user's posts (latest 50) ──
-    const postsSnapshot = await db.collection('posts')
-      .where('userId', '==', uid)
-      .where('status', '==', 'active')
-      .orderBy('createdAt', 'desc')
-      .limit(50)
-      .get();
-
-    const posts = [];
-    postsSnapshot.forEach(doc => {
-      posts.push({ id: doc.id, ...doc.data() });
-    });
-
-    res.json({
-      success: true,
-      user: {
-        uid,
-        username: userData.username || '',
-        fullname: userData.fullname || '',
-        avatar: userData.avatar || '',
-        bio: userData.bio || '',
-        createdAt: userData.createdAt || null,
-      },
-      posts,
-    });
+    res.json({ success: true, posts });
   } catch (error) {
-    console.error('❌ Profile view error:', error);
+    console.error('❌ Get my posts error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
