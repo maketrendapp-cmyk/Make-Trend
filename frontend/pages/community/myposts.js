@@ -9,7 +9,7 @@ import {
   useProfile,
   useMyPosts,
   useLikePost,
-  useDeletePost, // 👈 added
+  useDeletePost,
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -22,8 +22,9 @@ import {
   FiExternalLink,
   FiPlus,
   FiArrowLeft,
-  FiEdit,   // 👈 added
-  FiTrash2, // 👈 added
+  FiEdit,
+  FiTrash2,
+  FiX,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -66,7 +67,7 @@ export default function MyPosts() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const likeMutation = useLikePost();
-  const deletePostMutation = useDeletePost(); // 👈 added
+  const deletePostMutation = useDeletePost();
 
   // ── Fetch profile and posts ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
@@ -74,7 +75,10 @@ export default function MyPosts() {
 
   const isLoading = profileLoading || postsLoading;
 
-  // ── Like handler (optimistic via React Query) ──
+  // ── Custom delete confirmation modal state ──
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null });
+
+  // ── Like handler ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/myposts');
@@ -83,15 +87,33 @@ export default function MyPosts() {
     likeMutation.mutate(postId);
   };
 
-  // ── Delete handler ──
-  const handleDelete = (postId) => {
-    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
-      return;
-    }
-    deletePostMutation.mutate(postId);
+  // ── Delete handler (opens modal) ──
+  const handleDeleteClick = (postId) => {
+    setDeleteModal({ isOpen: true, postId });
   };
 
-  // ── Share handler (same URL as feed) ──
+  // ── Confirm delete ──
+  const confirmDelete = () => {
+    if (deleteModal.postId) {
+      deletePostMutation.mutate(deleteModal.postId, {
+        onSuccess: () => {
+          setDeleteModal({ isOpen: false, postId: null });
+          toast.success('Post deleted successfully');
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to delete post');
+          setDeleteModal({ isOpen: false, postId: null });
+        },
+      });
+    }
+  };
+
+  // ── Cancel delete ──
+  const cancelDelete = () => {
+    setDeleteModal({ isOpen: false, postId: null });
+  };
+
+  // ── Share handler ──
   const handleShare = async (postId) => {
     const url = `${window.location.origin}/community/post/${postId}`;
     try {
@@ -198,6 +220,11 @@ export default function MyPosts() {
     );
   }
 
+  // ── Use profile data for post author info ──
+  const authorName = profile?.fullname || profile?.username || 'Anonymous';
+  const authorAvatar = profile?.avatar || '';
+  const authorUid = user?.uid;
+
   return (
     <>
       <Meta title="My Posts – Make Trend Community" />
@@ -285,29 +312,32 @@ export default function MyPosts() {
                   key={post.id}
                   className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition"
                 >
-                  {/* ── Post Header ── */}
+                  {/* ── Post Header (using profile data) ── */}
                   <div className="flex items-start gap-3">
-                    <Link href={`/community/profile/${post.userId}`} className="flex-shrink-0">
+                    <Link href={`/userinfo/${authorUid}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
-                        {post.user?.avatar ? (
+                        {authorAvatar ? (
                           <Image
-                            src={post.user.avatar}
-                            alt={post.user.fullname || 'User'}
+                            src={authorAvatar}
+                            alt={authorName}
                             width={40}
                             height={40}
                             className="w-full h-full object-cover"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-slate-600 text-sm font-bold">
-                            {post.user?.fullname?.[0] || post.user?.username?.[0] || 'U'}
+                            {authorName?.[0] || 'U'}
                           </div>
                         )}
                       </div>
                     </Link>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center flex-wrap gap-2">
-                        <Link href={`/community/profile/${post.userId}`} className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm">
-                          {post.user?.fullname || post.user?.username || 'Anonymous'}
+                        <Link
+                          href={`/userinfo/${authorUid}`}
+                          className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm"
+                        >
+                          {authorName}
                         </Link>
                         <span className="text-xs text-slate-400">· {formatDate(post.createdAt)}</span>
                       </div>
@@ -404,7 +434,7 @@ export default function MyPosts() {
                       <span>{post.commentsCount || 0}</span>
                     </Link>
 
-                    {/* ── EDIT BUTTON ── */}
+                    {/* ── EDIT ── */}
                     <Link
                       href={`/community/edit/${post.id}`}
                       className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition"
@@ -413,9 +443,9 @@ export default function MyPosts() {
                       <span>Edit</span>
                     </Link>
 
-                    {/* ── DELETE BUTTON ── */}
+                    {/* ── DELETE ── */}
                     <button
-                      onClick={() => handleDelete(post.id)}
+                      onClick={() => handleDeleteClick(post.id)}
                       disabled={deletePostMutation.isLoading}
                       className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50"
                     >
@@ -427,7 +457,7 @@ export default function MyPosts() {
                       <span>Delete</span>
                     </button>
 
-                    {/* ── SHARE BUTTON ── */}
+                    {/* ── SHARE ── */}
                     <button
                       onClick={() => handleShare(post.id)}
                       className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition ml-auto"
@@ -441,7 +471,57 @@ export default function MyPosts() {
             })}
           </div>
         )}
+
+        {/* ── Custom Delete Confirmation Modal ── */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fadeIn">
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Delete Post</h3>
+                <button
+                  onClick={cancelDelete}
+                  className="text-slate-400 hover:text-slate-600 transition"
+                >
+                  <FiX className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-slate-600 text-sm mb-6">
+                Are you sure you want to delete this post? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deletePostMutation.isLoading}
+                  className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                >
+                  {deletePostMutation.isLoading ? (
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FiTrash2 className="w-4 h-4" />
+                  )}
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </>
   );
 }
