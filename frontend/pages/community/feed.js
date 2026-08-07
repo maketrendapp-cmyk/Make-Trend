@@ -18,6 +18,7 @@ import {
   FiExternalLink,
   FiPlay,
   FiChevronUp,
+  FiUser, // 👈 added for My Posts button
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -387,12 +388,21 @@ export default function CommunityFeed() {
           </div>
           <div className="flex items-center gap-3">
             {isAuthenticated && (
-              <Link
-                href="/community/create"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition text-sm font-medium"
-              >
-                <span>+</span> Create Post
-              </Link>
+              <>
+                <Link
+                  href="/community/create"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition text-sm font-medium"
+                >
+                  <span>+</span> Create Post
+                </Link>
+                {/* ── NEW: My Posts button ── */}
+                <Link
+                  href="/community/myposts"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium"
+                >
+                  <FiUser className="w-4 h-4" /> My Posts
+                </Link>
+              </>
             )}
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
