@@ -45,12 +45,12 @@ import {
   FiYoutube,
   FiTwitch,
   FiLinkedin,
-  FiTiktok,
+  // FiTiktok removed from fi
   FiCode,
   FiShoppingBag,
   FiPlay,
 } from 'react-icons/fi';
-import { FaRocket, FaDiscord, FaTelegram } from 'react-icons/fa';
+import { FaRocket, FaDiscord, FaTelegram, FaTiktok } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -117,10 +117,10 @@ const SOCIAL_ICONS = {
   instagram: FiInstagram,
   linkedin: FiLinkedin,
   youtube: FiYoutube,
-  tiktok: FiTiktok,
+  tiktok: FaTiktok,      // from react-icons/fa
   github: FiGithub,
-  discord: FiDiscord,
-  telegram: FiTelegram,
+  discord: FaDiscord,    // from react-icons/fa
+  telegram: FaTelegram,  // from react-icons/fa
   twitch: FiTwitch,
   other: FiLink,
 };
@@ -128,23 +128,6 @@ const SOCIAL_ICONS = {
 const getSocialIcon = (platform) => {
   const Icon = SOCIAL_ICONS[platform?.toLowerCase()] || FiLink;
   return Icon;
-};
-
-// ── Detect link type for icon ──
-const getLinkIcon = (url) => {
-  if (!url) return FiLink;
-  if (url.includes('youtube.com') || url.includes('youtu.be')) return FiYoutube;
-  if (url.includes('vimeo.com')) return FiVideo;
-  if (url.includes('twitter.com') || url.includes('x.com')) return FiTwitter;
-  if (url.includes('github.com')) return FiGithub;
-  if (url.includes('instagram.com')) return FiInstagram;
-  if (url.includes('facebook.com')) return FiFacebook;
-  if (url.includes('linkedin.com')) return FiLinkedin;
-  if (url.includes('tiktok.com')) return FiTiktok;
-  if (url.includes('discord.gg') || url.includes('discord.com')) return FiDiscord;
-  if (url.includes('telegram.org') || url.includes('t.me')) return FiTelegram;
-  if (url.includes('twitch.tv')) return FiTwitch;
-  return FiLink;
 };
 
 export default function ProductDetail() {
