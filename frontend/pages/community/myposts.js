@@ -5,7 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
-import { useProfile, useMyPosts, useLikePost } from '../../lib/queries';
+import {
+  useProfile,
+  useMyPosts,
+  useLikePost,
+  useDeletePost, // 👈 added
+} from '../../lib/queries';
 import {
   FiHeart,
   FiMessageCircle,
@@ -17,6 +22,8 @@ import {
   FiExternalLink,
   FiPlus,
   FiArrowLeft,
+  FiEdit,   // 👈 added
+  FiTrash2, // 👈 added
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -59,6 +66,7 @@ export default function MyPosts() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const likeMutation = useLikePost();
+  const deletePostMutation = useDeletePost(); // 👈 added
 
   // ── Fetch profile and posts ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
@@ -66,7 +74,7 @@ export default function MyPosts() {
 
   const isLoading = profileLoading || postsLoading;
 
-  // ── Like handler (optimistic) ──
+  // ── Like handler (optimistic via React Query) ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/myposts');
@@ -75,7 +83,15 @@ export default function MyPosts() {
     likeMutation.mutate(postId);
   };
 
-  // ── Share handler ──
+  // ── Delete handler ──
+  const handleDelete = (postId) => {
+    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
+      return;
+    }
+    deletePostMutation.mutate(postId);
+  };
+
+  // ── Share handler (same URL as feed) ──
   const handleShare = async (postId) => {
     const url = `${window.location.origin}/community/post/${postId}`;
     try {
@@ -388,6 +404,30 @@ export default function MyPosts() {
                       <span>{post.commentsCount || 0}</span>
                     </Link>
 
+                    {/* ── EDIT BUTTON ── */}
+                    <Link
+                      href={`/community/edit/${post.id}`}
+                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition"
+                    >
+                      <FiEdit className="w-4 h-4" />
+                      <span>Edit</span>
+                    </Link>
+
+                    {/* ── DELETE BUTTON ── */}
+                    <button
+                      onClick={() => handleDelete(post.id)}
+                      disabled={deletePostMutation.isLoading}
+                      className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50"
+                    >
+                      {deletePostMutation.isLoading ? (
+                        <FiLoader className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FiTrash2 className="w-4 h-4" />
+                      )}
+                      <span>Delete</span>
+                    </button>
+
+                    {/* ── SHARE BUTTON ── */}
                     <button
                       onClick={() => handleShare(post.id)}
                       className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition ml-auto"
