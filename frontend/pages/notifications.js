@@ -1,5 +1,5 @@
 // pages/notifications.js
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -36,6 +36,9 @@ export default function Notifications() {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const { invalidateNotifications, invalidateSystemNotifications } = useInvalidateQueries();
+
+  // ── Tab state ──
+  const [activeTab, setActiveTab] = useState('personal'); // 'personal' | 'system'
 
   // ── Personal notifications ──
   const {
@@ -89,7 +92,6 @@ export default function Notifications() {
     setProcessingId(id);
     try {
       await markReadMutation.mutateAsync(id);
-      // Optimistic update: we could also update the cache directly, but invalidate is simpler
       await refetchPersonal();
     } catch (err) {
       toast.error('Failed to mark as read');
@@ -218,6 +220,7 @@ export default function Notifications() {
   }
 
   const unreadSystemCount = systemData?.unreadCount || 0;
+  const unreadPersonalCount = personalNotifications.filter((n) => !n.read).length;
 
   return (
     <>
@@ -242,212 +245,245 @@ export default function Notifications() {
           </button>
         </div>
 
-        {/* ── System Notifications Section ── */}
-        {systemData && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <FiGlobe className="text-purple-600" /> System Updates
-                {unreadSystemCount > 0 && (
-                  <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full">
-                    {unreadSystemCount} new
-                  </span>
+        {/* ── Tabs ── */}
+        <div className="flex border-b border-slate-200 mb-6">
+          <button
+            onClick={() => setActiveTab('personal')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition relative ${
+              activeTab === 'personal'
+                ? 'text-purple-600 border-b-2 border-purple-600'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <FiUser className="w-4 h-4" />
+            Personal
+            {unreadPersonalCount > 0 && (
+              <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full ml-1">
+                {unreadPersonalCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('system')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition relative ${
+              activeTab === 'system'
+                ? 'text-purple-600 border-b-2 border-purple-600'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <FiGlobe className="w-4 h-4" />
+            System
+            {unreadSystemCount > 0 && (
+              <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full ml-1">
+                {unreadSystemCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* ── Tab Content ── */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'personal' && (
+            <motion.div
+              key="personal"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-700">Personal Notifications</h2>
+                {personalNotifications.some((n) => !n.read) && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    disabled={actionLoading}
+                    className="text-xs font-medium text-purple-600 hover:text-purple-800 transition px-3 py-1 rounded-lg border border-purple-200 hover:bg-purple-50 disabled:opacity-50"
+                  >
+                    Mark all read
+                  </button>
                 )}
-              </h2>
-              {unreadSystemCount > 0 && (
-                <button
-                  onClick={handleMarkSystemRead}
-                  disabled={actionLoading}
-                  className="text-xs font-medium text-purple-600 hover:text-purple-800 transition px-3 py-1 rounded-lg border border-purple-200 hover:bg-purple-50 disabled:opacity-50"
-                >
-                  Mark all read
-                </button>
-              )}
-            </div>
-
-            {systemData.notifications.length === 0 ? (
-              <div className="bg-slate-50 rounded-xl p-4 text-center text-sm text-slate-400 border border-slate-200">
-                No system updates
               </div>
-            ) : (
-              <div className="space-y-2">
-                {systemData.notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-3 hover:shadow-sm transition"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0 text-purple-600">
-                      <FiGlobe className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
-                      <p className="text-sm text-slate-600 mt-0.5">{notification.description}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <FiClock className="w-3 h-3" />
-                          {formatDate(notification.createdAt)}
-                        </span>
-                        {notification.redirectUrl && (
-                          <a
-                            href={notification.redirectUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-purple-600 hover:underline flex items-center gap-0.5"
-                          >
-                            <FiExternalLink className="w-3 h-3" /> Open
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    {notification.read ? (
-                      <FiCheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
-                    ) : (
-                      <FiCircle className="w-4 h-4 text-purple-400 flex-shrink-0 mt-1" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* ── Personal Notifications Section ── */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <FiUser className="text-purple-600" /> Personal Notifications
-              {personalNotifications.filter((n) => !n.read).length > 0 && (
-                <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full">
-                  {personalNotifications.filter((n) => !n.read).length} unread
-                </span>
-              )}
-            </h2>
-            {personalNotifications.some((n) => !n.read) && (
-              <button
-                onClick={handleMarkAllRead}
-                disabled={actionLoading}
-                className="text-xs font-medium text-purple-600 hover:text-purple-800 transition px-3 py-1 rounded-lg border border-purple-200 hover:bg-purple-50 disabled:opacity-50"
-              >
-                Mark all read
-              </button>
-            )}
-          </div>
-
-          {personalNotifications.length === 0 ? (
-            <div className="bg-slate-50 rounded-xl p-4 text-center text-sm text-slate-400 border border-slate-200">
-              No personal notifications
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {personalNotifications.map((notification, index) => {
-                const isRead = notification.read || false;
-                const isPersonal = notification.type === 'personal';
-                const sender = notification.sender || {};
-
-                let avatarContent;
-                if (isPersonal) {
-                  avatarContent = sender.avatar ? (
-                    <Image
-                      src={sender.avatar}
-                      alt={sender.fullname || sender.username || 'User'}
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                      {(sender.fullname || sender.username || 'U')[0].toUpperCase()}
-                    </div>
-                  );
-                } else {
-                  avatarContent = (
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                      <FiBell className="w-4 h-4" />
-                    </div>
-                  );
-                }
-
-                return (
-                  <motion.div
-                    key={notification.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    className={`bg-white rounded-xl border p-4 flex items-start gap-3 hover:shadow-sm transition ${
-                      isRead ? 'border-slate-200' : 'border-purple-200 bg-purple-50/30'
-                    }`}
-                    ref={index === personalNotifications.length - 1 ? lastElementRef : null}
-                  >
-                    <div className="flex-shrink-0">{avatarContent}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {notification.title || (isPersonal ? 'Personal Message' : 'Notification')}
-                      </p>
-                      <p className="text-sm text-slate-600 mt-0.5">{notification.description}</p>
-                      <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <FiClock className="w-3 h-3" />
-                          {formatDate(notification.createdAt)}
-                        </span>
-                        {isPersonal && sender.fullname && (
-                          <span className="flex items-center gap-1">
-                            <FiUser className="w-3 h-3" /> {sender.fullname}
-                          </span>
-                        )}
-                        {notification.redirectUrl && (
-                          <a
-                            href={notification.redirectUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-purple-600 hover:underline flex items-center gap-0.5"
-                          >
-                            <FiExternalLink className="w-3 h-3" /> Open
-                          </a>
-                        )}
-                        {!isRead && (
-                          <button
-                            onClick={() => handleMarkRead(notification.id)}
-                            disabled={processingId === notification.id}
-                            className="text-purple-600 hover:text-purple-800 font-medium transition disabled:opacity-50"
-                          >
-                            {processingId === notification.id ? (
-                              <FiLoader className="w-3 h-3 animate-spin" />
-                            ) : (
-                              'Mark read'
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {isRead ? (
-                      <FiCheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
-                    ) : (
-                      <FiCircle className="w-4 h-4 text-purple-400 flex-shrink-0 mt-1" />
-                    )}
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Infinite scroll loading indicator */}
-          {hasNextPage && (
-            <div className="py-4 flex justify-center">
-              {isFetchingNextPage ? (
-                <div className="flex items-center gap-2 text-slate-400">
-                  <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
-                  Loading more...
+              {personalNotifications.length === 0 ? (
+                <div className="bg-slate-50 rounded-xl p-4 text-center text-sm text-slate-400 border border-slate-200">
+                  No personal notifications
                 </div>
               ) : (
-                <div className="h-4" />
+                <div className="space-y-2">
+                  {personalNotifications.map((notification, index) => {
+                    const isRead = notification.read || false;
+                    const isPersonal = notification.type === 'personal';
+                    const sender = notification.sender || {};
+
+                    let avatarContent;
+                    if (isPersonal) {
+                      avatarContent = sender.avatar ? (
+                        <Image
+                          src={sender.avatar}
+                          alt={sender.fullname || sender.username || 'User'}
+                          width={32}
+                          height={32}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+                          {(sender.fullname || sender.username || 'U')[0].toUpperCase()}
+                        </div>
+                      );
+                    } else {
+                      avatarContent = (
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                          <FiBell className="w-4 h-4" />
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <motion.div
+                        key={notification.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        className={`bg-white rounded-xl border p-4 flex items-start gap-3 hover:shadow-sm transition ${
+                          isRead ? 'border-slate-200' : 'border-purple-200 bg-purple-50/30'
+                        }`}
+                        ref={index === personalNotifications.length - 1 ? lastElementRef : null}
+                      >
+                        <div className="flex-shrink-0">{avatarContent}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {notification.title || (isPersonal ? 'Personal Message' : 'Notification')}
+                          </p>
+                          <p className="text-sm text-slate-600 mt-0.5">{notification.description}</p>
+                          <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <FiClock className="w-3 h-3" />
+                              {formatDate(notification.createdAt)}
+                            </span>
+                            {isPersonal && sender.fullname && (
+                              <span className="flex items-center gap-1">
+                                <FiUser className="w-3 h-3" /> {sender.fullname}
+                              </span>
+                            )}
+                            {notification.redirectUrl && (
+                              <a
+                                href={notification.redirectUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-purple-600 hover:underline flex items-center gap-0.5"
+                              >
+                                <FiExternalLink className="w-3 h-3" /> Open
+                              </a>
+                            )}
+                            {!isRead && (
+                              <button
+                                onClick={() => handleMarkRead(notification.id)}
+                                disabled={processingId === notification.id}
+                                className="text-purple-600 hover:text-purple-800 font-medium transition disabled:opacity-50"
+                              >
+                                {processingId === notification.id ? (
+                                  <FiLoader className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  'Mark read'
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {isRead ? (
+                          <FiCheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
+                        ) : (
+                          <FiCircle className="w-4 h-4 text-purple-400 flex-shrink-0 mt-1" />
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
               )}
-            </div>
+
+              {/* Infinite scroll loading indicator */}
+              {hasNextPage && (
+                <div className="py-4 flex justify-center">
+                  {isFetchingNextPage ? (
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
+                      Loading more...
+                    </div>
+                  ) : (
+                    <div className="h-4" />
+                  )}
+                </div>
+              )}
+
+              {!hasNextPage && personalNotifications.length > 0 && (
+                <p className="text-center text-xs text-slate-400 py-4">End of notifications</p>
+              )}
+            </motion.div>
           )}
 
-          {!hasNextPage && personalNotifications.length > 0 && (
-            <p className="text-center text-xs text-slate-400 py-4">End of notifications</p>
+          {activeTab === 'system' && (
+            <motion.div
+              key="system"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-700">System Updates</h2>
+                {unreadSystemCount > 0 && (
+                  <button
+                    onClick={handleMarkSystemRead}
+                    disabled={actionLoading}
+                    className="text-xs font-medium text-purple-600 hover:text-purple-800 transition px-3 py-1 rounded-lg border border-purple-200 hover:bg-purple-50 disabled:opacity-50"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
+
+              {systemData?.notifications?.length === 0 ? (
+                <div className="bg-slate-50 rounded-xl p-4 text-center text-sm text-slate-400 border border-slate-200">
+                  No system updates
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {systemData?.notifications?.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-3 hover:shadow-sm transition"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0 text-purple-600">
+                        <FiGlobe className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                        <p className="text-sm text-slate-600 mt-0.5">{notification.description}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <FiClock className="w-3 h-3" />
+                            {formatDate(notification.createdAt)}
+                          </span>
+                          {notification.redirectUrl && (
+                            <a
+                              href={notification.redirectUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-purple-600 hover:underline flex items-center gap-0.5"
+                            >
+                              <FiExternalLink className="w-3 h-3" /> Open
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <FiCheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       </div>
     </>
   );
