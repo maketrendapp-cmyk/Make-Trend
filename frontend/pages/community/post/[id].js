@@ -121,7 +121,7 @@ export default function PostDetail() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler (optimistic + localStorage) ──
+  // ── Like handler (optimistic + API call) ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
@@ -139,10 +139,8 @@ export default function PostDetail() {
     const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
     const updatedPost = { ...currentPost, userLiked: newVoted, likes: newLikes };
 
-    // Update single post cache
+    // Update caches immediately
     queryClient.setQueryData(['post', id], updatedPost);
-
-    // Update feed caches (if they exist)
     const feedQueries = queryClient.getQueryCache().findAll(['posts']);
     for (const query of feedQueries) {
       const data = query.state.data;
@@ -160,12 +158,13 @@ export default function PostDetail() {
       }
     }
 
-    // Update localStorage
     setLocalVote(id, newVoted, newLikes);
 
-    // Call mutation
+    // ── API Call: mutate with callbacks ──
+    console.log('📤 Sending like API request for post:', id);
     likeMutation.mutate(id, {
       onSuccess: (data) => {
+        console.log('✅ Like API success:', data);
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
 
@@ -174,7 +173,6 @@ export default function PostDetail() {
         if (current) {
           queryClient.setQueryData(['post', id], { ...current, userLiked: serverVoted, likes: serverLikes });
         }
-
         const feedQueries2 = queryClient.getQueryCache().findAll(['posts']);
         for (const query of feedQueries2) {
           const data2 = query.state.data;
@@ -191,12 +189,11 @@ export default function PostDetail() {
             queryClient.setQueryData(query.queryKey, { ...data2, pages: newPages2 });
           }
         }
-
-        // Sync localStorage
         setLocalVote(id, serverVoted, serverLikes);
       },
       onError: (error) => {
-        // Revert
+        console.error('❌ Like API error:', error);
+        // Revert optimistic update
         queryClient.setQueryData(['post', id], currentPost);
         const feedQueries3 = queryClient.getQueryCache().findAll(['posts']);
         for (const query of feedQueries3) {
@@ -220,12 +217,11 @@ export default function PostDetail() {
     });
   };
 
-  // ── Comment handler (optimistic + refetch on success) ──
+  // ── Comment handler (optimistic + refetch) ──
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || !isAuthenticated) return;
 
-    // Save current comment text
     const text = commentText.trim();
     setCommentText('');
 
@@ -242,7 +238,6 @@ export default function PostDetail() {
       createdAt: new Date().toISOString(),
     };
 
-    // Update comments cache optimistically
     const currentComments = queryClient.getQueryData(['postComments', id]);
     if (currentComments) {
       const newPages = currentComments.pages.map((page, idx) => {
@@ -260,7 +255,6 @@ export default function PostDetail() {
       });
     }
 
-    // Also increment comment count on post
     const currentPost = queryClient.getQueryData(['post', id]);
     if (currentPost) {
       queryClient.setQueryData(['post', id], {
@@ -269,17 +263,17 @@ export default function PostDetail() {
       });
     }
 
-    // Call mutation
+    // API call
     addCommentMutation.mutate(
       { postId: id, content: text },
       {
         onSuccess: () => {
-          // Refetch comments to sync with server (replace optimistic comment)
+          console.log('✅ Comment added, refetching...');
           refetchComments();
-          // Refetch post to update commentsCount
           refetchPost();
         },
         onError: (error) => {
+          console.error('❌ Comment error:', error);
           // Revert optimistic comment
           const revertComments = queryClient.getQueryData(['postComments', id]);
           if (revertComments) {
@@ -292,7 +286,6 @@ export default function PostDetail() {
               pages: revertPages,
             });
           }
-          // Revert comment count
           const revertPost = queryClient.getQueryData(['post', id]);
           if (revertPost) {
             queryClient.setQueryData(['post', id], {
