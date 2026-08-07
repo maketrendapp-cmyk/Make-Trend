@@ -821,6 +821,24 @@ export function useMarkSystemNotificationsRead() {
   });
 }
 
+// lib/queries.js
+
+export function usePublicProfile(uid) {
+  return useQuery(
+    ['public-profile', uid],
+    async () => {
+      if (!uid) return null;
+      const res = await apiRequest(`/users/${uid}`, { method: 'GET' });
+      return res.user;
+    },
+    {
+      enabled: !!uid,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    }
+  );
+}
+
 // ── Invalidation helper ──
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
