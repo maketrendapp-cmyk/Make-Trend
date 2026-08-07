@@ -4973,7 +4973,10 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
 app.get('/api/grow-feed', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const limit = parseInt(req.query.limit) || 25;
+    let limit = parseInt(req.query.limit) || 25;
+    const MAX_LIMIT = 100;   // Hard cap to prevent abuse
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
+
     const lastTaskId = req.query.lastTaskId || null;
 
     if (!(await checkRateLimit(uid, 'grow-feed', 20, 60))) {
@@ -5359,7 +5362,10 @@ async function invalidateProductCaches(productId, makerUid) {
 // ─────────────────────────────────────────────
 app.get('/api/productstrend/feed', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 20;
+    let limit = parseInt(req.query.limit) || 20;
+    const MAX_LIMIT = 100;   // Hard cap to prevent abuse
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
+
     const lastId = req.query.lastId || null;
     const search = req.query.search || '';
     const category = req.query.category || '';
