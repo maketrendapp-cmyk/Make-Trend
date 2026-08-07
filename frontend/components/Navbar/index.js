@@ -2,20 +2,21 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../AuthScreen';
-import { useProfile } from '../../lib/queries';
+import { useProfile, useSystemNotifications } from '../../lib/queries'; // import useSystemNotifications
 import { useState, useEffect } from 'react';
 import MobileNav from './MobileNav';
 import DesktopNav from './DesktopNav';
 import { FiMenu, FiHome, FiUser, FiX } from 'react-icons/fi';
-import { FaCrown } from 'react-icons/fa'; // ✅ Added missing import
+import { FaCrown } from 'react-icons/fa';
 
 export default function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+  // Fetch unread system notifications count
+  const { data: systemData } = useSystemNotifications(isAuthenticated);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  // State for avatar image error (React-friendly fallback)
   const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {
@@ -32,32 +33,16 @@ export default function Navbar() {
     setIsMobileMenuOpen(false);
   };
 
-  // ── User details ──
-  const displayName = profile?.fullname ||
-    profile?.name ||
-    user?.fullName ||
-    user?.fullname ||
-    user?.displayName ||
-    'User';
-
-  const displayUsername = profile?.username ||
-    user?.username ||
-    user?.email?.split('@')[0] ||
-    'user';
-
-  const avatarUrl = profile?.avatar ||
-    profile?.profilePic ||
-    user?.photoURL ||
-    user?.avatar ||
-    null;
-
+  const displayName = profile?.fullname || profile?.name || user?.fullName || user?.fullname || user?.displayName || 'User';
+  const displayUsername = profile?.username || user?.username || user?.email?.split('@')[0] || 'user';
+  const avatarUrl = profile?.avatar || profile?.profilePic || user?.photoURL || user?.avatar || null;
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
   const isPro = profile?.plan === 'pro' || false;
   const isProfileLoading = profileLoading || (user && !profile);
+  const unreadCount = systemData?.unreadCount || 0; // gets unread system notifications count
 
   const isActive = (path) => router.pathname === path;
 
-  // Reset avatar error when avatar URL changes
   useEffect(() => {
     setAvatarError(false);
   }, [avatarUrl]);
@@ -76,7 +61,7 @@ export default function Navbar() {
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="flex h-14 sm:h-16 items-center justify-between">
 
-            {/* ── Logo (left) ── */}
+            {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
               <img
                 src="/favicon.ico"
@@ -89,7 +74,7 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* ── Desktop Nav (right) ── */}
+            {/* Desktop Nav */}
             <div className="hidden md:block">
               <DesktopNav
                 isAuthenticated={isAuthenticated}
@@ -100,12 +85,12 @@ export default function Navbar() {
                 firstLetter={firstLetter}
                 isPro={isPro}
                 handleLogout={handleLogout}
+                unreadCount={unreadCount} // pass count
               />
             </div>
 
-            {/* ── Mobile Header (visible only on mobile) ── */}
+            {/* Mobile Header */}
             <div className="flex items-center gap-1 md:hidden">
-              {/* Home Button */}
               <Link
                 href="/"
                 className={`
@@ -120,7 +105,6 @@ export default function Navbar() {
                 <span className="text-xs">Home</span>
               </Link>
 
-              {/* User / Get Started */}
               {isAuthenticated ? (
                 <Link
                   href="/profile"
@@ -158,17 +142,12 @@ export default function Navbar() {
                 </Link>
               )}
 
-              {/* Menu Button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200"
                 aria-label="Toggle menu"
               >
-                {isMobileMenuOpen ? (
-                  <FiX className="w-5 h-5" />
-                ) : (
-                  <FiMenu className="w-5 h-5" />
-                )}
+                {isMobileMenuOpen ? <FiX className="w-5 h-5" /> : <FiMenu className="w-5 h-5" />}
               </button>
             </div>
 
@@ -176,7 +155,6 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* ── Mobile Drawer ── */}
       <MobileNav
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
@@ -186,6 +164,7 @@ export default function Navbar() {
         avatarUrl={avatarUrl}
         firstLetter={firstLetter}
         handleLogout={handleLogout}
+        unreadCount={unreadCount}
       />
     </>
   );
