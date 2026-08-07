@@ -635,19 +635,6 @@ export function useLikePost() {
   });
 }
 
-// 5. Like/unlike a post – simple mutation, UI updates handled by components
-export function useLikePost() {
-  return useMutation({
-    mutationFn: async (postId) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      const data = await apiRequest(`/posts/${postId}/like`, {
-        method: 'POST',
-      }, token);
-      return data;
-    },
-  });
-}
 
 // 6. Add a comment – simple mutation, UI updates handled by components
 export function useAddComment() {
