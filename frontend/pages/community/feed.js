@@ -1,8 +1,9 @@
 // pages/community/feed.js
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import { usePosts, useLikePost } from '../../lib/queries';
@@ -16,9 +17,26 @@ import {
   FiX,
   FiExternalLink,
   FiPlay,
+  FiChevronDown,
+  FiChevronUp,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+
+// ── localStorage helpers for like status ──
+const getLocalVote = (postId) => {
+  try {
+    const raw = localStorage.getItem(`community_like_${postId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+};
+
+const setLocalVote = (postId, voted, likes) => {
+  try {
+    localStorage.setItem(`community_like_${postId}`, JSON.stringify({ voted, likes }));
+  } catch (e) {}
+};
 
 // ── Constants ──
 const CATEGORIES = [
@@ -70,6 +88,7 @@ const POST_TYPE_LABELS = {
 export default function CommunityFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
 
   // ── Filter state ──
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -78,10 +97,13 @@ export default function CommunityFeed() {
   const [appliedType, setAppliedType] = useState('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // ── Like mutation (optimistic) ──
+  // ── "Read more" state ──
+  const [expandedPosts, setExpandedPosts] = useState(new Set());
+
+  // ── Like mutation ──
   const likeMutation = useLikePost();
 
-  // ── Fetch posts with backend filtering ──
+  // ── Fetch posts ──
   const {
     data,
     isLoading,
@@ -98,6 +120,17 @@ export default function CommunityFeed() {
   );
 
   const posts = data?.pages?.flatMap((page) => page.posts) || [];
+
+  // ── Helper to get post from cache ──
+  const getPostFromCache = (postId) => {
+    const allPosts = queryClient.getQueryData(['posts', appliedCategory === 'all' ? 'all' : appliedCategory, appliedType === 'all' ? 'all' : appliedType]);
+    if (!allPosts) return null;
+    for (const page of allPosts.pages) {
+      const found = page.posts.find(p => p.id === postId);
+      if (found) return found;
+    }
+    return null;
+  };
 
   // ── Apply filters ──
   const applyFilters = () => {
@@ -130,13 +163,43 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler (optimistic) ──
+  // ── Like handler with localStorage ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
-    likeMutation.mutate(postId);
+
+    // Get current post from cache to know current state
+    const currentPost = getPostFromCache(postId);
+    if (!currentPost) {
+      toast.error('Post not found');
+      return;
+    }
+
+    // Optimistic UI: update localStorage and cache is already handled by the mutation's onMutate.
+    // But we also want to update localStorage here for immediate feedback.
+    const newVoted = !currentPost.userLiked;
+    const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
+    setLocalVote(postId, newVoted, newLikes);
+
+    // Call the mutation
+    likeMutation.mutate(postId, {
+      onSuccess: (data) => {
+        // Sync localStorage with server
+        const serverVoted = data.action === 'added';
+        const serverLikes = data.likes;
+        setLocalVote(postId, serverVoted, serverLikes);
+      },
+      onError: (error) => {
+        // Revert localStorage to previous state
+        const revertedPost = getPostFromCache(postId);
+        if (revertedPost) {
+          setLocalVote(postId, revertedPost.userLiked, revertedPost.likes);
+        }
+        toast.error(error.message || 'Failed to like');
+      },
+    });
   };
 
   // ── Share handler ──
@@ -185,6 +248,19 @@ export default function CommunityFeed() {
     } catch {
       return 'Just now';
     }
+  };
+
+  // ── Toggle expand post ──
+  const toggleExpand = (postId) => {
+    setExpandedPosts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
   };
 
   // ── Skeleton loader ──
@@ -405,6 +481,13 @@ export default function CommunityFeed() {
               const isVideo = post.videoUrl && post.videoUrl.trim() !== '';
               const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
               const hasCTA = post.ctaText && post.ctaUrl;
+              const isExpanded = expandedPosts.has(post.id);
+
+              // Determine if we need "Read more"
+              const titleLength = post.title?.length || 0;
+              const descLength = post.description?.length || 0;
+              const truncateTitle = titleLength > 150;
+              const truncateDesc = descLength > 400;
 
               return (
                 <div
@@ -453,12 +536,46 @@ export default function CommunityFeed() {
 
                   {/* ── Post Content ── */}
                   <Link href={`/community/post/${post.id}`} className="block mt-3">
+                    {/* Title with "Read more" */}
                     <h2 className="text-lg font-bold text-slate-900 hover:text-purple-600 transition">
-                      {post.title}
+                      {truncateTitle && !isExpanded ? (
+                        <>
+                          {post.title.slice(0, 150)}...
+                          <span
+                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
+                            className="text-purple-600 hover:underline ml-1 text-sm font-normal"
+                          >
+                            Read more
+                          </span>
+                        </>
+                      ) : (
+                        post.title
+                      )}
                     </h2>
-                    <p className="text-slate-600 mt-1 text-sm whitespace-pre-wrap line-clamp-4">
-                      {post.description}
+                    {/* Description with "Read more" */}
+                    <p className="text-slate-600 mt-1 text-sm whitespace-pre-wrap">
+                      {truncateDesc && !isExpanded ? (
+                        <>
+                          {post.description.slice(0, 400)}...
+                          <span
+                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
+                            className="text-purple-600 hover:underline ml-1 text-sm font-normal"
+                          >
+                            Read more
+                          </span>
+                        </>
+                      ) : (
+                        post.description
+                      )}
                     </p>
+                    {(truncateTitle || truncateDesc) && isExpanded && (
+                      <button
+                        onClick={() => toggleExpand(post.id)}
+                        className="text-xs text-purple-600 hover:underline mt-1 flex items-center gap-0.5"
+                      >
+                        Show less <FiChevronUp className="w-3 h-3" />
+                      </button>
+                    )}
                   </Link>
 
                   {/* ── Image ── */}
@@ -504,15 +621,15 @@ export default function CommunityFeed() {
                     </div>
                   )}
 
-                  {/* ── Actions ── */}
-                  <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100">
+                  {/* ── Actions with box styling ── */}
+                  <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => handleLike(post.id)}
                       disabled={!isAuthenticated}
-                      className={`flex items-center gap-1.5 text-sm transition ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition ${
                         isLiked
-                          ? 'text-purple-600 font-semibold'
-                          : 'text-slate-500 hover:text-purple-600'
+                          ? 'border-purple-300 bg-purple-50 text-purple-600'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {isLiked ? (
@@ -525,7 +642,7 @@ export default function CommunityFeed() {
 
                     <Link
                       href={`/community/post/${post.id}`}
-                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm"
                     >
                       <FiMessageCircle className="w-4 h-4" />
                       <span>{post.commentsCount || 0}</span>
@@ -533,7 +650,7 @@ export default function CommunityFeed() {
 
                     <button
                       onClick={() => handleShare(post.id)}
-                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition ml-auto"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm ml-auto"
                     >
                       <FiShare2 className="w-4 h-4" />
                       <span>Share</span>
