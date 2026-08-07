@@ -414,6 +414,29 @@ async function invalidateUserExchanges(uid) {
   await invalidateKey(`user:exchanges:${uid}`);
 }
 
+// ── Helper: Create notification (internal, used by other endpoints) ──
+async function createNotification({ userId, type, title, description, redirectUrl, fromUserId = null }) {
+  try {
+    const data = {
+      userId,
+      type, // 'personal' or 'system'
+      title: title.slice(0, 100),
+      description: description ? description.slice(0, 300) : '',
+      redirectUrl: redirectUrl || null,
+      fromUserId: fromUserId || null,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await db.collection('notifications').add(data);
+    // Invalidate cache for this user
+    await invalidatePattern(`notifications:user:${userId}:*`);
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+}
+
+
 
 
 // ============================================================
@@ -1029,22 +1052,23 @@ app.post('/api/auth/register', async (req, res) => {
     const cleanReferredBy = sanitizeReferralCode(referredByCode);
 
     const userData = {
-      uid,
-      username: cleanUsername,
-      fullname: cleanFullname,
-      email: cleanEmail,
-      avatar: avatar || '',
-      referralCode: newReferralCode,
-      referredBy: cleanReferredBy || null,
-      deviceId: deviceId || '',   // store as deviceFingerprint
-      completed: true,
-      plan: 'free',
-      mtCoinsEarned: 0,           // default (will be set to 100 if referral is valid)
-      mtCoinsSpent: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-      isBanned: false,
-    };
+  uid,
+  username: cleanUsername,
+  fullname: cleanFullname,
+  email: cleanEmail,
+  avatar: avatar || '',
+  referralCode: newReferralCode,
+  referredBy: cleanReferredBy || null,
+  deviceId: deviceId || '',   // store as deviceFingerprint
+  completed: true,
+  plan: 'free',
+  mtCoinsEarned: 0,           // default (will be set to 100 if referral is valid)
+  mtCoinsSpent: 0,
+  lastReadSystemAt: 0,        // ✅ NEW
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+  isBanned: false,
+};
 
     let bonusAwarded = false;
 
@@ -1175,22 +1199,23 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
     const cleanReferredBy = sanitizeReferralCode(referredByCode);
 
     const userData = {
-      uid,
-      username: cleanUsername,
-      fullname: cleanFullname,
-      email: cleanEmail,
-      avatar: avatar || '',
-      referralCode: newReferralCode,
-      referredBy: cleanReferredBy || null,
-      deviceId: deviceId || '',   // store as deviceFingerprint
-      completed: true,
-      plan: 'free',
-      mtCoinsEarned: 0,           // default (will be set to 100 if referral is valid)
-      mtCoinsSpent: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-      isBanned: false,
-    };
+  uid,
+  username: cleanUsername,
+  fullname: cleanFullname,
+  email: cleanEmail,
+  avatar: avatar || '',
+  referralCode: newReferralCode,
+  referredBy: cleanReferredBy || null,
+  deviceId: deviceId || '',   // store as deviceFingerprint
+  completed: true,
+  plan: 'free',
+  mtCoinsEarned: 0,           // default (will be set to 100 if referral is valid)
+  mtCoinsSpent: 0,
+  lastReadSystemAt: 0,        // ✅ NEW
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+  isBanned: false,
+};
 
     let bonusAwarded = false;
 
@@ -6190,7 +6215,251 @@ app.post('/api/productstrend/products/:id/comments', verifyToken, checkBanned, a
 });
 
 // ============================================================
-// 18. GLOBAL ERROR HANDLER
+// 23. NOTIFICATIONS
+// ============================================================
+
+// ── Get user's notifications (paginated, cached) ──
+app.get('/api/notifications', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    let limit = parseInt(req.query.limit) || 20;
+    const MAX_LIMIT = 50;
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
+    const lastId = req.query.lastId || null;
+
+    // ── Build cache key ──
+    const cacheKey = `notifications:user:${uid}:${limit}:${lastId || 'null'}`;
+    let result = null;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) result = JSON.parse(cached);
+    } catch (e) { /* ignore */ }
+
+    if (!result) {
+      let query = db.collection('notifications')
+        .where('userId', '==', uid)
+        .orderBy('createdAt', 'desc')
+        .limit(limit + 1);
+
+      if (lastId) {
+        const lastDoc = await db.collection('notifications').doc(lastId).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      }
+
+      const snapshot = await query.get();
+      const notifications = [];
+      let hasMore = false;
+      let lastNotificationId = null;
+
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i++) {
+        if (i >= limit) {
+          hasMore = true;
+          break;
+        }
+        const doc = docs[i];
+        const data = doc.data();
+        // ── If personal, fetch sender info ──
+        let sender = null;
+        if (data.type === 'personal' && data.fromUserId) {
+          const senderDoc = await db.collection('users').doc(data.fromUserId).get();
+          if (senderDoc.exists) {
+            const sData = senderDoc.data();
+            sender = {
+              uid: data.fromUserId,
+              username: sData.username || '',
+              fullname: sData.fullname || '',
+              avatar: sData.avatar || '',
+            };
+          }
+        }
+        notifications.push({
+          id: doc.id,
+          ...data,
+          sender,
+        });
+        lastNotificationId = doc.id;
+      }
+
+      result = { notifications, hasMore, lastId: lastNotificationId };
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 60); // 1 min TTL
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('❌ Get notifications error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Mark single notification as read ──
+app.put('/api/notifications/:id/read', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+
+    // ── Check ownership ──
+    const docRef = db.collection('notifications').doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Notification not found' });
+    }
+    const data = doc.data();
+    if (data.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'Not your notification' });
+    }
+
+    await docRef.update({
+      read: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // ── Invalidate user's notification cache ──
+    await invalidatePattern(`notifications:user:${uid}:*`);
+
+    res.json({ success: true, message: 'Marked as read' });
+  } catch (error) {
+    console.error('❌ Mark read error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Mark all notifications as read ──
+app.put('/api/notifications/read-all', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    const snapshot = await db.collection('notifications')
+      .where('userId', '==', uid)
+      .where('read', '==', false)
+      .get();
+
+    const batch = db.batch();
+    snapshot.forEach(doc => {
+      batch.update(doc.ref, { read: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    });
+    await batch.commit();
+
+    // ── Invalidate cache ──
+    await invalidatePattern(`notifications:user:${uid}:*`);
+
+    res.json({ success: true, message: `Marked ${snapshot.size} notifications as read` });
+  } catch (error) {
+    console.error('❌ Mark all read error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── SYSTEM NOTIFICATIONS (global, per-user last-read timestamp) ──
+
+// GET system notifications (unread only)
+app.get('/api/notifications/system', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    // ── Get user's last read timestamp ──
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = userDoc.data();
+    const lastRead = userData.lastReadSystemAt || 0; // numeric timestamp (seconds)
+
+    // ── Query system notifications newer than lastRead ──
+    let query = db.collection('systemNotifications')
+      .orderBy('createdAt', 'desc')
+      .limit(50);
+
+    if (lastRead > 0) {
+      const lastReadDate = new Date(lastRead * 1000);
+      query = query.where('createdAt', '>', lastReadDate);
+    }
+
+    const snapshot = await query.get();
+    const notifications = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      notifications.push({
+        id: doc.id,
+        title: data.title || '',
+        description: data.description || '',
+        redirectUrl: data.redirectUrl || null,
+        createdAt: data.createdAt || null,
+      });
+    });
+
+    const unreadCount = notifications.length;
+
+    res.json({
+      success: true,
+      notifications,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error('❌ Get system notifications error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Mark all system notifications as read
+app.post('/api/notifications/system/read', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    await db.collection('users').doc(uid).update({
+      lastReadSystemAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.json({ success: true, message: 'All system notifications marked as read' });
+  } catch (error) {
+    console.error('❌ Mark system read error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Admin: Create system notification
+app.post('/api/admin/system-notifications', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    const { title, description, redirectUrl } = req.body;
+
+    if (!title || title.trim().length < 1) {
+      return res.status(400).json({ success: false, error: 'Title is required' });
+    }
+    if (description && description.length > 500) {
+      return res.status(400).json({ success: false, error: 'Description must be less than 500 characters' });
+    }
+
+    const data = {
+      title: title.trim().slice(0, 100),
+      description: description ? description.trim().slice(0, 300) : '',
+      redirectUrl: redirectUrl || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await db.collection('systemNotifications').add(data);
+
+    res.status(201).json({
+      success: true,
+      message: 'System notification broadcasted successfully',
+      notification: { id: docRef.id, ...data },
+    });
+  } catch (error) {
+    console.error('❌ Create system notification error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// 18. GLOBAL ERROR HANDLER (renumbered from 18 to 24)
 // ============================================================
 app.use((err, req, res, next) => {
   console.error('🔥 Global error:', err);
@@ -6210,7 +6479,7 @@ app.use((err, req, res, next) => {
 
 
 // ============================================================
-// 19. START SERVER
+// 19. START SERVER (unchanged)
 // ============================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
