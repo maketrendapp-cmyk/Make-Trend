@@ -1,5 +1,5 @@
 // pages/community/post/[id].js
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -63,7 +63,7 @@ const CATEGORIES = [
   { value: 'other', label: '📌 Other' },
 ];
 
-// ── localStorage helpers for like status ──
+// ── localStorage helpers ──
 const getLocalVote = (postId) => {
   try {
     const raw = localStorage.getItem(`community_like_${postId}`);
@@ -121,14 +121,13 @@ export default function PostDetail() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler with localStorage and manual cache update ──
+  // ── Like handler (optimistic + localStorage) ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
       return;
     }
 
-    // Get current post from cache
     const currentPost = queryClient.getQueryData(['post', id]);
     if (!currentPost) {
       toast.error('Post not found');
@@ -143,9 +142,9 @@ export default function PostDetail() {
     // Update single post cache
     queryClient.setQueryData(['post', id], updatedPost);
 
-    // Also update feed cache for consistency (if it exists)
-    const feedQueryKeys = queryClient.getQueryCache().findAll(['posts']);
-    for (const query of feedQueryKeys) {
+    // Update feed caches (if they exist)
+    const feedQueries = queryClient.getQueryCache().findAll(['posts']);
+    for (const query of feedQueries) {
       const data = query.state.data;
       if (data && data.pages) {
         const newPages = data.pages.map((page) => ({
@@ -170,18 +169,17 @@ export default function PostDetail() {
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
 
-        // Sync single post cache
+        // Sync caches with server
         const current = queryClient.getQueryData(['post', id]);
         if (current) {
           queryClient.setQueryData(['post', id], { ...current, userLiked: serverVoted, likes: serverLikes });
         }
 
-        // Sync feed caches
-        const feedQueries = queryClient.getQueryCache().findAll(['posts']);
-        for (const query of feedQueries) {
-          const data = query.state.data;
-          if (data && data.pages) {
-            const newPages = data.pages.map((page) => ({
+        const feedQueries2 = queryClient.getQueryCache().findAll(['posts']);
+        for (const query of feedQueries2) {
+          const data2 = query.state.data;
+          if (data2 && data2.pages) {
+            const newPages2 = data2.pages.map((page) => ({
               ...page,
               posts: page.posts.map((p) => {
                 if (p.id === id) {
@@ -190,22 +188,21 @@ export default function PostDetail() {
                 return p;
               }),
             }));
-            queryClient.setQueryData(query.queryKey, { ...data, pages: newPages });
+            queryClient.setQueryData(query.queryKey, { ...data2, pages: newPages2 });
           }
         }
 
-        // Update localStorage
+        // Sync localStorage
         setLocalVote(id, serverVoted, serverLikes);
       },
       onError: (error) => {
         // Revert
         queryClient.setQueryData(['post', id], currentPost);
-        // Revert feed caches
-        const feedQueries = queryClient.getQueryCache().findAll(['posts']);
-        for (const query of feedQueries) {
-          const data = query.state.data;
-          if (data && data.pages) {
-            const newPages = data.pages.map((page) => ({
+        const feedQueries3 = queryClient.getQueryCache().findAll(['posts']);
+        for (const query of feedQueries3) {
+          const data3 = query.state.data;
+          if (data3 && data3.pages) {
+            const newPages3 = data3.pages.map((page) => ({
               ...page,
               posts: page.posts.map((p) => {
                 if (p.id === id) {
@@ -214,7 +211,7 @@ export default function PostDetail() {
                 return p;
               }),
             }));
-            queryClient.setQueryData(query.queryKey, { ...data, pages: newPages });
+            queryClient.setQueryData(query.queryKey, { ...data3, pages: newPages3 });
           }
         }
         setLocalVote(id, currentPost.userLiked, currentPost.likes);
@@ -223,16 +220,88 @@ export default function PostDetail() {
     });
   };
 
-  // ── Comment submit ──
+  // ── Comment handler (optimistic + refetch on success) ──
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || !isAuthenticated) return;
 
+    // Save current comment text
+    const text = commentText.trim();
+    setCommentText('');
+
+    // Optimistic comment
+    const optimisticComment = {
+      id: `temp-${Date.now()}`,
+      content: text,
+      userId: user?.uid,
+      user: {
+        username: user?.username || 'You',
+        fullname: user?.fullname || 'You',
+        avatar: user?.avatar || null,
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    // Update comments cache optimistically
+    const currentComments = queryClient.getQueryData(['postComments', id]);
+    if (currentComments) {
+      const newPages = currentComments.pages.map((page, idx) => {
+        if (idx === 0) {
+          return {
+            ...page,
+            comments: [optimisticComment, ...page.comments],
+          };
+        }
+        return page;
+      });
+      queryClient.setQueryData(['postComments', id], {
+        ...currentComments,
+        pages: newPages,
+      });
+    }
+
+    // Also increment comment count on post
+    const currentPost = queryClient.getQueryData(['post', id]);
+    if (currentPost) {
+      queryClient.setQueryData(['post', id], {
+        ...currentPost,
+        commentsCount: (currentPost.commentsCount || 0) + 1,
+      });
+    }
+
+    // Call mutation
     addCommentMutation.mutate(
-      { postId: id, content: commentText.trim() },
+      { postId: id, content: text },
       {
         onSuccess: () => {
-          setCommentText('');
+          // Refetch comments to sync with server (replace optimistic comment)
+          refetchComments();
+          // Refetch post to update commentsCount
+          refetchPost();
+        },
+        onError: (error) => {
+          // Revert optimistic comment
+          const revertComments = queryClient.getQueryData(['postComments', id]);
+          if (revertComments) {
+            const revertPages = revertComments.pages.map((page) => ({
+              ...page,
+              comments: page.comments.filter((c) => c.id !== optimisticComment.id),
+            }));
+            queryClient.setQueryData(['postComments', id], {
+              ...revertComments,
+              pages: revertPages,
+            });
+          }
+          // Revert comment count
+          const revertPost = queryClient.getQueryData(['post', id]);
+          if (revertPost) {
+            queryClient.setQueryData(['post', id], {
+              ...revertPost,
+              commentsCount: (revertPost.commentsCount || 0) - 1,
+            });
+          }
+          setCommentText(text);
+          toast.error(error.message || 'Failed to add comment');
         },
       }
     );
@@ -342,7 +411,6 @@ export default function PostDetail() {
   const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
   const hasCTA = post.ctaText && post.ctaUrl;
 
-  // ── Read more logic ──
   const titleLength = post.title?.length || 0;
   const descLength = post.description?.length || 0;
   const truncateTitle = titleLength > 150;
