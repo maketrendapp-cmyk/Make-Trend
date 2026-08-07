@@ -529,14 +529,18 @@ export function useDeleteProduct() {
 
 // 1. Fetch posts feed (infinite scroll, public, with category filter)
 // StaleTime: 2 min to reduce refetches
-export function usePosts(category = null, enabled = true) {
-  const queryKey = ['posts', category || 'all'];
+// 1. Fetch posts feed (infinite scroll, public, with category & type filters)
+export function usePosts(category = null, type = null, enabled = true) {
+  const queryKey = ['posts', category || 'all', type || 'all'];
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam = null }) => {
       let url = '/posts?limit=20';
       if (category && category !== 'all') {
         url += `&category=${category}`;
+      }
+      if (type && type !== 'all') {
+        url += `&type=${type}`;
       }
       if (pageParam) {
         url += `&lastId=${pageParam}`;
@@ -549,7 +553,7 @@ export function usePosts(category = null, enabled = true) {
     },
     enabled,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 2 * 60 * 1000, // 2 minutes – reduces reads
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
     keepPreviousData: true,
   });
