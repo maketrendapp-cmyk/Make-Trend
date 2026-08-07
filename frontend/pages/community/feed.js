@@ -22,7 +22,7 @@ import {
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ── localStorage helpers for like status ──
+// ── localStorage helpers ──
 const getLocalVote = (postId) => {
   try {
     const raw = localStorage.getItem(`community_like_${postId}`);
@@ -89,20 +89,15 @@ export default function CommunityFeed() {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
-  // ── Filter state ──
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [appliedCategory, setAppliedCategory] = useState('all');
   const [appliedType, setAppliedType] = useState('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  // ── "Read more" state ──
   const [expandedPosts, setExpandedPosts] = useState(new Set());
 
-  // ── Like mutation ──
   const likeMutation = useLikePost();
 
-  // ── Fetch posts ──
   const {
     data,
     isLoading,
@@ -120,19 +115,10 @@ export default function CommunityFeed() {
 
   const posts = data?.pages?.flatMap((page) => page.posts) || [];
 
-  // ── Helper to get post from cache ──
-  const getPostFromCache = (postId) => {
-    const queryKey = ['posts', appliedCategory === 'all' ? 'all' : appliedCategory, appliedType === 'all' ? 'all' : appliedType];
-    const allPosts = queryClient.getQueryData(queryKey);
-    if (!allPosts) return null;
-    for (const page of allPosts.pages) {
-      const found = page.posts.find(p => p.id === postId);
-      if (found) return found;
-    }
-    return null;
+  const getFeedQueryKey = () => {
+    return ['posts', appliedCategory === 'all' ? 'all' : appliedCategory, appliedType === 'all' ? 'all' : appliedType];
   };
 
-  // ── Apply filters ──
   const applyFilters = () => {
     setAppliedCategory(selectedCategory);
     setAppliedType(selectedType);
@@ -147,7 +133,6 @@ export default function CommunityFeed() {
     setIsFilterOpen(false);
   };
 
-  // ── Infinite scroll observer ──
   const observerRef = useRef(null);
   const lastElementRef = useCallback(
     (node) => {
@@ -163,48 +148,126 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler with localStorage ──
+  // ── Like handler: optimistic update + manual cache sync ──
   const handleLike = (postId) => {
-    console.log('Like clicked for post:', postId, 'Authenticated:', isAuthenticated);
-    
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
 
-    // Get current post from cache
-    const currentPost = getPostFromCache(postId);
-    if (!currentPost) {
-      console.warn('Post not found in cache:', postId);
+    const queryKey = getFeedQueryKey();
+    const currentData = queryClient.getQueryData(queryKey);
+    if (!currentData) {
       toast.error('Post not found');
       return;
     }
 
-    // Optimistic UI: update localStorage and call mutation
-    const newVoted = !currentPost.userLiked;
-    const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
+    // ── Find the post and its indices ──
+    let foundPost = null;
+    let pageIndex = -1;
+    let postIndex = -1;
+    for (let i = 0; i < currentData.pages.length; i++) {
+      const page = currentData.pages[i];
+      const idx = page.posts.findIndex(p => p.id === postId);
+      if (idx !== -1) {
+        foundPost = page.posts[idx];
+        pageIndex = i;
+        postIndex = idx;
+        break;
+      }
+    }
+
+    if (!foundPost) {
+      toast.error('Post not found');
+      return;
+    }
+
+    // ── Optimistic update ──
+    const newVoted = !foundPost.userLiked;
+    const newLikes = newVoted ? foundPost.likes + 1 : foundPost.likes - 1;
+    const updatedPost = { ...foundPost, userLiked: newVoted, likes: newLikes };
+
+    // Update feed cache
+    const newPages = currentData.pages.map((page, idx) => {
+      if (idx === pageIndex) {
+        return {
+          ...page,
+          posts: page.posts.map((p, pIdx) => (pIdx === postIndex ? updatedPost : p)),
+        };
+      }
+      return page;
+    });
+    queryClient.setQueryData(queryKey, { ...currentData, pages: newPages });
+
+    // Update single post cache
+    queryClient.setQueryData(['post', postId], updatedPost);
+
+    // Update localStorage
     setLocalVote(postId, newVoted, newLikes);
 
+    // ── Call mutation ──
     likeMutation.mutate(postId, {
       onSuccess: (data) => {
-        console.log('Like mutation success:', data);
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
+
+        // ── Sync feed cache with server ──
+        const currentDataAfter = queryClient.getQueryData(queryKey);
+        if (currentDataAfter) {
+          const syncedPages = currentDataAfter.pages.map((page, idx) => {
+            if (idx === pageIndex) {
+              return {
+                ...page,
+                posts: page.posts.map((p, pIdx) => {
+                  if (pIdx === postIndex) {
+                    return { ...p, userLiked: serverVoted, likes: serverLikes };
+                  }
+                  return p;
+                }),
+              };
+            }
+            return page;
+          });
+          queryClient.setQueryData(queryKey, { ...currentDataAfter, pages: syncedPages });
+        }
+
+        // Sync single post cache
+        const currentPost = queryClient.getQueryData(['post', postId]);
+        if (currentPost) {
+          queryClient.setQueryData(['post', postId], { ...currentPost, userLiked: serverVoted, likes: serverLikes });
+        }
+
+        // Update localStorage with server values
         setLocalVote(postId, serverVoted, serverLikes);
       },
       onError: (error) => {
-        console.error('Like mutation error:', error);
-        // Revert localStorage to previous state
-        const revertedPost = getPostFromCache(postId);
-        if (revertedPost) {
-          setLocalVote(postId, revertedPost.userLiked, revertedPost.likes);
+        // ── Revert optimistic update ──
+        // Revert feed cache
+        const revertData = queryClient.getQueryData(queryKey);
+        if (revertData) {
+          const revertPages = revertData.pages.map((page, idx) => {
+            if (idx === pageIndex) {
+              return {
+                ...page,
+                posts: page.posts.map((p, pIdx) => (pIdx === postIndex ? foundPost : p)),
+              };
+            }
+            return page;
+          });
+          queryClient.setQueryData(queryKey, { ...revertData, pages: revertPages });
         }
+
+        // Revert single post cache
+        queryClient.setQueryData(['post', postId], foundPost);
+
+        // Revert localStorage
+        setLocalVote(postId, foundPost.userLiked, foundPost.likes);
+
         toast.error(error.message || 'Failed to like');
       },
     });
   };
 
-  // ── Share handler ──
   const handleShare = async (postId) => {
     const url = `${window.location.origin}/community/post/${postId}`;
     try {
@@ -221,7 +284,6 @@ export default function CommunityFeed() {
     }
   };
 
-  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Just now';
     try {
@@ -252,7 +314,6 @@ export default function CommunityFeed() {
     }
   };
 
-  // ── Toggle expand post ──
   const toggleExpand = (postId) => {
     setExpandedPosts(prev => {
       const newSet = new Set(prev);
@@ -265,22 +326,20 @@ export default function CommunityFeed() {
     });
   };
 
-  // ── Skeleton loader ──
   if (isLoading && !posts.length) {
     return (
       <>
         <Meta title="Community Feed – Make Trend" />
         <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
+          {/* Skeleton */}
           <div className="flex justify-between items-center mb-6">
             <div className="h-8 w-32 bg-slate-200 rounded-lg" />
             <div className="h-10 w-32 bg-slate-200 rounded-xl" />
           </div>
           <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 w-20 bg-slate-200 rounded-full flex-shrink-0" />
-            ))}
+            {[1,2,3,4,5].map(i => <div key={i} className="h-10 w-20 bg-slate-200 rounded-full flex-shrink-0" />)}
           </div>
-          {[1, 2, 3].map((i) => (
+          {[1,2,3].map(i => (
             <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 mb-4">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-slate-200" />
@@ -298,16 +357,12 @@ export default function CommunityFeed() {
     );
   }
 
-  // ── Error state ──
   if (isError && !posts.length) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <p className="text-red-600 font-medium">Failed to load posts.</p>
-          <button
-            onClick={() => refetch()}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
-          >
+          <button onClick={() => refetch()} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
             <FiRefreshCw className="w-4 h-4" /> Retry
           </button>
         </div>
@@ -317,37 +372,23 @@ export default function CommunityFeed() {
 
   return (
     <>
-      <Meta
-        title="Community Feed – Make Trend"
-        description="Discover posts from the Make Trend community – product launches, updates, questions, and more."
-      />
+      <Meta title="Community Feed – Make Trend" />
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              🌍 Community Feed
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">🌍 Community Feed</h1>
             <p className="text-sm text-slate-400">Discover what's happening</p>
           </div>
           <div className="flex items-center gap-3">
             {isAuthenticated && (
-              <Link
-                href="/community/create"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition text-sm font-medium"
-              >
+              <Link href="/community/create" className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition text-sm font-medium">
                 <span>+</span> Create Post
               </Link>
             )}
-            <button
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium"
-            >
-              <FiFilter className="w-4 h-4" />
-              Filters
-              {(appliedCategory !== 'all' || appliedType !== 'all') && (
-                <span className="w-2 h-2 bg-purple-600 rounded-full" />
-              )}
+            <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium">
+              <FiFilter className="w-4 h-4" /> Filters
+              {(appliedCategory !== 'all' || appliedType !== 'all') && <span className="w-2 h-2 bg-purple-600 rounded-full" />}
             </button>
           </div>
         </div>
@@ -357,60 +398,29 @@ export default function CommunityFeed() {
           <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-sm animate-slideDown">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-900">Filters</h3>
-              <button
-                onClick={clearFilters}
-                className="text-sm text-red-500 hover:text-red-700 font-medium"
-              >
-                Clear All
-              </button>
+              <button onClick={clearFilters} className="text-sm text-red-500 hover:text-red-700 font-medium">Clear All</button>
             </div>
-
-            {/* Category */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
               <div className="flex flex-wrap gap-2">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.value}
-                    onClick={() => setSelectedCategory(cat.value)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                      selectedCategory === cat.value
-                        ? 'bg-purple-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
+                {CATEGORIES.map(cat => (
+                  <button key={cat.value} onClick={() => setSelectedCategory(cat.value)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${selectedCategory === cat.value ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                     {cat.label}
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* Post Type */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-700 mb-2">Post Type</label>
               <div className="flex flex-wrap gap-2">
-                {POST_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    onClick={() => setSelectedType(type.value)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                      selectedType === type.value
-                        ? 'bg-purple-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
+                {POST_TYPES.map(type => (
+                  <button key={type.value} onClick={() => setSelectedType(type.value)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${selectedType === type.value ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                     {type.label}
                   </button>
                 ))}
               </div>
             </div>
-
-            <button
-              onClick={applyFilters}
-              className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition font-medium text-sm"
-            >
-              Apply Filters
-            </button>
+            <button onClick={applyFilters} className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition font-medium text-sm">Apply Filters</button>
           </div>
         )}
 
@@ -421,37 +431,16 @@ export default function CommunityFeed() {
             {appliedCategory !== 'all' && (
               <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
                 Category: {CATEGORIES.find(c => c.value === appliedCategory)?.label || appliedCategory}
-                <button
-                  onClick={() => {
-                    setSelectedCategory('all');
-                    setAppliedCategory('all');
-                  }}
-                  className="hover:text-red-500"
-                >
-                  <FiX className="w-3 h-3" />
-                </button>
+                <button onClick={() => { setSelectedCategory('all'); setAppliedCategory('all'); }} className="hover:text-red-500"><FiX className="w-3 h-3" /></button>
               </span>
             )}
             {appliedType !== 'all' && (
               <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
                 Type: {POST_TYPES.find(t => t.value === appliedType)?.label || appliedType}
-                <button
-                  onClick={() => {
-                    setSelectedType('all');
-                    setAppliedType('all');
-                  }}
-                  className="hover:text-red-500"
-                >
-                  <FiX className="w-3 h-3" />
-                </button>
+                <button onClick={() => { setSelectedType('all'); setAppliedType('all'); }} className="hover:text-red-500"><FiX className="w-3 h-3" /></button>
               </span>
             )}
-            <button
-              onClick={clearFilters}
-              className="text-xs text-red-500 hover:text-red-700 font-medium"
-            >
-              Clear all
-            </button>
+            <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 font-medium">Clear all</button>
           </div>
         )}
 
@@ -461,17 +450,10 @@ export default function CommunityFeed() {
             <div className="text-5xl mb-4">📭</div>
             <h3 className="text-lg font-semibold text-slate-900">No posts found</h3>
             <p className="text-slate-500 text-sm">
-              {isAuthenticated
-                ? 'Be the first to share something!'
-                : 'Sign in to join the conversation.'}
+              {isAuthenticated ? 'Be the first to share something!' : 'Sign in to join the conversation.'}
             </p>
             {isAuthenticated && (
-              <Link
-                href="/community/create"
-                className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
-              >
-                Create Post
-              </Link>
+              <Link href="/community/create" className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition">Create Post</Link>
             )}
           </div>
         ) : (
@@ -484,31 +466,19 @@ export default function CommunityFeed() {
               const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
               const hasCTA = post.ctaText && post.ctaUrl;
               const isExpanded = expandedPosts.has(post.id);
-
-              // Determine if we need "Read more"
               const titleLength = post.title?.length || 0;
               const descLength = post.description?.length || 0;
               const truncateTitle = titleLength > 150;
               const truncateDesc = descLength > 400;
 
               return (
-                <div
-                  key={post.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition"
-                  ref={index === posts.length - 1 ? lastElementRef : null}
-                >
-                  {/* ── Post Header ── */}
+                <div key={post.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition" ref={index === posts.length - 1 ? lastElementRef : null}>
+                  {/* Post Header */}
                   <div className="flex items-start gap-3">
                     <Link href={`/community/profile/${post.userId}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
                         {post.user?.avatar ? (
-                          <Image
-                            src={post.user.avatar}
-                            alt={post.user.fullname || 'User'}
-                            width={40}
-                            height={40}
-                            className="w-full h-full object-cover"
-                          />
+                          <Image src={post.user.avatar} alt={post.user.fullname || 'User'} width={40} height={40} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-slate-600 text-sm font-bold">
                             {post.user?.fullname?.[0] || post.user?.username?.[0] || 'U'}
@@ -524,9 +494,7 @@ export default function CommunityFeed() {
                         <span className="text-xs text-slate-400">· {formatDate(post.createdAt)}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                          {postTypeIcon} {postTypeLabel}
-                        </span>
+                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{postTypeIcon} {postTypeLabel}</span>
                         {post.category && post.category !== 'general' && (
                           <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">
                             {CATEGORIES.find(c => c.value === post.category)?.label || post.category}
@@ -536,100 +504,58 @@ export default function CommunityFeed() {
                     </div>
                   </div>
 
-                  {/* ── Post Content ── */}
+                  {/* Post Content */}
                   <Link href={`/community/post/${post.id}`} className="block mt-3">
-                    {/* Title with "Read more" */}
                     <h2 className="text-lg font-bold text-slate-900 hover:text-purple-600 transition">
                       {truncateTitle && !isExpanded ? (
                         <>
                           {post.title.slice(0, 150)}...
-                          <span
-                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
-                            className="text-purple-600 hover:underline ml-1 text-sm font-normal"
-                          >
-                            Read more
-                          </span>
+                          <span onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }} className="text-purple-600 hover:underline ml-1 text-sm font-normal">Read more</span>
                         </>
-                      ) : (
-                        post.title
-                      )}
+                      ) : post.title}
                     </h2>
-                    {/* Description with "Read more" */}
                     <p className="text-slate-600 mt-1 text-sm whitespace-pre-wrap">
                       {truncateDesc && !isExpanded ? (
                         <>
                           {post.description.slice(0, 400)}...
-                          <span
-                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
-                            className="text-purple-600 hover:underline ml-1 text-sm font-normal"
-                          >
-                            Read more
-                          </span>
+                          <span onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }} className="text-purple-600 hover:underline ml-1 text-sm font-normal">Read more</span>
                         </>
-                      ) : (
-                        post.description
-                      )}
+                      ) : post.description}
                     </p>
                     {(truncateTitle || truncateDesc) && isExpanded && (
-                      <button
-                        onClick={() => toggleExpand(post.id)}
-                        className="text-xs text-purple-600 hover:underline mt-1 flex items-center gap-0.5"
-                      >
-                        Show less <FiChevronUp className="w-3 h-3" />
-                      </button>
+                      <button onClick={() => toggleExpand(post.id)} className="text-xs text-purple-600 hover:underline mt-1 flex items-center gap-0.5">Show less <FiChevronUp className="w-3 h-3" /></button>
                     )}
                   </Link>
 
-                  {/* ── Image ── */}
+                  {/* Image */}
                   {hasImage && (
                     <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                       <div className="relative aspect-video max-h-80">
-                        <Image
-                          src={post.imageUrl}
-                          alt={post.title}
-                          fill
-                          sizes="(max-width: 768px) 100vw, 600px"
-                          className="object-contain"
-                          loading="lazy"
-                        />
+                        <Image src={post.imageUrl} alt={post.title} fill sizes="(max-width: 768px) 100vw, 600px" className="object-contain" loading="lazy" />
                       </div>
                     </Link>
                   )}
 
-                  {/* ── Video ── */}
+                  {/* Video */}
                   {isVideo && (
                     <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
-                      <video
-                        src={post.videoUrl}
-                        controls
-                        className="w-full h-full"
-                        poster={post.imageUrl || undefined}
-                        playsInline
-                      />
+                      <video src={post.videoUrl} controls className="w-full h-full" poster={post.imageUrl || undefined} playsInline />
                     </Link>
                   )}
 
-                  {/* ── CTA Button ── */}
+                  {/* CTA */}
                   {hasCTA && (
                     <div className="mt-3">
-                      <a
-                        href={post.ctaUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium"
-                      >
+                      <a href={post.ctaUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium">
                         {post.ctaText} <FiExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </div>
                   )}
 
-                  {/* ── Actions with box styling ── */}
+                  {/* Actions */}
                   <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLike(post.id);
-                      }}
+                      onClick={() => handleLike(post.id)}
                       disabled={!isAuthenticated}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition ${
                         isLiked
@@ -637,26 +563,16 @@ export default function CommunityFeed() {
                           : 'border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      {isLiked ? (
-                        <FaHeart className="w-4 h-4 text-purple-600" />
-                      ) : (
-                        <FiHeart className="w-4 h-4" />
-                      )}
+                      {isLiked ? <FaHeart className="w-4 h-4 text-purple-600" /> : <FiHeart className="w-4 h-4" />}
                       <span>{post.likes || 0}</span>
                     </button>
 
-                    <Link
-                      href={`/community/post/${post.id}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm"
-                    >
+                    <Link href={`/community/post/${post.id}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm">
                       <FiMessageCircle className="w-4 h-4" />
                       <span>{post.commentsCount || 0}</span>
                     </Link>
 
-                    <button
-                      onClick={() => handleShare(post.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm ml-auto"
-                    >
+                    <button onClick={() => handleShare(post.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm ml-auto">
                       <FiShare2 className="w-4 h-4" />
                       <span>Share</span>
                     </button>
@@ -667,41 +583,25 @@ export default function CommunityFeed() {
           </div>
         )}
 
-        {/* ── Infinite scroll loading ── */}
+        {/* ── Infinite scroll ── */}
         {hasNextPage && (
           <div className="py-6 flex justify-center">
             {isFetchingNextPage ? (
-              <div className="flex items-center gap-2 text-slate-400">
-                <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
-                Loading more...
-              </div>
+              <div className="flex items-center gap-2 text-slate-400"><FiLoader className="w-5 h-5 animate-spin text-purple-600" /> Loading more...</div>
             ) : (
               <div className="h-4" />
             )}
           </div>
         )}
-
-        {!hasNextPage && posts.length > 0 && (
-          <p className="text-center text-xs text-slate-400 py-6">
-            You've reached the end 🎉
-          </p>
-        )}
+        {!hasNextPage && posts.length > 0 && <p className="text-center text-xs text-slate-400 py-6">You've reached the end 🎉</p>}
       </div>
 
       <style jsx>{`
         @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        .animate-slideDown {
-          animation: slideDown 0.3s ease-out;
-        }
+        .animate-slideDown { animation: slideDown 0.3s ease-out; }
       `}</style>
     </>
   );
