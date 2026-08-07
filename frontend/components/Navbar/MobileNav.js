@@ -11,6 +11,7 @@ import {
   FiDownload,
   FiShield,
   FiBook,
+  FiBell,
 } from 'react-icons/fi';
 
 export default function MobileNav({
@@ -22,11 +23,13 @@ export default function MobileNav({
   avatarUrl,
   firstLetter,
   handleLogout,
+  unreadCount = 0,
 }) {
   const router = useRouter();
 
   const navLinks = [
     { href: '/', label: 'Home', icon: <FiHome className="w-4 h-4" /> },
+    ...(isAuthenticated ? [{ href: '/notifications', label: 'Notifications', icon: <FiBell className="w-4 h-4" /> }] : []),
     { href: '/create', label: 'Create', icon: <FiPlus className="w-4 h-4" /> },
     { href: '/about', label: 'About', icon: <FiInfo className="w-4 h-4" /> },
     { href: '/contact', label: 'Contact', icon: <FiMail className="w-4 h-4" /> },
