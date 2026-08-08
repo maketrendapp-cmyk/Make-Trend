@@ -3,6 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import {
@@ -27,7 +28,7 @@ import {
   FiUser,
   FiFilter,
   FiChevronDown,
-  FiTag,                // ← Fixed: added FiTag
+  FiAlertTriangle,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -70,6 +71,7 @@ const CATEGORY_OPTIONS = [
 export default function MyProducts() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const { invalidateMyProducts } = useInvalidateQueries();
   const deleteMutation = useDeleteProduct();
 
@@ -108,19 +110,46 @@ export default function MyProducts() {
     );
   }, [allProducts, searchTerm]);
 
-  // ── Delete mutation ──
-  const [deletingId, setDeletingId] = useState(null);
+  // ── Delete modal state ──
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async (productId) => {
-    if (!confirm('Delete this product?')) return;
-    setDeletingId(productId);
+  // ── Confirm delete ──
+  const confirmDelete = (product) => {
+    setDeleteModal(product);
+  };
+
+  // ── Handle delete with optimistic update ──
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setIsDeleting(true);
+
+    const productId = deleteModal.id;
+    const queryKey = ['myProducts', { status: statusFilter || undefined, category: categoryFilter || undefined }];
+
+    // ── Optimistically remove product from cache ──
+    queryClient.setQueryData(queryKey, (oldData) => {
+      if (!oldData) return oldData;
+      const newPages = oldData.pages.map((page) => ({
+        ...page,
+        products: page.products.filter((p) => p.id !== productId),
+      }));
+      return { ...oldData, pages: newPages };
+    });
+
     try {
       await deleteMutation.mutateAsync(productId);
+      // Invalidate to ensure consistency (but cache already updated)
+      await invalidateMyProducts();
       await refetch();
+      toast.success('Product deleted');
+      setDeleteModal(null);
     } catch (err) {
-      toast.error('Failed to delete');
+      // Revert optimistic update on error
+      await refetch();
+      toast.error('Failed to delete product');
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -495,15 +524,10 @@ export default function MyProducts() {
                         <FiEdit2 className="inline w-3 h-3 mr-1" /> Edit
                       </Link>
                       <button
-                        onClick={() => handleDelete(product.id)}
-                        disabled={deletingId === product.id}
-                        className="flex-1 text-center text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
+                        onClick={() => confirmDelete(product)}
+                        className="flex-1 text-center text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition"
                       >
-                        {deletingId === product.id ? (
-                          <FiLoader className="w-3 h-3 animate-spin mx-auto" />
-                        ) : (
-                          <FiTrash2 className="inline w-3 h-3 mr-1" />
-                        )}
+                        <FiTrash2 className="inline w-3 h-3 mr-1" />
                       </button>
                     </div>
                   </div>
@@ -533,6 +557,36 @@ export default function MyProducts() {
           </>
         )}
       </div>
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100">
+            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiAlertTriangle className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1.5">Delete Product</h3>
+            <p className="text-gray-500 text-xs sm:text-sm mb-6 leading-relaxed">
+              Are you sure you want to delete <strong>{deleteModal.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isDeleting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Delete'}
+              </button>
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
