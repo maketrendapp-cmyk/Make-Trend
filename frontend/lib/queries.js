@@ -12,7 +12,6 @@ async function apiRequest(endpoint, options = {}, token = null) {
   const method = options.method || 'GET';
   const cacheKey = `${endpoint}-${JSON.stringify(options)}-${token || 'no-token'}`;
   
-  // Only cache GET requests to prevent swallowing mutations
   if (method === 'GET' && requestCache.has(cacheKey)) {
     return requestCache.get(cacheKey);
   }
@@ -56,18 +55,18 @@ export function useProfile(enabled = false) {
   });
 }
 
-// ── Public Profile (Fixed Object Syntax) ──
+// ── Public Profile (Handles API responses properly without crashing) ──
 export function usePublicProfile(uid) {
   return useQuery({
     queryKey: ['public-profile', uid],
     queryFn: async () => {
       if (!uid) return null;
       const res = await apiRequest(`/users/${uid}`, { method: 'GET' });
-      return res.user;
+      return res.user || res.profile || res; // Safely handles differing backend formats
     },
     enabled: !!uid,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1,
+    retry: false, // Do not endlessly retry on a 404
   });
 }
 
