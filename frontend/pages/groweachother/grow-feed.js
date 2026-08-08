@@ -15,6 +15,8 @@ import {
   FiExternalLink,
   FiCompass,
   FiRepeat,
+  FiFilter,
+  FiLogIn,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -32,6 +34,20 @@ import { useGrowFeed, useAvailableTasks, useInvalidateQueries } from '../../lib/
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
+
+// ── Platform definitions ──
+const PLATFORMS = ['YouTube', 'Instagram', 'Twitter', 'Facebook', 'TikTok', 'Twitch', 'LinkedIn', 'GitHub'];
+const TASK_TYPES_BY_PLATFORM = {
+  YouTube: ['Subscribe', 'Like', 'Comment', 'Share', 'Watch', 'View'],
+  Instagram: ['Follow', 'Like', 'Comment', 'Share', 'View'],
+  Facebook: ['Like', 'Follow', 'Comment', 'Share', 'Watch'],
+  Twitter: ['Follow', 'Like', 'Retweet', 'Reply'],
+  TikTok: ['Follow', 'Like', 'Comment', 'Share'],
+  Twitch: ['Follow', 'Subscribe', 'Like', 'Watch'],
+  LinkedIn: ['Follow', 'Like', 'Comment', 'Share'],
+  GitHub: ['Follow', 'Star', 'Watch'],
+};
+const DEFAULT_TASK_TYPES = ['Follow', 'Like', 'Comment', 'Share'];
 
 const PLATFORM_ICONS = {
   youtube: FaYoutube,
@@ -60,7 +76,16 @@ export default function GrowFeed() {
   const { user, isAuthenticated } = useAuth();
   const { invalidateGrowFeed } = useInvalidateQueries();
 
-  // ── React Query: Grow Feed (infinite) ──
+  // ── Filter state ──
+  const [platformFilter, setPlatformFilter] = useState('');
+  const [taskTypeFilter, setTaskTypeFilter] = useState('');
+  const [availableTaskTypes, setAvailableTaskTypes] = useState(DEFAULT_TASK_TYPES);
+
+  // ── React Query: Grow Feed (infinite) with filters ──
+  const filters = {
+    platform: platformFilter || undefined,
+    taskType: taskTypeFilter || undefined,
+  };
   const {
     data,
     fetchNextPage,
@@ -70,20 +95,26 @@ export default function GrowFeed() {
     refetch,
     isError,
     error,
-  } = useGrowFeed(isAuthenticated && !!user);
+  } = useGrowFeed(filters, true); // always enabled, public
 
-  // ── Flatten tasks from all pages ──
-  const tasks = data?.pages?.flatMap((page) => page.tasks) || [];
+  // ── Flatten and filter tasks ──
+  const allTasks = data?.pages?.flatMap((page) => page.tasks) || [];
+  // If user is authenticated, hide tasks they have already exchanged.
+  // For guests, hasExchange is always false, so no filtering needed.
+  const tasks = isAuthenticated
+    ? allTasks.filter(task => !task.hasExchange)
+    : allTasks;
+
   const hasMore = hasNextPage;
 
-  // ── Modal state ──
+  // ── Modal state (only for logged-in users) ──
   const [showModal, setShowModal] = useState(false);
   const [selectedTargetTask, setSelectedTargetTask] = useState(null);
   const [selectedMyTask, setSelectedMyTask] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
-  // ── Available tasks (for modal) ──
+  // ── Available tasks for modal (only if authenticated) ──
   const {
     data: availableTasksData,
     refetch: refetchAvailable,
@@ -92,7 +123,6 @@ export default function GrowFeed() {
   const myTasks = availableTasksData || [];
 
   // ── Intersection Observer for infinite scroll ──
-  const loadingRef = useRef(false);
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -120,12 +150,34 @@ export default function GrowFeed() {
     };
   }, [isFetchingNextPage, hasMore, tasks.length, fetchNextPage]);
 
-  // ── Open modal ──
+  // ── Handle platform filter change ──
+  const handlePlatformChange = (e) => {
+    const val = e.target.value;
+    setPlatformFilter(val);
+    setTaskTypeFilter('');
+    if (val && PLATFORMS.includes(val)) {
+      setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[val] || DEFAULT_TASK_TYPES);
+    } else {
+      setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+    }
+  };
+
+  const clearFilters = () => {
+    setPlatformFilter('');
+    setTaskTypeFilter('');
+    setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+  };
+
+  // ── Modal: open for exchange creation ──
   const handleHelpToGrow = async (task) => {
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/groweachother/grow-feed');
+      return;
+    }
     setSelectedTargetTask(task);
     setSelectedMyTask(null);
     setModalError('');
-    await refetchAvailable(); // fresh list of tasks
+    await refetchAvailable();
     setShowModal(true);
   };
 
@@ -140,10 +192,7 @@ export default function GrowFeed() {
     setModalError('');
 
     try {
-      const token = await getToken(); // We need getToken here – but it's not imported.
-      // Actually, we must import getToken from '../../lib/api' for this request.
-      // We'll import it at the top.
-      // We'll add import { getToken } from '../../lib/api'; at the top.
+      const token = await getToken();
       const res = await fetch(`${API_BASE}/exchanges`, {
         method: 'POST',
         headers: {
@@ -165,9 +214,7 @@ export default function GrowFeed() {
       setShowModal(false);
       setSelectedTargetTask(null);
       setSelectedMyTask(null);
-      // Invalidate grow feed cache to refresh the list
       invalidateGrowFeed();
-      // Also refetch to update immediately
       refetch();
     } catch (err) {
       console.error('Create exchange error:', err);
@@ -177,7 +224,7 @@ export default function GrowFeed() {
     }
   };
 
-  // ── Helper: get platform icon and color ──
+  // ── Helpers ──
   const getPlatformIcon = (platform) => {
     const Icon = PLATFORM_ICONS[platform?.toLowerCase()] || FaLink;
     return Icon;
@@ -187,31 +234,13 @@ export default function GrowFeed() {
     return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600 bg-purple-50';
   };
 
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Meta title="Grow Feed | Make Trend" />
-        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-sm p-8 text-center border border-gray-100">
-            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
-              <FiHeart className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900">Grow Together Feed</h2>
-            <p className="text-gray-500 mt-1.5 text-sm">
-              Sign in to see tasks from others and start growing together.
-            </p>
-            <button
-              onClick={() => router.push('/login')}
-              className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium text-sm rounded-xl hover:bg-purple-700 transition w-full shadow-sm"
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
+  const goToUserProfile = (uid) => {
+    if (uid) {
+      router.push(`/userinfo/${uid}`);
+    }
+  };
 
+  // ── Render loading ──
   if (isLoading) {
     return (
       <>
@@ -256,6 +285,9 @@ export default function GrowFeed() {
     );
   }
 
+  // Determine if we have any visible tasks after filtering.
+  const hasVisibleTasks = tasks.length > 0;
+
   return (
     <>
       <Meta title="Grow Feed | Make Trend" description="Help others grow and get help in return." />
@@ -264,24 +296,32 @@ export default function GrowFeed() {
           {/* ── Top Navigation Bar ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push('/groweachother/my-tasks')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl font-medium text-xs sm:text-sm transition"
-              >
-                <FiPlus className="w-4 h-4" /> My Tasks
-              </button>
-              <button
-                onClick={() => router.push('/groweachother/my-exchanges')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-medium text-xs sm:text-sm transition"
-              >
-                <FiRepeat className="w-4 h-4" /> Exchanges
-              </button>
+              {isAuthenticated ? (
+                <>
+                  <button
+                    onClick={() => router.push('/groweachother/my-tasks')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl font-medium text-xs sm:text-sm transition"
+                  >
+                    <FiPlus className="w-4 h-4" /> My Tasks
+                  </button>
+                  <button
+                    onClick={() => router.push('/groweachother/my-exchanges')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-medium text-xs sm:text-sm transition"
+                  >
+                    <FiRepeat className="w-4 h-4" /> Exchanges
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => router.push('/login?redirect=/groweachother/grow-feed')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-medium text-xs sm:text-sm transition"
+                >
+                  <FiLogIn className="w-4 h-4" /> Sign in to participate
+                </button>
+              )}
             </div>
             <button
-              onClick={() => {
-                // Force refetch the first page only
-                refetch({ refetchPage: (page, index) => index === 0 });
-              }}
+              onClick={() => refetch({ refetchPage: (page, index) => index === 0 })}
               className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
               title="Refresh Feed"
             >
@@ -300,25 +340,90 @@ export default function GrowFeed() {
             </div>
           </div>
 
-          {isError && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
-              {error?.message || 'Failed to load feed'}
+          {/* ── Filters ── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <FiFilter className="text-purple-500 flex-shrink-0" />
+                <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Filters</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div className="relative w-full sm:w-44">
+                  <select
+                    value={platformFilter}
+                    onChange={handlePlatformChange}
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  >
+                    <option value="">All Platforms</option>
+                    {PLATFORMS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="relative w-full sm:w-44">
+                  <select
+                    value={taskTypeFilter}
+                    onChange={(e) => setTaskTypeFilter(e.target.value)}
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                    disabled={!platformFilter && availableTaskTypes === DEFAULT_TASK_TYPES}
+                  >
+                    <option value="">All Tasks</option>
+                    {availableTaskTypes.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {(platformFilter || taskTypeFilter) && (
+                  <button
+                    onClick={clearFilters}
+                    className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition"
+                  >
+                    <FiX className="w-3.5 h-3.5" />
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+          </div>
 
           {/* ── Feed ── */}
-          {tasks.length === 0 && !isFetchingNextPage && (
+          {!hasVisibleTasks && !isFetchingNextPage && (
             <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
               <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">🌱</div>
-              <h3 className="text-base font-bold text-gray-900 mb-1">No tasks available</h3>
-              <p className="text-sm text-gray-400 mb-6 font-medium">Check back later or create your own tasks!</p>
-              <button
-                onClick={() => router.push('/groweachother/my-tasks')}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
-              >
-                <FiPlus className="w-4 h-4" />
-                Create Task
-              </button>
+              <h3 className="text-base font-bold text-gray-900 mb-1">
+                {isAuthenticated && allTasks.length > 0
+                  ? 'All tasks exchanged!'
+                  : 'No tasks available'}
+              </h3>
+              <p className="text-sm text-gray-400 mb-6 font-medium">
+                {isAuthenticated && allTasks.length > 0
+                  ? 'You have already exchanged all visible tasks. Check back later!'
+                  : platformFilter || taskTypeFilter
+                  ? 'Try adjusting your filters.'
+                  : 'Check back later or create your own tasks!'}
+              </p>
+              {isAuthenticated && !platformFilter && !taskTypeFilter && allTasks.length === 0 && (
+                <button
+                  onClick={() => router.push('/groweachother/my-tasks')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
+                >
+                  <FiPlus className="w-4 h-4" />
+                  Create Task
+                </button>
+              )}
             </div>
           )}
 
@@ -331,9 +436,12 @@ export default function GrowFeed() {
                   key={task.id}
                   className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all"
                 >
-                  {/* Owner Header */}
+                  {/* Owner Header – clickable to profile */}
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                    <div
+                      className="flex items-center gap-3 cursor-pointer"
+                      onClick={() => goToUserProfile(task.owner?.uid)}
+                    >
                       <div className="w-10 h-10 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {task.owner?.avatar ? (
                           <img
@@ -346,7 +454,7 @@ export default function GrowFeed() {
                         )}
                       </div>
                       <div>
-                        <p className="font-bold text-gray-900 text-sm">
+                        <p className="font-bold text-gray-900 text-sm hover:text-purple-600 transition">
                           {task.owner?.fullname || task.owner?.username || 'Community Member'}
                         </p>
                         <p className="text-xs text-gray-400 font-medium">@{task.owner?.username || 'user'}</p>
@@ -398,6 +506,7 @@ export default function GrowFeed() {
                         <FiUser className="w-3.5 h-3.5" /> Your Task
                       </span>
                     ) : task.hasExchange ? (
+                      // This case shouldn't occur because we filtered them out, but keep for safety.
                       <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 text-xs font-semibold rounded-xl">
                         <FiCheckCircle className="w-3.5 h-3.5" /> Exchanged
                       </span>
@@ -438,8 +547,8 @@ export default function GrowFeed() {
         </div>
       </div>
 
-      {/* ── Help To Grow Modal ── */}
-      {showModal && (
+      {/* ── Help To Grow Modal (only shown if authenticated) ── */}
+      {showModal && isAuthenticated && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
             <div className="flex items-center justify-between mb-4">
