@@ -29,6 +29,7 @@ import {
   FiFilter,
   FiChevronDown,
   FiAlertTriangle,      // ← import added
+FiTag,  // ← ADD THIS
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
