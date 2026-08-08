@@ -779,6 +779,25 @@ async function checkRateLimit(identifier, action, limit, windowSeconds) {
   }
 }
 
+// ── Daily limit helper (resets at midnight UTC) ──
+async function checkDailyLimit(uid, action, limit) {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const key = `daily:${action}:${uid}:${today}`;
+  const count = await redis.incr(key);
+  if (count === 1) {
+    // Set expiry to end of day (UTC)
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setUTCHours(0, 0, 0, 0);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const secondsUntilMidnight = Math.floor((tomorrow - now) / 1000);
+    if (secondsUntilMidnight > 0) {
+      await redis.expire(key, secondsUntilMidnight);
+    }
+  }
+  return count <= limit;
+}
+
 
 
 // ── Get ban status with Redis cache (5 min TTL) ──
@@ -4701,7 +4720,14 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     if (!(await checkRateLimit(uid, 'social-task-create', 10, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many requests.' });
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait a moment.' });
+    }
+    // ── Daily limit: max 100 tasks per day ──
+    if (!(await checkDailyLimit(uid, 'task-create', 100))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily task limit reached (max 100 tasks per day). Come back tomorrow!'
+      });
     }
     const { platform, url, taskType, title, description } = req.body;
     if (!platform || typeof platform !== 'string' || platform.trim().length === 0 || platform.trim().length > 50) {
@@ -4914,6 +4940,43 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
     const updatedTaskWithOwner = { id, ...updatedData, owner: await getUserInfo(uid) };
     await cacheTaskDetails(id, updatedTaskWithOwner);
 
+    // ── Invalidate exchange caches for ACTIVE exchanges referencing this task ──
+    try {
+      // Find only active exchanges (not completed or cancelled)
+      const exchangesA = await db.collection('exchanges')
+        .where('userATaskId', '==', id)
+        .where('overallStatus', '==', 'active')
+        .get();
+      const exchangesB = await db.collection('exchanges')
+        .where('userBTaskId', '==', id)
+        .where('overallStatus', '==', 'active')
+        .get();
+
+      const affectedUsers = new Set();
+      const allExchanges = [...exchangesA.docs, ...exchangesB.docs];
+
+      for (const exchangeDoc of allExchanges) {
+        const data = exchangeDoc.data();
+        const exchangeId = exchangeDoc.id;
+        const userA = data.userAUid;
+        const userB = data.userBUid;
+        affectedUsers.add(userA);
+        affectedUsers.add(userB);
+
+        // Invalidate detail caches for both users
+        await invalidateKey(`exchange:${exchangeId}:${userA}`);
+        await invalidateKey(`exchange:${exchangeId}:${userB}`);
+      }
+
+      // Invalidate list caches for all affected users (who have active exchanges)
+      for (const userId of affectedUsers) {
+        await invalidatePattern(`exchanges:${userId}:*`);
+      }
+    } catch (err) {
+      console.warn('Failed to invalidate exchange caches on task update:', err);
+      // Continue – don't block the response
+    }
+
     // ── Invalidate user's own tasks cache so changes appear in "My Tasks" ──
     await invalidatePattern(`social-tasks:${uid}:*`);
 
@@ -5084,6 +5147,13 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     }
     if (!(await checkRateLimit(uid, 'exchange-create', 5, 60))) {
       return res.status(429).json({ success: false, error: 'Too many exchanges. Please wait.' });
+    }
+    // ── Daily limit: max 1000 exchanges per day ──
+    if (!(await checkDailyLimit(uid, 'exchange-create', 1000))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily exchange limit reached (max 1000 exchanges per day). Come back tomorrow!'
+      });
     }
     const targetTaskDoc = await db.collection('socialTasks').doc(targetTaskId).get();
     if (!targetTaskDoc.exists) return res.status(404).json({ success: false, error: 'Target task not found' });
