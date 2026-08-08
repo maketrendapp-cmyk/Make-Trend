@@ -484,30 +484,52 @@ export function useProductDetail(id, enabled = true) {
   });
 }
 
-// 3. My Products
-export function useMyProducts(enabled = true) {
-  return useQuery({
-    queryKey: ['myProducts'],
-    queryFn: async () => {
+// 3. My Products (infinite scroll with filters)
+export function useMyProducts(filters = {}, enabled = true) {
+  const { status, category } = filters;
+  const queryKey = ['myProducts', { status, category }];
+
+  return useInfiniteQuery({
+    queryKey,
+    queryFn: async ({ pageParam = null }) => {
       const token = await getToken();
-      if (!token) return [];
-      const data = await apiRequest('/productstrend/my-products', {}, token);
-      return data.products || [];
+      if (!token) throw new Error('Not authenticated');
+
+      const params = new URLSearchParams({
+        limit: 20,
+      });
+      if (status) params.append('status', status);
+      if (category) params.append('category', category);
+      if (pageParam) params.append('lastId', pageParam);
+
+      const data = await apiRequest(`/productstrend/my-products?${params.toString()}`, {}, token);
+      return {
+        products: data.products || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
     },
     enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
-// 4. Product Comments – PUBLIC
+// 4. Product Comments – PUBLIC (infinite scroll)
 export function useProductComments(productId, enabled = true) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['productComments', productId],
-    queryFn: async () => {
-      const data = await apiRequest(`/productstrend/products/${productId}/comments`, {}, null);
-      return data.comments || [];
+    queryFn: async ({ pageParam = null }) => {
+      const params = new URLSearchParams({ limit: 20 });
+      if (pageParam) params.append('lastId', pageParam);
+      const data = await apiRequest(`/productstrend/products/${productId}/comments?${params.toString()}`, {}, null);
+      return {
+        comments: data.comments || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
     },
     enabled: !!productId && enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 1 * 60 * 1000,
   });
 }
@@ -906,7 +928,7 @@ export function useInvalidateQueries() {
     invalidateExchangeDetail: (id) => queryClient.invalidateQueries(['exchangeDetail', id]),
     invalidateProductFeed: () => queryClient.invalidateQueries(['productFeed']),
     invalidateProductDetail: (id) => queryClient.invalidateQueries(['productDetail', id]),
-    invalidateMyProducts: () => queryClient.invalidateQueries(['myProducts']),
+    invalidateMyProducts: () => queryClient.invalidateQueries({ queryKey: ['myProducts'] }),
     invalidateProductComments: (id) => queryClient.invalidateQueries(['productComments', id]),
     invalidateNotifications: () => queryClient.invalidateQueries(['notifications']),
     invalidateSystemNotifications: () => queryClient.invalidateQueries(['systemNotifications']),
