@@ -82,8 +82,8 @@ const nextConfig = {
       },
 //user profile 
 {
-        source: '/userprofile/:path*',
-        destination: '/userprofile/:path*',
+        source: '/userinfo/:path*',
+        destination: '/userinfo/:path*',
       },
       // ── Existing catch‑all rules ──
       {
