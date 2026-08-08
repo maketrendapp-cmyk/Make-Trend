@@ -1,7 +1,8 @@
 // pages/productstrend/[id].js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
@@ -28,6 +29,8 @@ import {
   FiTrash2,
   FiShare2,
   FiGlobe,
+  FiInfo,
+  FiDollarSign,
   FiUsers,
   FiCpu,
   FiTwitter,
@@ -42,78 +45,29 @@ import {
   FiYoutube,
   FiTwitch,
   FiLinkedin,
-  FiX,
+  FiAlertTriangle,
+  FiCheckCircle,
+  FiMapPin,
 } from 'react-icons/fi';
-import { FaDiscord, FaTelegram, FaTiktok } from 'react-icons/fa';
+import { FaRocket, FaDiscord, FaTelegram, FaTiktok } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
 const PRICING_COLORS = {
-  Free: 'text-emerald-700 bg-emerald-50 border-emerald-200/60',
-  Freemium: 'text-blue-700 bg-blue-50 border-blue-200/60',
-  Paid: 'text-amber-700 bg-amber-50 border-amber-200/60',
-  Enterprise: 'text-purple-700 bg-purple-50 border-purple-200/60',
-  'Contact for Pricing': 'text-slate-700 bg-slate-50 border-slate-200/60',
+  Free: 'text-green-600 bg-green-50 border-green-200',
+  Freemium: 'text-blue-600 bg-blue-50 border-blue-200',
+  Paid: 'text-amber-600 bg-amber-50 border-amber-200',
+  Enterprise: 'text-purple-600 bg-purple-50 border-purple-200',
+  'Contact for Pricing': 'text-slate-600 bg-slate-50 border-slate-200',
 };
 
 const STATUS_COLORS = {
-  Live: 'text-emerald-700 bg-emerald-50 border-emerald-200/60',
-  Beta: 'text-blue-700 bg-blue-50 border-blue-200/60',
-  'Coming Soon': 'text-amber-700 bg-amber-50 border-amber-200/60',
-  'In Development': 'text-slate-700 bg-slate-50 border-slate-200/60',
-};
-
-// ── URL & Icon Helpers ──
-function detectPlatformFromUrl(url) {
-  if (!url) return null;
-  try {
-    const hostname = new URL(url).hostname.toLowerCase();
-    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) return 'youtube';
-    if (hostname.includes('facebook.com') || hostname.includes('fb.com')) return 'facebook';
-    if (hostname.includes('twitter.com') || hostname.includes('x.com')) return 'twitter';
-    if (hostname.includes('instagram.com')) return 'instagram';
-    if (hostname.includes('linkedin.com')) return 'linkedin';
-    if (hostname.includes('github.com')) return 'github';
-    if (hostname.includes('twitch.tv')) return 'twitch';
-    if (hostname.includes('tiktok.com')) return 'tiktok';
-    if (hostname.includes('discord.com') || hostname.includes('discord.gg')) return 'discord';
-    if (hostname.includes('t.me') || hostname.includes('telegram.me')) return 'telegram';
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-const SOCIAL_ICONS = {
-  twitter: FiTwitter,
-  facebook: FiFacebook,
-  instagram: FiInstagram,
-  linkedin: FiLinkedin,
-  youtube: FiYoutube,
-  tiktok: FaTiktok,
-  github: FiGithub,
-  discord: FaDiscord,
-  telegram: FaTelegram,
-  twitch: FiTwitch,
-};
-
-const getSocialIcon = (platformOrUrl) => {
-  let platform = platformOrUrl?.toLowerCase();
-  if (platformOrUrl && platformOrUrl.startsWith('http')) {
-    platform = detectPlatformFromUrl(platformOrUrl);
-  }
-  return SOCIAL_ICONS[platform] || FiLink;
-};
-
-const getFavicon = (url) => {
-  try {
-    const domain = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  } catch {
-    return null;
-  }
+  Live: 'text-green-600 bg-green-50 border-green-200',
+  Beta: 'text-blue-600 bg-blue-50 border-blue-200',
+  'Coming Soon': 'text-amber-600 bg-amber-50 border-amber-200',
+  'In Development': 'text-slate-600 bg-slate-50 border-slate-200',
 };
 
 // ── localStorage helpers ──
@@ -131,7 +85,7 @@ const setLocalVote = (productId, voted, upvotes) => {
   } catch (e) {}
 };
 
-// ── Cloudinary optimization ──
+// ── Cloudinary image optimisation ──
 const getOptimizedUrl = (url, width = 1200, height = 675) => {
   if (!url) return url;
   if (url.includes('res.cloudinary.com')) {
@@ -153,6 +107,37 @@ const getVideoEmbedUrl = (url) => {
   return null;
 };
 
+// ── Get favicon from URL ──
+const getFavicon = (url) => {
+  if (!url) return null;
+  try {
+    const domain = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch {
+    return null;
+  }
+};
+
+// ── Social icon mapping (with fallback) ──
+const SOCIAL_ICONS = {
+  twitter: FiTwitter,
+  facebook: FiFacebook,
+  instagram: FiInstagram,
+  linkedin: FiLinkedin,
+  youtube: FiYoutube,
+  tiktok: FaTiktok,
+  github: FiGithub,
+  discord: FaDiscord,
+  telegram: FaTelegram,
+  twitch: FiTwitch,
+  other: FiLink,
+};
+
+const getSocialIcon = (platform) => {
+  const Icon = SOCIAL_ICONS[platform?.toLowerCase()] || FiLink;
+  return Icon;
+};
+
 export default function ProductDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -166,6 +151,7 @@ export default function ProductDetail() {
     fetchNextPage: fetchMoreComments,
     hasNextPage: hasMoreComments,
     isFetchingNextPage: isFetchingMoreComments,
+    refetch: refetchComments,
   } = useProductComments(id, true);
 
   const upvoteMutation = useUpvoteProduct();
@@ -174,9 +160,7 @@ export default function ProductDetail() {
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
-  
-  // Custom Delete Modal State
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const isMaker = product?.makerUid === user?.uid;
@@ -222,7 +206,11 @@ export default function ProductDetail() {
     const newUserVoted = !prevUserVoted;
     const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
 
-    const optimisticProduct = { ...currentProduct, upvotes: newUpvotes, userVoted: newUserVoted };
+    const optimisticProduct = {
+      ...currentProduct,
+      upvotes: newUpvotes,
+      userVoted: newUserVoted,
+    };
 
     queryClient.setQueryData(['productDetail', id], optimisticProduct);
     setLocalVote(id, newUserVoted, newUpvotes);
@@ -234,7 +222,11 @@ export default function ProductDetail() {
         const serverUpvotes = data.upvotes;
         const current = queryClient.getQueryData(['productDetail', id]);
         if (current) {
-          queryClient.setQueryData(['productDetail', id], { ...current, upvotes: serverUpvotes, userVoted: serverVoted });
+          queryClient.setQueryData(['productDetail', id], {
+            ...current,
+            upvotes: serverUpvotes,
+            userVoted: serverVoted,
+          });
         }
         setLocalVote(id, serverVoted, serverUpvotes);
         setLocalUpvote({ voted: serverVoted, upvotes: serverUpvotes });
@@ -263,14 +255,21 @@ export default function ProductDetail() {
       id: `temp-${Date.now()}`,
       text: commentText.trim(),
       userId: user?.uid,
-      user: { username: user?.username || 'You', fullname: user?.fullname || 'You', avatar: user?.avatar || null },
+      user: {
+        username: user?.username || 'You',
+        fullname: user?.fullname || 'You',
+        avatar: user?.avatar || null,
+      },
       createdAt: new Date().toISOString(),
     };
 
     const currentComments = queryClient.getQueryData(['productComments', id]) || { pages: [{ comments: [] }] };
     const updatedPages = [...currentComments.pages];
     if (updatedPages.length > 0) {
-      updatedPages[0] = { ...updatedPages[0], comments: [optimisticComment, ...updatedPages[0].comments] };
+      updatedPages[0] = {
+        ...updatedPages[0],
+        comments: [optimisticComment, ...updatedPages[0].comments],
+      };
     } else {
       updatedPages.push({ comments: [optimisticComment], nextCursor: null });
     }
@@ -283,32 +282,46 @@ export default function ProductDetail() {
       const result = await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
       const serverComment = result.comment;
 
-      const currentCache = queryClient.getQueryData(['productComments', id]);
-      if (currentCache) {
-        const updatedPages = currentCache.pages.map((page, idx) => {
+      const cache = queryClient.getQueryData(['productComments', id]);
+      if (cache) {
+        const pages = cache.pages.map((page, idx) => {
           if (idx === 0) {
             return {
               ...page,
-              comments: page.comments.map(c => c.id === optimisticComment.id ? { ...serverComment, user: serverComment.user || optimisticComment.user } : c),
+              comments: page.comments.map(c =>
+                c.id === optimisticComment.id
+                  ? { ...serverComment, user: serverComment.user || optimisticComment.user }
+                  : c
+              ),
             };
           }
           return page;
         });
-        queryClient.setQueryData(['productComments', id], { ...currentCache, pages: updatedPages });
+        queryClient.setQueryData(['productComments', id], { ...cache, pages });
       }
+
+      await refetchComments({ refetchPage: (page, index) => index === 0 });
 
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
-        queryClient.setQueryData(['productDetail', id], { ...currentProduct, commentsCount: (currentProduct.commentsCount || 0) + 1 });
+        queryClient.setQueryData(['productDetail', id], {
+          ...currentProduct,
+          commentsCount: (currentProduct.commentsCount || 0) + 1,
+        });
       }
     } catch (error) {
-      const revertComments = queryClient.getQueryData(['productComments', id]);
-      if (revertComments) {
-        const revertedPages = revertComments.pages.map((page, idx) => {
-          if (idx === 0) return { ...page, comments: page.comments.filter((c) => c.id !== optimisticComment.id) };
+      const revertCache = queryClient.getQueryData(['productComments', id]);
+      if (revertCache) {
+        const revertedPages = revertCache.pages.map((page, idx) => {
+          if (idx === 0) {
+            return {
+              ...page,
+              comments: page.comments.filter((c) => c.id !== optimisticComment.id),
+            };
+          }
           return page;
         });
-        queryClient.setQueryData(['productComments', id], { ...revertComments, pages: revertedPages });
+        queryClient.setQueryData(['productComments', id], { ...revertCache, pages: revertedPages });
       }
       toast.error(error.message || 'Failed to post comment');
       setCommentText(optimisticComment.text);
@@ -317,8 +330,9 @@ export default function ProductDetail() {
     }
   };
 
-  // ── Delete Handler ──
-  const executeDelete = async () => {
+  // ── Delete handlers ──
+  const handleDeleteClick = () => setDeleteModal(true);
+  const handleDeleteConfirm = async () => {
     setIsDeleting(true);
     try {
       const token = await getToken();
@@ -331,15 +345,16 @@ export default function ProductDetail() {
         await invalidateProductDetail(id);
         await invalidateProductFeed();
         await invalidateMyProducts();
-        setShowDeleteModal(false);
+        toast.success('Product deleted');
         router.push('/productstrend/my-products');
-        toast.success('Product deleted successfully');
       } else {
         toast.error(data.error || 'Delete failed');
+        setDeleteModal(false);
       }
     } catch (err) {
       console.error('Delete error:', err);
       toast.error('Failed to delete product');
+      setDeleteModal(false);
     } finally {
       setIsDeleting(false);
     }
@@ -356,43 +371,57 @@ export default function ProductDetail() {
     if (!timestamp) return 'Recently';
     try {
       let date;
-      if (timestamp.toDate && typeof timestamp.toDate === 'function') date = timestamp.toDate();
-      else if (timestamp.seconds !== undefined) date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
-      else if (timestamp._seconds !== undefined) date = new Date(timestamp._seconds * 1000);
-      else if (typeof timestamp === 'string' || typeof timestamp === 'number') date = new Date(timestamp);
-      else if (timestamp instanceof Date) date = timestamp;
-      else date = new Date(timestamp);
-      
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } else if (timestamp.seconds !== undefined) {
+        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+      } else if (timestamp._seconds !== undefined) {
+        date = new Date(timestamp._seconds * 1000);
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        date = new Date(timestamp);
+      }
       if (isNaN(date.getTime())) return 'Recently';
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch {
       return 'Recently';
     }
   };
 
+  const goToUserProfile = (uid) => {
+    if (uid) router.push(`/userinfo/${uid}`);
+  };
+
+  // ── Loading ──
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8 animate-pulse">
-        <div className="h-5 w-24 bg-slate-200 rounded-lg mb-6" />
-        <div className="w-full aspect-[21/9] sm:aspect-[16/6] bg-slate-200 rounded-3xl mb-8" />
-        <div className="flex gap-6">
-          <div className="w-20 h-20 bg-slate-200 rounded-2xl flex-shrink-0" />
-          <div className="flex-1 space-y-4 pt-2">
+      <>
+        <Meta title="Loading..." />
+        <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse">
+          <div className="h-8 w-24 bg-slate-200 rounded-lg mb-6" />
+          <div className="w-full aspect-video bg-slate-200 rounded-2xl" />
+          <div className="mt-6 space-y-4">
             <div className="h-8 w-64 bg-slate-200 rounded" />
-            <div className="h-5 w-full max-w-lg bg-slate-200 rounded" />
+            <div className="h-5 w-full bg-slate-200 rounded" />
+            <div className="flex gap-4">
+              <div className="h-10 w-24 bg-slate-200 rounded-full" />
+              <div className="h-10 w-24 bg-slate-200 rounded-full" />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (isError || !product) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <div className="bg-red-50 border border-red-200 rounded-3xl p-10">
-          <p className="text-red-600 font-bold text-lg mb-2">Product not found</p>
-          <p className="text-slate-500 text-sm mb-6 font-medium">The product you are looking for does not exist or has been removed.</p>
-          <button onClick={() => refetch()} className="inline-flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition">
+      <div className="max-w-4xl mx-auto px-4 py-8 text-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <p className="text-red-600 font-medium">Product not found.</p>
+          <button onClick={() => refetch()} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
             <FiRefreshCw className="w-4 h-4" /> Retry
           </button>
         </div>
@@ -402,365 +431,451 @@ export default function ProductDetail() {
 
   const videoEmbedUrl = getVideoEmbedUrl(product.demoUrl);
   const isVideoLink = !!videoEmbedUrl;
+  const websiteFavicon = product.url ? getFavicon(product.url) : null;
 
   return (
     <>
-      <Meta title={`${product.name} – ProductTrend`} description={product.tagline} />
-      <div className="min-h-screen bg-slate-50/50 pb-16">
-        <div className="max-w-5xl mx-auto px-4 py-8">
-          
-          <Link href="/productstrend/feed" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900 transition mb-6 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200/60">
-            <FiArrowLeft className="w-4 h-4" /> Back to Products
-          </Link>
+      <Meta title={`${product.name} – ProductTrend`} />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 md:py-10">
+        {/* Back button */}
+        <Link
+          href="/productstrend/feed"
+          className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-purple-600 transition mb-6"
+        >
+          <FiArrowLeft className="w-4 h-4" /> Back to Feed
+        </Link>
 
-          <div className="bg-white rounded-[2rem] border border-slate-200/80 shadow-sm overflow-hidden">
-            
-            {/* ── Hero Image ── */}
-            <div className="w-full aspect-[21/9] sm:aspect-[16/6] bg-slate-100 overflow-hidden relative border-b border-slate-100">
-              {(product.thumbnail || product.imageUrl) ? (
-                <img
-                  src={getOptimizedUrl(product.thumbnail || product.imageUrl, 1200, 675)}
-                  alt={product.name}
-                  className="w-full h-full object-cover sm:object-contain bg-slate-100"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-                  <span className="text-6xl sm:text-8xl opacity-50">🚀</span>
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 sm:p-10">
-              {/* ── Product Header ── */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6 mb-6">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex-shrink-0 p-1">
-                  {product.logo || product.imageUrl ? (
-                    <img
-                      src={getOptimizedUrl(product.logo || product.imageUrl, 200, 200)}
-                      alt={product.name}
-                      className="w-full h-full object-cover rounded-xl"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-slate-50 rounded-xl flex items-center justify-center text-3xl">🚀</div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">{product.name}</h1>
-                  <p className="text-base sm:text-lg text-slate-600 font-medium mt-1.5 leading-snug">{product.tagline}</p>
-                  
-                  <div className="flex flex-wrap items-center gap-2 mt-4">
-                    {product.category && (
-                      <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200/60">
-                        {product.category}
-                      </span>
-                    )}
-                    {product.pricing && (
-                      <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${PRICING_COLORS[product.pricing] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
-                        {product.pricing}
-                      </span>
-                    )}
-                    {product.productStatus && (
-                      <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${STATUS_COLORS[product.productStatus] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
-                        {product.productStatus}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Upvote Box (Desktop Right Aligned) */}
-                <div className="w-full sm:w-auto mt-4 sm:mt-0 flex flex-col gap-3">
-                   <button
-                    onClick={handleUpvote}
-                    disabled={upvoteMutation.isLoading}
-                    className={`w-full sm:w-auto flex flex-col items-center justify-center gap-1 px-8 py-3 rounded-2xl border-2 transition-all shadow-sm active:scale-95 ${
-                      userVoted
-                        ? 'bg-purple-50 border-purple-500 text-purple-700'
-                        : 'bg-white border-slate-200 text-slate-700 hover:border-purple-300 hover:bg-purple-50/50'
-                    }`}
-                  >
-                    <FiHeart className={`w-6 h-6 ${userVoted ? 'fill-purple-600 text-purple-600' : 'text-slate-400'}`} />
-                    <span className="font-bold text-lg leading-none">{upvotes}</span>
-                  </button>
-                  <button
-                    onClick={handleShare}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100 transition text-sm font-semibold"
-                  >
-                    {shareCopied ? 'Link Copied!' : <><FiShare2 className="w-4 h-4" /> Share</>}
-                  </button>
-                </div>
-              </div>
-
-              {/* ── Metadata Bar ── */}
-              <div className="flex flex-wrap items-center gap-4 py-4 border-y border-slate-100 text-sm font-medium text-slate-500">
-                <div 
-                  className="flex items-center gap-2 cursor-pointer hover:text-purple-600 transition"
-                  onClick={() => router.push(`/userinfo/${product.maker?.uid}`)}
-                >
-                  <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-100">
-                    {product.maker?.avatar ? (
-                      <img src={product.maker.avatar} alt="Maker" className="w-full h-full object-cover" />
-                    ) : (
-                      <FiUser className="w-full h-full p-1" />
-                    )}
-                  </div>
-                  <span>By {product.maker?.fullname || product.maker?.username || 'Maker'}</span>
-                  {isMaker && <span className="ml-1 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md uppercase tracking-wider">You</span>}
-                </div>
-                <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-300" />
-                <span className="flex items-center gap-1.5"><FiCalendar className="w-4 h-4" /> {formatDate(product.createdAt)}</span>
-                <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-300" />
-                <span className="flex items-center gap-1.5"><FiMessageCircle className="w-4 h-4" /> {product.commentsCount || 0} Comments</span>
-              </div>
-
-              {/* ── Main Content Grid ── */}
-              <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                {/* Left Column (Description & Video) */}
-                <div className="lg:col-span-2 space-y-8">
-                  {/* Description */}
-                  {product.description && (
-                    <div className="prose prose-slate max-w-none">
-                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-3">
-                        <FiInfo className="text-purple-600" /> About Product
-                      </h3>
-                      <p className="text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">{product.description}</p>
-                    </div>
-                  )}
-
-                  {/* Video Embed */}
-                  {isVideoLink && (
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-3">
-                        <FiPlay className="text-red-500" /> Demo Video
-                      </h3>
-                      <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black relative w-full aspect-video">
-                        <iframe
-                          src={videoEmbedUrl}
-                          title="Demo"
-                          className="absolute top-0 left-0 w-full h-full"
-                          allowFullScreen
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Website Preview Image (If available and no video) */}
-                  {product.websiteImage && !isVideoLink && (
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-3">
-                        <FiGlobe className="text-blue-500" /> Preview
-                      </h3>
-                      <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-                        <img src={getOptimizedUrl(product.websiteImage, 800, 450)} alt="Preview" className="w-full object-cover" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Column (Details & Links) */}
-                <div className="space-y-6">
-                  
-                  {/* Action Links */}
-                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 space-y-3">
-                    {product.url && (
-                      <a href={product.url} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition shadow-sm">
-                        <img src={getFavicon(product.url)} alt="" className="w-4 h-4 rounded-sm bg-white" onError={(e) => e.target.style.display='none'} />
-                        Visit Website <FiExternalLink className="w-4 h-4 opacity-70" />
-                      </a>
-                    )}
-                    {product.demoUrl && !isVideoLink && (
-                      <a href={product.demoUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl font-semibold transition shadow-sm">
-                        <FiVideo className="w-4 h-4 text-blue-500" /> Watch Demo
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Features */}
-                  {product.features?.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Key Features</h3>
-                      <ul className="space-y-2.5">
-                        {product.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-100 p-3 rounded-xl shadow-sm">
-                            <FiCheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                            <span className="leading-snug">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Tech Stack */}
-                  {product.techStack?.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Tech Stack</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {product.techStack.map((tech, idx) => (
-                          <span key={idx} className="text-xs font-semibold bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg shadow-sm">
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Social & Other Links */}
-                  {product.socialLinks?.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Links</h3>
-                      <div className="flex flex-col gap-2">
-                        {product.socialLinks.map((link, idx) => {
-                          const Icon = getSocialIcon(link.url || link.platform);
-                          const favicon = getFavicon(link.url);
-                          return (
-                            <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-purple-200 hover:shadow transition group">
-                              <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-600 group-hover:text-purple-600 group-hover:bg-purple-50 transition">
-                                {Icon === FiLink && favicon ? <img src={favicon} alt="" className="w-4 h-4 rounded-sm" /> : <Icon className="w-4 h-4" />}
-                              </div>
-                              <span className="text-sm font-semibold text-slate-700 group-hover:text-purple-700 transition">
-                                {link.platform || 'Visit Link'}
-                              </span>
-                              <FiExternalLink className="w-3.5 h-3.5 text-slate-300 ml-auto group-hover:text-purple-400 transition" />
-                            </a>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Maker Actions */}
-                  {isMaker && (
-                    <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-2xl">
-                      <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-3">Maker Controls</h3>
-                      <div className="flex gap-2">
-                        <Link href={`/productstrend/launch?id=${product.id}`} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-amber-200 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-50 transition shadow-sm">
-                          <FiEdit2 className="w-4 h-4" /> Edit
-                        </Link>
-                        <button onClick={() => setShowDeleteModal(true)} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-50 transition shadow-sm">
-                          <FiTrash2 className="w-4 h-4" /> Delete
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            </div>
+        {/* Main card */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Hero Image */}
+          <div className="w-full aspect-[16/9] bg-slate-100 overflow-hidden relative">
+            {(product.thumbnail || product.imageUrl) ? (
+              <Image
+                src={getOptimizedUrl(product.thumbnail || product.imageUrl, 1200, 675)}
+                alt={product.name}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 70vw"
+                className="object-contain"
+                priority
+                quality={90}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-6xl text-slate-300">🚀</div>
+            )}
           </div>
 
-          {/* ── Comments Section ── */}
-          <div className="mt-8 bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2 mb-6">
-              <FiMessageCircle className="text-purple-600" />
-              Discussion ({product.commentsCount || 0})
-            </h3>
-
-            <form onSubmit={handleAddComment} className="flex gap-3 mb-8">
-              <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden flex-shrink-0 hidden sm:block">
-                {user?.avatar ? <img src={user.avatar} alt="You" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><FiUser /></div>}
-              </div>
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder={isAuthenticated ? "What do you think about this product?" : "Sign in to join the discussion"}
-                className="flex-1 border border-slate-200 bg-slate-50 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition placeholder-slate-400"
-                disabled={!isAuthenticated || submittingComment}
-              />
-              <button
-                type="submit"
-                disabled={!isAuthenticated || !commentText.trim() || submittingComment}
-                className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 flex items-center gap-2 shadow-sm"
-              >
-                {submittingComment ? <FiLoader className="w-5 h-5 animate-spin" /> : <><FiSend className="w-4 h-4" /><span className="hidden sm:inline">Post</span></>}
-              </button>
-            </form>
-
-            <div className="space-y-5">
-              {comments.length === 0 ? (
-                <div className="text-center py-10 bg-slate-50 rounded-2xl border border-slate-100">
-                  <FiMessageCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500 font-medium">No comments yet. Be the first to share your thoughts!</p>
-                </div>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-4">
-                    <div 
-                      className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200 cursor-pointer"
-                      onClick={() => goToUserProfile(comment.userId)}
-                    >
-                      {comment.user?.avatar ? (
-                        <img src={comment.user.avatar} alt="User" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-sm font-bold text-slate-500">
-                          {comment.user?.fullname?.[0] || comment.user?.username?.[0] || 'U'}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-none p-4">
-                        <div className="flex items-center justify-between gap-4 mb-1">
-                          <p 
-                            className="text-sm font-bold text-slate-900 cursor-pointer hover:text-purple-600 transition"
-                            onClick={() => goToUserProfile(comment.userId)}
-                          >
-                            {comment.user?.fullname || comment.user?.username || 'Anonymous'}
-                          </p>
-                          <span className="text-xs text-slate-400 font-medium">{formatDate(comment.createdAt)}</span>
-                        </div>
-                        <p className="text-sm text-slate-700 leading-relaxed font-medium">{comment.text}</p>
-                      </div>
-                    </div>
+          <div className="p-5 sm:p-8">
+            {/* ── Product header ── */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-5">
+              <div className="flex-shrink-0">
+                {product.logo ? (
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border-2 border-slate-200 shadow-sm">
+                    <Image
+                      src={getOptimizedUrl(product.logo, 200, 200)}
+                      alt={product.name}
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                      quality={90}
+                    />
                   </div>
-                ))
-              )}
-
-              {hasMore && (
-                <div className="text-center pt-4">
-                  <button
-                    onClick={() => fetchMoreComments()}
-                    disabled={isFetchingMoreComments}
-                    className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition text-sm font-semibold disabled:opacity-50 shadow-sm"
-                  >
-                    {isFetchingMoreComments ? (
-                      <span className="flex items-center justify-center gap-2"><FiLoader className="w-4 h-4 animate-spin" /> Loading...</span>
-                    ) : (
-                      'Load More Comments'
-                    )}
-                  </button>
+                ) : product.imageUrl ? (
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-100 overflow-hidden border border-slate-200">
+                    <Image
+                      src={getOptimizedUrl(product.imageUrl, 200, 200)}
+                      alt={product.name}
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                      quality={90}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-100 flex items-center justify-center text-3xl text-slate-300 border border-slate-200">
+                    🚀
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{product.name}</h1>
+                <p className="text-base text-slate-500 mt-1">{product.tagline}</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {product.category && (
+                    <span className="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">{product.category}</span>
+                  )}
+                  {product.pricing && (
+                    <span className={`text-xs font-medium px-3 py-1 rounded-full border ${PRICING_COLORS[product.pricing] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                      {product.pricing}
+                    </span>
+                  )}
+                  {product.productStatus && (
+                    <span className={`text-xs font-medium px-3 py-1 rounded-full border ${STATUS_COLORS[product.productStatus] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                      {product.productStatus}
+                    </span>
+                  )}
+                  {product.referralCode && (
+                    <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full">🔗 {product.referralCode}</span>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
+
+            {/* ── Upvote & share row ── */}
+            <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-t border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleUpvote}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full border transition font-medium text-sm ${
+                    userVoted
+                      ? 'bg-purple-100 border-purple-300 text-purple-700'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-purple-50 hover:border-purple-200'
+                  }`}
+                  disabled={upvoteMutation.isLoading}
+                >
+                  <FiHeart className={`w-4 h-4 ${userVoted ? 'fill-purple-600 text-purple-600' : ''}`} />
+                  <span>{upvotes}</span>
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition text-sm font-medium"
+                >
+                  {shareCopied ? 'Copied!' : <FiShare2 className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <span className="flex items-center gap-1.5"><FiClock className="w-3.5 h-3.5" /> {formatDate(product.createdAt)}</span>
+                <span className="flex items-center gap-1.5"><FiMessageCircle className="w-3.5 h-3.5" /> {product.commentsCount || 0}</span>
+                {isMaker && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Maker</span>}
+                {!isAuthenticated && (
+                  <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <FiLock className="w-3 h-3" /> Sign in
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* ── Maker info (clickable) ── */}
+            <div
+              className="flex items-center gap-3 mt-5 cursor-pointer hover:bg-slate-50/70 rounded-xl p-2 -mx-2 transition"
+              onClick={() => goToUserProfile(product.maker?.uid)}
+            >
+              <div className="w-9 h-9 rounded-full bg-purple-100 overflow-hidden flex-shrink-0">
+                {product.maker?.avatar ? (
+                  <Image src={product.maker.avatar} alt={product.maker.fullname || 'User'} width={36} height={36} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-purple-600"><FiUser className="w-4 h-4" /></div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-slate-700 text-sm hover:text-purple-600 transition">
+                  {product.maker?.fullname || product.maker?.username || 'Anonymous'}
+                </p>
+                <p className="text-xs text-slate-400">View Profile →</p>
+              </div>
+            </div>
+
+            {/* ── Description ── */}
+            {product.description && (
+              <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                  <FiInfo className="text-purple-500" /> Description
+                </h3>
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{product.description}</p>
+              </div>
+            )}
+
+            {/* ── Video embed ── */}
+            {isVideoLink && (
+              <div className="mt-6 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+                <div className="relative w-full aspect-video bg-black">
+                  <iframe
+                    src={videoEmbedUrl}
+                    title={`${product.name} – Demo`}
+                    className="absolute top-0 left-0 w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Features ── */}
+            {product.features && product.features.length > 0 && (
+              <div className="mt-6 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <FiList className="text-purple-600" /> Key Features
+                </h3>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {product.features.map((feature, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm text-slate-700">
+                      <span className="text-purple-500 mt-0.5">•</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* ── Website & Links ── */}
+            {(product.url || product.websiteTitle || product.websiteDescription || product.websiteImage || product.demoUrl || product.twitter || product.referralCode) && (
+              <div className="mt-6 p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <FiGlobe className="text-emerald-600" /> Website & Links
+                </h3>
+                {product.websiteTitle && (
+                  <p className="text-sm text-slate-800 font-medium">{product.websiteTitle}</p>
+                )}
+                {product.websiteDescription && (
+                  <p className="text-sm text-slate-600 mt-1">{product.websiteDescription}</p>
+                )}
+                {product.websiteImage && (
+                  <div className="mt-2 w-32 h-20 rounded-lg overflow-hidden border border-slate-200">
+                    <Image
+                      src={getOptimizedUrl(product.websiteImage, 200, 120)}
+                      alt="Website preview"
+                      width={128}
+                      height={80}
+                      className="w-full h-full object-cover"
+                      quality={80}
+                    />
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {product.url && (
+                    <a
+                      href={product.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition text-xs font-medium"
+                    >
+                      {websiteFavicon ? (
+                        <img src={websiteFavicon} alt="" className="w-4 h-4" />
+                      ) : (
+                        <FiGlobe className="w-3 h-3" />
+                      )}
+                      Website
+                    </a>
+                  )}
+                  {product.demoUrl && !isVideoLink && (
+                    <a
+                      href={product.demoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition text-xs font-medium"
+                    >
+                      <FiVideo className="w-3 h-3" /> Demo
+                    </a>
+                  )}
+                  {product.twitter && (
+                    <a
+                      href={`https://twitter.com/${product.twitter.replace('@', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-sky-500 border border-sky-200 rounded-lg hover:bg-sky-50 transition text-xs font-medium"
+                    >
+                      <FiTwitter className="w-3 h-3" /> {product.twitter}
+                    </a>
+                  )}
+                  {product.referralCode && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium">
+                      <FiLink className="w-3 h-3" /> {product.referralCode}
+                    </span>
+                  )}
+                </div>
+                {product.releaseDate && (
+                  <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
+                    <FiCalendar className="w-3 h-3" />
+                    Released: {new Date(product.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ── Social Links ── */}
+            {product.socialLinks && product.socialLinks.length > 0 && (
+              <div className="mt-6 p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <FiUsers className="text-indigo-600" /> Connect
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {product.socialLinks.map((link, index) => {
+                    const Icon = getSocialIcon(link.platform);
+                    return (
+                      <a
+                        key={index}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition text-xs font-medium"
+                      >
+                        <Icon className="w-3.5 h-3.5 text-indigo-600" />
+                        {link.platform}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Target Audience ── */}
+            {product.targetAudience && (
+              <div className="mt-6 p-4 bg-cyan-50/60 rounded-xl border border-cyan-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                  <FiUsers className="text-cyan-600" /> Target Audience
+                </h3>
+                <p className="text-sm text-slate-600">{product.targetAudience}</p>
+              </div>
+            )}
+
+            {/* ── Tech Stack ── */}
+            {product.techStack && product.techStack.length > 0 && (
+              <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <FiCpu className="text-slate-600" /> Tech Stack
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.techStack.map((tech, index) => (
+                    <span
+                      key={index}
+                      className="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Maker actions ── */}
+            {isMaker && (
+              <div className="flex flex-wrap items-center gap-3 mt-6 pt-4 border-t border-slate-100">
+                <Link
+                  href={`/productstrend/launch?id=${product.id}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm hover:bg-slate-200 transition"
+                >
+                  <FiEdit2 className="w-4 h-4" /> Edit
+                </Link>
+                <button
+                  onClick={handleDeleteClick}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm hover:bg-red-100 transition"
+                >
+                  <FiTrash2 className="w-4 h-4" /> Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Comments Section ── */}
+        <div className="mt-10">
+          <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+            <FiMessageCircle className="text-purple-600" />
+            Comments ({product.commentsCount || 0})
+          </h3>
+
+          <form onSubmit={handleAddComment} className="mt-4 flex gap-3">
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder={isAuthenticated ? "Add a comment..." : "Sign in to comment"}
+              className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+              disabled={!isAuthenticated || submittingComment}
+            />
+            <button
+              type="submit"
+              disabled={!isAuthenticated || !commentText.trim() || submittingComment}
+              className="px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50 flex items-center gap-2 text-sm"
+            >
+              {submittingComment ? <FiLoader className="w-4 h-4 animate-spin" /> : <FiSend className="w-4 h-4" />}
+            </button>
+          </form>
+          {!isAuthenticated && (
+            <p className="mt-2 text-xs text-slate-400">
+              <Link href={`/login?redirect=/productstrend/${id}`} className="text-purple-600 hover:underline">
+                Sign in
+              </Link> to join the conversation.
+            </p>
+          )}
+
+          <div className="mt-6 space-y-4">
+            {comments.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-6 bg-white rounded-xl border border-slate-100">
+                No comments yet. Be the first!
+              </p>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                    {comment.user?.avatar ? (
+                      <Image
+                        src={comment.user.avatar}
+                        alt={comment.user.fullname || 'User'}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-600">
+                        {comment.user?.fullname?.[0] || comment.user?.username?.[0] || 'U'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-700">
+                      {comment.user?.fullname || comment.user?.username || 'Anonymous'}
+                    </p>
+                    <p className="text-sm text-slate-600 mt-0.5">{comment.text}</p>
+                    <p className="text-xs text-slate-400 mt-1">{formatDate(comment.createdAt)}</p>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {hasMore && (
+              <div className="text-center py-4">
+                <button
+                  onClick={() => fetchMoreComments()}
+                  disabled={isFetchingMoreComments}
+                  className="px-6 py-2.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-xl hover:bg-purple-100 transition text-sm font-medium disabled:opacity-50"
+                >
+                  {isFetchingMoreComments ? (
+                    <span className="flex items-center gap-2"><FiLoader className="w-4 h-4 animate-spin" /> Loading...</span>
+                  ) : (
+                    'Load More Comments'
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ── Custom Delete Modal ── */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm transition-opacity">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 transform scale-100">
-            <div className="w-14 h-14 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
-              <FiTrash2 className="w-6 h-6" />
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100">
+            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiAlertTriangle className="w-5 h-5" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Product?</h3>
-            <p className="text-sm text-slate-500 font-medium mb-6 leading-relaxed">
-              Are you sure you want to permanently delete <strong className="text-slate-700">{product.name}</strong>? This action cannot be undone.
+            <h3 className="text-lg font-bold text-gray-900 mb-1.5">Delete Product</h3>
+            <p className="text-gray-500 text-xs sm:text-sm mb-6 leading-relaxed">
+              Are you sure you want to delete <strong>{product?.name}</strong>? This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeleteModal(false)}
+                onClick={handleDeleteConfirm}
                 disabled={isDeleting}
-                className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition disabled:opacity-50"
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
               >
-                Cancel
+                {isDeleting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Delete'}
               </button>
               <button
-                onClick={executeDelete}
-                disabled={isDeleting}
-                className="flex-1 bg-red-600 text-white py-3 rounded-xl font-semibold hover:bg-red-700 transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                onClick={() => setDeleteModal(false)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-200 transition"
               >
-                {isDeleting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Yes, Delete'}
+                Cancel
               </button>
             </div>
           </div>
