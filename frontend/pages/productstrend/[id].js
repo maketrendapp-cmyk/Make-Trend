@@ -48,6 +48,7 @@ import {
   FiCode,
   FiShoppingBag,
   FiPlay,
+FiAlertTriangle,  // ← ADD THIS
 } from 'react-icons/fi';
 import { FaRocket, FaDiscord, FaTelegram, FaTiktok } from 'react-icons/fa';
 
