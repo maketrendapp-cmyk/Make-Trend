@@ -28,7 +28,7 @@ import {
   FiUser,
   FiFilter,
   FiChevronDown,
-  FiAlertTriangle,
+  FiAlertTriangle,      // ← import added
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -114,12 +114,10 @@ export default function MyProducts() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ── Confirm delete ──
   const confirmDelete = (product) => {
     setDeleteModal(product);
   };
 
-  // ── Handle delete with optimistic update ──
   const handleDelete = async () => {
     if (!deleteModal) return;
     setIsDeleting(true);
@@ -127,7 +125,7 @@ export default function MyProducts() {
     const productId = deleteModal.id;
     const queryKey = ['myProducts', { status: statusFilter || undefined, category: categoryFilter || undefined }];
 
-    // ── Optimistically remove product from cache ──
+    // Optimistically remove from cache
     queryClient.setQueryData(queryKey, (oldData) => {
       if (!oldData) return oldData;
       const newPages = oldData.pages.map((page) => ({
@@ -139,13 +137,11 @@ export default function MyProducts() {
 
     try {
       await deleteMutation.mutateAsync(productId);
-      // Invalidate to ensure consistency (but cache already updated)
       await invalidateMyProducts();
       await refetch();
       toast.success('Product deleted');
       setDeleteModal(null);
     } catch (err) {
-      // Revert optimistic update on error
       await refetch();
       toast.error('Failed to delete product');
     } finally {
@@ -204,7 +200,6 @@ export default function MyProducts() {
     }
   };
 
-  // ── Clear all filters ──
   const clearFilters = () => {
     setStatusFilter('');
     setCategoryFilter('');
@@ -435,7 +430,6 @@ export default function MyProducts() {
                   key={product.id}
                   className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
                 >
-                  {/* ── Image / Logo Area ── */}
                   <Link
                     href={`/productstrend/${product.id}`}
                     className="block relative aspect-video bg-slate-100 overflow-hidden"
@@ -466,7 +460,6 @@ export default function MyProducts() {
                     </div>
                   </Link>
 
-                  {/* ── Content ── */}
                   <div className="p-5 flex flex-col flex-1">
                     <Link
                       href={`/productstrend/${product.id}`}
@@ -535,7 +528,6 @@ export default function MyProducts() {
               ))}
             </div>
 
-            {/* ── Infinite Scroll Sentinel ── */}
             {hasMore && (
               <div id="my-products-end" className="py-8 flex justify-center">
                 {isFetchingNextPage ? (
