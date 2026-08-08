@@ -2,7 +2,6 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import Image from 'next/image';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import { usePublicProfile } from '../../lib/queries';
@@ -105,6 +104,9 @@ export default function UserInfo() {
   const { id, isReady } = router;
   const { user, isAuthenticated } = useAuth();
 
+  // ── FIX: ALWAYS call hooks at the top level BEFORE any early returns ──
+  const { data: profile, isLoading, isError, error } = usePublicProfile(id);
+
   // ── Wait for router to be ready ──
   if (!isReady) {
     return (
@@ -119,9 +121,6 @@ export default function UserInfo() {
       </div>
     );
   }
-
-  // ── Now safe to call the hook ──
-  const { data: profile, isLoading, isError, error } = usePublicProfile(id);
 
   if (isError && error) {
     console.error('Profile fetch error:', error);
@@ -240,11 +239,10 @@ export default function UserInfo() {
               <div className="relative group">
                 <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white shadow-md transition-all duration-300 group-hover:shadow-xl">
                   {profile.avatar ? (
-                    <Image
+                    // FIX: Replaced next/image with standard img to prevent unconfigured domain errors
+                    <img
                       src={profile.avatar}
                       alt={profile.fullname || 'User'}
-                      width={112}
-                      height={112}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -411,3 +409,4 @@ export default function UserInfo() {
     </>
   );
 }
+
