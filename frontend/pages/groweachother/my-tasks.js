@@ -1,5 +1,5 @@
 // pages/groweachother/my-tasks.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
@@ -16,7 +16,7 @@ import {
   FiCompass,
   FiRepeat,
   FiExternalLink,
-  FiChevronDown,
+  FiFilter,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -71,7 +71,6 @@ const TASK_TYPES_BY_PLATFORM = {
   GitHub: ['Follow', 'Star', 'Watch'],
 };
 
-// ── Default task types (for custom platforms) ──
 const DEFAULT_TASK_TYPES = ['Follow', 'Like', 'Comment', 'Share'];
 
 export default function MyTasks() {
@@ -79,14 +78,61 @@ export default function MyTasks() {
   const { user, isAuthenticated } = useAuth();
   const { invalidateMyTasks } = useInvalidateQueries();
 
-  // ── React Query: My Tasks ──
+  // ── Filter state ──
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState('');
+  const [taskTypeFilter, setTaskTypeFilter] = useState('');
+  const [availableTaskTypes, setAvailableTaskTypes] = useState(DEFAULT_TASK_TYPES);
+
+  // ── React Query: My Tasks (infinite, with filters) ──
+  const filters = {
+    status: statusFilter,
+    platform: platformFilter || undefined,
+    taskType: taskTypeFilter || undefined,
+  };
+
   const {
-    data: tasks = [],
+    data,
+    fetchNextPage,
+    hasNextPage,
     isLoading,
+    isFetchingNextPage,
+    refetch,
     isError,
     error,
-    refetch,
-  } = useMyTasks(isAuthenticated && !!user);
+  } = useMyTasks(filters, isAuthenticated && !!user);
+
+  // ── Flatten tasks from all pages ──
+  const tasks = data?.pages?.flatMap((page) => page.tasks) || [];
+  const hasMore = hasNextPage;
+
+  // ── Intersection Observer for infinite scroll ──
+  const observerRef = useRef(null);
+
+  useEffect(() => {
+    if (isFetchingNextPage || !hasMore || tasks.length === 0) return;
+
+    const lastElement = document.querySelector('#tasks-end');
+    if (!lastElement) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(lastElement);
+    observerRef.current = observer;
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [isFetchingNextPage, hasMore, tasks.length, fetchNextPage]);
 
   // ── Modal state ──
   const [showModal, setShowModal] = useState(false);
@@ -96,13 +142,12 @@ export default function MyTasks() {
     url: '',
     taskType: '',
     title: '',
-    description: '', // ← NEW
+    description: '',
   });
   const [customPlatform, setCustomPlatform] = useState('');
   const [customTaskType, setCustomTaskType] = useState('');
   const [showCustomPlatformInput, setShowCustomPlatformInput] = useState(false);
   const [showCustomTaskTypeInput, setShowCustomTaskTypeInput] = useState(false);
-  const [availableTaskTypes, setAvailableTaskTypes] = useState(DEFAULT_TASK_TYPES);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
@@ -110,6 +155,25 @@ export default function MyTasks() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // ── Handle platform filter change ──
+  const handlePlatformFilterChange = (e) => {
+    const val = e.target.value;
+    setPlatformFilter(val);
+    setTaskTypeFilter('');
+    if (val && PLATFORMS.includes(val)) {
+      setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[val] || DEFAULT_TASK_TYPES);
+    } else {
+      setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+    }
+  };
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setPlatformFilter('');
+    setTaskTypeFilter('');
+    setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+  };
 
   // ── Open modal for create/edit ──
   const openCreateModal = () => {
@@ -128,7 +192,6 @@ export default function MyTasks() {
     setEditingTask(task);
     const platform = task.platform || '';
     const taskType = task.taskType || '';
-    // Determine if platform is custom
     const isCustomPlatform = platform && !PLATFORMS.includes(platform);
     const isCustomTaskType = taskType && !DEFAULT_TASK_TYPES.includes(taskType) && !Object.values(TASK_TYPES_BY_PLATFORM).flat().includes(taskType);
 
@@ -143,7 +206,6 @@ export default function MyTasks() {
     setCustomTaskType(isCustomTaskType ? taskType : '');
     setShowCustomPlatformInput(isCustomPlatform);
     setShowCustomTaskTypeInput(isCustomTaskType);
-    // Set available task types based on platform
     if (platform && PLATFORMS.includes(platform)) {
       setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[platform] || DEFAULT_TASK_TYPES);
     } else {
@@ -153,7 +215,7 @@ export default function MyTasks() {
     setShowModal(true);
   };
 
-  // ── Handle platform change ──
+  // ── Handle platform change in modal ──
   const handlePlatformChange = (e) => {
     const val = e.target.value;
     setFormData({ ...formData, platform: val });
@@ -163,13 +225,11 @@ export default function MyTasks() {
     } else {
       setShowCustomPlatformInput(false);
       setCustomPlatform('');
-      // Update task types based on selected platform
       if (PLATFORMS.includes(val)) {
         setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[val] || DEFAULT_TASK_TYPES);
       } else {
         setAvailableTaskTypes(DEFAULT_TASK_TYPES);
       }
-      // Reset task type if it's not in the new list
       const currentTaskType = formData.taskType;
       if (currentTaskType && !availableTaskTypes.includes(currentTaskType) && currentTaskType !== 'custom') {
         setFormData(prev => ({ ...prev, taskType: '' }));
@@ -177,7 +237,7 @@ export default function MyTasks() {
     }
   };
 
-  // ── Handle task type change ──
+  // ── Handle task type change in modal ──
   const handleTaskTypeChange = (e) => {
     const val = e.target.value;
     setFormData({ ...formData, taskType: val });
@@ -279,7 +339,7 @@ export default function MyTasks() {
     }
   };
 
-  // ── Delete task handlers ──
+  // ── Delete task ──
   const confirmDelete = (task) => {
     setTaskToDelete(task);
     setShowDeleteModal(true);
@@ -414,7 +474,7 @@ export default function MyTasks() {
       <Meta title="My Tasks | Make Trend" description="Manage your social tasks for Grow Together." />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
-          
+
           {/* ── Top Navigation Links Bar ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-2">
@@ -432,7 +492,7 @@ export default function MyTasks() {
               </button>
             </div>
             <button
-              onClick={() => refetch()}
+              onClick={() => refetch({ refetchPage: (page, index) => index === 0 })}
               className="p-2 text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
               title="Refresh"
             >
@@ -441,7 +501,7 @@ export default function MyTasks() {
           </div>
 
           {/* ── Header ── */}
-          <div className="flex items-center justify-between mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <FiPlus className="text-purple-600 w-5 h-5" />
@@ -458,6 +518,86 @@ export default function MyTasks() {
             </button>
           </div>
 
+          {/* ── Filters ── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <FiFilter className="text-purple-500 flex-shrink-0" />
+                <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Filters</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                {/* Status filter */}
+                <div className="relative w-full sm:w-36">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Platform filter */}
+                <div className="relative w-full sm:w-40">
+                  <select
+                    value={platformFilter}
+                    onChange={handlePlatformFilterChange}
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  >
+                    <option value="">All Platforms</option>
+                    {PLATFORMS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Task Type filter */}
+                <div className="relative w-full sm:w-40">
+                  <select
+                    value={taskTypeFilter}
+                    onChange={(e) => setTaskTypeFilter(e.target.value)}
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                    disabled={!platformFilter && availableTaskTypes === DEFAULT_TASK_TYPES}
+                  >
+                    <option value="">All Task Types</option>
+                    {availableTaskTypes.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Clear filters */}
+                {(statusFilter !== 'all' || platformFilter || taskTypeFilter) && (
+                  <button
+                    onClick={clearFilters}
+                    className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition"
+                  >
+                    <FiX className="w-3.5 h-3.5" />
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           {isError && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
               {error?.message || 'Failed to load tasks'}
@@ -465,18 +605,26 @@ export default function MyTasks() {
           )}
 
           {/* ── Tasks List ── */}
-          {tasks.length === 0 ? (
+          {tasks.length === 0 && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
               <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">📋</div>
-              <h3 className="text-base font-bold text-gray-900 mb-1">No tasks yet</h3>
-              <p className="text-sm text-gray-400 mb-6 font-medium">Create your first social task to get started!</p>
-              <button
-                onClick={openCreateModal}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
-              >
-                <FiPlus className="w-4 h-4" />
-                Create Task
-              </button>
+              <h3 className="text-base font-bold text-gray-900 mb-1">
+                {statusFilter !== 'all' || platformFilter || taskTypeFilter ? 'No matching tasks' : 'No tasks yet'}
+              </h3>
+              <p className="text-sm text-gray-400 mb-6 font-medium">
+                {statusFilter !== 'all' || platformFilter || taskTypeFilter
+                  ? 'Try adjusting your filters.'
+                  : 'Create your first social task to get started!'}
+              </p>
+              {statusFilter === 'all' && !platformFilter && !taskTypeFilter && (
+                <button
+                  onClick={openCreateModal}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
+                >
+                  <FiPlus className="w-4 h-4" />
+                  Create Task
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-3.5">
@@ -491,7 +639,6 @@ export default function MyTasks() {
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      
                       <div className="flex items-start gap-3.5 flex-1 min-w-0">
                         <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-100/60 flex items-center justify-center flex-shrink-0 shadow-sm">
                           <Icon className={`w-5 h-5 ${color}`} />
@@ -554,12 +701,31 @@ export default function MyTasks() {
                           <FiTrash2 className="w-4 h-4" />
                         </button>
                       </div>
-
                     </div>
                   </div>
                 );
               })}
             </div>
+          )}
+
+          {/* ── Infinite scroll sentinel ── */}
+          {hasMore && (
+            <div id="tasks-end" className="py-6 flex justify-center">
+              {isFetchingNextPage ? (
+                <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
+                  <FiLoader className="w-4 h-4 animate-spin text-purple-600" />
+                  Loading more tasks...
+                </div>
+              ) : (
+                <div className="h-4" />
+              )}
+            </div>
+          )}
+
+          {!hasMore && tasks.length > 0 && (
+            <p className="text-center text-xs font-medium text-gray-400 py-6">
+              You've seen all tasks 🎉
+            </p>
           )}
         </div>
       </div>
@@ -658,7 +824,7 @@ export default function MyTasks() {
                 )}
               </div>
 
-              {/* Title (optional) */}
+              {/* Title */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
                   Title (optional)
@@ -674,7 +840,7 @@ export default function MyTasks() {
                 <p className="mt-1 text-[11px] text-gray-400 font-medium">{formData.title.length}/100 characters</p>
               </div>
 
-              {/* Description (optional) */}
+              {/* Description */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
                   Description / Instructions (optional)
