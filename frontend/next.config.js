@@ -75,6 +75,16 @@ const nextConfig = {
         source: '/groweachother/:path*',
         destination: '/groweachother/:path*',
       },
+//community page 🤩
+{
+        source: '/community/:path*',
+        destination: '/community/:path*',
+      },
+//user profile 
+{
+        source: '/userprofile/:path*',
+        destination: '/userprofile/:path*',
+      },
       // ── Existing catch‑all rules ──
       {
         source: '/:slug',
