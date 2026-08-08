@@ -6291,8 +6291,8 @@ app.delete('/api/productstrend/products/:id', verifyToken, checkBanned, async (r
     // ── Delete from Firestore ──
     await docRef.delete();
 
-    // ── Invalidate user's own products list ──
-    await invalidateKey(`productstrend:my-products:${uid}`);
+    // ── Invalidate all user's own products list caches (with filters) ──
+    await invalidatePattern(`productstrend:my-products:${uid}:*`);
 
     res.json({ success: true, message: 'Product deleted' });
   } catch (error) {
@@ -6304,6 +6304,7 @@ app.delete('/api/productstrend/products/:id', verifyToken, checkBanned, async (r
 // ─────────────────────────────────────────────
 // 7. UPVOTE PRODUCT (toggle)
 // ─────────────────────────────────────────────
+// ── 7. UPVOTE PRODUCT (toggle) with daily limit ──
 app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
@@ -6314,8 +6315,17 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
       return res.status(400).json({ success: false, error: 'Device ID or user ID required' });
     }
 
+    // ── Per‑minute rate limit: 20 upvotes per minute ──
     if (!(await checkRateLimit(uid, 'upvote-product', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many upvotes. Please wait.' });
+    }
+
+    // ── Daily limit: max 100 upvotes per day ──
+    if (!(await checkDailyLimit(uid, 'upvote-product', 100))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily upvote limit reached (max 100 upvotes per day). Come back tomorrow!'
+      });
     }
 
     const docRef = db.collection('products').doc(id);
@@ -6449,6 +6459,7 @@ app.get('/api/productstrend/products/:id/comments', async (req, res) => {
 // ─────────────────────────────────────────────
 // 9. ADD COMMENT TO PRODUCT
 // ─────────────────────────────────────────────
+// ── 9. ADD COMMENT TO PRODUCT ──
 app.post('/api/productstrend/products/:id/comments', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
@@ -6459,8 +6470,17 @@ app.post('/api/productstrend/products/:id/comments', verifyToken, checkBanned, a
       return res.status(400).json({ success: false, error: 'Comment must be 1-500 characters' });
     }
 
+    // ── Per‑minute rate limit: 10 comments per minute ──
     if (!(await checkRateLimit(uid, 'add-comment', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many comments. Please wait.' });
+    }
+
+    // ── Per‑product daily limit: 10 comments per product per day ──
+    if (!(await checkDailyLimit(uid, `comment:${id}`, 10))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily comment limit reached for this product (max 10 comments per day). Come back tomorrow!'
+      });
     }
 
     const commentData = {
