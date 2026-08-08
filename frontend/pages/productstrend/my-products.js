@@ -1,5 +1,5 @@
 // pages/productstrend/my-products.js
-import React, { useState, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -25,6 +25,8 @@ import {
   FiX,
   FiExternalLink,
   FiUser,
+  FiFilter,
+  FiChevronDown,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -40,26 +42,73 @@ const STATUS_LABELS = {
   rejected: '❌ Rejected',
 };
 
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'All Categories' },
+  { value: 'Tech', label: 'Tech' },
+  { value: 'Design', label: 'Design' },
+  { value: 'AI', label: 'AI' },
+  { value: 'Productivity', label: 'Productivity' },
+  { value: 'Education', label: 'Education' },
+  { value: 'Health', label: 'Health' },
+  { value: 'Fitness', label: 'Fitness' },
+  { value: 'Gaming', label: 'Gaming' },
+  { value: 'Social', label: 'Social' },
+  { value: 'Marketing', label: 'Marketing' },
+  { value: 'SaaS', label: 'SaaS' },
+  { value: 'Developer Tools', label: 'Developer Tools' },
+  { value: 'Other', label: 'Other' },
+];
+
 export default function MyProducts() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const { invalidateMyProducts } = useInvalidateQueries();
-  const { data: products = [], isLoading, isError, refetch } = useMyProducts(isAuthenticated);
   const deleteMutation = useDeleteProduct();
 
-  const [deletingId, setDeletingId] = useState(null);
+  // ── Filter state ──
+  const [statusFilter, setStatusFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const filters = {
+    status: statusFilter || undefined,
+    category: categoryFilter || undefined,
+  };
+
+  // ── React Query: My Products (infinite) ──
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isLoading,
+    isFetchingNextPage,
+    refetch,
+    isError,
+  } = useMyProducts(filters, isAuthenticated);
+
+  const allProducts = data?.pages?.flatMap((page) => page.products) || [];
+  const hasMore = hasNextPage;
 
   // ── Local search ──
   const filteredProducts = useMemo(() => {
-    if (!searchTerm.trim()) return products;
+    if (!searchTerm.trim()) return allProducts;
     const term = searchTerm.trim().toLowerCase();
-    return products.filter((p) =>
+    return allProducts.filter((p) =>
       p.name?.toLowerCase().includes(term) ||
       p.tagline?.toLowerCase().includes(term) ||
       p.category?.toLowerCase().includes(term)
     );
-  }, [products, searchTerm]);
+  }, [allProducts, searchTerm]);
+
+  // ── Delete mutation ──
+  const [deletingId, setDeletingId] = useState(null);
 
   const handleDelete = async (productId) => {
     if (!confirm('Delete this product?')) return;
@@ -74,6 +123,33 @@ export default function MyProducts() {
     }
   };
 
+  // ── Intersection Observer for infinite scroll ──
+  const observerRef = useRef(null);
+
+  useEffect(() => {
+    if (isFetchingNextPage || !hasMore || filteredProducts.length === 0) return;
+
+    const lastElement = document.querySelector('#my-products-end');
+    if (!lastElement) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(lastElement);
+    observerRef.current = observer;
+
+    return () => {
+      if (observerRef.current) observerRef.current.disconnect();
+    };
+  }, [isFetchingNextPage, hasMore, filteredProducts.length, fetchNextPage]);
+
+  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
     try {
@@ -98,7 +174,14 @@ export default function MyProducts() {
     }
   };
 
-  // ── Skeleton loader ──
+  // ── Clear all filters ──
+  const clearFilters = () => {
+    setStatusFilter('');
+    setCategoryFilter('');
+    setSearchTerm('');
+  };
+
+  // ── Loading state ──
   if (isLoading) {
     return (
       <>
@@ -175,6 +258,8 @@ export default function MyProducts() {
     );
   }
 
+  const hasFilters = statusFilter || categoryFilter || searchTerm;
+
   return (
     <>
       <Meta title="My Products – ProductTrend" />
@@ -208,35 +293,87 @@ export default function MyProducts() {
           </button>
         </div>
 
-        {/* ── Search ── */}
+        {/* ── Filters & Search ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search your products by name, tagline, or category..."
-              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+          <div className="flex flex-col md:flex-row gap-3">
+            {/* Search */}
+            <div className="flex-1">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search your products..."
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="relative w-full md:w-44">
+              <FiFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full appearance-none border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-slate-50 cursor-pointer"
               >
-                <FiX className="w-4 h-4" />
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Category Filter */}
+            <div className="relative w-full md:w-44">
+              <FiTag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full appearance-none border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-slate-50 cursor-pointer"
+              >
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Clear Filters */}
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition whitespace-nowrap"
+              >
+                <FiX className="inline w-4 h-4 mr-1" /> Clear
               </button>
             )}
           </div>
-          {searchTerm && (
-            <p className="mt-2 text-xs text-slate-400">
-              Showing {filteredProducts.length} of {products.length} products
-            </p>
+
+          {/* Active filters count */}
+          {hasFilters && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <p className="text-xs text-slate-400">
+                Showing {filteredProducts.length} of {allProducts.length} products
+                {statusFilter && <span className="ml-2">• Status: {statusFilter}</span>}
+                {categoryFilter && <span className="ml-2">• Category: {categoryFilter}</span>}
+                {searchTerm && <span className="ml-2">• Search: "{searchTerm}"</span>}
+              </p>
+            </div>
           )}
         </div>
 
         {/* ── Products Grid ── */}
-        {products.length === 0 ? (
+        {allProducts.length === 0 && !isLoading && !isFetchingNextPage ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-6xl mb-4">🚀</div>
             <h3 className="text-xl font-semibold text-slate-900">No products launched yet</h3>
@@ -248,132 +385,151 @@ export default function MyProducts() {
               <FiPlus className="w-4 h-4" /> Launch Your First Product
             </button>
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : filteredProducts.length === 0 && allProducts.length > 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">🔍</div>
             <h3 className="text-lg font-semibold text-slate-900">No matches found</h3>
-            <p className="text-slate-500 text-sm">Try adjusting your search terms.</p>
+            <p className="text-slate-500 text-sm">Try adjusting your search or filters.</p>
             <button
-              onClick={() => setSearchTerm('')}
-              className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition"
+              onClick={clearFilters}
+              className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
             >
-              <FiX className="w-4 h-4" /> Clear Search
+              Clear Filters
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
-              >
-                {/* ── Image / Logo Area ── */}
-                <Link
-                  href={`/productstrend/${product.id}`}
-                  className="block relative aspect-video bg-slate-100 overflow-hidden"
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
                 >
-                  {product.thumbnail || product.imageUrl ? (
-                    <Image
-                      src={product.thumbnail || product.imageUrl}
-                      alt={product.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">
-                      🚀
-                    </div>
-                  )}
-                  {/* ── Status badge overlay ── */}
-                  <div className="absolute top-3 right-3">
-                    <span
-                      className={`text-[10px] font-medium px-2.5 py-1 rounded-full border shadow-sm ${
-                        STATUS_BADGE[product.status] || 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      {STATUS_LABELS[product.status] || product.status || 'Pending'}
-                    </span>
-                  </div>
-                </Link>
-
-                {/* ── Content ── */}
-                <div className="p-5 flex flex-col flex-1">
+                  {/* ── Image / Logo Area ── */}
                   <Link
                     href={`/productstrend/${product.id}`}
-                    className="block group-hover:text-purple-600 transition-colors"
+                    className="block relative aspect-video bg-slate-100 overflow-hidden"
                   >
-                    <h3 className="font-semibold text-slate-900 text-base line-clamp-1">
-                      {product.name}
-                    </h3>
-                  </Link>
-                  <p className="text-sm text-slate-500 line-clamp-2 mt-1 flex-1">
-                    {product.tagline}
-                  </p>
-
-                  {/* ── Logo (circle) if available ── */}
-                  {product.logo && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
-                        <Image
-                          src={product.logo}
-                          alt="Logo"
-                          width={24}
-                          height={24}
-                          className="w-full h-full object-cover"
-                        />
+                    {product.thumbnail || product.imageUrl ? (
+                      <Image
+                        src={product.thumbnail || product.imageUrl}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                        quality={85}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">
+                        🚀
                       </div>
-                      <span className="text-[10px] text-slate-400 font-medium">Logo</span>
+                    )}
+                    <div className="absolute top-3 right-3">
+                      <span
+                        className={`text-[10px] font-medium px-2.5 py-1 rounded-full border shadow-sm ${
+                          STATUS_BADGE[product.status] || 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {STATUS_LABELS[product.status] || product.status || 'Pending'}
+                      </span>
                     </div>
-                  )}
+                  </Link>
 
-                  {/* ── Stats ── */}
-                  <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <FiHeart className="w-3.5 h-3.5" />
-                      {product.upvotes || 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FiMessageCircle className="w-3.5 h-3.5" />
-                      {product.commentsCount || 0}
-                    </span>
-                    <span className="flex items-center gap-1 ml-auto">
-                      <FiClock className="w-3.5 h-3.5" />
-                      {formatDate(product.createdAt)}
-                    </span>
-                  </div>
-
-                  {/* ── Actions ── */}
-                  <div className="flex gap-2 mt-3 pt-2 border-t border-slate-100">
+                  {/* ── Content ── */}
+                  <div className="p-5 flex flex-col flex-1">
                     <Link
                       href={`/productstrend/${product.id}`}
-                      className="flex-1 text-center text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition"
+                      className="block group-hover:text-purple-600 transition-colors"
                     >
-                      View
+                      <h3 className="font-semibold text-slate-900 text-base line-clamp-1">
+                        {product.name}
+                      </h3>
                     </Link>
-                    <Link
-                      href={`/productstrend/edit/${product.id}`}
-                      className="flex-1 text-center text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
-                    >
-                      <FiEdit2 className="inline w-3 h-3 mr-1" /> Edit
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      disabled={deletingId === product.id}
-                      className="flex-1 text-center text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
-                    >
-                      {deletingId === product.id ? (
-                        <FiLoader className="w-3 h-3 animate-spin mx-auto" />
-                      ) : (
-                        <FiTrash2 className="inline w-3 h-3 mr-1" />
-                      )}
-                    </button>
+                    <p className="text-sm text-slate-500 line-clamp-2 mt-1 flex-1">
+                      {product.tagline}
+                    </p>
+
+                    {product.logo && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+                          <Image
+                            src={product.logo}
+                            alt="Logo"
+                            width={24}
+                            height={24}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">Logo</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <FiHeart className="w-3.5 h-3.5" />
+                        {product.upvotes || 0}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <FiMessageCircle className="w-3.5 h-3.5" />
+                        {product.commentsCount || 0}
+                      </span>
+                      <span className="flex items-center gap-1 ml-auto">
+                        <FiClock className="w-3.5 h-3.5" />
+                        {formatDate(product.createdAt)}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2 mt-3 pt-2 border-t border-slate-100">
+                      <Link
+                        href={`/productstrend/${product.id}`}
+                        className="flex-1 text-center text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition"
+                      >
+                        View
+                      </Link>
+                      <Link
+                        href={`/productstrend/launch?id=${product.id}`}
+                        className="flex-1 text-center text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+                      >
+                        <FiEdit2 className="inline w-3 h-3 mr-1" /> Edit
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        disabled={deletingId === product.id}
+                        className="flex-1 text-center text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
+                      >
+                        {deletingId === product.id ? (
+                          <FiLoader className="w-3 h-3 animate-spin mx-auto" />
+                        ) : (
+                          <FiTrash2 className="inline w-3 h-3 mr-1" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {/* ── Infinite Scroll Sentinel ── */}
+            {hasMore && (
+              <div id="my-products-end" className="py-8 flex justify-center">
+                {isFetchingNextPage ? (
+                  <div className="flex items-center gap-2 text-slate-400 text-sm">
+                    <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
+                    Loading more...
+                  </div>
+                ) : (
+                  <div className="h-4" />
+                )}
               </div>
-            ))}
-          </div>
+            )}
+
+            {!hasMore && filteredProducts.length > 0 && (
+              <p className="text-center text-xs text-slate-400 py-6">
+                You've reached the end of your products 🎉
+              </p>
+            )}
+          </>
         )}
       </div>
     </>

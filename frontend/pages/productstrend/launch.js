@@ -180,42 +180,80 @@ export default function LaunchProduct() {
     }
   };
 
+  // ── Enhanced validate() matching backend rules ──
   const validate = () => {
     const newErrors = {};
+
+    // Name
     if (!formData.name.trim() || formData.name.trim().length < 1 || formData.name.trim().length > 100) {
       newErrors.name = 'Name must be 1-100 characters';
     }
+    // Tagline
     if (!formData.tagline.trim() || formData.tagline.trim().length < 1 || formData.tagline.trim().length > 200) {
       newErrors.tagline = 'Tagline must be 1-200 characters';
     }
+    // Description
     if (formData.description && formData.description.length > 2000) {
       newErrors.description = 'Description must be less than 2000 characters';
     }
+    // URL
     if (formData.url && !isValidUrl(formData.url.trim())) {
       newErrors.url = 'Please enter a valid URL (e.g., https://example.com)';
     }
+    // Logo
     if (formData.logo && !isValidUrl(formData.logo.trim())) {
       newErrors.logo = 'Please enter a valid HTTPS URL';
     }
+    // Thumbnail
     if (formData.thumbnail && !isValidUrl(formData.thumbnail.trim())) {
       newErrors.thumbnail = 'Please enter a valid HTTPS URL';
     }
+    // Demo URL
     if (formData.demoUrl && !isValidUrl(formData.demoUrl.trim())) {
       newErrors.demoUrl = 'Please enter a valid demo URL';
     }
+    // Twitter handle
     if (formData.twitter && !formData.twitter.startsWith('@') && formData.twitter.trim()) {
       newErrors.twitter = 'Twitter handle should start with @';
     }
+    // Target audience
+    if (formData.targetAudience && formData.targetAudience.length > 200) {
+      newErrors.targetAudience = 'Target audience must be less than 200 characters';
+    }
+    // Referral code
+    if (formData.referralCode && formData.referralCode.length > 50) {
+      newErrors.referralCode = 'Referral code must be less than 50 characters';
+    }
+    // Social links
     formData.socialLinks.forEach((link, idx) => {
       if (link.url && !isValidUrl(link.url.trim())) {
         newErrors[`social_${idx}`] = 'Invalid URL';
       }
+      if (link.platform && link.platform.trim().length > 50) {
+        newErrors[`social_${idx}`] = 'Platform must be less than 50 characters';
+      }
     });
+    // Features (optional but if provided must be strings)
+    if (formData.features && !Array.isArray(formData.features)) {
+      newErrors.features = 'Features must be a list';
+    }
+    // Tech stack
+    if (formData.techStack && !Array.isArray(formData.techStack)) {
+      newErrors.techStack = 'Tech stack must be a list';
+    }
+    // Pricing & productStatus – just ensure they are from allowed lists (optional)
+    if (formData.pricing && !PRICING_OPTIONS.includes(formData.pricing)) {
+      newErrors.pricing = 'Invalid pricing option';
+    }
+    if (formData.productStatus && !STATUS_OPTIONS.includes(formData.productStatus)) {
+      newErrors.productStatus = 'Invalid product status';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ── Meta fetch ──
+  // ── Frontend-only meta fetch with multiple proxies ──
   const fetchWebsiteMeta = async () => {
     const url = formData.url.trim();
     if (!url || !isValidUrl(url)) {
@@ -227,62 +265,79 @@ export default function LaunchProduct() {
     setMetaFetched(false);
     setErrors((prev) => ({ ...prev, meta: '' }));
 
-    try {
-      const proxies = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-      ];
+    // List of proxy services
+    const proxies = [
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+      `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    ];
 
-      let html = null;
-      for (const proxyUrl of proxies) {
-        try {
-          const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-          if (response.ok) {
-            html = await response.text();
-            break;
-          }
-        } catch {
-          continue;
+    let html = null;
+    let lastError = null;
+
+    for (const proxyUrl of proxies) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const response = await fetch(proxyUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; MakeTrendBot/1.0)',
+          },
+        });
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          html = await response.text();
+          break;
         }
+      } catch (err) {
+        lastError = err;
+        console.warn(`Proxy failed (${proxyUrl}):`, err.message);
+        // Continue to next proxy
       }
-
-      if (!html) throw new Error('Could not fetch website');
-
-      const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-      const title = titleMatch ? titleMatch[1].trim() : '';
-
-      const descriptionMatch =
-        html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
-        html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
-      const description = descriptionMatch ? descriptionMatch[1].trim() : '';
-
-      const imageMatch =
-        html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) ||
-        html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:image["']/i);
-      let image = imageMatch ? imageMatch[1].trim() : '';
-
-      if (image && image.startsWith('/')) {
-        try {
-          const parsedUrl = new URL(url);
-          image = `${parsedUrl.origin}${image}`;
-        } catch {
-          // ignore
-        }
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        websiteTitle: title || '',
-        websiteDescription: description || '',
-        websiteImage: image || '',
-      }));
-      setMetaFetched(true);
-    } catch (err) {
-      console.error('Meta fetch error:', err);
-      setErrors({ meta: 'Could not fetch website info. Please enter the details manually.' });
-    } finally {
-      setIsFetchingMeta(false);
     }
+
+    if (!html) {
+      console.error('All proxies failed:', lastError);
+      setErrors({ meta: 'Could not fetch website info. Please enter the details manually.' });
+      setIsFetchingMeta(false);
+      return;
+    }
+
+    // Extract metadata from HTML
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : '';
+
+    const descriptionMatch =
+      html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
+    const description = descriptionMatch ? descriptionMatch[1].trim() : '';
+
+    const imageMatch =
+      html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:image["']/i) ||
+      html.match(/<meta[^>]*property=["']twitter:image["'][^>]*content=["']([^"']*)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']twitter:image["']/i);
+    let image = imageMatch ? imageMatch[1].trim() : '';
+
+    // Resolve relative image URL
+    if (image && image.startsWith('/')) {
+      try {
+        const parsedUrl = new URL(url);
+        image = `${parsedUrl.origin}${image}`;
+      } catch {
+        // ignore
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      websiteTitle: title || '',
+      websiteDescription: description || '',
+      websiteImage: image || '',
+    }));
+    setMetaFetched(true);
+    setIsFetchingMeta(false);
   };
 
   const applyMetaData = () => {
@@ -636,7 +691,7 @@ export default function LaunchProduct() {
               </div>
             </div>
 
-            {/* ── Media ── */}
+            {/* ── Media & Links ── */}
             <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <FiImage className="text-purple-500" /> Media & Links
@@ -699,6 +754,7 @@ export default function LaunchProduct() {
                     </div>
                   </div>
                 )}
+                {errors.meta && <p className="mt-1 text-sm text-red-600">{errors.meta}</p>}
               </div>
 
               {/* Logo */}
@@ -904,10 +960,11 @@ export default function LaunchProduct() {
                     className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                   />
                 </div>
+                {errors.targetAudience && <p className="mt-1 text-sm text-red-600">{errors.targetAudience}</p>}
               </div>
             </div>
 
-            {/* ── Advanced Options (collapsible) ── */}
+            {/* ── Advanced Options ── */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <button
                 type="button"
@@ -939,6 +996,7 @@ export default function LaunchProduct() {
                         ))}
                       </select>
                     </div>
+                    {errors.pricing && <p className="mt-1 text-sm text-red-600">{errors.pricing}</p>}
                   </div>
 
                   {/* Product Status */}
@@ -959,6 +1017,7 @@ export default function LaunchProduct() {
                         ))}
                       </select>
                     </div>
+                    {errors.productStatus && <p className="mt-1 text-sm text-red-600">{errors.productStatus}</p>}
                   </div>
 
                   {/* Twitter Handle */}
@@ -1145,9 +1204,10 @@ export default function LaunchProduct() {
                         value={formData.referralCode}
                         onChange={handleChange}
                         placeholder="e.g., MAKETREND2024"
-                        className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                        className={`w-full border ${errors.referralCode ? 'border-red-300' : 'border-slate-200'} rounded-xl pl-10 pr-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition`}
                       />
                     </div>
+                    {errors.referralCode && <p className="mt-1 text-sm text-red-600">{errors.referralCode}</p>}
                   </div>
                 </div>
               )}

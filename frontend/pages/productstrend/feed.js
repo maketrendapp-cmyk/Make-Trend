@@ -71,11 +71,14 @@ export default function ProductTrendFeed() {
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
-  // ── Backend filters (sent to API) ──
-  const backendFilters = {};
-  if (searchQuery.trim()) backendFilters.search = searchQuery.trim();
-  if (category !== 'All') backendFilters.category = category;
-  if (sortBy) backendFilters.sort = sortBy;
+  // ── Memoize backend filters to avoid unnecessary refetches ──
+  const backendFilters = useMemo(() => {
+    const filters = {};
+    if (searchQuery.trim()) filters.search = searchQuery.trim();
+    if (category !== 'All') filters.category = category;
+    if (sortBy) filters.sort = sortBy;
+    return filters;
+  }, [searchQuery, category, sortBy]);
 
   // ── React Query feed ──
   const {
@@ -190,18 +193,19 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Optimistic upvote toggle with localStorage ──
+  // ── Optimistic upvote toggle with ID‑based cache updates ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
       return;
     }
 
+    // Find the current product data
     let currentProduct = null;
+    let currentPage = null;
     let pageIndex = -1;
     let productIndex = -1;
 
-    // Find the product in the current pages
     if (data?.pages) {
       for (let i = 0; i < data.pages.length; i++) {
         const page = data.pages[i];
@@ -235,7 +239,7 @@ export default function ProductTrendFeed() {
     // ── Update localStorage ──
     setLocalVote(productId, newUserVoted, newUpvotes);
 
-    // ── Update feed cache ──
+    // ── Update feed cache optimistically ──
     const newPages = data.pages.map((page, idx) => {
       if (idx === pageIndex) {
         return {
@@ -253,67 +257,80 @@ export default function ProductTrendFeed() {
       pageParams: data.pageParams,
     });
 
-    // Also update product detail cache for consistency
+    // Also update product detail cache
     queryClient.setQueryData(['productDetail', productId], updatedProduct);
 
     // ── Call the mutation ──
     upvoteMutation.mutate(productId, {
-      onSuccess: (data) => {
-        // Sync with server response
-        const serverVoted = data.action === 'added';
-        const serverUpvotes = data.upvotes;
-        // Update cache with server values
-        const currentPages = queryClient.getQueryData(['productFeed', backendFilters]);
-        if (currentPages) {
-          const updatedPages = currentPages.pages.map((page, idx) => {
-            if (idx === pageIndex) {
-              return {
-                ...page,
-                products: page.products.map((p, pIdx) =>
-                  pIdx === productIndex ? { ...p, upvotes: serverUpvotes, userVoted: serverVoted } : p
-                ),
-              };
-            }
-            return page;
+      onSuccess: (result) => {
+        // ── Server returns { action: 'added'|'removed', upvotes: number } ──
+        const serverVoted = result.action === 'added';
+        const serverUpvotes = result.upvotes;
+
+        // ── Update feed cache by scanning for the product ID ──
+        const currentFeedData = queryClient.getQueryData(['productFeed', backendFilters]);
+        if (currentFeedData) {
+          const updatedPages = currentFeedData.pages.map((page) => {
+            const products = page.products.map((p) => {
+              if (p.id === productId) {
+                return { ...p, upvotes: serverUpvotes, userVoted: serverVoted };
+              }
+              return p;
+            });
+            return { ...page, products };
           });
           queryClient.setQueryData(['productFeed', backendFilters], {
+            ...currentFeedData,
             pages: updatedPages,
-            pageParams: currentPages.pageParams,
           });
         }
-        // Update detail cache
-        const currentDetail = queryClient.getQueryData(['productDetail', productId]);
-        if (currentDetail) {
+
+        // ── Update detail cache ──
+        const detailData = queryClient.getQueryData(['productDetail', productId]);
+        if (detailData) {
           queryClient.setQueryData(['productDetail', productId], {
-            ...currentDetail,
+            ...detailData,
             upvotes: serverUpvotes,
             userVoted: serverVoted,
           });
         }
-        // Update localStorage with server values
+
+        // ── Update localStorage with server values ──
         setLocalVote(productId, serverVoted, serverUpvotes);
       },
-      onError: (error) => {
-        // Revert to previous state
-        const revertPages = data.pages.map((page, idx) => {
-          if (idx === pageIndex) {
-            return {
-              ...page,
-              products: page.products.map((p, pIdx) =>
-                pIdx === productIndex ? currentProduct : p
-              ),
-            };
-          }
-          return page;
-        });
-        queryClient.setQueryData(['productFeed', backendFilters], {
-          pages: revertPages,
-          pageParams: data.pageParams,
-        });
-        queryClient.setQueryData(['productDetail', productId], currentProduct);
+      onError: () => {
+        // ── Revert optimistic update ──
+        // Revert feed cache
+        const currentFeedData = queryClient.getQueryData(['productFeed', backendFilters]);
+        if (currentFeedData) {
+          const revertedPages = currentFeedData.pages.map((page) => {
+            const products = page.products.map((p) => {
+              if (p.id === productId) {
+                return { ...p, upvotes: prevUpvotes, userVoted: prevUserVoted };
+              }
+              return p;
+            });
+            return { ...page, products };
+          });
+          queryClient.setQueryData(['productFeed', backendFilters], {
+            ...currentFeedData,
+            pages: revertedPages,
+          });
+        }
+
+        // Revert detail cache
+        const detailData = queryClient.getQueryData(['productDetail', productId]);
+        if (detailData) {
+          queryClient.setQueryData(['productDetail', productId], {
+            ...detailData,
+            upvotes: prevUpvotes,
+            userVoted: prevUserVoted,
+          });
+        }
+
         // Revert localStorage
         setLocalVote(productId, prevUserVoted, prevUpvotes);
-        toast.error(error.message || 'Failed to upvote');
+        toast.error('Failed to upvote');
       },
     });
   };
@@ -414,10 +431,9 @@ export default function ProductTrendFeed() {
           </div>
         </div>
 
-        {/* ── Search & Filters – improved horizontal layout ── */}
+        {/* ── Search & Filters ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row gap-3">
-            {/* Search input with button inside */}
             <div className="flex flex-1 gap-2">
               <div className="relative flex-1">
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -446,7 +462,6 @@ export default function ProductTrendFeed() {
               </button>
             </div>
 
-            {/* Dropdowns inline */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <select
@@ -540,7 +555,6 @@ export default function ProductTrendFeed() {
                 key={product.id}
                 className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
               >
-                {/* ── Logo / Image – circle if logo exists, else square ── */}
                 <Link href={`/productstrend/${product.id}`} className="flex-shrink-0">
                   {product.logo ? (
                     <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
@@ -571,7 +585,6 @@ export default function ProductTrendFeed() {
                   )}
                 </Link>
 
-                {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <Link href={`/productstrend/${product.id}`} className="flex-1 min-w-0">
@@ -596,7 +609,6 @@ export default function ProductTrendFeed() {
                     {product.tagline}
                   </p>
                   <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-                    {/* Creator avatar + name */}
                     <span className="flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
                         {product.maker?.avatar ? (

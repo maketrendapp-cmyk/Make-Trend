@@ -1,5 +1,5 @@
 // pages/productstrend/[id].js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -45,7 +45,6 @@ import {
   FiYoutube,
   FiTwitch,
   FiLinkedin,
-  // FiTiktok removed from fi
   FiCode,
   FiShoppingBag,
   FiPlay,
@@ -101,26 +100,23 @@ const getOptimizedUrl = (url, width = 1200, height = 675) => {
 // ── Video embed detection ──
 const getVideoEmbedUrl = (url) => {
   if (!url) return null;
-  // YouTube
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?]+)/);
   if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
-  // Vimeo
   const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
   if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
   return null;
 };
 
-// ── Social media icon mapping (with fallback) ──
 const SOCIAL_ICONS = {
   twitter: FiTwitter,
   facebook: FiFacebook,
   instagram: FiInstagram,
   linkedin: FiLinkedin,
   youtube: FiYoutube,
-  tiktok: FaTiktok,      // from react-icons/fa
+  tiktok: FaTiktok,
   github: FiGithub,
-  discord: FaDiscord,    // from react-icons/fa
-  telegram: FaTelegram,  // from react-icons/fa
+  discord: FaDiscord,
+  telegram: FaTelegram,
   twitch: FiTwitch,
   other: FiLink,
 };
@@ -138,7 +134,14 @@ export default function ProductDetail() {
   const { invalidateProductDetail, invalidateProductFeed, invalidateMyProducts } = useInvalidateQueries();
 
   const { data: product, isLoading, isError, refetch } = useProductDetail(id, !!id);
-  const { data: comments = [], refetch: refetchComments } = useProductComments(id, true);
+  const {
+    data: commentsData,
+    fetchNextPage: fetchMoreComments,
+    hasNextPage: hasMoreComments,
+    isFetchingNextPage: isFetchingMoreComments,
+    refetch: refetchComments,
+  } = useProductComments(id, true);
+
   const upvoteMutation = useUpvoteProduct();
   const addCommentMutation = useAddProductComment();
 
@@ -147,6 +150,9 @@ export default function ProductDetail() {
   const [shareCopied, setShareCopied] = useState(false);
 
   const isMaker = product?.makerUid === user?.uid;
+
+  const comments = commentsData?.pages?.flatMap((page) => page.comments) || [];
+  const hasMore = hasMoreComments;
 
   // ── Local upvote state ──
   const [localUpvote, setLocalUpvote] = useState(null);
@@ -171,7 +177,7 @@ export default function ProductDetail() {
   const userVoted = currentUpvote?.voted ?? false;
   const upvotes = currentUpvote?.upvotes ?? 0;
 
-  // ── Optimistic upvote ──
+  // ── Robust upvote handler ──
   const handleUpvote = () => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/' + id);
@@ -179,8 +185,10 @@ export default function ProductDetail() {
     }
 
     const currentProduct = product;
-    const prevUpvotes = currentProduct?.upvotes || 0;
-    const prevUserVoted = currentProduct?.userVoted || false;
+    if (!currentProduct) return;
+
+    const prevUpvotes = currentProduct.upvotes || 0;
+    const prevUserVoted = currentProduct.userVoted || false;
     const newUserVoted = !prevUserVoted;
     const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
 
@@ -190,6 +198,7 @@ export default function ProductDetail() {
       userVoted: newUserVoted,
     };
 
+    // Optimistic update
     queryClient.setQueryData(['productDetail', id], optimisticProduct);
     setLocalVote(id, newUserVoted, newUpvotes);
     setLocalUpvote({ voted: newUserVoted, upvotes: newUpvotes });
@@ -209,13 +218,12 @@ export default function ProductDetail() {
         setLocalVote(id, serverVoted, serverUpvotes);
         setLocalUpvote({ voted: serverVoted, upvotes: serverUpvotes });
       },
-      onError: (error) => {
+      onError: () => {
+        // Revert
         queryClient.setQueryData(['productDetail', id], currentProduct);
-        if (currentProduct) {
-          setLocalVote(id, currentProduct.userVoted, currentProduct.upvotes);
-          setLocalUpvote({ voted: currentProduct.userVoted, upvotes: currentProduct.upvotes });
-        }
-        toast.error(error.message || 'Failed to upvote');
+        setLocalVote(id, prevUserVoted, prevUpvotes);
+        setLocalUpvote({ voted: prevUserVoted, upvotes: prevUpvotes });
+        toast.error('Failed to upvote');
       },
     });
   };
@@ -231,6 +239,7 @@ export default function ProductDetail() {
 
     setSubmittingComment(true);
 
+    // Optimistically add comment (temporary ID)
     const optimisticComment = {
       id: `temp-${Date.now()}`,
       text: commentText.trim(),
@@ -243,14 +252,26 @@ export default function ProductDetail() {
       createdAt: new Date().toISOString(),
     };
 
-    const currentComments = queryClient.getQueryData(['productComments', id]) || [];
-    queryClient.setQueryData(['productComments', id], [optimisticComment, ...currentComments]);
+    const currentComments = queryClient.getQueryData(['productComments', id]) || { pages: [{ comments: [] }] };
+    const updatedPages = [...currentComments.pages];
+    if (updatedPages.length > 0) {
+      updatedPages[0] = {
+        ...updatedPages[0],
+        comments: [optimisticComment, ...updatedPages[0].comments],
+      };
+    } else {
+      updatedPages.push({ comments: [optimisticComment], nextCursor: null });
+    }
+    queryClient.setQueryData(['productComments', id], { ...currentComments, pages: updatedPages });
 
     const textToSend = commentText.trim();
     setCommentText('');
 
     try {
       await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
+      // Invalidate comments cache to refresh
+      await queryClient.invalidateQueries({ queryKey: ['productComments', id] });
+      // Update product commentsCount
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
         queryClient.setQueryData(['productDetail', id], {
@@ -259,7 +280,20 @@ export default function ProductDetail() {
         });
       }
     } catch (error) {
-      queryClient.setQueryData(['productComments', id], currentComments);
+      // Revert optimistic comment
+      const revertComments = queryClient.getQueryData(['productComments', id]);
+      if (revertComments) {
+        const revertedPages = revertComments.pages.map((page, idx) => {
+          if (idx === 0) {
+            return {
+              ...page,
+              comments: page.comments.filter((c) => c.id !== optimisticComment.id),
+            };
+          }
+          return page;
+        });
+        queryClient.setQueryData(['productComments', id], { ...revertComments, pages: revertedPages });
+      }
       toast.error(error.message || 'Failed to post comment');
       setCommentText(optimisticComment.text);
     } finally {
@@ -354,7 +388,6 @@ export default function ProductDetail() {
     );
   }
 
-  // ── Detect video embed ──
   const videoEmbedUrl = getVideoEmbedUrl(product.demoUrl);
   const isVideoLink = !!videoEmbedUrl;
 
@@ -367,7 +400,7 @@ export default function ProductDetail() {
         </Link>
 
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* ── Hero Image (thumbnail) ── */}
+          {/* ── Hero Image ── */}
           <div className="w-full aspect-[16/9] bg-slate-100 overflow-hidden relative">
             {(product.thumbnail || product.imageUrl) ? (
               <Image
@@ -385,7 +418,7 @@ export default function ProductDetail() {
           </div>
 
           <div className="p-6 md:p-8">
-            {/* ── Product header with logo ── */}
+            {/* ── Product header ── */}
             <div className="flex items-start gap-4 mb-4">
               {product.logo ? (
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border-2 border-slate-200 shadow-sm flex-shrink-0">
@@ -410,18 +443,14 @@ export default function ProductDetail() {
                   />
                 </div>
               ) : (
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-100 flex items-center justify-center text-4xl text-slate-300 border border-slate-200 flex-shrink-0">
-                  🚀
-                </div>
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-100 flex items-center justify-center text-4xl text-slate-300 border border-slate-200 flex-shrink-0">🚀</div>
               )}
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900">{product.name}</h1>
                 <p className="text-base text-slate-500 mt-1">{product.tagline}</p>
                 <div className="flex flex-wrap gap-2 mt-3">
                   {product.category && (
-                    <span className="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
-                      {product.category}
-                    </span>
+                    <span className="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">{product.category}</span>
                   )}
                   {product.pricing && (
                     <span className={`text-xs font-medium px-3 py-1 rounded-full border ${PRICING_COLORS[product.pricing] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
@@ -434,28 +463,26 @@ export default function ProductDetail() {
                     </span>
                   )}
                   {product.referralCode && (
-                    <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full">
-                      🔗 {product.referralCode}
-                    </span>
+                    <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full">🔗 {product.referralCode}</span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* ── Upvote & Share buttons ── */}
+            {/* ── Upvote & Share ── */}
             <div className="flex flex-wrap items-center justify-between gap-4 mt-2 mb-4">
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleUpvote}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full border transition font-medium text-sm ${
-                    product.userVoted
+                    userVoted
                       ? 'bg-purple-100 border-purple-300 text-purple-700'
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-purple-50 hover:border-purple-200'
                   }`}
                   disabled={upvoteMutation.isLoading}
                 >
-                  <FiHeart className={`w-4 h-4 ${product.userVoted ? 'fill-purple-600 text-purple-600' : ''}`} />
-                  <span>{product.upvotes || 0}</span>
+                  <FiHeart className={`w-4 h-4 ${userVoted ? 'fill-purple-600 text-purple-600' : ''}`} />
+                  <span>{upvotes}</span>
                 </button>
                 <button
                   onClick={handleShare}
@@ -465,17 +492,9 @@ export default function ProductDetail() {
                 </button>
               </div>
               <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                <span className="flex items-center gap-1.5">
-                  <FiClock className="w-3.5 h-3.5" />
-                  Launched {formatDate(product.createdAt)}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <FiMessageCircle className="w-3.5 h-3.5" />
-                  {product.commentsCount || 0} comments
-                </span>
-                {isMaker && (
-                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Maker</span>
-                )}
+                <span className="flex items-center gap-1.5"><FiClock className="w-3.5 h-3.5" /> Launched {formatDate(product.createdAt)}</span>
+                <span className="flex items-center gap-1.5"><FiMessageCircle className="w-3.5 h-3.5" /> {product.commentsCount || 0} comments</span>
+                {isMaker && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Maker</span>}
                 {!isAuthenticated && (
                   <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1">
                     <FiLock className="w-3 h-3" /> Sign in to upvote
@@ -488,17 +507,9 @@ export default function ProductDetail() {
             <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
               <div className="w-8 h-8 rounded-full bg-purple-100 overflow-hidden flex-shrink-0">
                 {product.maker?.avatar ? (
-                  <Image
-                    src={product.maker.avatar}
-                    alt={product.maker.fullname || 'User'}
-                    width={32}
-                    height={32}
-                    className="w-full h-full object-cover"
-                  />
+                  <Image src={product.maker.avatar} alt={product.maker.fullname || 'User'} width={32} height={32} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-purple-600">
-                    <FiUser className="w-4 h-4" />
-                  </div>
+                  <div className="w-full h-full flex items-center justify-center text-purple-600"><FiUser className="w-4 h-4" /></div>
                 )}
               </div>
               <span className="font-medium text-slate-700 text-sm">
@@ -514,7 +525,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* ── Video embed (if demoUrl is YouTube/Vimeo) ── */}
+            {/* ── Video embed ── */}
             {isVideoLink && (
               <div className="mt-6 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
                 <div className="relative w-full aspect-video bg-black">
@@ -533,15 +544,10 @@ export default function ProductDetail() {
             {/* ── Features ── */}
             {product.features && product.features.length > 0 && (
               <div className="mt-6 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <FiList className="text-purple-600" /> Key Features
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><FiList className="text-purple-600" /> Key Features</h3>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {product.features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-slate-700">
-                      <span className="text-purple-500">•</span>
-                      {feature}
-                    </li>
+                    <li key={index} className="flex items-start gap-2 text-sm text-slate-700"><span className="text-purple-500">•</span>{feature}</li>
                   ))}
                 </ul>
               </div>
@@ -550,92 +556,34 @@ export default function ProductDetail() {
             {/* ── Website & Links ── */}
             {(product.url || product.websiteTitle || product.websiteDescription || product.websiteImage || product.demoUrl || product.twitter || product.referralCode) && (
               <div className="mt-6 p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
-                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <FiGlobe className="text-emerald-600" /> Website & Links
-                </h3>
-                {product.websiteTitle && (
-                  <p className="text-sm text-slate-800 font-medium">{product.websiteTitle}</p>
-                )}
-                {product.websiteDescription && (
-                  <p className="text-sm text-slate-600 mt-1">{product.websiteDescription}</p>
-                )}
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><FiGlobe className="text-emerald-600" /> Website & Links</h3>
+                {product.websiteTitle && <p className="text-sm text-slate-800 font-medium">{product.websiteTitle}</p>}
+                {product.websiteDescription && <p className="text-sm text-slate-600 mt-1">{product.websiteDescription}</p>}
                 {product.websiteImage && (
                   <div className="mt-2 w-32 h-20 rounded-lg overflow-hidden border border-slate-200">
-                    <Image
-                      src={getOptimizedUrl(product.websiteImage, 200, 120)}
-                      alt="Website preview"
-                      width={128}
-                      height={80}
-                      className="w-full h-full object-cover"
-                      quality={80}
-                    />
+                    <Image src={getOptimizedUrl(product.websiteImage, 200, 120)} alt="Website preview" width={128} height={80} className="w-full h-full object-cover" quality={80} />
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {product.url && (
-                    <a
-                      href={product.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition text-xs font-medium"
-                    >
-                      <FiExternalLink className="w-3 h-3" /> Website
-                    </a>
-                  )}
-                  {product.demoUrl && !isVideoLink && (
-                    <a
-                      href={product.demoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition text-xs font-medium"
-                    >
-                      <FiVideo className="w-3 h-3" /> Demo
-                    </a>
-                  )}
-                  {product.twitter && (
-                    <a
-                      href={`https://twitter.com/${product.twitter.replace('@', '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-sky-500 border border-sky-200 rounded-lg hover:bg-sky-50 transition text-xs font-medium"
-                    >
-                      <FiTwitter className="w-3 h-3" /> {product.twitter}
-                    </a>
-                  )}
-                  {product.referralCode && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium">
-                      <FiLink className="w-3 h-3" /> Referral: {product.referralCode}
-                    </span>
-                  )}
+                  {product.url && <a href={product.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition text-xs font-medium"><FiExternalLink className="w-3 h-3" /> Website</a>}
+                  {product.demoUrl && !isVideoLink && <a href={product.demoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition text-xs font-medium"><FiVideo className="w-3 h-3" /> Demo</a>}
+                  {product.twitter && <a href={`https://twitter.com/${product.twitter.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-sky-500 border border-sky-200 rounded-lg hover:bg-sky-50 transition text-xs font-medium"><FiTwitter className="w-3 h-3" /> {product.twitter}</a>}
+                  {product.referralCode && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium"><FiLink className="w-3 h-3" /> Referral: {product.referralCode}</span>}
                 </div>
-                {product.releaseDate && (
-                  <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
-                    <FiCalendar className="w-3 h-3" />
-                    Released: {new Date(product.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </p>
-                )}
+                {product.releaseDate && <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5"><FiCalendar className="w-3 h-3" /> Released: {new Date(product.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>}
               </div>
             )}
 
             {/* ── Social Links ── */}
             {product.socialLinks && product.socialLinks.length > 0 && (
               <div className="mt-6 p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <FiUsers className="text-indigo-600" /> Social Links
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><FiUsers className="text-indigo-600" /> Social Links</h3>
                 <div className="flex flex-wrap gap-3">
                   {product.socialLinks.map((link, index) => {
                     const Icon = getSocialIcon(link.platform);
                     return (
-                      <a
-                        key={index}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition text-xs font-medium"
-                      >
-                        <Icon className="w-3.5 h-3.5 text-indigo-600" />
-                        {link.platform}
+                      <a key={index} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition text-xs font-medium">
+                        <Icon className="w-3.5 h-3.5 text-indigo-600" /> {link.platform}
                       </a>
                     );
                   })}
@@ -646,9 +594,7 @@ export default function ProductDetail() {
             {/* ── Target Audience ── */}
             {product.targetAudience && (
               <div className="mt-6 p-4 bg-cyan-50/60 rounded-xl border border-cyan-100">
-                <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
-                  <FiUsers className="text-cyan-600" /> Target Audience
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2"><FiUsers className="text-cyan-600" /> Target Audience</h3>
                 <p className="text-sm text-slate-600">{product.targetAudience}</p>
               </div>
             )}
@@ -656,17 +602,10 @@ export default function ProductDetail() {
             {/* ── Tech Stack ── */}
             {product.techStack && product.techStack.length > 0 && (
               <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <FiCpu className="text-slate-600" /> Tech Stack
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><FiCpu className="text-slate-600" /> Tech Stack</h3>
                 <div className="flex flex-wrap gap-2">
                   {product.techStack.map((tech, index) => (
-                    <span
-                      key={index}
-                      className="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full"
-                    >
-                      {tech}
-                    </span>
+                    <span key={index} className="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full">{tech}</span>
                   ))}
                 </div>
               </div>
@@ -675,18 +614,8 @@ export default function ProductDetail() {
             {/* ── Maker actions ── */}
             {isMaker && (
               <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100">
-                <Link
-                  href={`/productstrend/edit/${product.id}`}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm hover:bg-slate-200 transition"
-                >
-                  <FiEdit2 className="w-4 h-4" /> Edit
-                </Link>
-                <button
-                  onClick={handleDelete}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm hover:bg-red-100 transition"
-                >
-                  <FiTrash2 className="w-4 h-4" /> Delete
-                </button>
+                <Link href={`/productstrend/launch?id=${product.id}`} className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm hover:bg-slate-200 transition"><FiEdit2 className="w-4 h-4" /> Edit</Link>
+                <button onClick={handleDelete} className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm hover:bg-red-100 transition"><FiTrash2 className="w-4 h-4" /> Delete</button>
               </div>
             )}
           </div>
@@ -696,7 +625,7 @@ export default function ProductDetail() {
         <div className="mt-10">
           <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
             <FiMessageCircle className="text-purple-600" />
-            Comments ({comments.length})
+            Comments ({product.commentsCount || 0})
           </h3>
 
           <form onSubmit={handleAddComment} className="mt-4 flex gap-3">
@@ -718,29 +647,20 @@ export default function ProductDetail() {
           </form>
           {!isAuthenticated && (
             <p className="mt-2 text-xs text-slate-400">
-              <Link href={`/login?redirect=/productstrend/${id}`} className="text-purple-600 hover:underline">
-                Sign in
-              </Link> to join the conversation.
+              <Link href={`/login?redirect=/productstrend/${id}`} className="text-purple-600 hover:underline">Sign in</Link> to join the conversation.
             </p>
           )}
 
+          {/* ── Comments List ── */}
           <div className="mt-6 space-y-4">
             {comments.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6 bg-white rounded-xl border border-slate-100">
-                No comments yet. Be the first!
-              </p>
+              <p className="text-sm text-slate-400 text-center py-6 bg-white rounded-xl border border-slate-100">No comments yet. Be the first!</p>
             ) : (
               comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
                   <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
                     {comment.user?.avatar ? (
-                      <Image
-                        src={comment.user.avatar}
-                        alt={comment.user.fullname || 'User'}
-                        width={32}
-                        height={32}
-                        className="w-full h-full object-cover"
-                      />
+                      <Image src={comment.user.avatar} alt={comment.user.fullname || 'User'} width={32} height={32} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-600">
                         {comment.user?.fullname?.[0] || comment.user?.username?.[0] || 'U'}
@@ -748,14 +668,29 @@ export default function ProductDetail() {
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-700">
-                      {comment.user?.fullname || comment.user?.username || 'Anonymous'}
-                    </p>
+                    <p className="text-sm font-medium text-slate-700">{comment.user?.fullname || comment.user?.username || 'Anonymous'}</p>
                     <p className="text-sm text-slate-600 mt-0.5">{comment.text}</p>
                     <p className="text-xs text-slate-400 mt-1">{formatDate(comment.createdAt)}</p>
                   </div>
                 </div>
               ))
+            )}
+
+            {/* ── Load More ── */}
+            {hasMore && (
+              <div className="text-center py-4">
+                <button
+                  onClick={() => fetchMoreComments()}
+                  disabled={isFetchingMoreComments}
+                  className="px-6 py-2.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-xl hover:bg-purple-100 transition text-sm font-medium disabled:opacity-50"
+                >
+                  {isFetchingMoreComments ? (
+                    <span className="flex items-center gap-2"><FiLoader className="w-4 h-4 animate-spin" /> Loading...</span>
+                  ) : (
+                    'Load More Comments'
+                  )}
+                </button>
+              </div>
             )}
           </div>
         </div>
