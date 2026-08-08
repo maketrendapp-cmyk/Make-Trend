@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePublicUser } from '@/lib/queries';
+import { usePublicUser } from '../../lib/queries'; // ✅ relative path
 import {
   FiGlobe,
   FiTwitter,
@@ -16,7 +16,6 @@ import {
 } from 'react-icons/fi';
 import { FaXTwitter } from 'react-icons/fa6';
 
-// Map platform names to icons – extend as needed
 const platformIcons = {
   twitter: FaXTwitter,
   github: FiGithub,
@@ -30,11 +29,10 @@ const platformIcons = {
 
 export default function PublicProfile() {
   const router = useRouter();
-  const { id } = router.query; // uid from URL
+  const { id } = router.query;
 
   const { data: user, isLoading, isError, error } = usePublicUser(id);
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -43,7 +41,6 @@ export default function PublicProfile() {
     );
   }
 
-  // Error state
   if (isError || !user) {
     const isNotFound = error?.response?.status === 404;
     return (
@@ -68,10 +65,8 @@ export default function PublicProfile() {
     );
   }
 
-  // Helper: render social links
   const renderSocialLinks = () => {
     if (!user.socialLinks?.length) return null;
-
     return (
       <div className="mt-6">
         <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider mb-3">
@@ -101,7 +96,6 @@ export default function PublicProfile() {
 
   const renderWebsites = () => {
     if (!user.websites?.length) return null;
-
     return (
       <div className="mt-6">
         <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider mb-3">
@@ -125,6 +119,24 @@ export default function PublicProfile() {
     );
   };
 
+  // Helper to format date from Firestore timestamp or string
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    let date;
+    if (timestamp.seconds) {
+      date = new Date(timestamp.seconds * 1000);
+    } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      date = new Date(timestamp);
+    } else {
+      return '';
+    }
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
   return (
     <>
       <Head>
@@ -133,7 +145,6 @@ export default function PublicProfile() {
           name="description"
           content={user.bio || `Profile of ${user.fullname || user.username}`}
         />
-        {/* Open Graph */}
         <meta
           property="og:title"
           content={`${user.fullname || user.username} on Make Trend`}
@@ -149,11 +160,9 @@ export default function PublicProfile() {
 
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          {/* Cover / header area – you can add a cover image later */}
           <div className="h-32 bg-gradient-to-r from-blue-400 to-purple-500" />
 
           <div className="px-6 pb-6 relative">
-            {/* Avatar */}
             <div className="flex justify-center -mt-12 mb-4">
               <div className="relative w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-white">
                 {user.avatar ? (
@@ -171,7 +180,6 @@ export default function PublicProfile() {
               </div>
             </div>
 
-            {/* Name & Username */}
             <div className="text-center">
               <h1 className="text-2xl font-bold text-gray-900">
                 {user.fullname || user.username}
@@ -181,14 +189,12 @@ export default function PublicProfile() {
               )}
             </div>
 
-            {/* Bio */}
             {user.bio && (
               <div className="mt-4 text-center text-gray-700">
                 <p>{user.bio}</p>
               </div>
             )}
 
-            {/* Location & Gender */}
             <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm text-gray-600">
               {user.country && (
                 <span className="flex items-center gap-1">
@@ -199,7 +205,6 @@ export default function PublicProfile() {
               {user.gender && <span className="text-gray-500">{user.gender}</span>}
             </div>
 
-            {/* Skills */}
             {user.skills?.length > 0 && (
               <div className="mt-6 flex flex-wrap justify-center gap-2">
                 {user.skills.map((skill, index) => (
@@ -213,24 +218,12 @@ export default function PublicProfile() {
               </div>
             )}
 
-            {/* Social Links */}
             {renderSocialLinks()}
-
-            {/* Websites */}
             {renderWebsites()}
 
-            {/* Joined date */}
             {user.createdAt && (
               <div className="mt-6 text-center text-xs text-gray-400">
-                Joined{' '}
-                {new Date(
-                  user.createdAt.seconds * 1000 ||
-                    user.createdAt
-                ).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                Joined {formatDate(user.createdAt)}
               </div>
             )}
           </div>
