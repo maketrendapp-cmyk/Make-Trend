@@ -1,10 +1,9 @@
 // pages/userinfo/[id].js
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
-import { usePublicProfile } from '../../lib/queries';
 import {
   FiArrowLeft,
   FiUser,
@@ -34,7 +33,10 @@ import {
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ── Platform icon mapping ──
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+const API_BASE = `${BACKEND_URL}/api`;
+
 const PLATFORM_ICONS = {
   youtube: FaYoutube,
   facebook: FaFacebook,
@@ -104,20 +106,47 @@ export default function UserInfo() {
   const { id, isReady } = router;
   const { user, isAuthenticated } = useAuth();
 
-  // Safely extract UID (handles catch-all arrays gracefully)
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  // ── Explicitly trigger direct API fetch when route ID is available ──
+  useEffect(() => {
+    if (!isReady || !id) return;
+
+    const uid = Array.isArray(id) ? id[0] : id;
+    let isMounted = true;
+
+    async function fetchUserProfile() {
+      try {
+        setLoading(true);
+        setError(false);
+        const res = await fetch(`${API_BASE}/users/${uid}`);
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'User not found');
+        }
+
+        if (isMounted) {
+          setProfile(data.user || data.profile || data);
+        }
+      } catch (err) {
+        console.error('Fetch public profile error:', err);
+        if (isMounted) setError(true);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    fetchUserProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isReady, id]);
+
   const uid = Array.isArray(id) ? id[0] : id;
-
-  // ── FIX: ALWAYS call hooks unconditionally at the top ──
-  // Extracting isPending & isFetching prevents the "User not found" race condition crash
-  const { 
-    data: profile, 
-    isLoading, 
-    isPending, 
-    isFetching, 
-    isError, 
-    error 
-  } = usePublicProfile(uid);
-
   const isOwnProfile = isAuthenticated && user?.uid === uid;
 
   const formatDate = (timestamp) => {
@@ -160,29 +189,21 @@ export default function UserInfo() {
     }
   };
 
-  // ── FIX: Wait for Next router OR React Query Network Fetch ──
-  const showLoadingState = !isReady || isLoading || isPending || isFetching;
-
-  if (showLoadingState) {
+  if (!isReady || loading) {
     return (
       <>
         <Meta title="User Profile | Make Trend" />
-        <div className="max-w-3xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-center py-20">
-            <div className="flex flex-col items-center gap-4 text-slate-500">
-              <FiLoader className="w-8 h-8 animate-spin text-purple-600" />
-              <span className="font-medium">Loading profile...</span>
-            </div>
+        <div className="max-w-3xl mx-auto px-4 py-16">
+          <div className="flex flex-col items-center justify-center gap-4 text-slate-500">
+            <FiLoader className="w-8 h-8 animate-spin text-purple-600" />
+            <span className="font-medium">Loading profile...</span>
           </div>
         </div>
       </>
     );
   }
 
-  // ── Only trigger Error UI if the network request completely resolved and failed ──
-  if (isError || !profile) {
-    if (isError && error) console.error('Profile fetch error:', error);
-    
+  if (error || !profile) {
     return (
       <>
         <Meta title="User Not Found | Make Trend" />
@@ -203,7 +224,6 @@ export default function UserInfo() {
     );
   }
 
-  // ── Render Profile ──
   return (
     <>
       <Meta title={`${profile.fullname || profile.username || 'User'} – Make Trend`} />
@@ -404,5 +424,4 @@ export default function UserInfo() {
     </>
   );
 }
-
 
