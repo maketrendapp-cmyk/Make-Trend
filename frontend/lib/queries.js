@@ -602,8 +602,9 @@ export function useDeleteProduct() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['productFeed']);
-      queryClient.invalidateQueries(['myProducts']);
+      // Use object form to invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['productFeed'] });
+      queryClient.invalidateQueries({ queryKey: ['myProducts'] });
       toast.success('Product deleted');
     },
     onError: (error) => {
@@ -959,8 +960,8 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['myTasks']);
       queryClient.invalidateQueries(['availableTasks']);
       queryClient.invalidateQueries(['myExchanges']);
-      queryClient.invalidateQueries(['productFeed']);
-      queryClient.invalidateQueries(['myProducts']);
+     queryClient.invalidateQueries({ queryKey: ['productFeed'] });
+queryClient.invalidateQueries({ queryKey: ['myProducts'] });
       queryClient.invalidateQueries(['notifications']);
       queryClient.invalidateQueries(['systemNotifications']);
       queryClient.invalidateQueries(['posts']);
