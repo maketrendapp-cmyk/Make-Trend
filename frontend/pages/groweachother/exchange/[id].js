@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Meta from '../../../components/Meta';
 import { useAuth } from '../../../components/AuthScreen';
-import { getToken } from '../../../lib/api';
+import { useExchangeDetail, useUpdateExchangeStatus, useInvalidateQueries } from '../../../lib/queries';
 import {
   FiArrowLeft,
   FiCheckCircle,
@@ -33,7 +33,6 @@ import {
   FaGithub,
   FaLink,
 } from 'react-icons/fa';
-import { useExchangeDetail, useInvalidateQueries } from '../../../lib/queries';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -86,27 +85,8 @@ export default function ExchangeDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
-  const { invalidateExchangeDetail } = useInvalidateQueries();
 
-  // ── 🔥 GUARD: if id is undefined, show loading and wait ──
-  if (!id) {
-    return (
-      <>
-        <Meta title="Exchange | Make Trend" />
-        <div className="min-h-screen bg-gray-50 py-8 px-4">
-          <div className="max-w-3xl mx-auto">
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
-              <div className="flex items-center justify-center py-16">
-                <FiLoader className="w-8 h-8 text-purple-600 animate-spin" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── Query always enabled because id is truthy ──
+  // ── React Query: Exchange Detail ──
   const {
     data: exchange,
     isLoading,
@@ -115,8 +95,10 @@ export default function ExchangeDetail() {
     refetch,
   } = useExchangeDetail(id, isAuthenticated);
 
-  // ── Submission state ──
-  const [submitting, setSubmitting] = useState(false);
+  // ── Mutation for status updates ──
+  const { mutate: updateStatus, isLoading: isSubmitting } = useUpdateExchangeStatus();
+
+  // ── State for cancel confirmation modal ──
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   // ── Format date robustly ──
@@ -144,35 +126,17 @@ export default function ExchangeDetail() {
     }
   };
 
-  // ── Update exchange status ──
-  const updateStatus = async (status) => {
-    if (!exchange || submitting) return;
-    setSubmitting(true);
-    try {
-      const token = await getToken();
-      if (!token) {
-        setSubmitting(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/exchanges/${id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to update status');
-      
-      invalidateExchangeDetail(id);
-      await refetch();
-      setShowCancelModal(false);
-    } catch (err) {
-      console.error('Update status error:', err);
-    } finally {
-      setSubmitting(false);
-    }
+  // ── Handlers for status updates ──
+  const handleMarkDone = () => {
+    if (!id) return;
+    updateStatus({ id, status: 'done' });
+  };
+
+  const handleCancel = () => {
+    if (!id) return;
+    updateStatus({ id, status: 'cancel' }, {
+      onSuccess: () => setShowCancelModal(false),
+    });
   };
 
   const getPlatformIcon = (platform) => PLATFORM_ICONS[platform?.toLowerCase()] || FaLink;
@@ -180,7 +144,25 @@ export default function ExchangeDetail() {
   const getStatusIcon = (status) => STATUS_ICONS[status] || FiClock;
   const getStatusClass = (status) => STATUS_BADGE_CLASSES[status] || 'bg-gray-100 text-gray-600 border-gray-200';
 
-  // ── If not authenticated, show login prompt ──
+  // ── If id is undefined (router not ready) ──
+  if (!id) {
+    return (
+      <>
+        <Meta title="Exchange | Make Trend" />
+        <div className="min-h-screen bg-gray-50 py-8 px-4">
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+              <div className="flex items-center justify-center py-16">
+                <FiLoader className="w-8 h-8 text-purple-600 animate-spin" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── If not authenticated ──
   if (!isAuthenticated) {
     return (
       <>
@@ -246,7 +228,7 @@ export default function ExchangeDetail() {
     );
   }
 
-  // ── Main render – data is available ──
+  // ── Main render ──
   const userIsA = exchange.userA?.uid === user?.uid;
   const myTask = userIsA ? exchange.userATask : exchange.userBTask;
   const otherTask = userIsA ? exchange.userBTask : exchange.userATask;
@@ -262,10 +244,8 @@ export default function ExchangeDetail() {
   const otherTaskMissing = !otherTask || !otherTask.id;
   const anyTaskMissing = myTaskMissing || otherTaskMissing;
 
-  // ── Determine action availability ──
   const canAct = isActive && !anyTaskMissing && myStatus !== 'done' && myStatus !== 'cancelled';
 
-  // ── Determine missing task banner message ──
   let missingBannerMessage = '';
   if (anyTaskMissing) {
     if (isCancelled) {
@@ -299,7 +279,7 @@ export default function ExchangeDetail() {
       <Meta title={`Exchange #${exchangeIdDisplay} | Make Trend`} />
       <div className="min-h-screen bg-gray-50 py-6 px-4">
         <div className="max-w-3xl mx-auto">
-          
+
           {/* ── Top Navigation ── */}
           <div className="flex items-center justify-between gap-2 mb-6 bg-white p-2.5 sm:p-3 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
             <div className="flex items-center gap-2">
@@ -360,7 +340,7 @@ export default function ExchangeDetail() {
 
             {/* ── Two-column task cards ── */}
             <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-              
+
               {/* ── Your Task Card ── */}
               <div className={`bg-gray-50/70 rounded-2xl p-5 border ${myTaskMissing ? 'border-dashed border-red-300 bg-red-50/30' : 'border-gray-200/60'} flex flex-col justify-between transition`}>
                 <div>
@@ -525,8 +505,8 @@ export default function ExchangeDetail() {
                 <div className="py-2">
                   <p className="text-red-600 font-bold flex items-center justify-center gap-2 text-base"><FiX className="w-5 h-5" /> Exchange Cancelled</p>
                   <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">
-                    {anyTaskMissing 
-                      ? 'This exchange was cancelled because a task was deleted.' 
+                    {anyTaskMissing
+                      ? 'This exchange was cancelled because a task was deleted.'
                       : 'This exchange session has been closed.'}
                   </p>
                 </div>
@@ -535,16 +515,16 @@ export default function ExchangeDetail() {
                   {canAct ? (
                     <>
                       <button
-                        onClick={() => updateStatus('done')}
-                        disabled={submitting}
+                        onClick={handleMarkDone}
+                        disabled={isSubmitting}
                         className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-bold text-sm hover:shadow-md transition shadow-sm disabled:opacity-50 active:scale-95"
                       >
-                        {submitting ? <FiLoader className="w-5 h-5 animate-spin" /> : <FiCheckCircle className="w-5 h-5" />}
-                        {submitting ? 'Updating...' : 'I Completed Their Task'}
+                        {isSubmitting ? <FiLoader className="w-5 h-5 animate-spin" /> : <FiCheckCircle className="w-5 h-5" />}
+                        {isSubmitting ? 'Updating...' : 'I Completed Their Task'}
                       </button>
                       <button
                         onClick={() => setShowCancelModal(true)}
-                        disabled={submitting}
+                        disabled={isSubmitting}
                         className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white text-red-600 border border-red-200 rounded-xl font-bold text-sm hover:bg-red-50 transition shadow-sm disabled:opacity-50"
                       >
                         <FiXCircle className="w-5 h-5" /> Cancel
@@ -584,11 +564,11 @@ export default function ExchangeDetail() {
             <p className="text-gray-500 text-xs sm:text-sm mb-6 leading-relaxed">Are you sure you want to cancel this exchange? This action cannot be undone.</p>
             <div className="flex gap-3">
               <button
-                onClick={() => updateStatus('cancel')}
-                disabled={submitting}
+                onClick={handleCancel}
+                disabled={isSubmitting}
                 className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
               >
-                {submitting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Yes, Cancel'}
+                {isSubmitting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Yes, Cancel'}
               </button>
               <button
                 onClick={() => setShowCancelModal(false)}
