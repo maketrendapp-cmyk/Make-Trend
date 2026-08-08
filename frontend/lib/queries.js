@@ -48,6 +48,21 @@ export function useProfile(enabled = false) {
   });
 }
 
+// ── Public user profile (fetch by UID) ──
+export function usePublicUser(uid) {
+  return useQuery({
+    queryKey: ['publicUser', uid],
+    queryFn: async () => {
+      if (!uid) return null;
+      const data = await apiRequest(`/users/${uid}`, {}, null); // no token needed
+      return data.user || null;
+    },
+    enabled: !!uid,
+    staleTime: 5 * 60 * 1000, // matches backend cache
+    retry: 1,
+  });
+}
+
 // ── Stats ──
 export function useStats(enabled = false) {
   return useQuery({
