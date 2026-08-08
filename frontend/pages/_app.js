@@ -60,7 +60,7 @@ const TOP_NAV_ONLY_PAGES = [
 '/groweachother',
 '/productstrend',
 '/community',
-
+'/userprofile',
 ];
 
 function MyApp({ Component, pageProps }) {
