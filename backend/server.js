@@ -6034,8 +6034,8 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
     // ── Cache details ──
     await cacheProductDetails(newProduct.id, newProduct);
 
-    // ── Invalidate user's own products list ──
-    await invalidateKey(`productstrend:my-products:${uid}`);
+    // ── Invalidate all user's own products list caches ──
+    await invalidatePattern(`productstrend:my-products:${uid}:*`);
 
     res.status(201).json({ success: true, product: newProduct });
   } catch (error) {
@@ -6252,8 +6252,8 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
     const product = { id: updatedDoc.id, ...updatedData, maker };
     await cacheProductDetails(id, product);
 
-    // ── Invalidate user's own products list ──
-    await invalidateKey(`productstrend:my-products:${uid}`);
+    // ── Invalidate all user's own products list caches ──
+    await invalidatePattern(`productstrend:my-products:${uid}:*`);
 
     res.json({ success: true, product });
   } catch (error) {
