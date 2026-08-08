@@ -104,11 +104,21 @@ export default function UserInfo() {
   const { id, isReady } = router;
   const { user, isAuthenticated } = useAuth();
 
-  // ── FIX 2: React Hooks MUST be called unconditionally at the top ──
-  // Do NOT place this hook behind `if (!isReady) return ...`
-  const { data: profile, isLoading, isError, error } = usePublicProfile(id);
+  // Safely extract UID (handles catch-all arrays gracefully)
+  const uid = Array.isArray(id) ? id[0] : id;
 
-  const isOwnProfile = isAuthenticated && user?.uid === id;
+  // ── FIX: ALWAYS call hooks unconditionally at the top ──
+  // Extracting isPending & isFetching prevents the "User not found" race condition crash
+  const { 
+    data: profile, 
+    isLoading, 
+    isPending, 
+    isFetching, 
+    isError, 
+    error 
+  } = usePublicProfile(uid);
+
+  const isOwnProfile = isAuthenticated && user?.uid === uid;
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Unknown';
@@ -150,30 +160,18 @@ export default function UserInfo() {
     }
   };
 
-  // ── Wait for router to be ready ONLY AFTER hooks have been declared ──
-  if (!isReady) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 shadow-sm">
-          <div className="text-6xl mb-4">👤</div>
-          <h2 className="text-2xl font-bold text-slate-800">Loading Profile...</h2>
-          <div className="mt-6 flex justify-center">
-            <FiLoader className="w-8 h-8 animate-spin text-purple-600" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ── FIX: Wait for Next router OR React Query Network Fetch ──
+  const showLoadingState = !isReady || isLoading || isPending || isFetching;
 
-  if (isLoading) {
+  if (showLoadingState) {
     return (
       <>
         <Meta title="User Profile | Make Trend" />
         <div className="max-w-3xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-center py-16">
-            <div className="flex items-center gap-3 text-slate-500">
-              <FiLoader className="w-6 h-6 animate-spin text-purple-600" />
-              <span>Loading profile...</span>
+          <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-4 text-slate-500">
+              <FiLoader className="w-8 h-8 animate-spin text-purple-600" />
+              <span className="font-medium">Loading profile...</span>
             </div>
           </div>
         </div>
@@ -181,18 +179,21 @@ export default function UserInfo() {
     );
   }
 
+  // ── Only trigger Error UI if the network request completely resolved and failed ──
   if (isError || !profile) {
+    if (isError && error) console.error('Profile fetch error:', error);
+    
     return (
       <>
         <Meta title="User Not Found | Make Trend" />
-        <div className="max-w-3xl mx-auto px-4 py-8 text-center">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-8">
-            <div className="text-4xl mb-2">👤</div>
-            <p className="text-red-600 font-medium text-lg">User not found.</p>
-            <p className="text-slate-500 text-sm mt-1">The profile you're looking for doesn't exist.</p>
+        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-10 shadow-sm">
+            <div className="text-5xl mb-3">👤</div>
+            <p className="text-red-600 font-bold text-xl">User not found</p>
+            <p className="text-slate-500 text-sm mt-2 font-medium">The profile you're looking for doesn't exist or was removed.</p>
             <button
               onClick={() => router.push('/community/feed')}
-              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+              className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition shadow-sm"
             >
               Back to Feed
             </button>
@@ -231,10 +232,9 @@ export default function UserInfo() {
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl shadow-purple-50/30 p-6 sm:p-8 transition-all hover:shadow-2xl hover:shadow-purple-50/40">
             <div className="flex flex-col items-center sm:flex-row gap-6">
               {/* Avatar */}
-              <div className="relative group">
+              <div className="relative group flex-shrink-0">
                 <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white shadow-md transition-all duration-300 group-hover:shadow-xl">
                   {profile.avatar ? (
-                    /* ── FIX 3: Removed next/image, using standard img tag to prevent host domain crashes ── */
                     <img
                       src={profile.avatar}
                       alt={profile.fullname || 'User'}
@@ -252,7 +252,7 @@ export default function UserInfo() {
               <div className="flex-1 text-center sm:text-left">
                 <h2 className="text-2xl font-extrabold text-slate-900">{profile.fullname || profile.username || 'Anonymous'}</h2>
                 {profile.username && (
-                  <p className="text-sm text-slate-500">@{profile.username}</p>
+                  <p className="text-sm text-slate-500 font-medium">@{profile.username}</p>
                 )}
                 {profile.bio && (
                   <p className="text-slate-600 mt-2 text-sm leading-relaxed max-w-md mx-auto sm:mx-0">
@@ -260,7 +260,7 @@ export default function UserInfo() {
                   </p>
                 )}
                 {profile.createdAt && (
-                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-2 justify-center sm:justify-start">
+                  <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-2 justify-center sm:justify-start font-medium">
                     <FiClock className="w-3 h-3" /> Joined {formatDate(profile.createdAt)}
                   </p>
                 )}
@@ -300,15 +300,15 @@ export default function UserInfo() {
             {(profile.country || profile.gender) && (
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-5">
                 {profile.country && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50/50 p-2 rounded-xl">
+                  <div className="flex items-center gap-2.5 text-sm text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                     <FiGlobe className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                    <span>{profile.country}</span>
+                    <span className="font-medium">{profile.country}</span>
                   </div>
                 )}
                 {profile.gender && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50/50 p-2 rounded-xl">
+                  <div className="flex items-center gap-2.5 text-sm text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                     <FiUser className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                    <span>{profile.gender}</span>
+                    <span className="font-medium">{profile.gender}</span>
                   </div>
                 )}
               </div>
@@ -317,12 +317,12 @@ export default function UserInfo() {
             {/* ── Skills ── */}
             {profile.skills && profile.skills.length > 0 && (
               <div className="mt-5 pt-4 border-t border-slate-100">
-                <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-2">
+                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-3">
                   <FiBookmark className="w-4 h-4 text-purple-500" /> Skills
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {profile.skills.map((skill, idx) => (
-                    <span key={idx} className="bg-purple-100 text-purple-700 text-xs px-3 py-1.5 rounded-full font-medium">
+                    <span key={idx} className="bg-purple-50 text-purple-700 border border-purple-100 text-xs px-3 py-1.5 rounded-lg font-bold">
                       {skill}
                     </span>
                   ))}
@@ -333,7 +333,7 @@ export default function UserInfo() {
             {/* ── Social Links ── */}
             {profile.socialLinks && profile.socialLinks.length > 0 && (
               <div className="mt-5 pt-4 border-t border-slate-100">
-                <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-3">
                   <FiUsers className="w-4 h-4 text-purple-500" /> Social Links
                 </h3>
                 <div className="flex flex-wrap gap-3">
@@ -345,7 +345,7 @@ export default function UserInfo() {
                         href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`inline-flex items-center gap-1.5 text-sm hover:underline underline-offset-2 transition ${color}`}
+                        className={`inline-flex items-center gap-1.5 text-sm font-semibold hover:underline underline-offset-2 transition ${color}`}
                         title={link.channelName || platform || link.url}
                       >
                         <Icon className="w-4 h-4" />
@@ -360,7 +360,7 @@ export default function UserInfo() {
             {/* ── Websites ── */}
             {profile.websites && profile.websites.length > 0 && (
               <div className="mt-5 pt-4 border-t border-slate-100">
-                <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-2">
+                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-3">
                   <FiLink className="w-4 h-4 text-purple-500" /> Websites
                 </h3>
                 <div className="flex flex-wrap gap-4">
@@ -372,7 +372,7 @@ export default function UserInfo() {
                         href={site.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 transition underline-offset-2 hover:underline"
+                        className="inline-flex items-center gap-2 text-sm text-purple-600 hover:text-purple-800 transition underline-offset-2 hover:underline font-medium"
                       >
                         {favicon && (
                           <img src={favicon} alt="" className="w-4 h-4 rounded" />
@@ -388,12 +388,12 @@ export default function UserInfo() {
 
           {/* ── Sign-in CTA ── */}
           {!isAuthenticated && (
-            <div className="mt-8 bg-gradient-to-r from-purple-50/80 to-indigo-50/80 rounded-2xl border border-purple-100/60 p-6 text-center shadow-sm">
-              <h3 className="text-lg font-bold text-slate-800">👋 Want to connect?</h3>
-              <p className="text-sm text-slate-600 mt-1">Sign in to send a message or follow this user.</p>
+            <div className="mt-8 bg-gradient-to-r from-purple-50/80 to-indigo-50/80 rounded-3xl border border-purple-100/60 p-8 text-center shadow-sm">
+              <h3 className="text-xl font-bold text-slate-800">👋 Want to connect?</h3>
+              <p className="text-sm text-slate-600 mt-2 font-medium">Sign in to send a message or follow this user.</p>
               <Link
                 href={`/login?redirect=/userinfo/${id}`}
-                className="mt-3 inline-flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-md"
+                className="mt-4 inline-flex items-center gap-2 px-8 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-bold shadow-md"
               >
                 <FiLogIn className="w-4 h-4" /> Sign In / Sign Up
               </Link>
