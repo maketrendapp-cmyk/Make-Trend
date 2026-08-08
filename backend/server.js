@@ -271,17 +271,13 @@ function getGlobalFeedCacheKey(limit = 25, lastTaskId = null) {
   return `grow-feed:global:limit:${limit}:lastTaskId:${lastTaskId || 'null'}`;
 }
 
-async function getFirstFeedPageKey(limit = 25) {
-  const key = getGlobalFeedCacheKey(limit, null);
-  const exists = await redis.exists(key);
-  return exists ? key : null;
-}
-
-// ── Add a new task to the global feed cache (first page only) ──
+// ── Add a task to ALL global feed cache pages ──
 async function addTaskToGlobalFeed(task, limit = 25) {
   try {
-    const firstPageKey = await getFirstFeedPageKey(limit);
-    if (!firstPageKey) {
+    const pattern = 'grow-feed:global:*';
+    const keys = await redis.keys(pattern);
+
+    if (keys.length === 0) {
       // No cache exists – create first page
       const newKey = getGlobalFeedCacheKey(limit, null);
       const newData = {
@@ -294,20 +290,27 @@ async function addTaskToGlobalFeed(task, limit = 25) {
       return;
     }
 
-    const cached = await redis.get(firstPageKey);
-    if (!cached) return;
-    let data = JSON.parse(cached);
-    if (data.tasks && Array.isArray(data.tasks)) {
-      data.tasks = [task, ...data.tasks];
-      if (data.tasks.length > limit) {
-        data.tasks = data.tasks.slice(0, limit);
+    for (const key of keys) {
+      const cached = await redis.get(key);
+      if (!cached) continue;
+      let data = JSON.parse(cached);
+      if (data.tasks && Array.isArray(data.tasks)) {
+        // Avoid duplicates
+        const exists = data.tasks.some(t => t.id === task.id);
+        if (!exists) {
+          data.tasks = [task, ...data.tasks];
+          // Extract limit from key or use default
+          const limitMatch = key.match(/limit:(\d+)/);
+          const pageLimit = limitMatch ? parseInt(limitMatch[1]) : limit;
+          if (data.tasks.length > pageLimit) {
+            data.tasks = data.tasks.slice(0, pageLimit);
+          }
+          // Update lastId
+          data.lastId = data.tasks.length > 0 ? data.tasks[data.tasks.length - 1].id : null;
+          await redis.set(key, JSON.stringify(data));
+          console.log(`🔄 Added task ${task.id} to cache ${key}`);
+        }
       }
-      // ✅ Update lastId to the new last task (if any)
-      data.lastId = data.tasks.length > 0 ? data.tasks[data.tasks.length - 1].id : null;
-      // Optionally set hasMore to true if we have exactly limit items,
-      // but we cannot know for sure without a DB query; leaving as is is fine.
-      await redis.set(firstPageKey, JSON.stringify(data));
-      console.log(`🔄 Added task ${task.id} to global feed cache`);
     }
   } catch (error) {
     console.warn('Failed to add task to global feed cache:', error);
