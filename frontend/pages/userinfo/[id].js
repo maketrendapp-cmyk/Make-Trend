@@ -102,11 +102,11 @@ function getFavicon(url) {
 
 export default function UserInfo() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, isReady } = router; // 👈 Get isReady from router
   const { user, isAuthenticated } = useAuth();
 
-  // ── FIX: Guard prevents hook from running during SSR with undefined id ──
-  if (!id) {
+  // ── FIX: Wait for router to be ready before rendering ──
+  if (!isReady) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-12 text-center">
         <div className="bg-white rounded-3xl border border-slate-200 p-12 shadow-sm">
@@ -120,10 +120,9 @@ export default function UserInfo() {
     );
   }
 
-  // ── Hook is now SAFE to call (id exists) ──
+  // ── Now id is guaranteed to be available ──
   const { data: profile, isLoading, isError, error } = usePublicProfile(id);
 
-  // ── Debug: log error if any ──
   if (isError && error) {
     console.error('Profile fetch error:', error);
   }
