@@ -104,27 +104,9 @@ export default function UserInfo() {
   const { id, isReady } = router;
   const { user, isAuthenticated } = useAuth();
 
-  // ── FIX: ALWAYS call hooks at the top level BEFORE any early returns ──
+  // ── FIX 2: React Hooks MUST be called unconditionally at the top ──
+  // Do NOT place this hook behind `if (!isReady) return ...`
   const { data: profile, isLoading, isError, error } = usePublicProfile(id);
-
-  // ── Wait for router to be ready ──
-  if (!isReady) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 shadow-sm">
-          <div className="text-6xl mb-4">👤</div>
-          <h2 className="text-2xl font-bold text-slate-800">Loading Profile...</h2>
-          <div className="mt-6 flex justify-center">
-            <FiLoader className="w-8 h-8 animate-spin text-purple-600" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isError && error) {
-    console.error('Profile fetch error:', error);
-  }
 
   const isOwnProfile = isAuthenticated && user?.uid === id;
 
@@ -168,7 +150,21 @@ export default function UserInfo() {
     }
   };
 
-  // ── Loading ──
+  // ── Wait for router to be ready ONLY AFTER hooks have been declared ──
+  if (!isReady) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 shadow-sm">
+          <div className="text-6xl mb-4">👤</div>
+          <h2 className="text-2xl font-bold text-slate-800">Loading Profile...</h2>
+          <div className="mt-6 flex justify-center">
+            <FiLoader className="w-8 h-8 animate-spin text-purple-600" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <>
@@ -185,7 +181,6 @@ export default function UserInfo() {
     );
   }
 
-  // ── Error ──
   if (isError || !profile) {
     return (
       <>
@@ -239,7 +234,7 @@ export default function UserInfo() {
               <div className="relative group">
                 <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 overflow-hidden flex items-center justify-center shadow-inner border-4 border-white shadow-md transition-all duration-300 group-hover:shadow-xl">
                   {profile.avatar ? (
-                    // FIX: Replaced next/image with standard img to prevent unconfigured domain errors
+                    /* ── FIX 3: Removed next/image, using standard img tag to prevent host domain crashes ── */
                     <img
                       src={profile.avatar}
                       alt={profile.fullname || 'User'}
@@ -409,4 +404,5 @@ export default function UserInfo() {
     </>
   );
 }
+
 
