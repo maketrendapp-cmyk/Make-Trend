@@ -264,118 +264,68 @@ async function updateTemplateInAllCaches(templateId, updates) {
 }
 
 // ─────────────────────────────────────────────
-// Global feed cache helpers
+// GROW FEED – SORTED SETS (Fanout‑on‑write)
 // ─────────────────────────────────────────────
 
-function getGlobalFeedCacheKey(limit = 25, lastTaskId = null) {
-  return `grow-feed:global:limit:${limit}:lastTaskId:${lastTaskId || 'null'}`;
-}
-
-// ── Add a task to ALL global feed cache pages ──
-async function addTaskToGlobalFeed(task, limit = 25) {
-  try {
-    const pattern = 'grow-feed:global:*';
-    const keys = await redis.keys(pattern);
-
-    if (keys.length === 0) {
-      // No cache exists – create first page
-      const newKey = getGlobalFeedCacheKey(limit, null);
-      const newData = {
-        tasks: [task],
-        hasMore: false,
-        lastId: null,
-      };
-      await redis.set(newKey, JSON.stringify(newData));
-      console.log(`✅ Created global feed cache with task ${task.id}`);
-      return;
-    }
-
-    for (const key of keys) {
-      const cached = await redis.get(key);
-      if (!cached) continue;
-      let data = JSON.parse(cached);
-      if (data.tasks && Array.isArray(data.tasks)) {
-        // Avoid duplicates
-        const exists = data.tasks.some(t => t.id === task.id);
-        if (!exists) {
-          data.tasks = [task, ...data.tasks];
-          // Extract limit from key or use default
-          const limitMatch = key.match(/limit:(\d+)/);
-          const pageLimit = limitMatch ? parseInt(limitMatch[1]) : limit;
-          if (data.tasks.length > pageLimit) {
-            data.tasks = data.tasks.slice(0, pageLimit);
-          }
-          // Update lastId
-          data.lastId = data.tasks.length > 0 ? data.tasks[data.tasks.length - 1].id : null;
-          await redis.set(key, JSON.stringify(data));
-          console.log(`🔄 Added task ${task.id} to cache ${key}`);
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to add task to global feed cache:', error);
+function getFeedKey(platform = null, taskType = null) {
+  if (platform && taskType) {
+    return `feed:platform:${platform}:tasktype:${taskType}`;
+  } else if (platform) {
+    return `feed:platform:${platform}`;
+  } else if (taskType) {
+    return `feed:tasktype:${taskType}`;
+  } else {
+    return `feed:all`;
   }
 }
 
-// ── Update a task in all global feed cache pages ──
-async function updateTaskInGlobalFeed(taskId, updates) {
-  try {
-    const pattern = 'grow-feed:global:*';
-    const keys = await redis.keys(pattern);
-    if (keys.length === 0) return;
-
-    for (const key of keys) {
-      const cached = await redis.get(key);
-      if (!cached) continue;
-      let data = JSON.parse(cached);
-      if (data.tasks && Array.isArray(data.tasks)) {
-        let updated = false;
-        data.tasks = data.tasks.map(t => {
-          if (t.id === taskId) {
-            updated = true;
-            return { ...t, ...updates };
-          }
-          return t;
-        });
-        if (updated) {
-          await redis.set(key, JSON.stringify(data));
-        }
-      }
-    }
-    console.log(`🔄 Updated task ${taskId} in global feed cache`);
-  } catch (error) {
-    console.warn('Failed to update task in global feed cache:', error);
+// Add task ID to all relevant sorted sets
+async function addTaskToFeedSets(taskId, platform, taskType, timestamp) {
+  const keys = [
+    getFeedKey(),             // all
+    getFeedKey(platform),     // platform only
+    getFeedKey(null, taskType), // taskType only
+    getFeedKey(platform, taskType), // both
+  ];
+  const pipeline = redis.pipeline();
+  for (const key of keys) {
+    pipeline.zadd(key, timestamp, taskId);
   }
+  await pipeline.exec();
 }
 
-// ── Remove a task from all global feed cache pages ──
-async function removeTaskFromGlobalFeed(taskId) {
-  try {
-    const pattern = 'grow-feed:global:*';
-    const keys = await redis.keys(pattern);
-    if (keys.length === 0) return;
-
-    for (const key of keys) {
-      const cached = await redis.get(key);
-      if (!cached) continue;
-      let data = JSON.parse(cached);
-      if (data.tasks && Array.isArray(data.tasks)) {
-        const originalLength = data.tasks.length;
-        const wasLastId = data.lastId === taskId;
-        data.tasks = data.tasks.filter(t => t.id !== taskId);
-        if (data.tasks.length < originalLength) {
-          // ✅ If the removed task was the lastId, update it to the new last task
-          if (wasLastId) {
-            data.lastId = data.tasks.length > 0 ? data.tasks[data.tasks.length - 1].id : null;
-          }
-          await redis.set(key, JSON.stringify(data));
-        }
-      }
-    }
-    console.log(`🗑️ Removed task ${taskId} from global feed cache`);
-  } catch (error) {
-    console.warn('Failed to remove task from global feed cache:', error);
+// Remove task ID from all relevant sorted sets
+async function removeTaskFromFeedSets(taskId, platform, taskType) {
+  const keys = [
+    getFeedKey(),
+    getFeedKey(platform),
+    getFeedKey(null, taskType),
+    getFeedKey(platform, taskType),
+  ];
+  const pipeline = redis.pipeline();
+  for (const key of keys) {
+    pipeline.zrem(key, taskId);
   }
+  await pipeline.exec();
+}
+
+// Cache task details (full object) with TTL
+async function cacheTaskDetails(taskId, taskData) {
+  await redis.set(`task:${taskId}`, JSON.stringify(taskData), 'EX', 3600); // 1 hour TTL
+}
+
+// Get task details – tries cache, falls back to Firestore
+async function getTaskDetails(taskId) {
+  const cached = await redis.get(`task:${taskId}`);
+  if (cached) return JSON.parse(cached);
+  // Fallback to Firestore
+  const doc = await db.collection('socialTasks').doc(taskId).get();
+  if (!doc.exists) return null;
+  const data = doc.data();
+  const owner = await getUserInfo(data.uid);
+  const task = { id: taskId, ...data, owner };
+  await cacheTaskDetails(taskId, task);
+  return task;
 }
 
 // ── Get a user's exchanged task IDs (cached in Redis) ──
@@ -4789,8 +4739,9 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     const ownerInfo = await getUserInfo(uid);
     const taskWithOwner = { ...newTask, owner: ownerInfo };
 
-    // ── Add to global feed cache ──
-    await addTaskToGlobalFeed(taskWithOwner);
+    // ── Add task to feed sorted sets and cache details ──
+    await addTaskToFeedSets(newTask.id, newTask.platform, newTask.taskType, Date.now());
+    await cacheTaskDetails(newTask.id, taskWithOwner);
 
     // ── Invalidate user's own tasks cache so it appears in "My Tasks" ──
     await invalidatePattern(`social-tasks:${uid}:*`);
@@ -4938,21 +4889,30 @@ app.put('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) => {
     const updatedDoc = await docRef.get();
     const updatedData = updatedDoc.data();
 
-    // ── Handle feed cache based on active status change ──
-    if (active !== undefined && active !== oldActive) {
-      if (active === false) {
-        // Deactivated → remove from feed
-        await removeTaskFromGlobalFeed(id);
-      } else {
-        // Reactivated → add back to feed
-        const ownerInfo = await getUserInfo(uid);
-        const taskWithOwner = { id, ...updatedData, owner: ownerInfo };
-        await addTaskToGlobalFeed(taskWithOwner);
+    // ── Update feed sorted sets if platform/taskType/active changed ──
+    const oldData = doc.data(); // already fetched
+    const newPlatform = platform !== undefined ? platform.trim() : oldData.platform;
+    const newTaskType = taskType !== undefined ? taskType.trim() : oldData.taskType;
+    const newActive = active !== undefined ? active : oldData.active;
+
+    // If platform or taskType changed, move the task to new sets
+    if (newPlatform !== oldData.platform || newTaskType !== oldData.taskType) {
+      await removeTaskFromFeedSets(id, oldData.platform, oldData.taskType);
+      if (newActive) {
+        await addTaskToFeedSets(id, newPlatform, newTaskType, Date.now());
       }
-    } else {
-      // No active change → just update the task in cache
-      await updateTaskInGlobalFeed(id, updateData);
+    } else if (newActive !== oldData.active) {
+      // Active status changed
+      if (newActive) {
+        await addTaskToFeedSets(id, newPlatform, newTaskType, Date.now());
+      } else {
+        await removeTaskFromFeedSets(id, oldData.platform, oldData.taskType);
+      }
     }
+
+    // Update task details cache with new data
+    const updatedTaskWithOwner = { id, ...updatedData, owner: await getUserInfo(uid) };
+    await cacheTaskDetails(id, updatedTaskWithOwner);
 
     // ── Invalidate user's own tasks cache so changes appear in "My Tasks" ──
     await invalidatePattern(`social-tasks:${uid}:*`);
@@ -5010,8 +4970,9 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
       await invalidateUserExchanges(userId);
     }
 
-    // ── Remove from global feed cache ──
-    await removeTaskFromGlobalFeed(id);
+    // ── Remove from all feed sorted sets and delete details cache ──
+    await removeTaskFromFeedSets(id, doc.data().platform, doc.data().taskType);
+    await redis.del(`task:${id}`);
 
     // ── ✅ NEW: Clear the user's own tasks cache so the task disappears from "My Tasks" ──
     await invalidatePattern(`social-tasks:${uid}:*`);
@@ -5032,24 +4993,24 @@ app.delete('/api/social-tasks/:id', verifyToken, checkBanned, async (req, res) =
 // // // ─────────────────────────────────────────────
 // 5. GROW FEED – PUBLIC TASKS (global cache)
 // ─────────────────────────────────────────────
-// ── Grow Feed – PUBLIC (viewable without login), optional user flags ──
+// ── GROW FEED – uses sorted sets and task details cache ──
 app.get('/api/grow-feed', async (req, res) => {
   try {
     let limit = parseInt(req.query.limit) || 25;
     const MAX_LIMIT = 100;
     if (limit > MAX_LIMIT) limit = MAX_LIMIT;
 
-    const lastTaskId = req.query.lastTaskId || null;
+    const page = parseInt(req.query.page) || 1;
     const platform = req.query.platform || null;
     const taskType = req.query.taskType || null;
     const ip = getClientIp(req);
 
     // Rate limit by IP (public)
     if (!(await checkRateLimit(ip, 'grow-feed', 30, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+      return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
 
-    // ── Try to get authenticated user ID (optional) ──
+    // Try to get authenticated user ID (optional)
     let uid = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -5060,69 +5021,51 @@ app.get('/api/grow-feed', async (req, res) => {
       } catch (e) { /* ignore – treat as guest */ }
     }
 
-    const cacheKey = `grow-feed:global:limit:${limit}:lastTaskId:${lastTaskId || 'null'}:platform:${platform || 'null'}:taskType:${taskType || 'null'}`;
+    const feedKey = getFeedKey(platform, taskType);
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
 
-    let result = null;
-    try {
-      const cached = await redis.get(cacheKey);
-      if (cached) result = JSON.parse(cached);
-    } catch (e) { /* ignore */ }
+    // 1. Get task IDs from sorted set (newest first)
+    const taskIds = await redis.zrevrange(feedKey, start, end);
 
-    if (!result) {
-      console.log(`📡 Fetching global feed with filters platform=${platform}, taskType=${taskType} ...`);
-      let query = db.collection('socialTasks').where('active', '==', true);
-      if (platform) {
-        query = query.where('platform', '==', platform);
-      }
-      if (taskType) {
-        query = query.where('taskType', '==', taskType);
-      }
-      query = query.orderBy('createdAt', 'desc').limit(limit + 1);
-      if (lastTaskId) {
-        const lastDoc = await db.collection('socialTasks').doc(lastTaskId).get();
-        if (lastDoc.exists) query = query.startAfter(lastDoc);
-      }
-      const snapshot = await query.get();
-      const tasks = [];
-      let hasMore = false;
-      let lastId = null;
-      for (const doc of snapshot.docs) {
-        if (tasks.length >= limit) {
-          hasMore = true;
-          break;
-        }
-        const data = doc.data();
-        const user = await getUserInfo(data.uid);
-        tasks.push({
-          id: doc.id,
-          ...data,
-          owner: user,
-        });
-        lastId = doc.id;
-      }
-      result = { tasks, hasMore, lastId };
-      await redis.set(cacheKey, JSON.stringify(result));
-      console.log(`💾 Global feed cached: ${cacheKey}`);
+    // 2. Check if there are more tasks
+    let hasMore = false;
+    if (taskIds.length === limit) {
+      const nextId = await redis.zrevrange(feedKey, start + limit, start + limit);
+      if (nextId.length > 0) hasMore = true;
     }
 
-    // ── Compute per‑user flags ONLY if user is logged in ──
+    // 3. Fetch task details in parallel
+    const tasks = [];
+    if (taskIds.length > 0) {
+      const taskDetails = await Promise.all(taskIds.map(id => getTaskDetails(id)));
+      // Filter out nulls (deleted tasks)
+      for (const task of taskDetails) {
+        if (task) tasks.push(task);
+      }
+    }
+
+    // 4. Compute per‑user flags (if authenticated)
     if (uid) {
       const exchangedIds = await getUserExchangedTaskIds(uid);
-      result.tasks = result.tasks.map(task => ({
-        ...task,
-        isOwn: task.uid === uid,
-        hasExchange: exchangedIds.includes(task.id),
-      }));
+      tasks.forEach(task => {
+        task.isOwn = task.uid === uid;
+        task.hasExchange = exchangedIds.includes(task.id);
+      });
     } else {
-      // Guest: no flags (or set them false)
-      result.tasks = result.tasks.map(task => ({
-        ...task,
-        isOwn: false,
-        hasExchange: false,
-      }));
+      tasks.forEach(task => {
+        task.isOwn = false;
+        task.hasExchange = false;
+      });
     }
 
-    res.json({ success: true, ...result });
+    res.json({
+      success: true,
+      tasks,
+      hasMore,
+      page,
+      limit,
+    });
   } catch (error) {
     console.error('Grow feed error:', error);
     res.status(500).json({ success: false, error: 'Failed to load feed' });
