@@ -105,22 +105,28 @@ export default function UserInfo() {
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
 
-  // ── Guard: do NOT call the hook if id is missing (prevents SSR/build errors) ──
+  // ── FIX: Guard prevents hook from running during SSR with undefined id ──
   if (!id) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-center py-16">
-          <div className="flex items-center gap-3 text-slate-500">
-            <FiLoader className="w-6 h-6 animate-spin text-purple-600" />
-            <span>Loading...</span>
+      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 shadow-sm">
+          <div className="text-6xl mb-4">👤</div>
+          <h2 className="text-2xl font-bold text-slate-800">Loading Profile...</h2>
+          <div className="mt-6 flex justify-center">
+            <FiLoader className="w-8 h-8 animate-spin text-purple-600" />
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Now safe to call the hook ──
-  const { data: profile, isLoading, isError } = usePublicProfile(id);
+  // ── Hook is now SAFE to call (id exists) ──
+  const { data: profile, isLoading, isError, error } = usePublicProfile(id);
+
+  // ── Debug: log error if any ──
+  if (isError && error) {
+    console.error('Profile fetch error:', error);
+  }
 
   const isOwnProfile = isAuthenticated && user?.uid === id;
 
@@ -164,7 +170,7 @@ export default function UserInfo() {
     }
   };
 
-  // ── Loading state ──
+  // ── Loading ──
   if (isLoading) {
     return (
       <>
@@ -181,7 +187,7 @@ export default function UserInfo() {
     );
   }
 
-  // ── Error / Not found ──
+  // ── Error ──
   if (isError || !profile) {
     return (
       <>
@@ -203,7 +209,7 @@ export default function UserInfo() {
     );
   }
 
-  // ── Render profile ──
+  // ── Render Profile ──
   return (
     <>
       <Meta title={`${profile.fullname || profile.username || 'User'} – Make Trend`} />
