@@ -47,6 +47,8 @@ const TOP_NAV_ONLY_PAGES = [
 '/productstrend',
 '/community',
 '/userinfo',
+'/404',
+
 ];
 
 function MyApp({ Component, pageProps }) {
