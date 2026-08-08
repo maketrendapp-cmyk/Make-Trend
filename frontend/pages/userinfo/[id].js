@@ -64,7 +64,6 @@ const PLATFORM_COLORS = {
   reddit: 'text-orange-500',
 };
 
-// ── Detect platform from URL ──
 function detectPlatformFromUrl(url) {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
@@ -106,7 +105,29 @@ export default function UserInfo() {
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
 
+  // ── If id is not yet available, show a loading state (SSR safe) ──
+  if (!id) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="h-8 w-8 bg-slate-200 rounded-full" />
+          <div className="h-8 w-40 bg-slate-200 rounded-lg" />
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center sm:flex-row gap-6 shadow-sm">
+          <div className="w-28 h-28 rounded-full bg-slate-200" />
+          <div className="flex-1 space-y-2 text-center sm:text-left">
+            <div className="h-6 bg-slate-200 rounded w-40" />
+            <div className="h-4 bg-slate-200 rounded w-24" />
+            <div className="h-3 bg-slate-200 rounded w-48" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Only call the hook when id is truthy ──
   const { data: profile, isLoading, isError } = usePublicProfile(id);
+
   const isOwnProfile = isAuthenticated && user?.uid === id;
 
   const formatDate = (timestamp) => {
@@ -200,7 +221,7 @@ export default function UserInfo() {
       <Meta title={`${profile.fullname || profile.username || 'User'} – Make Trend`} />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/30 py-8 px-4">
         <div className="max-w-3xl mx-auto">
-          {/* Header with back & share */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <Link
