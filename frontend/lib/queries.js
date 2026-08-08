@@ -9,12 +9,8 @@ if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const requestCache = new Map();
 
 async function apiRequest(endpoint, options = {}, token = null) {
-  const method = options.method || 'GET';
   const cacheKey = `${endpoint}-${JSON.stringify(options)}-${token || 'no-token'}`;
-  
-  if (method === 'GET' && requestCache.has(cacheKey)) {
-    return requestCache.get(cacheKey);
-  }
+  if (requestCache.has(cacheKey)) return requestCache.get(cacheKey);
 
   const url = `${BACKEND_URL}/api${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
@@ -25,11 +21,8 @@ async function apiRequest(endpoint, options = {}, token = null) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'API error');
 
-  if (method === 'GET') {
-    requestCache.set(cacheKey, data);
-    setTimeout(() => requestCache.delete(cacheKey), 5000);
-  }
-  
+  requestCache.set(cacheKey, data);
+  setTimeout(() => requestCache.delete(cacheKey), 5000);
   return data;
 }
 
@@ -52,21 +45,6 @@ export function useProfile(enabled = false) {
     },
     enabled,
     staleTime: 2 * 60 * 1000,
-  });
-}
-
-// ── Public Profile (Handles API responses properly without crashing) ──
-export function usePublicProfile(uid) {
-  return useQuery({
-    queryKey: ['public-profile', uid],
-    queryFn: async () => {
-      if (!uid) return null;
-      const res = await apiRequest(`/users/${uid}`, { method: 'GET' });
-      return res.user || res.profile || res; // Safely handles differing backend formats
-    },
-    enabled: !!uid,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: false, // Do not endlessly retry on a 404
   });
 }
 
@@ -233,10 +211,10 @@ export function useCreateWithdrawal() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mtCoins'] });
-      queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries(['mtCoins']);
+      queryClient.invalidateQueries(['withdrawals']);
+      queryClient.invalidateQueries(['stats']);
+      queryClient.invalidateQueries(['profile']);
       toast.success('Withdrawal request submitted successfully!');
     },
     onError: (error) => {
@@ -307,6 +285,7 @@ export function useReferrals(enabled = false) {
 
 // ── 🔥 GROW TOGETHER QUERIES ──
 
+// 1. Grow Feed (infinite scroll)
 export function useGrowFeed(enabled = true) {
   return useInfiniteQuery({
     queryKey: ['growFeed'],
@@ -330,6 +309,7 @@ export function useGrowFeed(enabled = true) {
   });
 }
 
+// 2. My Tasks
 export function useMyTasks(enabled = true) {
   return useQuery({
     queryKey: ['myTasks'],
@@ -345,6 +325,7 @@ export function useMyTasks(enabled = true) {
   });
 }
 
+// 3. Available Tasks (for modal selection)
 export function useAvailableTasks(enabled = true) {
   return useQuery({
     queryKey: ['availableTasks'],
@@ -360,6 +341,7 @@ export function useAvailableTasks(enabled = true) {
   });
 }
 
+// 4. My Exchanges (infinite scroll with status filter)
 export function useMyExchanges(status = '', enabled = true) {
   return useInfiniteQuery({
     queryKey: ['myExchanges', status],
@@ -382,6 +364,7 @@ export function useMyExchanges(status = '', enabled = true) {
   });
 }
 
+// 5. Exchange Detail
 export function useExchangeDetail(id, enabled = true) {
   return useQuery({
     queryKey: ['exchangeDetail', id],
@@ -399,6 +382,7 @@ export function useExchangeDetail(id, enabled = true) {
 
 // ── 🚀 PRODUCT TREND QUERIES ──
 
+// 1. Product Feed (infinite scroll with filters) – PUBLIC
 export function useProductFeed(filters = {}, enabled = true) {
   const queryKey = ['productFeed', filters];
   return useInfiniteQuery({
@@ -424,6 +408,7 @@ export function useProductFeed(filters = {}, enabled = true) {
   });
 }
 
+// 2. Product Detail – PUBLIC
 export function useProductDetail(id, enabled = true) {
   return useQuery({
     queryKey: ['productDetail', id],
@@ -436,6 +421,7 @@ export function useProductDetail(id, enabled = true) {
   });
 }
 
+// 3. My Products
 export function useMyProducts(enabled = true) {
   return useQuery({
     queryKey: ['myProducts'],
@@ -450,6 +436,7 @@ export function useMyProducts(enabled = true) {
   });
 }
 
+// 4. Product Comments – PUBLIC
 export function useProductComments(productId, enabled = true) {
   return useQuery({
     queryKey: ['productComments', productId],
@@ -462,6 +449,7 @@ export function useProductComments(productId, enabled = true) {
   });
 }
 
+// 5. Launch Product Mutation
 export function useLaunchProduct() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -475,8 +463,8 @@ export function useLaunchProduct() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['productFeed'] });
-      queryClient.invalidateQueries({ queryKey: ['myProducts'] });
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['myProducts']);
       toast.success('Product launched successfully!');
     },
     onError: (error) => {
@@ -485,6 +473,7 @@ export function useLaunchProduct() {
   });
 }
 
+// 6. Upvote Product Mutation – Optimistic, no invalidations
 export function useUpvoteProduct() {
   return useMutation({
     mutationFn: async (productId) => {
@@ -498,6 +487,7 @@ export function useUpvoteProduct() {
   });
 }
 
+// 7. Add Product Comment Mutation – Optimistic, no invalidations
 export function useAddProductComment() {
   return useMutation({
     mutationFn: async ({ productId, text }) => {
@@ -512,6 +502,7 @@ export function useAddProductComment() {
   });
 }
 
+// 8. Delete Product Mutation
 export function useDeleteProduct() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -524,8 +515,8 @@ export function useDeleteProduct() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['productFeed'] });
-      queryClient.invalidateQueries({ queryKey: ['myProducts'] });
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['myProducts']);
       toast.success('Product deleted');
     },
     onError: (error) => {
@@ -536,6 +527,9 @@ export function useDeleteProduct() {
 
 // ── 🌍 COMMUNITY POSTS QUERIES ──
 
+// 1. Fetch posts feed (infinite scroll, public, with category filter)
+// StaleTime: 2 min to reduce refetches
+// 1. Fetch posts feed (infinite scroll, public, with category & type filters)
 export function usePosts(category = null, type = null, enabled = true) {
   const queryKey = ['posts', category || 'all', type || 'all'];
   return useInfiniteQuery({
@@ -565,6 +559,7 @@ export function usePosts(category = null, type = null, enabled = true) {
   });
 }
 
+// 2. Fetch a single post (public)
 export function usePost(id, enabled = true) {
   return useQuery({
     queryKey: ['post', id],
@@ -577,6 +572,7 @@ export function usePost(id, enabled = true) {
   });
 }
 
+// 3. Create a post (authenticated) – invalidates feed only
 export function useCreatePost() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -590,8 +586,8 @@ export function useCreatePost() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['myPosts'] }); 
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['myPosts']); // Add this line
       toast.success('Post created successfully!');
     },
     onError: (error) => {
@@ -600,6 +596,7 @@ export function useCreatePost() {
   });
 }
 
+// 4. Update a post – invalidates feed + single post
 export function useUpdatePost() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -613,9 +610,9 @@ export function useUpdatePost() {
       return data;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['post', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['myPosts'] }); 
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['post', variables.id]);
+      queryClient.invalidateQueries(['myPosts']); // Add this line
       toast.success('Post updated successfully!');
     },
     onError: (error) => {
@@ -624,6 +621,7 @@ export function useUpdatePost() {
   });
 }
 
+// 5. Like/unlike a post – Simple mutation, UI updates handled by components
 export function useLikePost() {
   return useMutation({
     mutationFn: async (postId) => {
@@ -638,6 +636,7 @@ export function useLikePost() {
 }
 
 
+// 6. Add a comment – simple mutation, UI updates handled by components
 export function useAddComment() {
   return useMutation({
     mutationFn: async ({ postId, content }) => {
@@ -652,6 +651,7 @@ export function useAddComment() {
   });
 }
 
+// 7. Delete a post – invalidates feed + single post
 export function useDeletePost() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -664,9 +664,9 @@ export function useDeletePost() {
       return data;
     },
     onSuccess: (data, postId) => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['post', postId] });
-      queryClient.invalidateQueries({ queryKey: ['myPosts'] }); 
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['post', postId]);
+      queryClient.invalidateQueries(['myPosts']); // Add this line
       toast.success('Post deleted');
     },
     onError: (error) => {
@@ -675,6 +675,7 @@ export function useDeletePost() {
   });
 }
 
+// 8. Get post comments (infinite scroll, public)
 export function usePostComments(postId, enabled = true) {
   const queryKey = ['postComments', postId];
   return useInfiniteQuery({
@@ -698,6 +699,7 @@ export function usePostComments(postId, enabled = true) {
   });
 }
 
+// 9. Get current user's posts (authenticated, for "My Posts" page)
 export function useMyPosts(enabled = true) {
   return useQuery({
     queryKey: ['myPosts'],
@@ -715,6 +717,7 @@ export function useMyPosts(enabled = true) {
 
 // ── 🔔 NOTIFICATION QUERIES ──
 
+// 1. Personal notifications (infinite scroll)
 export function useNotifications(enabled = true) {
   return useInfiniteQuery({
     queryKey: ['notifications'],
@@ -737,6 +740,7 @@ export function useNotifications(enabled = true) {
   });
 }
 
+// 2. System notifications (global, read once per user)
 export function useSystemNotifications(enabled = true) {
   return useQuery({
     queryKey: ['systemNotifications'],
@@ -752,6 +756,7 @@ export function useSystemNotifications(enabled = true) {
   });
 }
 
+// 3. Mark a single notification as read
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -764,7 +769,7 @@ export function useMarkNotificationRead() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries(['notifications']);
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to mark as read');
@@ -772,6 +777,7 @@ export function useMarkNotificationRead() {
   });
 }
 
+// 4. Mark all personal notifications as read
 export function useMarkAllNotificationsRead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -784,7 +790,7 @@ export function useMarkAllNotificationsRead() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries(['notifications']);
       toast.success('All notifications marked as read');
     },
     onError: (error) => {
@@ -793,6 +799,7 @@ export function useMarkAllNotificationsRead() {
   });
 }
 
+// 5. Mark all system notifications as read
 export function useMarkSystemNotificationsRead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -805,7 +812,7 @@ export function useMarkSystemNotificationsRead() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['systemNotifications'] });
+      queryClient.invalidateQueries(['systemNotifications']);
       toast.success('All system notifications marked as read');
     },
     onError: (error) => {
@@ -813,65 +820,66 @@ export function useMarkSystemNotificationsRead() {
     },
   });
 }
-
 // ── Invalidation helper ──
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
   return {
-    invalidateProfile: () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
-    invalidateStats: () => queryClient.invalidateQueries({ queryKey: ['stats'] }),
-    invalidateCampaigns: () => queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
-    invalidateTemplates: () => queryClient.invalidateQueries({ queryKey: ['templates'] }),
-    invalidateFeaturedTemplates: () => queryClient.invalidateQueries({ queryKey: ['featuredTemplates'] }),
-    invalidateSupportTickets: () => queryClient.invalidateQueries({ queryKey: ['supportTickets'] }),
-    invalidateComments: () => queryClient.invalidateQueries({ queryKey: ['comments'] }),
-    invalidateMtCoins: () => queryClient.invalidateQueries({ queryKey: ['mtCoins'] }),
-    invalidateWithdrawals: () => queryClient.invalidateQueries({ queryKey: ['withdrawals'] }),
-    invalidateWithdrawalMethods: () => queryClient.invalidateQueries({ queryKey: ['withdrawalMethods'] }),
-    invalidateReferrals: () => queryClient.invalidateQueries({ queryKey: ['referrals'] }),
-    invalidateDailyBonus: () => queryClient.invalidateQueries({ queryKey: ['dailyBonus'] }),
-    invalidateGrowFeed: () => queryClient.invalidateQueries({ queryKey: ['growFeed'] }),
-    invalidateMyTasks: () => queryClient.invalidateQueries({ queryKey: ['myTasks'] }),
-    invalidateAvailableTasks: () => queryClient.invalidateQueries({ queryKey: ['availableTasks'] }),
-    invalidateMyExchanges: () => queryClient.invalidateQueries({ queryKey: ['myExchanges'] }),
-    invalidateExchangeDetail: (id) => queryClient.invalidateQueries({ queryKey: ['exchangeDetail', id] }),
-    invalidateProductFeed: () => queryClient.invalidateQueries({ queryKey: ['productFeed'] }),
-    invalidateProductDetail: (id) => queryClient.invalidateQueries({ queryKey: ['productDetail', id] }),
-    invalidateMyProducts: () => queryClient.invalidateQueries({ queryKey: ['myProducts'] }),
-    invalidateProductComments: (id) => queryClient.invalidateQueries({ queryKey: ['productComments', id] }),
-    invalidateNotifications: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
-    invalidateSystemNotifications: () => queryClient.invalidateQueries({ queryKey: ['systemNotifications'] }),
+    invalidateProfile: () => queryClient.invalidateQueries(['profile']),
+    invalidateStats: () => queryClient.invalidateQueries(['stats']),
+    invalidateCampaigns: () => queryClient.invalidateQueries(['campaigns']),
+    invalidateTemplates: () => queryClient.invalidateQueries(['templates']),
+    invalidateFeaturedTemplates: () => queryClient.invalidateQueries(['featuredTemplates']),
+    invalidateSupportTickets: () => queryClient.invalidateQueries(['supportTickets']),
+    invalidateComments: () => queryClient.invalidateQueries(['comments']),
+    invalidateMtCoins: () => queryClient.invalidateQueries(['mtCoins']),
+    invalidateWithdrawals: () => queryClient.invalidateQueries(['withdrawals']),
+    invalidateWithdrawalMethods: () => queryClient.invalidateQueries(['withdrawalMethods']),
+    invalidateReferrals: () => queryClient.invalidateQueries(['referrals']),
+    invalidateDailyBonus: () => queryClient.invalidateQueries(['dailyBonus']),
+    invalidateGrowFeed: () => queryClient.invalidateQueries(['growFeed']),
+    invalidateMyTasks: () => queryClient.invalidateQueries(['myTasks']),
+    invalidateAvailableTasks: () => queryClient.invalidateQueries(['availableTasks']),
+    invalidateMyExchanges: () => queryClient.invalidateQueries(['myExchanges']),
+    invalidateExchangeDetail: (id) => queryClient.invalidateQueries(['exchangeDetail', id]),
+    invalidateProductFeed: () => queryClient.invalidateQueries(['productFeed']),
+    invalidateProductDetail: (id) => queryClient.invalidateQueries(['productDetail', id]),
+    invalidateMyProducts: () => queryClient.invalidateQueries(['myProducts']),
+    invalidateProductComments: (id) => queryClient.invalidateQueries(['productComments', id]),
+    invalidateNotifications: () => queryClient.invalidateQueries(['notifications']),
+    invalidateSystemNotifications: () => queryClient.invalidateQueries(['systemNotifications']),
     invalidateAllNotifications: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['systemNotifications'] });
+      queryClient.invalidateQueries(['notifications']);
+      queryClient.invalidateQueries(['systemNotifications']);
     },
-    invalidatePost: (id) => queryClient.invalidateQueries({ queryKey: ['post', id] }),
-    invalidatePosts: () => queryClient.invalidateQueries({ queryKey: ['posts'] }),
-    invalidatePostComments: (postId) => queryClient.invalidateQueries({ queryKey: ['postComments', postId] }),
-    invalidateMyPosts: () => queryClient.invalidateQueries({ queryKey: ['myPosts'] }),
+    invalidatePost: (id) => queryClient.invalidateQueries(['post', id]),
+    invalidatePosts: () => queryClient.invalidateQueries(['posts']),
+    invalidatePostComments: (postId) => queryClient.invalidateQueries(['postComments', postId]),
+    invalidateMyPosts: () => queryClient.invalidateQueries(['myPosts']),
     invalidateAll: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
-      queryClient.invalidateQueries({ queryKey: ['featuredTemplates'] });
-      queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
-      queryClient.invalidateQueries({ queryKey: ['comments'] });
-      queryClient.invalidateQueries({ queryKey: ['mtCoins'] });
-      queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-      queryClient.invalidateQueries({ queryKey: ['withdrawalMethods'] });
-      queryClient.invalidateQueries({ queryKey: ['referrals'] });
-      queryClient.invalidateQueries({ queryKey: ['dailyBonus'] });
-      queryClient.invalidateQueries({ queryKey: ['growFeed'] });
-      queryClient.invalidateQueries({ queryKey: ['myTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['availableTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['myExchanges'] });
-      queryClient.invalidateQueries({ queryKey: ['productFeed'] });
-      queryClient.invalidateQueries({ queryKey: ['myProducts'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['systemNotifications'] });
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['myPosts'] });
+      queryClient.invalidateQueries(['profile']);
+      queryClient.invalidateQueries(['stats']);
+      queryClient.invalidateQueries(['campaigns']);
+      queryClient.invalidateQueries(['templates']);
+      queryClient.invalidateQueries(['featuredTemplates']);
+      queryClient.invalidateQueries(['supportTickets']);
+      queryClient.invalidateQueries(['comments']);
+      queryClient.invalidateQueries(['mtCoins']);
+      queryClient.invalidateQueries(['withdrawals']);
+      queryClient.invalidateQueries(['withdrawalMethods']);
+      queryClient.invalidateQueries(['referrals']);
+      queryClient.invalidateQueries(['dailyBonus']);
+      queryClient.invalidateQueries(['growFeed']);
+      queryClient.invalidateQueries(['myTasks']);
+      queryClient.invalidateQueries(['availableTasks']);
+      queryClient.invalidateQueries(['myExchanges']);
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['myProducts']);
+      queryClient.invalidateQueries(['notifications']);
+      queryClient.invalidateQueries(['systemNotifications']);
+      queryClient.invalidateQueries(['posts']);
+      // Inside invalidateAll
+      queryClient.invalidateQueries(['myPosts']);
+      // productDetail, productComments, post, postComments, userProfile keys are dynamic, so skip here
     },
   };
 }
