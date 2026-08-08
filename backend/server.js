@@ -50,7 +50,7 @@ async function redisGet(key) {
 }
 
 // ── Get from cache or fetch ──
-async function getOrSetCache(key, fetchFn) {
+async function getOrSetCache(key, fetchFn, ttl = null) {
   try {
     const cached = await redisGet(key);
     if (cached) {
@@ -59,7 +59,11 @@ async function getOrSetCache(key, fetchFn) {
     }
     console.log(`📡 Cache MISS: ${key}`);
     const data = await fetchFn();
-    await redis.set(key, JSON.stringify(data)); // indefinite TTL – invalidated on changes
+    if (ttl) {
+      await redis.set(key, JSON.stringify(data), 'EX', ttl);
+    } else {
+      await redis.set(key, JSON.stringify(data));
+    }
     return data;
   } catch (error) {
     console.warn(`⚠️ Cache fallback for ${key}:`, error.message);
@@ -3453,9 +3457,17 @@ app.post('/api/upload', verifyToken, checkBanned, upload.single('image'), async 
 
     // ── Determine folder from query param (default: avatars) ──
     const folder = req.query.folder || 'avatars';
-    const transformation = folder === 'templates' 
-      ? [{ width: 800, height: 600, crop: 'limit' }]
-      : [{ width: 400, height: 400, crop: 'limit' }];
+    let transformation;
+    if (folder === 'avatars') {
+      transformation = [{ width: 400, height: 400, crop: 'limit', quality: 'auto' }];
+    } else if (folder === 'productstrend') {
+      transformation = [{ width: 1600, height: 1600, crop: 'limit', quality: 'auto' }];
+    } else if (folder === 'templates') {
+      transformation = [{ width: 1200, height: 800, crop: 'limit', quality: 'auto' }];
+    } else {
+      // Default fallback
+      transformation = [{ width: 1200, height: 1200, crop: 'limit', quality: 'auto' }];
+    }
 
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -5472,25 +5484,73 @@ async function getUserVoteStatus(productId, uid, deviceId) {
   return false;
 }
 
-// ── Helper: Invalidate product caches ──
+// ─────────────────────────────────────────────
+// PRODUCT TREND – SORTED SETS (Fanout‑on‑write)
+// ─────────────────────────────────────────────
+
+function getProductFeedKey(category = null, sort = 'newest') {
+  const cat = category || 'all';
+  return `products:feed:category:${cat}:sort:${sort}`;
+}
+
+async function addProductToFeedSets(productId, category, sort, timestamp) {
+  const sorts = ['newest', 'most-upvoted', 'most-commented'];
+  const keys = [];
+  for (const s of sorts) {
+    keys.push(getProductFeedKey(null, s));
+    keys.push(getProductFeedKey(category, s));
+  }
+  const pipeline = redis.pipeline();
+  for (const key of keys) {
+    pipeline.zadd(key, timestamp, productId);
+  }
+  await pipeline.exec();
+}
+
+async function removeProductFromFeedSets(productId, category) {
+  const sorts = ['newest', 'most-upvoted', 'most-commented'];
+  const keys = [];
+  for (const s of sorts) {
+    keys.push(getProductFeedKey(null, s));
+    keys.push(getProductFeedKey(category, s));
+  }
+  const pipeline = redis.pipeline();
+  for (const key of keys) {
+    pipeline.zrem(key, productId);
+  }
+  await pipeline.exec();
+}
+
+async function cacheProductDetails(productId, productData) {
+  await redis.set(`product:${productId}`, JSON.stringify(productData), 'EX', 3600);
+}
+
+async function getProductDetails(productId) {
+  const cached = await redis.get(`product:${productId}`);
+  if (cached) return JSON.parse(cached);
+  const doc = await db.collection('products').doc(productId).get();
+  if (!doc.exists) return null;
+  const data = doc.data();
+  const maker = await getProductMakerInfo(data.makerUid);
+  const product = { id: productId, ...data, maker };
+  await cacheProductDetails(productId, product);
+  return product;
+}
+
 async function invalidateProductCaches(productId, makerUid) {
-  await invalidatePattern('productstrend:feed:*');
-  await invalidateKey(`productstrend:product:${productId}`);
+  await invalidateKey(`product:${productId}`);
   if (makerUid) {
     await invalidateKey(`productstrend:my-products:${makerUid}`);
   }
 }
 
 // ─────────────────────────────────────────────
-// 1. GET PRODUCT FEED (paginated, filtered, cached)
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
 // 1. GET PRODUCT FEED (public, global cache)
 // ─────────────────────────────────────────────
 app.get('/api/productstrend/feed', async (req, res) => {
   try {
     let limit = parseInt(req.query.limit) || 20;
-    const MAX_LIMIT = 100;   // Hard cap to prevent abuse
+    const MAX_LIMIT = 50;
     if (limit > MAX_LIMIT) limit = MAX_LIMIT;
 
     const lastId = req.query.lastId || null;
@@ -5499,12 +5559,10 @@ app.get('/api/productstrend/feed', async (req, res) => {
     const sort = req.query.sort || 'newest';
     const ip = getClientIp(req);
 
-    // ── Rate limit by IP ──
     if (!(await checkRateLimit(ip, 'product-feed', 30, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
-    // ── Try to get authenticated user ID (optional) ──
     let uid = null;
     let deviceId = req.headers['x-device-id'] || null;
     const authHeader = req.headers.authorization;
@@ -5516,75 +5574,103 @@ app.get('/api/productstrend/feed', async (req, res) => {
       } catch (e) { /* ignore */ }
     }
 
-    // ── Global cache key (no uid) ──
-    const cacheKey = `productstrend:feed:global:${limit}:${lastId || 'null'}:${search}:${category}:${sort}`;
-
-    let result = null;
-    try {
-      const cached = await redisGet(cacheKey);
-      if (cached) result = JSON.parse(cached);
-    } catch (e) { /* ignore */ }
-
-    if (!result) {
-      console.log(`📡 Fetching product feed from Firestore (${search || 'all'}, ${category || 'all'})...`);
-      
-      let query = db.collection('products');
-      if (category) {
-        query = query.where('category', '==', category);
-      }
-      let orderField = 'createdAt';
-      let orderDirection = 'desc';
-      if (sort === 'oldest') {
-        orderDirection = 'asc';
-      } else if (sort === 'most-upvoted') {
-        orderField = 'upvotes';
-        orderDirection = 'desc';
-      } else if (sort === 'most-commented') {
-        orderField = 'commentsCount';
-        orderDirection = 'desc';
-      }
-      query = query.orderBy(orderField, orderDirection).orderBy(admin.firestore.FieldPath.documentId(), orderDirection);
-      
-      if (lastId) {
-        const lastDoc = await db.collection('products').doc(lastId).get();
-        if (lastDoc.exists) {
-          query = query.startAfter(lastDoc);
+    // ── If search provided ──
+    if (search) {
+      const cacheKey = `productstrend:feed:search:${search}:category:${category || 'all'}:sort:${sort}:limit:${limit}:lastId:${lastId || 'null'}`;
+      const result = await getOrSetCache(cacheKey, async () => {
+        console.log(`📡 Fetching product feed with search="${search}"`);
+        let query = db.collection('products')
+          .where('status', '==', 'approved');
+        if (category) query = query.where('category', '==', category);
+        const fetchLimit = Math.min(limit + 10, 100);
+        query = query.orderBy('createdAt', 'desc').limit(fetchLimit);
+        if (lastId) {
+          const lastDoc = await db.collection('products').doc(lastId).get();
+          if (lastDoc.exists) query = query.startAfter(lastDoc);
         }
-      }
-      query = query.limit(limit + 1);
-
-      const snapshot = await query.get();
-      const products = [];
-      let hasMore = false;
-      let lastProductId = null;
-      const docs = snapshot.docs;
-      for (let i = 0; i < docs.length; i++) {
-        if (i >= limit) {
-          hasMore = true;
-          break;
-        }
-        const doc = docs[i];
-        const data = doc.data();
-        if (data.status === 'rejected') continue;
-        if (search) {
+        const snapshot = await query.get();
+        const products = [];
+        let hasMore = false;
+        let lastProductId = null;
+        const docs = snapshot.docs;
+        let count = 0;
+        for (const doc of docs) {
+          if (count >= limit) {
+            hasMore = true;
+            break;
+          }
+          const data = doc.data();
+          if (data.status === 'rejected') continue;
           const name = (data.name || '').toLowerCase();
           const tagline = (data.tagline || '').toLowerCase();
           const desc = (data.description || '').toLowerCase();
           const term = search.toLowerCase();
-          if (!name.includes(term) && !tagline.includes(term) && !desc.includes(term)) {
-            continue;
-          }
+          if (!name.includes(term) && !tagline.includes(term) && !desc.includes(term)) continue;
+          const maker = await getProductMakerInfo(data.makerUid);
+          products.push({ id: doc.id, ...data, maker });
+          lastProductId = doc.id;
+          count++;
         }
-        const maker = await getProductMakerInfo(data.makerUid);
-        products.push({ id: doc.id, ...data, maker });
-        lastProductId = doc.id;
+        hasMore = snapshot.docs.length >= fetchLimit;
+        return { products, hasMore, lastId: lastProductId };
+      }, 120);
+
+      let userVotedSet = new Set();
+      if (uid) {
+        const voteCacheKey = `user:votes:${uid}`;
+        try {
+          const cachedVotes = await redisGet(voteCacheKey);
+          if (cachedVotes) {
+            userVotedSet = new Set(JSON.parse(cachedVotes));
+          } else {
+            const voteSnapshot = await db.collection('productVotes')
+              .where('userId', '==', uid)
+              .select('productId')
+              .get();
+            const votedIds = voteSnapshot.docs.map(d => d.data().productId);
+            userVotedSet = new Set(votedIds);
+            await redis.set(voteCacheKey, JSON.stringify(Array.from(userVotedSet)), 'EX', 300);
+          }
+        } catch (e) {
+          console.warn('Vote cache error:', e);
+        }
+      } else if (deviceId) {
+        const voteSnapshot = await db.collection('productVotes')
+          .where('deviceId', '==', deviceId)
+          .select('productId')
+          .get();
+        const votedIds = voteSnapshot.docs.map(d => d.data().productId);
+        userVotedSet = new Set(votedIds);
       }
-      result = { products, hasMore, lastId: lastProductId };
-      await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
-      console.log(`💾 Global feed cached: ${cacheKey}`);
+      const productsWithVote = result.products.map(product => ({
+        ...product,
+        userVoted: userVotedSet.has(product.id),
+      }));
+      return res.json({ success: true, products: productsWithVote, hasMore: result.hasMore, lastId: result.lastId });
     }
 
-    // ── Compute user vote status ──
+    // ── Non‑search ──
+    const feedKey = getProductFeedKey(category || null, sort);
+    let offset = 0;
+    if (lastId) {
+      const rank = await redis.zrevrank(feedKey, lastId);
+      if (rank !== null) offset = rank + 1;
+    }
+    const end = offset + limit - 1;
+    const productIds = await redis.zrevrange(feedKey, offset, end);
+
+    let hasMore = false;
+    if (productIds.length === limit) {
+      const next = await redis.zrevrange(feedKey, offset + limit, offset + limit);
+      if (next.length > 0) hasMore = true;
+    }
+
+    const products = [];
+    if (productIds.length > 0) {
+      const details = await Promise.all(productIds.map(id => getProductDetails(id)));
+      for (const product of details) if (product) products.push(product);
+    }
+
     let userVotedSet = new Set();
     if (uid) {
       const voteCacheKey = `user:votes:${uid}`;
@@ -5593,7 +5679,6 @@ app.get('/api/productstrend/feed', async (req, res) => {
         if (cachedVotes) {
           userVotedSet = new Set(JSON.parse(cachedVotes));
         } else {
-          // Fetch from Firestore
           const voteSnapshot = await db.collection('productVotes')
             .where('userId', '==', uid)
             .select('productId')
@@ -5606,7 +5691,6 @@ app.get('/api/productstrend/feed', async (req, res) => {
         console.warn('Vote cache error:', e);
       }
     } else if (deviceId) {
-      // For device-based votes, we could also cache, but we'll compute on the fly
       const voteSnapshot = await db.collection('productVotes')
         .where('deviceId', '==', deviceId)
         .select('productId')
@@ -5615,16 +5699,18 @@ app.get('/api/productstrend/feed', async (req, res) => {
       userVotedSet = new Set(votedIds);
     }
 
-    const productsWithVote = result.products.map(product => ({
+    const productsWithVote = products.map(product => ({
       ...product,
       userVoted: userVotedSet.has(product.id),
     }));
 
+    const lastProductId = productsWithVote.length > 0 ? productsWithVote[productsWithVote.length - 1].id : null;
+
     res.json({
       success: true,
       products: productsWithVote,
-      hasMore: result.hasMore,
-      lastId: result.lastId,
+      hasMore,
+      lastId: lastProductId,
     });
   } catch (error) {
     console.error('❌ Product feed error:', error);
@@ -5709,35 +5795,70 @@ app.get('/api/productstrend/products/:id', async (req, res) => {
 // ─────────────────────────────────────────────
 // 3. GET MY PRODUCTS (user's own products)
 // ─────────────────────────────────────────────
+// ── 3. GET MY PRODUCTS (user's own products, with pagination + filters) ──
 app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+
+    // ── Pagination & filters ──
+    let limit = parseInt(req.query.limit) || 20;
+    const MAX_LIMIT = 50;
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
+
+    const status = req.query.status || null;
+    const category = req.query.category || null;
+    const lastId = req.query.lastId || null;
+
     if (!(await checkRateLimit(uid, 'my-products', 20, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
-    const cacheKey = `productstrend:my-products:${uid}`;
-    let products = null;
-    try {
-      const cached = await redisGet(cacheKey);
-      if (cached) products = JSON.parse(cached);
-    } catch (e) { /* ignore */ }
+    // ── Build cache key ──
+    const cacheKey = `productstrend:my-products:${uid}:status:${status || 'all'}:category:${category || 'all'}:limit:${limit}:lastId:${lastId || 'null'}`;
 
-    if (!products) {
-      const snapshot = await db.collection('products')
+    const result = await getOrSetCache(cacheKey, async () => {
+      console.log(`📡 Fetching my products for user ${uid} (status=${status}, category=${category})...`);
+
+      let query = db.collection('products')
         .where('makerUid', '==', uid)
         .orderBy('createdAt', 'desc')
-        .get();
-      products = [];
-      for (const doc of snapshot.docs) {
+        .limit(limit + 1);
+
+      if (status) {
+        query = query.where('status', '==', status);
+      }
+      if (category) {
+        query = query.where('category', '==', category);
+      }
+      if (lastId) {
+        const lastDoc = await db.collection('products').doc(lastId).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      }
+
+      const snapshot = await query.get();
+      const products = [];
+      let hasMore = false;
+      let lastProductId = null;
+
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i++) {
+        if (i >= limit) {
+          hasMore = true;
+          break;
+        }
+        const doc = docs[i];
         const data = doc.data();
         const maker = await getProductMakerInfo(data.makerUid);
         products.push({ id: doc.id, ...data, maker });
+        lastProductId = doc.id;
       }
-      await redis.set(cacheKey, JSON.stringify(products), 'EX', 300);
-    }
 
-    res.json({ success: true, products });
+      return { products, hasMore, lastId: lastProductId };
+    }, 300); // 5 min TTL
+
+    res.json({ success: true, ...result });
   } catch (error) {
     console.error('❌ My products error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -5753,15 +5874,22 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
     const { 
       name, tagline, description, url, imageUrl, category,
       features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate,
-      // ── NEW FIELDS ──
       logo, thumbnail, socialLinks, referralCode,
       websiteTitle, websiteDescription, websiteImage
     } = req.body;
 
-    if (!(await checkRateLimit(uid, 'launch-product', 5, 3600))) {
-      return res.status(429).json({ success: false, error: 'Too many product launches. Please wait an hour.' });
+    // ── Rate limits ──
+    if (!(await checkRateLimit(uid, 'product-launch', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many launch attempts. Please wait a moment.' });
+    }
+    if (!(await checkDailyLimit(uid, 'product-launch', 5))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily product launch limit reached (max 5 per day). Come back tomorrow!'
+      });
     }
 
+    // ── Existing validations (copied from your original) ──
     if (!name || name.trim().length < 1 || name.trim().length > 100) {
       return res.status(400).json({ success: false, error: 'Name must be 1-100 characters' });
     }
@@ -5780,8 +5908,6 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
     if (category && typeof category !== 'string') {
       return res.status(400).json({ success: false, error: 'Category must be a string' });
     }
-
-    // ── Validate existing fields ──
     if (features !== undefined) {
       if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
         return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
@@ -5810,8 +5936,6 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
     if (releaseDate !== undefined && typeof releaseDate !== 'string') {
       return res.status(400).json({ success: false, error: 'Release date must be a string' });
     }
-
-    // ── NEW: Validate new fields ──
     if (logo !== undefined && logo && !validateImageUrl(logo)) {
       return res.status(400).json({ success: false, error: 'Invalid logo URL' });
     }
@@ -5866,6 +5990,7 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       }
     }
 
+    // ── Build product data ──
     const productData = {
       name: name.trim(),
       tagline: tagline.trim(),
@@ -5877,7 +6002,6 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       status: 'approved',
       upvotes: 0,
       commentsCount: 0,
-      // ── Existing fields ──
       features: features || [],
       pricing: pricing || 'Free',
       productStatus: productStatus || 'Live',
@@ -5886,7 +6010,6 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       twitter: twitter || '',
       techStack: techStack || [],
       releaseDate: releaseDate || '',
-      // ── NEW fields ──
       logo: logo || '',
       thumbnail: thumbnail || '',
       socialLinks: socialLinks || [],
@@ -5902,7 +6025,16 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
     const newProduct = { id: docRef.id, ...productData };
     newProduct.maker = await getProductMakerInfo(uid);
 
-    await invalidatePattern('productstrend:feed:*');
+    // ── Add to feed sorted sets ──
+    const timestamp = Date.now();
+    await addProductToFeedSets(newProduct.id, newProduct.category, 'newest', timestamp);
+    await addProductToFeedSets(newProduct.id, newProduct.category, 'most-upvoted', timestamp);
+    await addProductToFeedSets(newProduct.id, newProduct.category, 'most-commented', timestamp);
+
+    // ── Cache details ──
+    await cacheProductDetails(newProduct.id, newProduct);
+
+    // ── Invalidate user's own products list ──
     await invalidateKey(`productstrend:my-products:${uid}`);
 
     res.status(201).json({ success: true, product: newProduct });
@@ -5922,7 +6054,6 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
     const { 
       name, tagline, description, url, imageUrl, category, status,
       features, pricing, productStatus, targetAudience, demoUrl, twitter, techStack, releaseDate,
-      // ── NEW FIELDS ──
       logo, thumbnail, socialLinks, referralCode,
       websiteTitle, websiteDescription, websiteImage
     } = req.body;
@@ -5940,7 +6071,7 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
 
     const updateData = {};
 
-    // ── Existing field validations (unchanged) ──
+    // ── Existing validation for each field (copied from your original PUT) ──
     if (name !== undefined) {
       if (name.trim().length < 1 || name.trim().length > 100) {
         return res.status(400).json({ success: false, error: 'Name must be 1-100 characters' });
@@ -5981,8 +6112,6 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       }
       updateData.status = status;
     }
-
-    // ── Existing new fields (features, pricing, etc.) ──
     if (features !== undefined) {
       if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
         return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
@@ -6031,8 +6160,6 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       }
       updateData.releaseDate = releaseDate;
     }
-
-    // ── NEW: Validate and add new fields ──
     if (logo !== undefined) {
       if (logo && !validateImageUrl(logo)) {
         return res.status(400).json({ success: false, error: 'Invalid logo URL' });
@@ -6107,12 +6234,26 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
 
     await docRef.update(updateData);
 
-    await invalidateProductCaches(id, data.makerUid);
+    // ── If category changed, move between sorted sets ──
+    const oldCategory = data.category || 'Other';
+    const newCategory = category || oldCategory;
+    if (newCategory !== oldCategory) {
+      await removeProductFromFeedSets(id, oldCategory);
+      const timestamp = data.createdAt ? (data.createdAt.seconds || 0) * 1000 : Date.now();
+      await addProductToFeedSets(id, newCategory, 'newest', timestamp);
+      await addProductToFeedSets(id, newCategory, 'most-upvoted', timestamp);
+      await addProductToFeedSets(id, newCategory, 'most-commented', timestamp);
+    }
 
+    // ── Update details cache ──
     const updatedDoc = await docRef.get();
     const updatedData = updatedDoc.data();
     const maker = await getProductMakerInfo(updatedData.makerUid);
     const product = { id: updatedDoc.id, ...updatedData, maker };
+    await cacheProductDetails(id, product);
+
+    // ── Invalidate user's own products list ──
+    await invalidateKey(`productstrend:my-products:${uid}`);
 
     res.json({ success: true, product });
   } catch (error) {
@@ -6140,10 +6281,18 @@ app.delete('/api/productstrend/products/:id', verifyToken, checkBanned, async (r
       return res.status(403).json({ success: false, error: 'Not authorized to delete this product' });
     }
 
+    // ── Remove from feed sorted sets ──
+    const category = data.category || 'Other';
+    await removeProductFromFeedSets(id, category);
+
+    // ── Delete details cache ──
+    await redis.del(`product:${id}`);
+
+    // ── Delete from Firestore ──
     await docRef.delete();
 
-    await invalidateProductCaches(id, data.makerUid);
-    await invalidatePattern(`productstrend:feed:*`);
+    // ── Invalidate user's own products list ──
+    await invalidateKey(`productstrend:my-products:${uid}`);
 
     res.json({ success: true, message: 'Product deleted' });
   } catch (error) {
@@ -6205,9 +6354,14 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
       }
     });
 
-    await invalidateProductCaches(id, null);
+    // ── Update product details cache ──
+    const updatedDoc = await docRef.get();
+    const updatedData = updatedDoc.data();
+    const maker = await getProductMakerInfo(updatedData.makerUid);
+    const product = { id: updatedDoc.id, ...updatedData, maker };
+    await cacheProductDetails(id, product);
 
-    // ── ✅ Invalidate user's vote cache ──
+    // ── Invalidate user's vote cache ──
     if (uid) {
       await invalidateKey(`user:votes:${uid}`);
     }
@@ -6229,6 +6383,7 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
 // ─────────────────────────────────────────────
 // 8. GET PRODUCT COMMENTS (public)
 // ─────────────────────────────────────────────
+// ── 8. GET PRODUCT COMMENTS (public, paginated) ──
 app.get('/api/productstrend/products/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
@@ -6238,20 +6393,39 @@ app.get('/api/productstrend/products/:id/comments', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
-    const cacheKey = `productstrend:comments:${id}`;
-    let comments = null;
-    try {
-      const cached = await redisGet(cacheKey);
-      if (cached) comments = JSON.parse(cached);
-    } catch (e) { /* ignore */ }
+    let limit = parseInt(req.query.limit) || 20;
+    const MAX_LIMIT = 50;
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
 
-    if (!comments) {
-      const snapshot = await db.collection('productComments')
+    const lastId = req.query.lastId || null;
+
+    const cacheKey = `productstrend:comments:${id}:limit:${limit}:lastId:${lastId || 'null'}`;
+
+    const result = await getOrSetCache(cacheKey, async () => {
+      let query = db.collection('productComments')
         .where('productId', '==', id)
         .orderBy('createdAt', 'desc')
-        .get();
-      comments = [];
-      for (const doc of snapshot.docs) {
+        .limit(limit + 1);
+
+      if (lastId) {
+        const lastDoc = await db.collection('productComments').doc(lastId).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      }
+
+      const snapshot = await query.get();
+      const comments = [];
+      let hasMore = false;
+      let lastCommentId = null;
+
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i++) {
+        if (i >= limit) {
+          hasMore = true;
+          break;
+        }
+        const doc = docs[i];
         const data = doc.data();
         const user = await getProductMakerInfo(data.userId);
         comments.push({
@@ -6259,11 +6433,13 @@ app.get('/api/productstrend/products/:id/comments', async (req, res) => {
           ...data,
           user,
         });
+        lastCommentId = doc.id;
       }
-      await redis.set(cacheKey, JSON.stringify(comments), 'EX', 300);
-    }
 
-    res.json({ success: true, comments });
+      return { comments, hasMore, lastId: lastCommentId };
+    }, 300); // 5 min TTL
+
+    res.json({ success: true, ...result });
   } catch (error) {
     console.error('❌ Get comments error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -6302,9 +6478,17 @@ app.post('/api/productstrend/products/:id/comments', verifyToken, checkBanned, a
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // ── Invalidate comments cache ──
     await invalidateKey(`productstrend:comments:${id}`);
-    await invalidateKey(`productstrend:product:${id}`);
-    await invalidatePattern('productstrend:feed:*');
+
+    // ── Update product details cache ──
+    const productDoc = await productRef.get();
+    if (productDoc.exists) {
+      const data = productDoc.data();
+      const maker = await getProductMakerInfo(data.makerUid);
+      const product = { id: productDoc.id, ...data, maker };
+      await cacheProductDetails(id, product);
+    }
 
     const comment = { id: docRef.id, ...commentData };
     comment.user = await getProductMakerInfo(uid);
