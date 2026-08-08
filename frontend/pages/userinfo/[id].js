@@ -102,10 +102,10 @@ function getFavicon(url) {
 
 export default function UserInfo() {
   const router = useRouter();
-  const { id, isReady } = router; // 👈 Get isReady from router
+  const { id, isReady } = router;
   const { user, isAuthenticated } = useAuth();
 
-  // ── FIX: Wait for router to be ready before rendering ──
+  // ── Wait for router to be ready ──
   if (!isReady) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-12 text-center">
@@ -120,7 +120,7 @@ export default function UserInfo() {
     );
   }
 
-  // ── Now id is guaranteed to be available ──
+  // ── Now safe to call the hook ──
   const { data: profile, isLoading, isError, error } = usePublicProfile(id);
 
   if (isError && error) {
