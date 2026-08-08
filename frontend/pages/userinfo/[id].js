@@ -35,7 +35,7 @@ import {
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ── Platform icon mapping (same as edit-profile) ──
+// ── Platform icon mapping ──
 const PLATFORM_ICONS = {
   youtube: FaYoutube,
   facebook: FaFacebook,
@@ -105,27 +105,21 @@ export default function UserInfo() {
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
 
-  // ── If id is not yet available, show a loading state (SSR safe) ──
+  // ── Guard: do NOT call the hook if id is missing (prevents SSR/build errors) ──
   if (!id) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="h-8 w-8 bg-slate-200 rounded-full" />
-          <div className="h-8 w-40 bg-slate-200 rounded-lg" />
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center sm:flex-row gap-6 shadow-sm">
-          <div className="w-28 h-28 rounded-full bg-slate-200" />
-          <div className="flex-1 space-y-2 text-center sm:text-left">
-            <div className="h-6 bg-slate-200 rounded w-40" />
-            <div className="h-4 bg-slate-200 rounded w-24" />
-            <div className="h-3 bg-slate-200 rounded w-48" />
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center py-16">
+          <div className="flex items-center gap-3 text-slate-500">
+            <FiLoader className="w-6 h-6 animate-spin text-purple-600" />
+            <span>Loading...</span>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Only call the hook when id is truthy ──
+  // ── Now safe to call the hook ──
   const { data: profile, isLoading, isError } = usePublicProfile(id);
 
   const isOwnProfile = isAuthenticated && user?.uid === id;
@@ -175,17 +169,11 @@ export default function UserInfo() {
     return (
       <>
         <Meta title="User Profile | Make Trend" />
-        <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="h-8 w-8 bg-slate-200 rounded-full" />
-            <div className="h-8 w-40 bg-slate-200 rounded-lg" />
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center sm:flex-row gap-6 shadow-sm">
-            <div className="w-28 h-28 rounded-full bg-slate-200" />
-            <div className="flex-1 space-y-2 text-center sm:text-left">
-              <div className="h-6 bg-slate-200 rounded w-40" />
-              <div className="h-4 bg-slate-200 rounded w-24" />
-              <div className="h-3 bg-slate-200 rounded w-48" />
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-center py-16">
+            <div className="flex items-center gap-3 text-slate-500">
+              <FiLoader className="w-6 h-6 animate-spin text-purple-600" />
+              <span>Loading profile...</span>
             </div>
           </div>
         </div>
@@ -400,7 +388,7 @@ export default function UserInfo() {
             )}
           </div>
 
-          {/* ── Sign-in CTA for non-logged-in users ── */}
+          {/* ── Sign-in CTA ── */}
           {!isAuthenticated && (
             <div className="mt-8 bg-gradient-to-r from-purple-50/80 to-indigo-50/80 rounded-2xl border border-purple-100/60 p-6 text-center shadow-sm">
               <h3 className="text-lg font-bold text-slate-800">👋 Want to connect?</h3>
