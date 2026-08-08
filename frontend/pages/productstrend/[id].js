@@ -131,7 +131,7 @@ export default function ProductDetail() {
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
-  const { invalidateProductDetail, invalidateProductFeed, invalidateMyProducts } = useInvalidateQueries();
+  const { invalidateProductDetail, invalidateProductFeed, invalidateMyProducts, invalidateProductComments } = useInvalidateQueries();
 
   const { data: product, isLoading, isError, refetch } = useProductDetail(id, !!id);
   const {
@@ -228,7 +228,7 @@ export default function ProductDetail() {
     });
   };
 
-  // ── Comment handler ──
+  // ── Comment handler with fixed refetch ──
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
@@ -269,9 +269,14 @@ export default function ProductDetail() {
 
     try {
       await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
-      // Invalidate comments cache to refresh
+      
+      // ── Invalidate the comments cache ──
       await queryClient.invalidateQueries({ queryKey: ['productComments', id] });
-      // Update product commentsCount
+      
+      // ── Force refetch the first page of comments ──
+      await refetchComments({ refetchPage: (page, index) => index === 0 });
+      
+      // ── Update product commentsCount ──
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
         queryClient.setQueryData(['productDetail', id], {
@@ -352,6 +357,13 @@ export default function ProductDetail() {
       return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch {
       return 'Recently';
+    }
+  };
+
+  // ── Navigate to user profile ──
+  const goToUserProfile = (uid) => {
+    if (uid) {
+      router.push(`/userinfo/${uid}`);
     }
   };
 
@@ -503,8 +515,11 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* ── Maker info ── */}
-            <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+            {/* ── Maker info (clickable) ── */}
+            <div 
+              className="flex items-center gap-3 pt-4 border-t border-slate-100 cursor-pointer hover:bg-slate-50/50 rounded-xl p-2 -mx-2 transition"
+              onClick={() => goToUserProfile(product.maker?.uid)}
+            >
               <div className="w-8 h-8 rounded-full bg-purple-100 overflow-hidden flex-shrink-0">
                 {product.maker?.avatar ? (
                   <Image src={product.maker.avatar} alt={product.maker.fullname || 'User'} width={32} height={32} className="w-full h-full object-cover" />
@@ -512,9 +527,10 @@ export default function ProductDetail() {
                   <div className="w-full h-full flex items-center justify-center text-purple-600"><FiUser className="w-4 h-4" /></div>
                 )}
               </div>
-              <span className="font-medium text-slate-700 text-sm">
+              <span className="font-medium text-slate-700 text-sm hover:text-purple-600 transition">
                 {product.maker?.fullname || product.maker?.username || 'Anonymous'}
               </span>
+              <span className="text-xs text-slate-400">(View Profile)</span>
             </div>
 
             {/* ── Description ── */}
