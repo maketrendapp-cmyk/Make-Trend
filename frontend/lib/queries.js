@@ -300,16 +300,20 @@ export function useReferrals(enabled = false) {
 
 // ── 🔥 GROW TOGETHER QUERIES ──
 
-// 1. Grow Feed (infinite scroll)
-export function useGrowFeed(enabled = true) {
+// ── Grow Feed (infinite scroll with filters) – PUBLIC ──
+export function useGrowFeed(filters = {}, enabled = true) {
+  const { platform, taskType } = filters;
+  const queryKey = ['growFeed', { platform, taskType }];
   return useInfiniteQuery({
-    queryKey: ['growFeed'],
+    queryKey,
     queryFn: async ({ pageParam = null }) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      const url = pageParam
-        ? `/grow-feed?limit=20&lastTaskId=${pageParam}`
-        : '/grow-feed?limit=20';
+      const params = new URLSearchParams({ limit: 20 });
+      if (platform) params.append('platform', platform);
+      if (taskType) params.append('taskType', taskType);
+      if (pageParam) params.append('lastTaskId', pageParam);
+      const url = `/grow-feed?${params.toString()}`;
+      // Get token if logged in, otherwise null
+      const token = await getToken().catch(() => null);
       const data = await apiRequest(url, {}, token);
       return {
         tasks: data.tasks || [],
@@ -325,16 +329,34 @@ export function useGrowFeed(enabled = true) {
 }
 
 // 2. My Tasks
-export function useMyTasks(enabled = true) {
-  return useQuery({
-    queryKey: ['myTasks'],
-    queryFn: async () => {
+// ── My Tasks (infinite scroll with filters) ──
+export function useMyTasks(filters = {}, enabled = true) {
+  const { status, platform, taskType } = filters;
+  const queryKey = ['myTasks', { status, platform, taskType }];
+
+  return useInfiniteQuery({
+    queryKey,
+    queryFn: async ({ pageParam = null }) => {
       const token = await getToken();
-      if (!token) return [];
-      const data = await apiRequest('/social-tasks', {}, token);
-      return data.tasks || [];
+      if (!token) return { tasks: [], nextCursor: null };
+
+      const params = new URLSearchParams({
+        limit: 20,
+      });
+      if (status && status !== 'all') params.append('status', status);
+      if (platform) params.append('platform', platform);
+      if (taskType) params.append('taskType', taskType);
+      if (pageParam) params.append('lastId', pageParam);
+
+      const url = `/social-tasks?${params.toString()}`;
+      const data = await apiRequest(url, {}, token);
+      return {
+        tasks: data.tasks || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
     },
     enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -392,6 +414,32 @@ export function useExchangeDetail(id, enabled = true) {
     enabled: !!id && enabled,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+  });
+}
+
+// ── Update exchange status (done / cancel) ──
+export function useUpdateExchangeStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/exchanges/${id}/status`, {
+        method: 'PUT',
+        body: { status },
+      }, token);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate the exchange detail cache so the page refreshes
+      queryClient.invalidateQueries(['exchangeDetail', variables.id]);
+      // Also invalidate exchanges list caches if needed
+      queryClient.invalidateQueries(['myExchanges']);
+      toast.success('Exchange status updated!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update exchange status');
+    },
   });
 }
 
