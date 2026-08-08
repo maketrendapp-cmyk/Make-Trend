@@ -27,6 +27,7 @@ import {
   FiUser,
   FiFilter,
   FiChevronDown,
+  FiTag,                // ← Fixed: added FiTag
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
