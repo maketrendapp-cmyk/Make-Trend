@@ -28,20 +28,6 @@ const queryClient = new QueryClient({
 });
 
 const NO_LAYOUT_PAGES = [
-  '/templates/ncell-reward-v1',
-  '/templates/student-scholarship-nepal-v1',
-  '/templates/freefire-free-diamond-shop-v1',
-  '/templates/freefire-exclusive-rewards-v1',
-  '/templates/tonde-gamer-lucky-spin-v1',
-  '/templates/youtube-booster-v1',
-  '/ncell-reward-v1',
-  '/templates/pubg-uc-giveaway-v1',
-  '/templates/quiz-challenge-win-cash-v1',
-  '/templates/spin-win-daraz-discount-v1',
-  '/templates/lucky-draw-premium-prizes-v1',
-  '/templates/gaming-clip-contest',
-  '/templates/photography-contest',
-  '/templates/bgmi-tournament-registration',
   '/templates/',
   '/tasks',
   '/share',
