@@ -548,8 +548,10 @@ export function useLaunchProduct() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['productFeed']);
-      queryClient.invalidateQueries(['myProducts']);
+      queryClient.invalidateQueries({ queryKey: ['productFeed'] });
+      queryClient.invalidateQueries({ queryKey: ['myProducts'] });
+      // Optionally refetch the first page of myProducts immediately
+      queryClient.refetchQueries({ queryKey: ['myProducts'], type: 'active', exact: false });
       toast.success('Product launched successfully!');
     },
     onError: (error) => {
