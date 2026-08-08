@@ -823,20 +823,19 @@ export function useMarkSystemNotificationsRead() {
 
 // lib/queries.js
 
+// ── FIX: Converted to object syntax for React Query v5 ──
 export function usePublicProfile(uid) {
-  return useQuery(
-    ['public-profile', uid],
-    async () => {
+  return useQuery({
+    queryKey: ['public-profile', uid],
+    queryFn: async () => {
       if (!uid) return null;
       const res = await apiRequest(`/users/${uid}`, { method: 'GET' });
       return res.user;
     },
-    {
-      enabled: !!uid,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 1,
-    }
-  );
+    enabled: !!uid,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
 }
 
 // ── Invalidation helper ──
