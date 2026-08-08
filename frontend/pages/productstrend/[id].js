@@ -228,7 +228,7 @@ export default function ProductDetail() {
     });
   };
 
-  // ── Comment handler with fixed refetch ──
+  // ── Comment handler with server‑sync update ──
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
@@ -268,15 +268,27 @@ export default function ProductDetail() {
     setCommentText('');
 
     try {
-      await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
-      
-      // ── Invalidate the comments cache ──
-      await queryClient.invalidateQueries({ queryKey: ['productComments', id] });
-      
-      // ── Force refetch the first page of comments ──
-      await refetchComments({ refetchPage: (page, index) => index === 0 });
-      
-      // ── Update product commentsCount ──
+      const result = await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
+      const serverComment = result.comment;
+
+      // Replace optimistic comment with server comment in cache
+      const currentCache = queryClient.getQueryData(['productComments', id]);
+      if (currentCache) {
+        const updatedPages = currentCache.pages.map((page, idx) => {
+          if (idx === 0) {
+            return {
+              ...page,
+              comments: page.comments.map(c =>
+                c.id === optimisticComment.id ? { ...serverComment, user: serverComment.user || optimisticComment.user } : c
+              ),
+            };
+          }
+          return page;
+        });
+        queryClient.setQueryData(['productComments', id], { ...currentCache, pages: updatedPages });
+      }
+
+      // Update product commentsCount
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
         queryClient.setQueryData(['productDetail', id], {
