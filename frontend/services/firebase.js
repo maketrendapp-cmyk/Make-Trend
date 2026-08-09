@@ -13,7 +13,7 @@ import {
   TwitterAuthProvider,
   FacebookAuthProvider,
 } from 'firebase/auth';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging'; // ✅ ADD THIS
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -25,15 +25,21 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase (singleton)
+// Initialize Firebase (singleton) – safe on both server and client
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const messaging = getMessaging(app); // ✅ ADD THIS
 
-// ── Export everything ──
+let auth;
+let messaging;
+
+// ── Only initialise auth and messaging on the client ──
+if (typeof window !== 'undefined') {
+  auth = getAuth(app);
+  messaging = getMessaging(app);
+}
+
 export {
   auth,
-  messaging, // ✅ EXPORT MESSAGING
+  messaging, // will be undefined on server – guard against it in components
   onAuthStateChanged,
   onIdTokenChanged,
   signInWithEmailAndPassword,
@@ -44,6 +50,6 @@ export {
   GoogleAuthProvider,
   TwitterAuthProvider,
   FacebookAuthProvider,
-  getToken, // ✅ EXPORT getToken
-  onMessage, // ✅ EXPORT onMessage
+  getToken,
+  onMessage,
 };
