@@ -153,18 +153,28 @@ export function useCampaigns(filters = {}, enabled = true) {
   });
 }
 
-// ── Support Tickets ──
-export function useSupportTickets(enabled = false) {
-  return useQuery({
+// ── Support Tickets (infinite scroll with pagination) ──
+export function useSupportTickets(enabled = true) {
+  return useInfiniteQuery({
     queryKey: ['supportTickets'],
-    queryFn: async () => {
+    queryFn: async ({ pageParam = null }) => {
       const token = await getToken();
-      if (!token) return [];
-      const data = await apiRequest('/support', {}, token);
-      return data.tickets || [];
+      if (!token) return { tickets: [], nextCursor: null };
+      let url = `/support?limit=20`;
+      if (pageParam) {
+        url += `&lastId=${pageParam}`;
+      }
+      const data = await apiRequest(url, {}, token);
+      return {
+        tickets: data.tickets || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
     },
     enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
   });
 }
 
