@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../../components/Meta';
 import { useAuth } from '../../../components/AuthScreen';
 import {
@@ -23,21 +24,6 @@ import {
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-
-// ── localStorage helpers ──
-const getLocalVote = (postId) => {
-  try {
-    const raw = localStorage.getItem(`community_like_${postId}`);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return null;
-};
-
-const setLocalVote = (postId, voted, likes) => {
-  try {
-    localStorage.setItem(`community_like_${postId}`, JSON.stringify({ voted, likes }));
-  } catch (e) {}
-};
 
 const POST_TYPE_ICONS = {
   general: '📌',
@@ -77,12 +63,7 @@ export default function PostDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAuthenticated } = useAuth();
-
-  const [isLiked, setIsLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(0);
-  const [isLiking, setIsLiking] = useState(false);
-  const [commentText, setCommentText] = useState('');
-  const [expanded, setExpanded] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: post, isLoading: postLoading, isError: postError, refetch: refetchPost } = usePost(id, !!id);
   const {
@@ -94,7 +75,6 @@ export default function PostDetail() {
     refetch: refetchComments,
   } = usePostComments(id, !!id);
 
-  // ── SAFE: ensure comments is always an array ──
   const comments = Array.isArray(commentsData?.pages)
     ? commentsData.pages.flatMap((page) => page.comments || [])
     : [];
@@ -102,35 +82,22 @@ export default function PostDetail() {
   const likeMutation = useLikePost();
   const addCommentMutation = useAddComment();
 
-  const observerRef = useRef(null);
-  const lastElementRef = useCallback(
-    (node) => {
-      if (isFetchingNextPage) return;
-      if (observerRef.current) observerRef.current.disconnect();
-      observerRef.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasNextPage) {
-          fetchNextPage();
-        }
-      });
-      if (node) observerRef.current.observe(node);
-    },
-    [isFetchingNextPage, hasNextPage, fetchNextPage]
-  );
+  const [commentText, setCommentText] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  // ── Like state ──
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [isLiking, setIsLiking] = useState(false);
 
   useEffect(() => {
     if (post) {
-      const local = getLocalVote(id);
-      if (local) {
-        setIsLiked(local.voted);
-        setLikesCount(local.likes);
-      } else {
-        setIsLiked(post.userLiked || false);
-        setLikesCount(post.likes || 0);
-      }
+      setIsLiked(post.userLiked || false);
+      setLikesCount(post.likes || 0);
     }
-  }, [post, id]);
+  }, [post]);
 
-  // ── Simple like handler ──
+  // ── Like handler (optimistic) ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
@@ -141,33 +108,56 @@ export default function PostDetail() {
     const newVoted = !isLiked;
     const newCount = newVoted ? likesCount + 1 : likesCount - 1;
 
+    // Optimistic update
     setIsLiked(newVoted);
     setLikesCount(newCount);
-    setLocalVote(id, newVoted, newCount);
     setIsLiking(true);
+
+    // Update cache
+    const currentPost = queryClient.getQueryData(['post', id]);
+    if (currentPost) {
+      queryClient.setQueryData(['post', id], {
+        ...currentPost,
+        userLiked: newVoted,
+        likes: newCount,
+      });
+    }
 
     likeMutation.mutate(id, {
       onSuccess: (data) => {
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
-        if (serverVoted !== newVoted || serverLikes !== newCount) {
-          setIsLiked(serverVoted);
-          setLikesCount(serverLikes);
-          setLocalVote(id, serverVoted, serverLikes);
+        setIsLiked(serverVoted);
+        setLikesCount(serverLikes);
+        // Update cache with server values
+        const cached = queryClient.getQueryData(['post', id]);
+        if (cached) {
+          queryClient.setQueryData(['post', id], {
+            ...cached,
+            userLiked: serverVoted,
+            likes: serverLikes,
+          });
         }
         setIsLiking(false);
       },
       onError: (error) => {
+        // Revert
         setIsLiked(!newVoted);
         setLikesCount(newVoted ? newCount - 1 : newCount + 1);
-        setLocalVote(id, !newVoted, newVoted ? newCount - 1 : newCount + 1);
+        const cached = queryClient.getQueryData(['post', id]);
+        if (cached) {
+          queryClient.setQueryData(['post', id], {
+            ...cached,
+            userLiked: !newVoted,
+            likes: newVoted ? newCount - 1 : newCount + 1,
+          });
+        }
         setIsLiking(false);
         toast.error(error.message || 'Failed to like');
       },
     });
   };
 
-  // ── Comment handler ──
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || !isAuthenticated) return;
@@ -175,19 +165,73 @@ export default function PostDetail() {
     const text = commentText.trim();
     setCommentText('');
 
-    addCommentMutation.mutate(
-      { postId: id, content: text },
-      {
-        onSuccess: () => {
-          refetchComments();
-          refetchPost();
-        },
-        onError: (error) => {
-          setCommentText(text);
-          toast.error(error.message || 'Failed to add comment');
-        },
+    // Optimistic comment
+    const optimisticComment = {
+      id: `temp-${Date.now()}`,
+      content: text,
+      userId: user?.uid,
+      user: {
+        username: user?.username || 'You',
+        fullname: user?.fullname || 'You',
+        avatar: user?.avatar || null,
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    // Add to comments cache
+    const currentComments = queryClient.getQueryData(['postComments', id]) || { pages: [{ comments: [] }] };
+    const updatedPages = [...currentComments.pages];
+    if (updatedPages.length > 0) {
+      updatedPages[0] = {
+        ...updatedPages[0],
+        comments: [optimisticComment, ...updatedPages[0].comments],
+      };
+    } else {
+      updatedPages.push({ comments: [optimisticComment], nextCursor: null });
+    }
+    queryClient.setQueryData(['postComments', id], { ...currentComments, pages: updatedPages });
+
+    // Also increment comments count
+    const currentPost = queryClient.getQueryData(['post', id]);
+    if (currentPost) {
+      queryClient.setQueryData(['post', id], {
+        ...currentPost,
+        commentsCount: (currentPost.commentsCount || 0) + 1,
+      });
+    }
+
+    try {
+      await addCommentMutation.mutateAsync({ postId: id, content: text });
+      // Invalidate and refetch to sync with server
+      await queryClient.invalidateQueries({ queryKey: ['postComments', id] });
+      await refetchComments({ refetchPage: (page, index) => index === 0 });
+      await refetchPost();
+    } catch (error) {
+      // Revert optimistic comment
+      const revert = queryClient.getQueryData(['postComments', id]);
+      if (revert) {
+        const revertedPages = revert.pages.map((page, idx) => {
+          if (idx === 0) {
+            return {
+              ...page,
+              comments: page.comments.filter((c) => c.id !== optimisticComment.id),
+            };
+          }
+          return page;
+        });
+        queryClient.setQueryData(['postComments', id], { ...revert, pages: revertedPages });
       }
-    );
+      // Revert comments count
+      const revertedPost = queryClient.getQueryData(['post', id]);
+      if (revertedPost) {
+        queryClient.setQueryData(['post', id], {
+          ...revertedPost,
+          commentsCount: (revertedPost.commentsCount || 0) - 1,
+        });
+      }
+      toast.error(error.message || 'Failed to add comment');
+      setCommentText(text);
+    }
   };
 
   const handleShare = async () => {
@@ -235,6 +279,26 @@ export default function PostDetail() {
       return 'Just now';
     }
   };
+
+  // ── Profile navigation ──
+  const goToUserProfile = (uid) => {
+    if (uid) router.push(`/userinfo/${uid}`);
+  };
+
+  const observerRef = useRef(null);
+  const lastElementRef = useCallback(
+    (node) => {
+      if (isFetchingNextPage) return;
+      if (observerRef.current) observerRef.current.disconnect();
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasNextPage) {
+          fetchNextPage();
+        }
+      });
+      if (node) observerRef.current.observe(node);
+    },
+    [isFetchingNextPage, hasNextPage, fetchNextPage]
+  );
 
   if (postLoading || commentsLoading) {
     return (
@@ -317,7 +381,10 @@ export default function PostDetail() {
         <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
           {/* Header */}
           <div className="flex items-start gap-3">
-            <Link href={`/userinfo/${post.userId}`} className="flex-shrink-0">
+            <button
+              onClick={() => goToUserProfile(post.userId)}
+              className="flex-shrink-0 cursor-pointer hover:opacity-80 transition"
+            >
               <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
                 {post.user?.avatar ? (
                   <Image
@@ -333,12 +400,15 @@ export default function PostDetail() {
                   </div>
                 )}
               </div>
-            </Link>
+            </button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center flex-wrap gap-2">
-                <Link href={`/userinfo/${post.userId}`} className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm">
+                <button
+                  onClick={() => goToUserProfile(post.userId)}
+                  className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm cursor-pointer"
+                >
                   {post.user?.fullname || post.user?.username || 'Anonymous'}
-                </Link>
+                </button>
                 <span className="text-xs text-slate-400">· {formatDate(post.createdAt)}</span>
               </div>
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -501,18 +571,21 @@ export default function PostDetail() {
           </div>
         )}
 
-        {/* ── SAFE Comments List ── */}
+        {/* ── Comments List ── */}
         <div className="space-y-4">
-          {(!Array.isArray(comments) || comments.length === 0) && !isFetchingNextPage ? (
+          {comments.length === 0 && !isFetchingNextPage ? (
             <p className="text-center text-sm text-slate-400 py-8">No comments yet. Be the first!</p>
           ) : (
-            Array.isArray(comments) && comments.map((comment, index) => (
+            comments.map((comment, index) => (
               <div
                 key={comment.id}
                 className="flex gap-3"
                 ref={index === comments.length - 1 ? lastElementRef : null}
               >
-                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                <button
+                  onClick={() => goToUserProfile(comment.userId)}
+                  className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition"
+                >
                   {comment.user?.avatar ? (
                     <Image
                       src={comment.user.avatar}
@@ -526,12 +599,15 @@ export default function PostDetail() {
                       {comment.user?.fullname?.[0] || comment.user?.username?.[0] || 'U'}
                     </div>
                   )}
-                </div>
+                </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm text-slate-900">
+                    <button
+                      onClick={() => goToUserProfile(comment.userId)}
+                      className="font-medium text-sm text-slate-900 hover:text-purple-600 transition cursor-pointer"
+                    >
                       {comment.user?.fullname || comment.user?.username || 'Anonymous'}
-                    </span>
+                    </button>
                     <span className="text-xs text-slate-400">{formatDate(comment.createdAt)}</span>
                   </div>
                   <p className="text-sm text-slate-600 mt-0.5">{comment.content}</p>
@@ -555,7 +631,7 @@ export default function PostDetail() {
           </div>
         )}
 
-        {!hasNextPage && Array.isArray(comments) && comments.length > 0 && (
+        {!hasNextPage && comments.length > 0 && (
           <p className="text-center text-xs text-slate-400 py-4">End of comments</p>
         )}
       </div>
