@@ -615,25 +615,24 @@ export function useDeleteProduct() {
 
 // ── 🌍 COMMUNITY POSTS QUERIES ──
 
-// 1. Fetch posts feed (infinite scroll, public, with category filter)
-// StaleTime: 2 min to reduce refetches
 // 1. Fetch posts feed (infinite scroll, public, with category & type filters)
-export function usePosts(category = null, type = null, enabled = true) {
-  const queryKey = ['posts', category || 'all', type || 'all'];
+// Supports: search (text or @username), userId (filter by user)
+export function usePosts(filters = {}, enabled = true) {
+  const { category, type, search, userId } = filters;
+  const queryKey = ['posts', { category, type, search, userId }];
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam = null }) => {
-      let url = '/posts?limit=20';
-      if (category && category !== 'all') {
-        url += `&category=${category}`;
-      }
-      if (type && type !== 'all') {
-        url += `&type=${type}`;
-      }
-      if (pageParam) {
-        url += `&lastId=${pageParam}`;
-      }
-      const data = await apiRequest(url, {}, null);
+      const params = new URLSearchParams({ limit: 20 });
+      if (category && category !== 'all') params.append('category', category);
+      if (type && type !== 'all') params.append('type', type);
+      if (search) params.append('search', search);
+      if (userId) params.append('userId', userId);
+      if (pageParam) params.append('lastId', pageParam);
+      const url = `/posts?${params.toString()}`;
+      // Send token if available (for userLiked flag)
+      const token = await getToken().catch(() => null);
+      const data = await apiRequest(url, {}, token);
       return {
         posts: data.posts || [],
         nextCursor: data.hasMore ? data.lastId : null,
@@ -787,17 +786,31 @@ export function usePostComments(postId, enabled = true) {
   });
 }
 
-// 9. Get current user's posts (authenticated, for "My Posts" page)
-export function useMyPosts(enabled = true) {
-  return useQuery({
-    queryKey: ['myPosts'],
-    queryFn: async () => {
+// 9. Get current user's posts (authenticated, with filters & pagination)
+export function useMyPosts(filters = {}, enabled = true) {
+  const { category, type, search } = filters;
+  const queryKey = ['myPosts', { category, type, search }];
+
+  return useInfiniteQuery({
+    queryKey,
+    queryFn: async ({ pageParam = null }) => {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
-      const data = await apiRequest('/my-posts', {}, token);
-      return data.posts || [];
+
+      const params = new URLSearchParams({ limit: 20 });
+      if (category && category !== 'all') params.append('category', category);
+      if (type && type !== 'all') params.append('type', type);
+      if (search) params.append('search', search);
+      if (pageParam) params.append('lastId', pageParam);
+
+      const data = await apiRequest(`/my-posts?${params.toString()}`, {}, token);
+      return {
+        posts: data.posts || [],
+        nextCursor: data.hasMore ? data.lastId : null,
+      };
     },
     enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
