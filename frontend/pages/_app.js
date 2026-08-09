@@ -9,7 +9,8 @@ import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Menu from '../components/Menu';
 import Sidebar from '../components/Sidebar';
-import { refreshDeviceId } from '../utils/deviceId'; // ✅ changed from getDeviceId
+import { refreshDeviceId } from '../utils/deviceId';
+import PushNotificationSetup from '../components/PushNotificationSetup'; // ✅ NEW IMPORT
 import '../styles/globals.css';
 
 // ── Create Device ID Context ──
@@ -43,12 +44,11 @@ const TOP_NAV_ONLY_PAGES = [
   '/contact',
   '/login',
   '/signup',
-'/groweachother',
-'/productstrend',
-'/community',
-'/userinfo',
-'/404',
-
+  '/groweachother',
+  '/productstrend',
+  '/community',
+  '/userinfo',
+  '/404',
 ];
 
 function MyApp({ Component, pageProps }) {
@@ -57,7 +57,7 @@ function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const pathname = router.pathname;
 
-  // ── Generate Device ID in background ── (updated)
+  // ── Generate Device ID in background ──
   useEffect(() => {
     console.log('🔄 Initializing device ID...');
     refreshDeviceId()
@@ -67,7 +67,6 @@ function MyApp({ Component, pageProps }) {
       })
       .catch((err) => {
         console.error('❌ Device ID error:', err);
-        // Fallback – should not happen because generateFingerprint always returns something
         const fallback = 'fallback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
         console.warn('⚠️ Using fallback ID:', fallback);
         setDeviceId(fallback);
@@ -80,6 +79,9 @@ function MyApp({ Component, pageProps }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        {/* ── Push notification setup – only runs when user is authenticated ── */}
+        <PushNotificationSetup />
+
         <DeviceIdContext.Provider value={deviceId}>
           <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
 
@@ -92,12 +94,10 @@ function MyApp({ Component, pageProps }) {
             </div>
           ) : (
             <div className="h-screen bg-bg flex flex-col overflow-hidden">
-              {/* Header */}
               <div className="flex-shrink-0 z-40 relative">
                 <Navbar />
               </div>
 
-              {/* Main Content */}
               <div className="flex flex-1 overflow-hidden relative">
                 <div className="hidden md:block flex-shrink-0 h-full z-30">
                   <Sidebar />
@@ -107,7 +107,6 @@ function MyApp({ Component, pageProps }) {
                 </div>
               </div>
 
-              {/* Bottom Navigation (mobile) */}
               <div className="md:hidden flex-shrink-0 relative z-40">
                 <BottomNav onMenuToggle={() => setIsMenuOpen(true)} />
               </div>
