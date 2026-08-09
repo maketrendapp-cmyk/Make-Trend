@@ -24,84 +24,49 @@ export default function Stats() {
   const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
   const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
 
-  // ── React Query ──
+  // ── Filter state ──
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [featureFilter, setFeatureFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest'); // only for client‑side sorting (optional)
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // ── React Query: Stats ──
   const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
+
+  // ── React Query: Campaigns with filters (backend-driven) ──
   const {
     data: campaignPages,
     isLoading: campaignsLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useCampaigns(isAuthenticated);
+  } = useCampaigns(
+    {
+      status: statusFilter,
+      search: searchTerm.trim() || undefined,
+      feature: featureFilter,
+    },
+    isAuthenticated
+  );
 
-  // Deduplicate campaigns to prevent React key bugs
+  // Flatten pages and deduplicate
   const allCampaigns = useMemo(() => {
-    const rawCampaigns = campaignPages?.pages?.flatMap(page => page.campaigns) || [];
+    const raw = campaignPages?.pages?.flatMap(page => page.campaigns) || [];
     const uniqueMap = new Map();
-    rawCampaigns.forEach(c => {
-      if (c && c.id) uniqueMap.set(c.id, c);
-    });
+    raw.forEach(c => { if (c && c.id) uniqueMap.set(c.id, c); });
     return Array.from(uniqueMap.values());
   }, [campaignPages]);
 
-  // ── Filter / Search / Sort State ──
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [featureFilter, setFeatureFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  // Count active filters (excluding sort)
-  const activeFilterCount = [statusFilter, featureFilter].filter(f => f !== 'all').length + (searchTerm.trim() ? 1 : 0);
-
-  // ── Filtered & Sorted Campaigns (FIXED BUG-FREE LOGIC) ──
-  const filteredCampaigns = useMemo(() => {
+  // ── Client‑side sorting (since backend only returns by date) ──
+  const sortedCampaigns = useMemo(() => {
     let result = [...allCampaigns];
-
-    // Search
-    if (searchTerm.trim()) {
-      const term = searchTerm.trim().toLowerCase();
-      result = result.filter(c =>
-        (c.title?.toLowerCase().includes(term)) ||
-        (c.description?.toLowerCase().includes(term)) ||
-        (c.reward?.toLowerCase().includes(term))
-      );
-    }
-
-    // Status filter (Fallback to 'active' if status is missing)
-    if (statusFilter !== 'all') {
-      result = result.filter(c => {
-        const status = (c.status || 'active').toLowerCase();
-        return status === statusFilter.toLowerCase();
-      });
-    }
-
-    // Feature filter
-    if (featureFilter !== 'all') {
-      result = result.filter(c => {
-        const features = c.features || {};
-        if (featureFilter === 'share') return !!features.shareCount;
-        if (featureFilter === 'tasks') return !!features.tasks;
-        if (featureFilter === 'finalUrl') return !!features.finalUrl;
-        return true;
-      });
-    }
-
-    // Sort
     switch (sortBy) {
       case 'newest':
-        result.sort((a, b) => {
-          const aTime = a.createdAt?.seconds || 0;
-          const bTime = b.createdAt?.seconds || 0;
-          return bTime - aTime;
-        });
+        result.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         break;
       case 'oldest':
-        result.sort((a, b) => {
-          const aTime = a.createdAt?.seconds || 0;
-          const bTime = b.createdAt?.seconds || 0;
-          return aTime - bTime;
-        });
+        result.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
         break;
       case 'views':
         result.sort((a, b) => (b.views || 0) - (a.views || 0));
@@ -118,11 +83,13 @@ export default function Stats() {
       default:
         break;
     }
-
     return result;
-  }, [allCampaigns, searchTerm, statusFilter, featureFilter, sortBy]);
+  }, [allCampaigns, sortBy]);
 
-  // ── Clear All Filters ──
+  // ── Count active filters ──
+  const activeFilterCount = [statusFilter, featureFilter].filter(f => f !== 'all').length + (searchTerm.trim() ? 1 : 0);
+
+  // ── Clear all filters ──
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
@@ -130,25 +97,8 @@ export default function Stats() {
     setSortBy('newest');
   };
 
-  // ── Edit Modal State ──
-  const [editingCampaign, setEditingCampaign] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    title: '',
-    description: '',
-    reward: '',
-    shareCount: 0,
-    tasks: [],
-    finalUrl: '',
-    features: { shareCount: false, tasks: false, finalUrl: false },
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [copiedCampaignId, setCopiedCampaignId] = useState(null);
-
   // ── Infinite Scroll Loader ──
   const loaderRef = useRef(null);
-
   useEffect(() => {
     if (!hasNextPage || isFetchingNextPage || campaignsLoading) return;
     const observer = new IntersectionObserver(
@@ -225,6 +175,22 @@ export default function Stats() {
       alert('Network error. Please try again.');
     }
   };
+
+  // ── Edit Modal State ──
+  const [editingCampaign, setEditingCampaign] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    reward: '',
+    shareCount: 0,
+    tasks: [],
+    finalUrl: '',
+    features: { shareCount: false, tasks: false, finalUrl: false },
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [copiedCampaignId, setCopiedCampaignId] = useState(null);
 
   // ── Edit Modal Functions ──
   const addTaskInEdit = () => {
@@ -365,9 +331,7 @@ export default function Stats() {
     setTimeout(() => setCopiedCampaignId(null), 2000);
   };
 
-  // ============================================================
-  // RENDER: UNAUTHENTICATED / NEEDS COMPLETION / LOADING
-  // ============================================================
+  // ── Loading / Unauthenticated States ──
   if (!isAuthenticated && !loading) {
     return (
       <>
@@ -399,8 +363,8 @@ export default function Stats() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
         <div className="h-8 w-48 bg-gray-200 rounded mb-4" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          {[1,2,3,4].map(i => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+          {[1,2,3].map(i => (
             <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <div className="h-8 w-8 bg-gray-200 rounded-full mb-3" />
               <div className="h-7 w-12 bg-gray-200 rounded mb-1" />
@@ -417,9 +381,6 @@ export default function Stats() {
     );
   }
 
-  // ============================================================
-  // MAIN RENDER (Original Layout & Structure)
-  // ============================================================
   return (
     <>
       <Meta title="Dashboard | Make Trend" />
@@ -442,53 +403,52 @@ export default function Stats() {
           </button>
         </div>
 
-        {/* ── Stats Cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        {/* ── Stats Cards (Enhanced – 3 boxes) ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Total Campaigns', value: stats?.totalCampaigns ?? 0, icon: FiBarChart2, color: 'blue' },
-            { label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0, icon: FiUnlock, color: 'purple' },
-            { label: 'Total Views', value: stats?.totalViews ?? 0, icon: FiEye, color: 'green' },
-            { label: 'Total Shares', value: stats?.totalShares ?? 0, icon: FiShare2, color: 'orange' },
+            { 
+              label: 'Total Unlocks', 
+              value: stats?.totalUnlocks ?? 0, 
+              icon: FiUnlock, 
+              color: 'purple',
+              bg: 'bg-purple-50',
+              text: 'text-purple-700',
+              border: 'border-purple-100'
+            },
+            { 
+              label: 'Total Views', 
+              value: stats?.totalViews ?? 0, 
+              icon: FiEye, 
+              color: 'blue',
+              bg: 'bg-blue-50',
+              text: 'text-blue-700',
+              border: 'border-blue-100'
+            },
+            { 
+              label: 'Total Shares', 
+              value: stats?.totalShares ?? 0, 
+              icon: FiShare2, 
+              color: 'green',
+              bg: 'bg-green-50',
+              text: 'text-green-700',
+              border: 'border-green-100'
+            },
           ].map((stat, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-2xl p-5 border border-gray-200/60 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group"
+              className={`${stat.bg} rounded-2xl p-5 border ${stat.border} shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group`}
             >
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`inline-flex items-center justify-center w-11 h-11 rounded-xl bg-${stat.color}-50 text-${stat.color}-600 group-hover:scale-110 transition`}>
-                  <stat.icon className="w-5 h-5" />
+              <div className="flex items-center gap-4">
+                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white ${stat.text} group-hover:scale-110 transition`}>
+                  <stat.icon className="w-6 h-6" />
                 </div>
-                <p className="text-3xl font-extrabold text-gray-900">{stat.value}</p>
+                <div>
+                  <p className="text-3xl font-extrabold text-gray-900">{stat.value}</p>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{stat.label}</p>
+                </div>
               </div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{stat.label}</p>
             </div>
           ))}
-        </div>
-
-        {/* ── Success Stats ── */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-100/60 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-green-100 text-green-700">
-                <FiCheckCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-green-700">{stats?.successfulCampaigns ?? 0}</p>
-                <p className="text-xs font-medium text-green-600 uppercase tracking-wider">Completed</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-5 border border-indigo-100/60 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700">
-                <FiAward className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-indigo-700">{stats?.totalCompletions ?? 0}</p>
-                <p className="text-xs font-medium text-indigo-600 uppercase tracking-wider">Completions</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* ── Filter & Search Bar ── */}
@@ -578,7 +538,7 @@ export default function Stats() {
 
         {/* ── Campaign List ── */}
         <div className="space-y-4">
-          {filteredCampaigns.length === 0 ? (
+          {sortedCampaigns.length === 0 ? (
             <div className="text-center py-16 px-4 bg-white rounded-3xl border border-gray-100 shadow-sm">
               <div className="text-6xl mb-4">🔍</div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">No campaigns found</h3>
@@ -596,7 +556,7 @@ export default function Stats() {
             </div>
           ) : (
             <>
-              {filteredCampaigns.map((camp, index) => {
+              {sortedCampaigns.map((camp, index) => {
                 const cStatus = (camp.status || 'active').toLowerCase();
                 const isSuccessful = camp.shareCount > 0 && camp.shares >= camp.shareCount;
                 return (
