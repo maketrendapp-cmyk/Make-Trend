@@ -81,20 +81,31 @@ async function invalidateKey(key) {
   }
 }
 
-// ── Invalidate all keys matching a pattern ──
+// ── Invalidate all keys matching a pattern (SCAN – production safe) ──
 async function invalidatePattern(pattern) {
   try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-      console.log(`🗑️ Cache invalidated: ${pattern} (${keys.length} keys)`);
+    let cursor = '0';
+    let deletedCount = 0;
+    do {
+      const reply = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = reply[0];
+      const keys = reply[1];
+      if (keys.length) {
+        await redis.del(...keys);
+        deletedCount += keys.length;
+      }
+    } while (cursor !== '0');
+    if (deletedCount > 0) {
+      console.log(`🗑️ Invalidated ${deletedCount} keys matching ${pattern}`);
     }
   } catch (error) {
     console.error(`❌ Cache invalidation error for ${pattern}:`, error);
   }
 }
 
-// ── Update a specific campaign in all cached user list pages ──
+
+// ── Update a specific campaign in all cached user list pages (in‑place) ──
+// Used ONLY for counter updates (views, shares, completions, unlocks) to avoid cache invalidation.
 async function updateCampaignInUserListCache(ownerId, campaignId, updates) {
   try {
     const pattern = `campaigns:user:${ownerId}:*`;
@@ -128,110 +139,6 @@ async function updateCampaignInUserListCache(ownerId, campaignId, updates) {
   }
 }
 
-// ── Helper to parse campaign cache key ──
-function parseCampaignCacheKey(key) {
-  // Example: campaigns:user:abc123:limit:25:lastCreatedAt:null:lastId:null
-  const parts = key.split(':');
-  const uid = parts[2]; // index 2
-  let limit = 25;
-  let lastCreatedAt = null;
-  let lastId = null;
-  for (let i = 0; i < parts.length; i++) {
-    if (parts[i] === 'limit') limit = parseInt(parts[i+1]) || 25;
-    if (parts[i] === 'lastCreatedAt') lastCreatedAt = parts[i+1] === 'null' ? null : parts[i+1];
-    if (parts[i] === 'lastId') lastId = parts[i+1] === 'null' ? null : parts[i+1];
-  }
-  return { uid, limit, lastCreatedAt, lastId };
-}
-
-// ── Find all cache keys for a user ──
-async function findUserCacheKeys(uid) {
-  const pattern = `campaigns:user:${uid}:*`;
-  return await redis.keys(pattern);
-}
-
-// ── Find the first page key (no cursor) ──
-async function findFirstPageKey(uid) {
-  const keys = await findUserCacheKeys(uid);
-  for (const key of keys) {
-    const parsed = parseCampaignCacheKey(key);
-    if (parsed.lastCreatedAt === null && parsed.lastId === null) {
-      return key;
-    }
-  }
-  return null;
-}
-
-// ── Add a campaign to the user's list cache (first page) ──
-async function addCampaignToUserListCache(uid, campaign) {
-  try {
-    const firstPageKey = await findFirstPageKey(uid);
-
-    // ── If cache doesn't exist, CREATE it ──
-    if (!firstPageKey) {
-      console.log(`📦 No cache exists for user ${uid}, creating new cache entry`);
-      const newCacheKey = `campaigns:user:${uid}:limit:25:lastCreatedAt:null:lastId:null`;
-      const newData = {
-        success: true,
-        campaigns: [campaign],
-        hasMore: false,
-        lastCreatedAt: null,
-        lastId: null,
-      };
-      await redis.set(newCacheKey, JSON.stringify(newData), 'EX', 86400);
-      console.log(`✅ Created new cache entry with campaign ${campaign.id} for user ${uid}`);
-      return;
-    }
-
-    // ── Cache exists – update it ──
-    const ttl = await redis.ttl(firstPageKey);
-    const cached = await redis.get(firstPageKey);
-    if (!cached) return;
-
-    let data = JSON.parse(cached);
-    if (data.campaigns && Array.isArray(data.campaigns)) {
-      // Add to the beginning (most recent)
-      data.campaigns = [campaign, ...data.campaigns];
-      // Extract limit from the cache key
-      const limit = parseCampaignCacheKey(firstPageKey).limit || 25;
-      if (data.campaigns.length > limit) {
-        data.campaigns = data.campaigns.slice(0, limit);
-      }
-      const ttlToUse = ttl > 0 ? ttl : 86400;
-      await redis.set(firstPageKey, JSON.stringify(data), 'EX', ttlToUse);
-      console.log(`🔄 Added campaign ${campaign.id} to user ${uid} list cache`);
-    }
-  } catch (error) {
-    console.warn(`Failed to add campaign to user list cache:`, error);
-  }
-}
-
-// ── Remove a campaign from the user's list cache (all pages) ──
-async function removeCampaignFromUserListCache(uid, campaignId) {
-  try {
-    const keys = await findUserCacheKeys(uid);
-    if (keys.length === 0) return;
-
-    for (const key of keys) {
-      const ttl = await redis.ttl(key);
-      const cached = await redis.get(key);
-      if (!cached) continue;
-
-      let data = JSON.parse(cached);
-      if (data.campaigns && Array.isArray(data.campaigns)) {
-        const originalLength = data.campaigns.length;
-        data.campaigns = data.campaigns.filter(c => c.id !== campaignId);
-        if (data.campaigns.length < originalLength) {
-          const ttlToUse = ttl > 0 ? ttl : 86400;
-          await redis.set(key, JSON.stringify(data), 'EX', ttlToUse);
-          console.log(`🔄 Removed campaign ${campaignId} from cache ${key}`);
-        }
-      }
-    }
-  } catch (error) {
-    console.warn(`Failed to remove campaign from user list cache:`, error);
-  }
-}
 
 // ── Update a specific template in all cached template list pages ──
 async function updateTemplateInAllCaches(templateId, updates) {
@@ -2000,13 +1907,11 @@ app.delete('/api/templates/:id/permanent', verifyToken, checkBanned, async (req,
 // 13. CAMPAIGN ENDPOINTS
 // ============================================================
 
-// ── Get user's campaigns ── (authenticated, with ban check + rate limit)
+// ── Get user's campaigns with filters (status, search, feature) ──
 app.get('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
-    if (!(await checkRateLimit(uid, 'campaigns-get', 60, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
-    }
+    const { status, search, feature } = req.query;
     let limit = parseInt(req.query.limit) || 25;
     const MAX_LIMIT = 100;
     if (limit > MAX_LIMIT) limit = MAX_LIMIT;
@@ -2014,34 +1919,53 @@ app.get('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
     const lastCreatedAt = req.query.lastCreatedAt ? new Date(parseInt(req.query.lastCreatedAt)) : null;
     const lastId = req.query.lastId || null;
 
-    const cacheKey = `campaigns:user:${uid}:limit:${limit}:lastCreatedAt:${req.query.lastCreatedAt || 'null'}:lastId:${lastId || 'null'}`;
+    // Base query: user's campaigns, exclude 'deleted' status
+    let query = db.collection('campaigns').where('userId', '==', uid);
 
-    let result;
-    try {
-      const cached = await redisGet(cacheKey);
-      if (cached) {
-        console.log(`📦 Cache HIT: ${cacheKey}`);
-        return res.json(JSON.parse(cached));
-      }
-    } catch (error) {
-      console.warn(`⚠️ Cache miss/error for ${cacheKey}:`, error.message);
+    // ── Status filter ──
+    if (status && status !== 'all') {
+      query = query.where('status', '==', status);
+    } else {
+      // Default: only active and paused (exclude deleted)
+      query = query.where('status', 'in', ['active', 'paused']);
     }
 
-    console.log(`📡 Fetching campaigns for user ${uid} (limit=${limit})...`);
-    let query = db.collection('campaigns')
-      .where('userId', '==', uid)
-      .where('status', 'in', ['active', 'paused'])
-      .orderBy('createdAt', 'desc')
-      .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
-      .limit(limit + 1);
+    // ── Feature filter (using boolean fields) ──
+    if (feature === 'share') {
+      query = query.where('hasShare', '==', true);
+    } else if (feature === 'tasks') {
+      query = query.where('hasTasks', '==', true);
+    } else if (feature === 'finalUrl') {
+      query = query.where('hasFinalUrl', '==', true);
+    }
+
+    // ── Search filter (prefix search on 'searchable' field) ──
+    if (search && typeof search === 'string') {
+      const term = search.trim().toLowerCase();
+      if (term) {
+        query = query.where('searchable', '>=', term)
+                     .where('searchable', '<=', term + '\uf8ff');
+      }
+    }
+
+    // ── Ordering & Pagination ──
+    query = query.orderBy('createdAt', 'desc')
+                 .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
+                 .limit(limit + 1);
 
     if (lastCreatedAt && lastId) {
-      query = query.startAfter(lastCreatedAt, lastId);
+      const lastDocSnapshot = await db.collection('campaigns').doc(lastId).get();
+      if (lastDocSnapshot.exists) {
+        // We need a document snapshot to use startAfter with multiple orderBy fields.
+        // Actually, we can startAfter with the values directly:
+        query = query.startAfter(lastCreatedAt, lastId);
+      }
     }
 
     const snapshot = await query.get();
     const campaigns = [];
     let hasMore = false;
+
     snapshot.forEach(doc => {
       if (campaigns.length < limit) {
         campaigns.push({ id: doc.id, ...doc.data() });
@@ -2050,6 +1974,7 @@ app.get('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
       }
     });
 
+    // ── Build cursor for next page ──
     let nextLastCreatedAt = null;
     let nextLastId = null;
     if (campaigns.length > 0) {
@@ -2074,13 +1999,19 @@ app.get('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
       lastId: nextLastId,
     };
 
-    // Cache with 24 hour TTL – invalidation on change ensures freshness
-try {
-  await redis.set(cacheKey, JSON.stringify(response)); // indefinite TTL – invalidated on changes
-  console.log(`💾 Campaigns cached (24 hour TTL): ${cacheKey}`);
-} catch (err) {
-  // ignore
-}
+    // ── Cache (optional) ──
+    // Invalidate cache when filters change, but since we have a new query key per filter,
+    // we can cache each combination with its own key.
+    // We'll use a cache key that includes filters:
+    const cacheKey = `campaigns:user:${uid}:status:${status || 'all'}:feature:${feature || 'all'}:search:${search || 'none'}:limit:${limit}:lastCreatedAt:${req.query.lastCreatedAt || 'null'}:lastId:${lastId || 'null'}`;
+    try {
+      // Cache for 5 minutes to reduce load, but we'll invalidate on any campaign change.
+      await redis.set(cacheKey, JSON.stringify(response), 'EX', 300);
+      console.log(`💾 Campaigns cached: ${cacheKey}`);
+    } catch (err) {
+      // ignore cache errors
+    }
+
     res.json(response);
   } catch (error) {
     console.error('❌ Get campaigns error:', error);
@@ -2250,25 +2181,30 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
     const finalReward = reward?.trim() || templateData.reward || 'Exclusive Reward';
 
     const campaignData = {
-      templateId,
-      userId: uid,
-      shareCount: finalShareCount,
-      tasks: finalTasks,
-      finalUrl: finalFinalUrl,
-      features: { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled },
-      title: finalTitle,
-      description: finalDescription,
-      image: templateData.image || '',
-      reward: finalReward,
-      templateSlug: templateData.slug || 'campaign',
-      status: 'active',
-      views: 0,
-      completions: 0,
-      shares: 0,
-      unlockCount: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+  templateId,
+  userId: uid,
+  shareCount: finalShareCount,
+  tasks: finalTasks,
+  finalUrl: finalFinalUrl,
+  features: { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled },
+  title: finalTitle,
+  description: finalDescription,
+  image: templateData.image || '',
+  reward: finalReward,
+  templateSlug: templateData.slug || 'campaign',
+  status: 'active',
+  views: 0,
+  completions: 0,
+  shares: 0,
+  unlockCount: 0,
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  // ── NEW FIELDS ──
+  hasShare: scEnabled || false,
+  hasTasks: tasksEnabled || false,
+  hasFinalUrl: fuEnabled || false,
+  searchable: (finalTitle + ' ' + finalDescription + ' ' + finalReward).toLowerCase(),
+};
 
     // ── Firestore writes (fast) ──
     const docRef = await db.collection('campaigns').add(campaignData);
@@ -2276,17 +2212,15 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
 
     const campaignId = docRef.id;
 
-    // ── Synchronous cache updates (completed before response) ──
+    // ── Invalidate all cached list caches for this user ──
     try {
-      // Fetch the newly created campaign with server timestamps
-      const docSnapshot = await docRef.get();
-      const actualCampaignData = docSnapshot.data();
-      const newCampaign = { id: campaignId, ...actualCampaignData };
-
-      // ── Update user's list cache (first page) ──
-      await addCampaignToUserListCache(uid, newCampaign);
-
-      // ── Invalidate user stats cache ──
+      // Invalidate all campaign list caches (any filter combination)
+      await invalidatePattern(`campaigns:user:${uid}:*`);
+      
+      // Invalidate single‑campaign cache (if any)
+      await invalidateKey(`campaigns:id:${campaignId}`);
+      
+      // Invalidate user stats
       await invalidateKey(`stats:user:${uid}`);
 
       // ── Update template usage in cache (only affected template) ──
@@ -2294,9 +2228,9 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
       const newUsageCount = updatedTemplateDoc.data().usageCount || 0;
       await updateTemplateInAllCaches(templateId, { usageCount: newUsageCount });
 
-      console.log(`✅ Cache updates completed for campaign ${campaignId}`);
+      console.log(`✅ Cache invalidated for campaign ${campaignId}`);
     } catch (err) {
-      console.error('❌ Cache update error:', err);
+      console.error('❌ Cache invalidation error:', err);
       // Continue even if cache fails – data is already in Firestore
     }
 
@@ -2592,12 +2526,23 @@ app.put('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
       }
     }
 
+    // ── Recompute searchable and feature flags ──
+    const finalTitle = updates.title ?? data.title;
+    const finalDescription = updates.description ?? data.description;
+    const finalReward = updates.reward ?? data.reward;
+    const finalFeatures = updates.features ?? data.features;
+
+    updates.searchable = (finalTitle + ' ' + finalDescription + ' ' + finalReward).toLowerCase();
+    updates.hasShare = finalFeatures.shareCount || false;
+    updates.hasTasks = finalFeatures.tasks || false;
+    updates.hasFinalUrl = finalFeatures.finalUrl || false;
+
     // ── 6. Apply updates ──
     updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await doc.ref.update(updates);
 
-    // ── 7. Invalidate caches ──
-    await updateCampaignInUserListCache(uid, id, updates);
+    // ── 7. Invalidate all caches ──
+    await invalidatePattern(`campaigns:user:${uid}:*`);
     await invalidateKey(`campaigns:id:${id}`);
     await invalidateKey(`stats:user:${uid}`);
 
@@ -2639,8 +2584,8 @@ app.delete('/api/campaigns/:id', verifyToken, checkBanned, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // ── Remove the campaign from the user's list cache ──
-    await removeCampaignFromUserListCache(uid, id);
+    // ── Invalidate all caches ──
+    await invalidatePattern(`campaigns:user:${uid}:*`);
     await invalidateKey(`campaigns:id:${id}`);
     await invalidateKey(`stats:user:${uid}`);
 
