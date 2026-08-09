@@ -114,17 +114,28 @@ export function useFeaturedTemplates(filters = {}, initialData = null) {
   });
 }
 
-// ── Campaigns ──
-export function useCampaigns(enabled = false) {
+// ── Campaigns (with server-side filters, search, and pagination) ──
+export function useCampaigns(filters = {}, enabled = true) {
+  const { status, search, feature } = filters;
+  // Build a stable query key that includes all filter values
+  const queryKey = ['campaigns', { status, search, feature }];
+
   return useInfiniteQuery({
-    queryKey: ['campaigns'],
+    queryKey,
     queryFn: async ({ pageParam = null }) => {
       const token = await getToken();
       if (!token) return { campaigns: [], nextCursor: null };
-      let url = '/campaigns?limit=25';
+
+      const params = new URLSearchParams({ limit: 25 });
+      if (status && status !== 'all') params.append('status', status);
+      if (search) params.append('search', search);
+      if (feature && feature !== 'all') params.append('feature', feature);
       if (pageParam) {
-        url += `&lastCreatedAt=${pageParam.lastCreatedAt}&lastId=${pageParam.lastId}`;
+        params.append('lastCreatedAt', pageParam.lastCreatedAt);
+        params.append('lastId', pageParam.lastId);
       }
+
+      const url = `/campaigns?${params.toString()}`;
       const data = await apiRequest(url, {}, token);
       return {
         campaigns: data.campaigns || [],
@@ -134,9 +145,11 @@ export function useCampaigns(enabled = false) {
         } : null,
       };
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    keepPreviousData: true, // prevents flicker when filters change
   });
 }
 
