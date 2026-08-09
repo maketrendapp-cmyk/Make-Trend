@@ -10,12 +10,12 @@ export default function PushNotificationSetup() {
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      // ── If user logs out, remove the token from backend ──
+      // ── Remove token on logout ──
       const removeToken = async () => {
         const savedToken = tokenRef.current;
         if (!savedToken) return;
         try {
-          const idToken = await user?.getIdToken?.(); // user might be null after logout, but we can still attempt
+          const idToken = await user?.getIdToken?.();
           if (!idToken) return;
           await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/fcm-token`, {
             method: 'DELETE',
@@ -39,7 +39,12 @@ export default function PushNotificationSetup() {
 
     const setupPush = async () => {
       try {
-        // 1. Request permission (only if not yet granted or denied)
+        // ── Guard against server‑side execution ──
+        if (!messaging) {
+          console.warn('Push notifications are only available on the client.');
+          return;
+        }
+
         if (Notification.permission === 'default') {
           const permission = await Notification.requestPermission();
           if (permission !== 'granted') {
@@ -51,7 +56,6 @@ export default function PushNotificationSetup() {
           return;
         }
 
-        // 2. Get FCM token
         const token = await getToken(messaging, {
           vapidKey: process.env.NEXT_PUBLIC_FCM_VAPID_KEY,
         });
@@ -63,7 +67,6 @@ export default function PushNotificationSetup() {
 
         tokenRef.current = token;
 
-        // 3. Send token to backend
         const idToken = await user.getIdToken();
         const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/fcm-token`, {
           method: 'POST',
@@ -81,9 +84,8 @@ export default function PushNotificationSetup() {
           console.log('✅ FCM token saved to backend');
         }
 
-        // 4. Listen for foreground messages
+        // ── Listen for foreground messages ──
         const unsubscribe = onMessage(messaging, (payload) => {
-          console.log('📩 Foreground message:', payload);
           toast.custom((t) => (
             <div
               className={`${
