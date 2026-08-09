@@ -6859,6 +6859,7 @@ app.get('/api/posts', async (req, res) => {
 
         let targetUserId = null;
         let searchTerm = search;
+        let fetchLimit = limit + 20; // default
 
         // ── Check if search is a username (@handle) ──
         if (search.startsWith('@')) {
@@ -6881,7 +6882,7 @@ app.get('/api/posts', async (req, res) => {
         } else {
           // Text search: we'll fetch more than limit and filter in memory
           // We'll use a larger fetch limit to compensate for filtering.
-          const fetchLimit = Math.min(limit + 20, 100);
+          fetchLimit = Math.min(limit + 20, 100);
           query = query.orderBy('createdAt', 'desc').limit(fetchLimit);
           // We'll filter in memory later.
         }
