@@ -1,4 +1,3 @@
-// pages/community/feed.js
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -23,6 +22,33 @@ import {
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+
+// ── Helper: Get embed info for video URLs ──
+function getEmbedInfo(url) {
+  if (!url) return null;
+  // YouTube: watch?v= or youtu.be/
+  const ytRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?]+)/;
+  const ytMatch = url.match(ytRegex);
+  if (ytMatch) {
+    return {
+      type: 'youtube',
+      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
+      id: ytMatch[1],
+    };
+  }
+  // Vimeo
+  const vimeoRegex = /vimeo\.com\/(\d+)/;
+  const vimeoMatch = url.match(vimeoRegex);
+  if (vimeoMatch) {
+    return {
+      type: 'vimeo',
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
+      id: vimeoMatch[1],
+    };
+  }
+  // Add other platforms (Dailymotion, Twitch, etc.) if needed
+  return null;
+}
 
 // ── localStorage helpers for like status ──
 const getLocalVote = (postId) => {
@@ -626,6 +652,10 @@ export default function CommunityFeed() {
               const hasCTA = post.ctaText && post.ctaUrl;
               const isExpanded = expandedPosts.has(post.id);
 
+              const embedInfo = getEmbedInfo(post.videoUrl);
+              const isEmbeddable = embedInfo !== null;
+              const hasVideoUrl = isVideo; // same as isVideo
+
               const titleLength = post.title?.length || 0;
               const descLength = post.description?.length || 0;
               const truncateTitle = titleLength > 150;
@@ -739,17 +769,28 @@ export default function CommunityFeed() {
                     </Link>
                   )}
 
-                  {/* ── Video ── */}
-                  {isVideo && (
-                    <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
-                      <video
-                        src={post.videoUrl}
-                        controls
-                        className="w-full h-full"
-                        poster={post.imageUrl || undefined}
-                        playsInline
-                      />
-                    </Link>
+                  {/* ── Video / Embed ── */}
+                  {hasVideoUrl && (
+                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
+                      {isEmbeddable ? (
+                        <iframe
+                          src={embedInfo.embedUrl}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          loading="lazy"
+                          title={post.title || 'Video'}
+                        />
+                      ) : (
+                        <video
+                          src={post.videoUrl}
+                          controls
+                          className="w-full h-full"
+                          poster={post.imageUrl || undefined}
+                          playsInline
+                        />
+                      )}
+                    </div>
                   )}
 
                   {/* ── CTA Button ── */}
