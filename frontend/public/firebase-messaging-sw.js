@@ -1,16 +1,22 @@
 // public/firebase-messaging-sw.js
-importScripts('https://www.gstatic.com/firebasejs/9.x.x/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.x.x/firebase-messaging-compat.js');
+// Use a specific version (9.23.0 works) – avoid `9.x.x`
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
-// ── Your actual Firebase config ──
+// ── Complete config (include authDomain & storageBucket – safe to add) ──
 firebase.initializeApp({
   apiKey: "AIzaSyCPQ7tqjbA2HELnJd0-wEF1g_w1oIh7oe8",
+  authDomain: "make-trend.firebaseapp.com",
   projectId: "make-trend",
+  storageBucket: "make-trend.firebasestorage.app",
   messagingSenderId: "241555047055",
   appId: "1:241555047055:web:c5f8eef5a0af227e5f66fa",
 });
 
 const messaging = firebase.messaging();
+
+// ── Optional: log that the worker started (visible in browser console) ──
+console.log('✅ Firebase messaging service worker loaded');
 
 // ── Background message handler ──
 messaging.onBackgroundMessage((payload) => {
