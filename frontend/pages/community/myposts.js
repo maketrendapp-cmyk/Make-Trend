@@ -118,6 +118,8 @@ export default function MyPosts() {
 
   // ── Delete modal state ──
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null });
+  // ── Track which post is currently being deleted (for per‑button loading) ──
+  const [deletingPostId, setDeletingPostId] = useState(null);
 
   // ── Intersection Observer for infinite scroll ──
   const observerRef = useRef(null);
@@ -167,15 +169,20 @@ export default function MyPosts() {
 
   const confirmDelete = () => {
     if (deleteModal.postId) {
+      // Set the deleting post ID to disable its button and show spinner
+      setDeletingPostId(deleteModal.postId);
+      
       deletePostMutation.mutate(deleteModal.postId, {
         onSuccess: () => {
           setDeleteModal({ isOpen: false, postId: null });
+          setDeletingPostId(null);
           invalidateMyPosts();
           toast.success('Post deleted');
         },
         onError: (error) => {
           toast.error(error.message || 'Failed to delete post');
           setDeleteModal({ isOpen: false, postId: null });
+          setDeletingPostId(null);
         },
       });
     }
@@ -183,6 +190,8 @@ export default function MyPosts() {
 
   const cancelDelete = () => {
     setDeleteModal({ isOpen: false, postId: null });
+    // Reset deletingPostId in case it was set
+    setDeletingPostId(null);
   };
 
   // ── Share handler ──
@@ -446,6 +455,7 @@ export default function MyPosts() {
               const isVideo = post.videoUrl && post.videoUrl.trim() !== '';
               const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
               const hasCTA = post.ctaText && post.ctaUrl;
+              const isDeletingThisPost = deletingPostId === post.id;
 
               return (
                 <div
@@ -583,12 +593,13 @@ export default function MyPosts() {
                       <span>Edit</span>
                     </Link>
 
+                    {/* ── Delete button with per‑post loading ── */}
                     <button
                       onClick={() => handleDeleteClick(post.id)}
-                      disabled={deletePostMutation.isLoading}
-                      className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50"
+                      disabled={deletePostMutation.isLoading || isDeletingThisPost}
+                      className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {deletePostMutation.isLoading ? (
+                      {isDeletingThisPost ? (
                         <FiLoader className="w-4 h-4 animate-spin" />
                       ) : (
                         <FiTrash2 className="w-4 h-4" />
@@ -649,16 +660,17 @@ export default function MyPosts() {
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={cancelDelete}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium"
+                  disabled={deletePostMutation.isLoading}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  disabled={deletePostMutation.isLoading}
+                  disabled={deletePostMutation.isLoading || deletingPostId !== null}
                   className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm font-medium disabled:opacity-50 flex items-center gap-2"
                 >
-                  {deletePostMutation.isLoading ? (
+                  {deletePostMutation.isLoading || deletingPostId !== null ? (
                     <FiLoader className="w-4 h-4 animate-spin" />
                   ) : (
                     <FiTrash2 className="w-4 h-4" />
