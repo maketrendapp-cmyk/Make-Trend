@@ -4,7 +4,6 @@ const withPWA = require('next-pwa')({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
-  // No customWorkerSrc – we serve the worker from public/
 });
 
 /** @type {import('next').NextConfig} */
@@ -50,7 +49,6 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'i.pinimg.com',
       },
-      // ── Cloudinary ──
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
@@ -66,27 +64,22 @@ const nextConfig = {
 
   async rewrites() {
     return [
-      // ── Exclude ProductTrend ──
       {
         source: '/productstrend/:path*',
         destination: '/productstrend/:path*',
       },
-      // ── Exclude Grow Together ──
       {
         source: '/groweachother/:path*',
         destination: '/groweachother/:path*',
       },
-      // ── Community page ──
       {
         source: '/community/:path*',
         destination: '/community/:path*',
       },
-      // ── User profile ──
       {
         source: '/userinfo/:path*',
         destination: '/userinfo/:path*',
       },
-      // ── Existing catch‑all rules ──
       {
         source: '/:slug',
         destination: '/templates/:slug',
