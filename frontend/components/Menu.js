@@ -22,8 +22,9 @@ import {
   FiUsers,
   FiAward,
   FiGrid,
+  FiRss,        // for community feed
 } from 'react-icons/fi';
-import { FaCrown } from 'react-icons/fa';
+import { FaCrown, FaRocket } from 'react-icons/fa';  // for ProductTrend
 
 export default function Menu({ isOpen, onClose }) {
   const router = useRouter();
@@ -167,12 +168,33 @@ export default function Menu({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* Community Section */}
+          {/* Community Section – updated with new links */}
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">
               Community
             </p>
             <div className="space-y-0.5">
+              <NavItem
+                href="/community"
+                icon={<FiRss className="w-4 h-4" />}
+                label="Community Feed"
+                isActive={router.pathname.startsWith('/community')}
+                onClick={onClose}
+              />
+              <NavItem
+                href="/groweachother"
+                icon={<FiUsers className="w-4 h-4" />}
+                label="Grow Together"
+                isActive={router.pathname.startsWith('/groweachother')}
+                onClick={onClose}
+              />
+              <NavItem
+                href="/productstrend"
+                icon={<FaRocket className="w-4 h-4" />}
+                label="ProductTrend"
+                isActive={router.pathname.startsWith('/productstrend')}
+                onClick={onClose}
+              />
               <NavItem
                 href="/follow"
                 icon={<FiHeart className="w-4 h-4" />}
