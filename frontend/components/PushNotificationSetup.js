@@ -9,14 +9,22 @@ export default function PushNotificationSetup() {
   const tokenRef = useRef(null);
 
   useEffect(() => {
+    console.log('🔔 PushNotificationSetup effect running', { isAuthenticated, user: !!user });
+
     if (!isAuthenticated || !user) {
-      // ── Remove token on logout ──
+      // ── Logout: remove token ──
       const removeToken = async () => {
         const savedToken = tokenRef.current;
-        if (!savedToken) return;
+        if (!savedToken) {
+          console.log('🗑️ No token to remove on logout');
+          return;
+        }
         try {
           const idToken = await user?.getIdToken?.();
-          if (!idToken) return;
+          if (!idToken) {
+            console.warn('⚠️ No idToken, cannot remove token');
+            return;
+          }
           await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/fcm-token`, {
             method: 'DELETE',
             headers: {
@@ -39,14 +47,20 @@ export default function PushNotificationSetup() {
 
     const setupPush = async () => {
       try {
-        // ── Guard against server‑side execution ──
+        console.log('📱 Setting up push notifications...');
+
+        // ── Guard: messaging must exist ──
         if (!messaging) {
-          console.warn('Push notifications are only available on the client.');
+          console.warn('❌ messaging is undefined – cannot set up push');
           return;
         }
+        console.log('✅ messaging is available');
 
+        // ── Permission ──
         if (Notification.permission === 'default') {
+          console.log('🔄 Requesting notification permission...');
           const permission = await Notification.requestPermission();
+          console.log('📛 Permission result:', permission);
           if (permission !== 'granted') {
             console.warn('Push permission denied');
             return;
@@ -55,18 +69,24 @@ export default function PushNotificationSetup() {
           console.warn('Push permission already denied');
           return;
         }
+        console.log('✅ Notification permission granted');
 
+        // ── Get FCM token ──
+        console.log('🔑 Getting FCM token with VAPID key:', process.env.NEXT_PUBLIC_FCM_VAPID_KEY ? '✅ present' : '❌ missing');
         const token = await getToken(messaging, {
           vapidKey: process.env.NEXT_PUBLIC_FCM_VAPID_KEY,
         });
 
         if (!token) {
-          console.warn('No FCM token received');
+          console.warn('❌ No FCM token received – check VAPID key or Firebase config');
           return;
         }
+        console.log('📱 FCM token obtained:', token.substring(0, 20) + '...');
 
         tokenRef.current = token;
 
+        // ── Send token to backend ──
+        console.log('📤 Sending token to backend...');
         const idToken = await user.getIdToken();
         const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/fcm-token`, {
           method: 'POST',
@@ -79,13 +99,15 @@ export default function PushNotificationSetup() {
 
         if (!res.ok) {
           const err = await res.json();
-          console.error('Failed to save FCM token:', err);
+          console.error('❌ Failed to save FCM token:', err);
         } else {
           console.log('✅ FCM token saved to backend');
         }
 
         // ── Listen for foreground messages ──
+        console.log('👂 Listening for foreground messages...');
         const unsubscribe = onMessage(messaging, (payload) => {
+          console.log('📩 Foreground message:', payload);
           toast.custom((t) => (
             <div
               className={`${
