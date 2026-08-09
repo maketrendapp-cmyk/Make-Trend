@@ -20,26 +20,26 @@ import {
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
-const API_BASE = BACKEND_URL; // Keep as BASE (without /api) – code appends /api in fetch calls
 
 export default function Support() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-const { data: tickets = [], isLoading: ticketsLoading } = useSupportTickets(isAuthenticated);
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
   const { invalidateSupportTickets } = useInvalidateQueries();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form fields
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  // ── Support tickets with infinite scroll ──
+  const {
+    data: ticketPages,
+    isLoading: ticketsLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useSupportTickets(isAuthenticated);
 
-  const fileInputRef = useRef(null);
+  // Flatten pages
+  const tickets = ticketPages?.pages?.flatMap(page => page.tickets) || [];
 
   // ── Set loading false when data is loaded ──
   useEffect(() => {
@@ -54,6 +54,32 @@ const { data: tickets = [], isLoading: ticketsLoading } = useSupportTickets(isAu
       router.push('/login');
     }
   }, [profileLoading, user, router]);
+
+  // ── Infinite Scroll Loader ──
+  const loaderRef = useRef(null);
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || ticketsLoading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, ticketsLoading, fetchNextPage]);
+
+  // ── Form fields ──
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const fileInputRef = useRef(null);
 
   // ── Image upload handler ──
   const handleImageChange = (e) => {
@@ -109,23 +135,23 @@ const { data: tickets = [], isLoading: ticketsLoading } = useSupportTickets(isAu
       }
       const token = await firebaseUser.getIdToken();
 
-// 1) Upload image if any
-let imageUrl = '';
-if (imageFile) {
-  const formData = new FormData();
-  formData.append('image', imageFile);
-  const uploadRes = await fetch(`${BACKEND_URL}/api/upload?folder=support`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-  const uploadData = await uploadRes.json();
-  if (uploadData.success) {
-    imageUrl = uploadData.url;
-  } else {
-    throw new Error(uploadData.error || 'Image upload failed');
-  }
-}
+      // 1) Upload image if any
+      let imageUrl = '';
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        const uploadRes = await fetch(`${BACKEND_URL}/api/upload?folder=support`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success) {
+          imageUrl = uploadData.url;
+        } else {
+          throw new Error(uploadData.error || 'Image upload failed');
+        }
+      }
 
       // 2) Create ticket
       const payload = { title: title.trim(), description: description.trim(), image: imageUrl };
@@ -456,7 +482,7 @@ if (imageFile) {
             </form>
           </div>
 
-          {/* ── Previous Reports ── */}
+          {/* ── Previous Reports with Infinite Scroll ── */}
           <div className="bg-white rounded-3xl shadow-xl border border-gray-100/60 p-6 backdrop-blur-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               📋 Previous Reports
@@ -472,9 +498,10 @@ if (imageFile) {
               </div>
             ) : (
               <div className="space-y-4">
-                {tickets.map((ticket) => (
+                {tickets.map((ticket, index) => (
                   <div
                     key={ticket.id}
+                    ref={index === tickets.length - 1 ? loaderRef : null}
                     className="border border-gray-200 rounded-2xl p-5 hover:shadow-lg transition-all duration-200 bg-white/50"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
@@ -500,6 +527,29 @@ if (imageFile) {
                     </div>
                   </div>
                 ))}
+
+                {/* ── Infinite scroll loader ── */}
+                {hasNextPage && (
+                  <div className="py-6 text-center">
+                    {isFetchingNextPage ? (
+                      <div className="inline-flex items-center gap-2 text-sm text-gray-500">
+                        <svg className="animate-spin h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Loading more...
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">Scroll to load more</span>
+                    )}
+                  </div>
+                )}
+
+                {!hasNextPage && tickets.length > 0 && (
+                  <p className="text-center text-xs text-gray-400 py-6">
+                    You've seen all your tickets 🎉
+                  </p>
+                )}
               </div>
             )}
           </div>
