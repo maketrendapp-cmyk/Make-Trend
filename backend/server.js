@@ -7235,8 +7235,8 @@ app.post('/api/posts', verifyToken, checkBanned, async (req, res) => {
     // ── Cache details ──
     await cachePostDetails(newPost.id, newPost);
 
-    // ── Invalidate user's own posts cache ──
-    await invalidateKey(`my-posts:${uid}`);
+   // ── Invalidate all user's own posts cache ──
+await invalidatePattern(`my-posts:${uid}:*`);
 
     res.status(201).json({
       success: true,
@@ -7335,8 +7335,8 @@ app.put('/api/posts/:id', verifyToken, checkBanned, async (req, res) => {
     const updatedPost = { id: updatedDoc.id, ...updatedData, user };
     await cachePostDetails(id, updatedPost);
 
-    // ── Invalidate user's own posts cache ──
-    await invalidateKey(`my-posts:${uid}`);
+    // ── Invalidate all user's own posts cache ──
+await invalidatePattern(`my-posts:${uid}:*`);
 
     res.json({ success: true, message: 'Post updated successfully' });
   } catch (error) {
@@ -7378,8 +7378,8 @@ app.delete('/api/posts/:id', verifyToken, checkBanned, async (req, res) => {
     // ── Delete details cache ──
     await redis.del(`post:${id}`);
 
-    // ── Invalidate user's own posts cache ──
-    await invalidateKey(`my-posts:${uid}`);
+   // ── Invalidate all user's own posts cache ──
+await invalidatePattern(`my-posts:${uid}:*`);
 
     res.json({ success: true, message: 'Post deleted' });
   } catch (error) {
