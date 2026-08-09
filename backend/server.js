@@ -5348,6 +5348,33 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     await invalidateUserExchanges(uid);
     await invalidateUserExchanges(targetTask.uid);
 
+    // ── Send notifications ──
+    try {
+      const initiatorInfo = await getUserInfo(uid);
+      // To the target user (user B)
+      await createNotification({
+        userId: targetTask.uid,
+        type: 'personal',
+        title: 'New Exchange Request! 🤝',
+        description: `${initiatorInfo.fullname || 'A user'} wants to exchange "${yourTask.title || 'your task'}" with you.`,
+        redirectUrl: `/groweachother/exchange/${exchangeRef.id}`,
+        fromUserId: uid,
+      });
+      // To the initiator (user A)
+      await createNotification({
+        userId: uid,
+        type: 'personal',
+        title: 'Exchange Initiated! 🚀',
+        description: `You started an exchange for "${yourTask.title || 'your task'}" with ${targetTask.uid}.`,
+        redirectUrl: `/groweachother/exchange/${exchangeRef.id}`,
+        fromUserId: uid,
+      });
+      console.log(`📬 Exchange notifications sent for ${exchangeRef.id}`);
+    } catch (notifError) {
+      console.error('❌ Failed to send exchange notifications:', notifError);
+      // Do not block the response
+    }
+
     res.status(201).json({ success: true, exchange: populatedNewExchange });
   } catch (error) {
     console.error('Create exchange error:', error);
