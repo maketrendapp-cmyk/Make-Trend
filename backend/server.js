@@ -6851,124 +6851,136 @@ app.get('/api/posts', async (req, res) => {
       } catch (e) { /* ignore */ }
     }
 
-    // ── If search is provided (text or @username) ──
-    if (search) {
-      const cacheKey = `posts:search:${search}:category:${category || 'all'}:type:${type || 'all'}:limit:${limit}:lastId:${lastId || 'null'}`;
-      const result = await getOrSetCache(cacheKey, async () => {
-        console.log(`📡 Fetching posts with search="${search}"`);
+// ── If search is provided (text or @username) ──
+if (search) {
+  const cacheKey = `posts:search:${search}:category:${category || 'all'}:type:${type || 'all'}:limit:${limit}:lastId:${lastId || 'null'}`;
+  const result = await getOrSetCache(cacheKey, async () => {
+    console.log(`📡 Fetching posts with search="${search}"`);
 
-        let targetUserId = null;
-        let searchTerm = search;
-        let fetchLimit = limit + 20; // default
+    let targetUserId = null;
+    let searchTerm = search;
+    // Fetch a bit more than limit to allow in‑memory filtering (for text search)
+    let fetchLimit = Math.min(limit + 20, 100);
 
-        // ── Check if search is a username (@handle) ──
-        if (search.startsWith('@')) {
-          const username = search.slice(1).toLowerCase();
-          const userSnapshot = await db.collection('users')
-            .where('username', '==', username)
-            .limit(1)
-            .get();
-          if (!userSnapshot.empty) {
-            targetUserId = userSnapshot.docs[0].id;
-          }
-          // If user not found, return empty results.
-        }
+    // ── Check if search is a username (@handle) ──
+    if (search.startsWith('@')) {
+      const username = search.slice(1).toLowerCase();
+      const userSnapshot = await db.collection('users')
+        .where('username', '==', username)
+        .limit(1)
+        .get();
+      if (!userSnapshot.empty) {
+        targetUserId = userSnapshot.docs[0].id;
+      }
+      // If user not found, return empty results quickly
+      if (!targetUserId) {
+        return { posts: [], hasMore: false, lastId: null };
+      }
+    }
 
-        let query = db.collection('posts').where('status', '==', 'active');
+    let query = db.collection('posts')
+      .where('status', '==', 'active')
+      .orderBy('createdAt', 'desc');
 
-        if (targetUserId) {
-          // Filter by user
-          query = query.where('userId', '==', targetUserId);
-        } else {
-          // Text search: we'll fetch more than limit and filter in memory
-          // We'll use a larger fetch limit to compensate for filtering.
-          fetchLimit = Math.min(limit + 20, 100);
-          query = query.orderBy('createdAt', 'desc').limit(fetchLimit);
-          // We'll filter in memory later.
-        }
+    if (targetUserId) {
+      // Filter by user
+      query = query.where('userId', '==', targetUserId);
+      // For username search, we can limit to the same fetchLimit
+      query = query.limit(fetchLimit);
+    } else {
+      // Text search: limit to fetchLimit, we'll filter in memory later
+      query = query.limit(fetchLimit);
+    }
 
-        if (category && category !== 'all') {
-          query = query.where('category', '==', category);
-        }
-        if (type && type !== 'all') {
-          query = query.where('type', '==', type);
-        }
+    if (category && category !== 'all') {
+      query = query.where('category', '==', category);
+    }
+    if (type && type !== 'all') {
+      query = query.where('type', '==', type);
+    }
 
-        if (!targetUserId && !lastId) {
-          // no cursor for search
-        } else if (lastId && !targetUserId) {
-          const lastDoc = await db.collection('posts').doc(lastId).get();
-          if (lastDoc.exists) query = query.startAfter(lastDoc);
-        }
+    // ── Pagination (lastId) – works for both cases ──
+    if (lastId) {
+      const lastDoc = await db.collection('posts').doc(lastId).get();
+      if (lastDoc.exists) {
+        query = query.startAfter(lastDoc);
+      }
+    }
 
-        const snapshot = await query.get();
-        const posts = [];
-        let hasMore = false;
-        let lastPostId = null;
-        let count = 0;
+    const snapshot = await query.get();
+    const posts = [];
+    let hasMore = false;
+    let lastPostId = null;
+    let count = 0;
 
-        const docs = snapshot.docs;
-        const term = search.toLowerCase();
-        for (const doc of docs) {
-          if (count >= limit) {
-            hasMore = true;
-            break;
-          }
-          const data = doc.data();
-          if (data.status === 'deleted') continue;
+    const docs = snapshot.docs;
+    const term = search.toLowerCase();
 
-          // For text search (not user filter), filter by keyword
-          if (!targetUserId) {
-            const title = (data.title || '').toLowerCase();
-            const desc = (data.description || '').toLowerCase();
-            if (!title.includes(term) && !desc.includes(term)) continue;
-          }
+    for (const doc of docs) {
+      if (count >= limit) {
+        hasMore = true;
+        break;
+      }
+      const data = doc.data();
+      if (data.status === 'deleted') continue;
 
-          const user = await getUserInfo(data.userId);
-          posts.push({
-            id: doc.id,
-            ...data,
-            user,
-          });
-          lastPostId = doc.id;
-          count++;
-        }
-
-        // For text search, hasMore might be inaccurate; we'll set it if we have more docs.
-        if (!targetUserId) {
-          hasMore = snapshot.docs.length >= fetchLimit;
-        }
-
-        return { posts, hasMore, lastId: lastPostId };
-      }, 120); // 2 minute TTL
-
-      // ── Compute userLiked flag ── (same as before)
-      if (uid) {
-        const likeCacheKey = `user:likes:${uid}`;
-        let likedSet = new Set();
-        try {
-          const cached = await redis.get(likeCacheKey);
-          if (cached) {
-            likedSet = new Set(JSON.parse(cached));
-          } else {
-            const snapshot = await db.collection('postLikes')
-              .where('userId', '==', uid)
-              .select('postId')
-              .get();
-            const likedIds = snapshot.docs.map(d => d.data().postId);
-            likedSet = new Set(likedIds);
-            await redis.set(likeCacheKey, JSON.stringify(Array.from(likedSet)), 'EX', 300);
-          }
-        } catch (e) {
-          console.warn('Like cache error:', e);
-        }
-        result.posts.forEach(post => {
-          post.userLiked = likedSet.has(post.id);
-        });
+      // For text search (not user filter), filter by keyword
+      if (!targetUserId) {
+        const title = (data.title || '').toLowerCase();
+        const desc = (data.description || '').toLowerCase();
+        if (!title.includes(term) && !desc.includes(term)) continue;
       }
 
-      return res.json({ success: true, ...result });
+      const user = await getUserInfo(data.userId);
+      posts.push({
+        id: doc.id,
+        ...data,
+        user,
+      });
+      lastPostId = doc.id;
+      count++;
     }
+
+    // ── Determine hasMore ──
+    // If we fetched fetchLimit documents and we hit the limit, there might be more.
+    // For text search, we may have filtered out some, so we check if snapshot length == fetchLimit.
+    // For username search, we also check snapshot length == fetchLimit.
+    if (snapshot.docs.length === fetchLimit) {
+      // There could be more documents beyond fetchLimit.
+      // Set hasMore true as a best-effort indicator.
+      hasMore = true;
+    }
+
+    return { posts, hasMore, lastId: lastPostId };
+  }, 120); // 2 minute TTL
+
+  // ── Compute userLiked flag (unchanged) ──
+  if (uid) {
+    const likeCacheKey = `user:likes:${uid}`;
+    let likedSet = new Set();
+    try {
+      const cached = await redis.get(likeCacheKey);
+      if (cached) {
+        likedSet = new Set(JSON.parse(cached));
+      } else {
+        const snapshot = await db.collection('postLikes')
+          .where('userId', '==', uid)
+          .select('postId')
+          .get();
+        const likedIds = snapshot.docs.map(d => d.data().postId);
+        likedSet = new Set(likedIds);
+        await redis.set(likeCacheKey, JSON.stringify(Array.from(likedSet)), 'EX', 300);
+      }
+    } catch (e) {
+      console.warn('Like cache error:', e);
+    }
+    result.posts.forEach(post => {
+      post.userLiked = likedSet.has(post.id);
+    });
+  }
+
+  return res.json({ success: true, ...result });
+}
 
     // ── If userId is provided (public user posts) ──
     if (userId) {
