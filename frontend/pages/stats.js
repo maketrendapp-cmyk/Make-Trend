@@ -9,11 +9,9 @@ import { auth } from '../services/firebase';
 import {
   FiBarChart2, FiEye, FiUnlock, FiShare2, FiCheckCircle,
   FiAward, FiPlusCircle, FiEdit2, FiTrash2, FiClock,
-  FiLink, FiLogIn, FiArrowRight, FiSearch, FiFilter,
-  FiX, FiChevronDown, FiCalendar, FiTrendingUp, FiUsers,
-  FiGrid, FiList, FiCopy, FiCheck
+  FiLogIn, FiSearch, FiFilter,
+  FiX, FiChevronDown, FiCopy, FiCheck
 } from 'react-icons/fi';
-import { FaRocket, FaChartLine } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -24,17 +22,18 @@ export default function Stats() {
   const { user, isAuthenticated, needsCompletion, loading, refreshUser } = useAuth();
   const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
 
-  // ── Filter state ──
-  const [searchTerm, setSearchTerm] = useState('');
+  // ── Filter & Search state ──
+  const [searchInput, setSearchInput] = useState('');      // what user types
+  const [searchQuery, setSearchQuery] = useState('');      // what is actually sent to backend
   const [statusFilter, setStatusFilter] = useState('all');
   const [featureFilter, setFeatureFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('newest'); // only for client‑side sorting (optional)
+  const [sortBy, setSortBy] = useState('newest');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // ── React Query: Stats ──
   const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
 
-  // ── React Query: Campaigns with filters (backend-driven) ──
+  // ── React Query: Campaigns with backend filters ──
   const {
     data: campaignPages,
     isLoading: campaignsLoading,
@@ -44,7 +43,7 @@ export default function Stats() {
   } = useCampaigns(
     {
       status: statusFilter,
-      search: searchTerm.trim() || undefined,
+      search: searchQuery || undefined,
       feature: featureFilter,
     },
     isAuthenticated
@@ -58,7 +57,7 @@ export default function Stats() {
     return Array.from(uniqueMap.values());
   }, [campaignPages]);
 
-  // ── Client‑side sorting (since backend only returns by date) ──
+  // ── Client‑side sorting ──
   const sortedCampaigns = useMemo(() => {
     let result = [...allCampaigns];
     switch (sortBy) {
@@ -87,14 +86,20 @@ export default function Stats() {
   }, [allCampaigns, sortBy]);
 
   // ── Count active filters ──
-  const activeFilterCount = [statusFilter, featureFilter].filter(f => f !== 'all').length + (searchTerm.trim() ? 1 : 0);
+  const activeFilterCount = [statusFilter, featureFilter].filter(f => f !== 'all').length + (searchQuery.trim() ? 1 : 0);
 
   // ── Clear all filters ──
   const clearFilters = () => {
-    setSearchTerm('');
+    setSearchInput('');
+    setSearchQuery('');
     setStatusFilter('all');
     setFeatureFilter('all');
     setSortBy('newest');
+  };
+
+  // ── Trigger search ──
+  const triggerSearch = () => {
+    setSearchQuery(searchInput.trim());
   };
 
   // ── Infinite Scroll Loader ──
@@ -363,8 +368,8 @@ export default function Stats() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
         <div className="h-8 w-48 bg-gray-200 rounded mb-4" />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-          {[1,2,3].map(i => (
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          {[1,2,3,4].map(i => (
             <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <div className="h-8 w-8 bg-gray-200 rounded-full mb-3" />
               <div className="h-7 w-12 bg-gray-200 rounded mb-1" />
@@ -403,8 +408,8 @@ export default function Stats() {
           </button>
         </div>
 
-        {/* ── Stats Cards (Enhanced – 3 boxes) ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {/* ── Stats Cards – 2 columns, 2 rows ── */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
           {[
             { 
               label: 'Total Unlocks', 
@@ -433,6 +438,15 @@ export default function Stats() {
               text: 'text-green-700',
               border: 'border-green-100'
             },
+            { 
+              label: 'Total Completions', 
+              value: stats?.totalCompletions ?? 0, 
+              icon: FiCheckCircle, 
+              color: 'orange',
+              bg: 'bg-orange-50',
+              text: 'text-orange-700',
+              border: 'border-orange-100'
+            },
           ].map((stat, idx) => (
             <div
               key={idx}
@@ -453,15 +467,24 @@ export default function Stats() {
 
         {/* ── Filter & Search Bar ── */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+          {/* Search input with button inside */}
           <div className="relative flex-1">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && triggerSearch()}
               placeholder="Search by title, description, or reward..."
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+              className="w-full pl-10 pr-12 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
             />
+            <button
+              onClick={triggerSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+              aria-label="Search"
+            >
+              <FiSearch className="w-4 h-4" />
+            </button>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button
@@ -543,7 +566,7 @@ export default function Stats() {
               <div className="text-6xl mb-4">🔍</div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">No campaigns found</h3>
               <p className="text-gray-500 text-sm mb-6">
-                {searchTerm || statusFilter !== 'all' || featureFilter !== 'all'
+                {searchQuery || statusFilter !== 'all' || featureFilter !== 'all'
                   ? 'Try adjusting your filters or search term.'
                   : 'Start your first campaign and watch your metrics grow.'}
               </p>
