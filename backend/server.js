@@ -5348,27 +5348,37 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     await invalidateUserExchanges(uid);
     await invalidateUserExchanges(targetTask.uid);
 
-    // ── Send notifications ──
+    // ── Send notifications with improved descriptions ──
     try {
-      const initiatorInfo = await getUserInfo(uid);
-      // To the target user (user B)
+      // Fetch both users' info for better messages
+      const [initiatorInfo, targetUserInfo] = await Promise.all([
+        getUserInfo(uid),
+        getUserInfo(targetTask.uid),
+      ]);
+
+      // Task title fallback
+      const taskTitle = yourTask.title || 'your task';
+
+      // 1. To the target user (the one whose task is being requested)
       await createNotification({
         userId: targetTask.uid,
         type: 'personal',
         title: 'New Exchange Request! 🤝',
-        description: `${initiatorInfo.fullname || 'A user'} wants to exchange "${yourTask.title || 'your task'}" with you.`,
+        description: `@${initiatorInfo.username || 'A user'} wants to exchange "${taskTitle}" with you.`,
         redirectUrl: `/groweachother/exchange/${exchangeRef.id}`,
         fromUserId: uid,
       });
-      // To the initiator (user A)
+
+      // 2. To the initiator (confirmation)
       await createNotification({
         userId: uid,
         type: 'personal',
         title: 'Exchange Initiated! 🚀',
-        description: `You started an exchange for "${yourTask.title || 'your task'}" with ${targetTask.uid}.`,
+        description: `You started an exchange for "${taskTitle}" with @${targetUserInfo.username || targetTask.uid}.`,
         redirectUrl: `/groweachother/exchange/${exchangeRef.id}`,
         fromUserId: uid,
       });
+
       console.log(`📬 Exchange notifications sent for ${exchangeRef.id}`);
     } catch (notifError) {
       console.error('❌ Failed to send exchange notifications:', notifError);
