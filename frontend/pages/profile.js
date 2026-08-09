@@ -1,5 +1,5 @@
 // pages/profile.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthScreen';
@@ -16,7 +16,7 @@ import {
   FiSettings, FiLock, FiHelpCircle,
   FiShare2, FiLogOut, FiGrid, FiInfo, FiDownload, FiAlertCircle,
   FiBook, FiShield, FiUsers, FiTrendingUp, FiCopy,
-  FiGift, FiCheckCircle, FiChevronRight, FiHeart
+  FiGift, FiCheckCircle, FiChevronRight, FiHeart, FiUser, // Added FiUser
 } from 'react-icons/fi';
 import { FaCrown, FaWallet, FaCoins, FaClock, FaRocket } from 'react-icons/fa';
 import Meta from '../components/Meta';
@@ -120,6 +120,7 @@ export default function Profile() {
     plan: profile?.plan || 'free',
     referrals: profile?.referrals || 0,
     referralCode: profile?.referralCode || '',
+    uid: user?.uid || profile?.uid || '',
   };
 
   // Cleaned up stats (removed views and unlocks as requested)
@@ -128,16 +129,72 @@ export default function Profile() {
     { icon: FiUsers, label: 'Referrals', value: profile?.referrals || 0 },
   ];
 
-  const quickActions = [
-    { icon: FiSettings, label: 'Edit Profile', href: '/edit-profile' },
-    { icon: FiLock, label: 'Change Password', href: '/change-password' },
-    { icon: FiHelpCircle, label: 'Support', href: '/support' },
-    { icon: FiShare2, label: 'Refer & Earn', href: '/refer-earn' },
-    { icon: FaCoins, label: 'Earn MT Coins', href: '/earncash' },
-    { icon: FaWallet, label: 'Withdraw', href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw' },
-    { icon: FaRocket, label: 'Launch Products', href: '/productstrend' },
-    { icon: FiHeart, label: 'Grow Together', href: '/groweachother', highlight: true },
-  ];
+  // ── Quick Actions (computed, includes new buttons) ──
+  const quickActions = useMemo(() => {
+    const baseActions = [
+      {
+        icon: FiUser,
+        label: 'View Profile',
+        href: isAuthenticated && displayUser.uid ? `/userprofile/${displayUser.uid}` : '/login?redirect=/profile',
+        highlight: true,
+      },
+      {
+        icon: FiGrid,
+        label: 'Community Feed',
+        href: '/community/feed',
+        highlight: false,
+      },
+      {
+        icon: FiSettings,
+        label: 'Edit Profile',
+        href: '/edit-profile',
+        highlight: false,
+      },
+      {
+        icon: FiLock,
+        label: 'Change Password',
+        href: '/change-password',
+        highlight: false,
+      },
+      {
+        icon: FiHelpCircle,
+        label: 'Support',
+        href: '/support',
+        highlight: false,
+      },
+      {
+        icon: FiShare2,
+        label: 'Refer & Earn',
+        href: '/refer-earn',
+        highlight: false,
+      },
+      {
+        icon: FaCoins,
+        label: 'Earn MT Coins',
+        href: '/earncash',
+        highlight: false,
+      },
+      {
+        icon: FaWallet,
+        label: 'Withdraw',
+        href: isAuthenticated ? '/withdraw' : '/login?redirect=/withdraw',
+        highlight: false,
+      },
+      {
+        icon: FaRocket,
+        label: 'Launch Products',
+        href: '/productstrend',
+        highlight: false,
+      },
+      {
+        icon: FiHeart,
+        label: 'Grow Together',
+        href: '/groweachother',
+        highlight: true,
+      },
+    ];
+    return baseActions;
+  }, [isAuthenticated, displayUser.uid]);
 
   const exploreOptions = [
     { icon: FiGrid, label: 'Follow Us', href: '/follow' },
