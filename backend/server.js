@@ -109,7 +109,14 @@ async function invalidatePattern(pattern) {
 async function updateCampaignInUserListCache(ownerId, campaignId, updates) {
   try {
     const pattern = `campaigns:user:${ownerId}:*`;
-    const keys = await redis.keys(pattern);
+    let cursor = '0';
+    let keys = [];
+    do {
+      const reply = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = reply[0];
+      keys = keys.concat(reply[1]);
+    } while (cursor !== '0');
+
     if (keys.length === 0) return;
 
     for (const key of keys) {
@@ -128,7 +135,7 @@ async function updateCampaignInUserListCache(ownerId, campaignId, updates) {
           return camp;
         });
         if (updated) {
-          const ttlToUse = ttl > 0 ? ttl : 86400; // keep existing TTL, default 24h
+          const ttlToUse = ttl > 0 ? ttl : 86400;
           await redis.set(key, JSON.stringify(data), 'EX', ttlToUse);
           console.log(`🔄 Updated campaign ${campaignId} in cache ${key}`);
         }
@@ -144,7 +151,14 @@ async function updateCampaignInUserListCache(ownerId, campaignId, updates) {
 async function updateTemplateInAllCaches(templateId, updates) {
   try {
     const pattern = 'templates:*';
-    const keys = await redis.keys(pattern);
+    let cursor = '0';
+    let keys = [];
+    do {
+      const reply = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = reply[0];
+      keys = keys.concat(reply[1]);
+    } while (cursor !== '0');
+
     if (keys.length === 0) return;
 
     for (const key of keys) {
@@ -163,7 +177,7 @@ async function updateTemplateInAllCaches(templateId, updates) {
           return t;
         });
         if (updated) {
-          const ttlToUse = ttl > 0 ? ttl : 86400; // keep existing TTL, default 24h
+          const ttlToUse = ttl > 0 ? ttl : 86400;
           await redis.set(key, JSON.stringify(data), 'EX', ttlToUse);
           console.log(`🔄 Updated template ${templateId} in cache ${key}`);
         }
@@ -1193,8 +1207,24 @@ app.post('/api/auth/complete-social', verifyToken, checkBanned, async (req, res)
 app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
+    const cacheKey = `user:profile:${uid}`;
+    const THIRTY_SECONDS = 30;
 
-    // ── Always fetch fresh from Firestore ──
+    // ── Try cache first ──
+    let cached = null;
+    try {
+      const cachedData = await redisGet(cacheKey);
+      if (cachedData) {
+        cached = JSON.parse(cachedData);
+        console.log(`📦 Profile cache HIT: ${uid}`);
+        return res.json(cached);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Profile cache miss/error: ${error.message}`);
+    }
+
+    // ── Cache miss – fetch from Firestore ──
+    console.log(`📡 Fetching profile for user ${uid} from Firestore...`);
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -1237,7 +1267,17 @@ app.get('/api/auth/me', verifyToken, checkBanned, async (req, res) => {
       websites: Array.isArray(userData.websites) ? userData.websites : [],
     };
 
-    res.json({ success: true, user: userWithDefaults });
+    const response = { success: true, user: userWithDefaults };
+
+    // ── Store in Redis with 30‑second TTL ──
+    try {
+      await redis.set(cacheKey, JSON.stringify(response), 'EX', THIRTY_SECONDS);
+      console.log(`💾 Profile cached (30s TTL): ${uid}`);
+    } catch (err) {
+      // ignore cache errors
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -1713,6 +1753,7 @@ app.get('/api/templates', async (req, res) => {
       limit || 50
     ].join(':');
     const cacheKey = filterKey;
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60; // 86400 seconds
     const result = await getOrSetCache(cacheKey, async () => {
       console.log(`📡 Fetching templates from Firestore (${all === 'true' ? 'all' : 'active'})...`);
       let query = db.collection('templates');
@@ -1749,7 +1790,7 @@ app.get('/api/templates', async (req, res) => {
         });
       });
       return { success: true, templates };
-    });
+    }, TWENTY_FOUR_HOURS);
     res.json(result);
   } catch (error) {
     console.error('❌ Get templates error:', error);
@@ -3016,51 +3057,74 @@ app.post('/api/campaigns/:id/unlock', async (req, res) => {
 });
 
 // ============================================================
-// 14. USER STATS (cached, with ban check + rate limit)
+// 14. USER STATS (cached with 6‑hour TTL)
 // ============================================================
 app.get('/api/stats', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     const cacheKey = `stats:user:${uid}`;
-    const result = await getOrSetCache(cacheKey, async () => {
-      console.log(`📡 Fetching stats for user ${uid} from Firestore...`);
-      const snapshot = await db.collection('campaigns')
-        .where('userId', '==', uid)
-        .select('views', 'unlockCount', 'shares', 'completions', 'shareCount', 'status')
-        .get();
+    const SIX_HOURS = 6 * 60 * 60; // 21600 seconds
 
-      let totalCampaigns = 0;
-      let totalViews = 0;
-      let totalUnlocks = 0;
-      let totalShares = 0;
-      let totalCompletions = 0;
-      let successfulCampaigns = 0;
+    // ── Try cache first ──
+    let result = null;
+    try {
+      const cached = await redisGet(cacheKey);
+      if (cached) {
+        result = JSON.parse(cached);
+        console.log(`📦 Stats cache HIT: ${cacheKey}`);
+        return res.json(result);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Stats cache miss/error: ${error.message}`);
+    }
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.status === 'deleted') return;
-        totalCampaigns++;
-        totalViews += data.views || 0;
-        totalUnlocks += data.unlockCount || 0;
-        totalShares += data.shares || 0;
-        totalCompletions += data.completions || 0;
-        if (data.shareCount > 0 && (data.shares || 0) >= data.shareCount) {
-          successfulCampaigns++;
-        }
-      });
+    // ── Cache miss – fetch from Firestore ──
+    console.log(`📡 Fetching stats for user ${uid} from Firestore...`);
+    const snapshot = await db.collection('campaigns')
+      .where('userId', '==', uid)
+      .select('views', 'unlockCount', 'shares', 'completions', 'shareCount', 'status')
+      .get();
 
-      return {
-        success: true,
-        stats: {
-          totalCampaigns,
-          totalViews,
-          totalUnlocks,
-          totalShares,
-          totalCompletions,
-          successfulCampaigns,
-        },
-      };
+    let totalCampaigns = 0;
+    let totalViews = 0;
+    let totalUnlocks = 0;
+    let totalShares = 0;
+    let totalCompletions = 0;
+    let successfulCampaigns = 0;
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.status === 'deleted') return;
+      totalCampaigns++;
+      totalViews += data.views || 0;
+      totalUnlocks += data.unlockCount || 0;
+      totalShares += data.shares || 0;
+      totalCompletions += data.completions || 0;
+      if (data.shareCount > 0 && (data.shares || 0) >= data.shareCount) {
+        successfulCampaigns++;
+      }
     });
+
+    result = {
+      success: true,
+      stats: {
+        totalCampaigns,
+        totalViews,
+        totalUnlocks,
+        totalShares,
+        totalCompletions,
+        successfulCampaigns,
+      },
+    };
+
+    // ── Store in Redis with 6‑hour TTL ──
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', SIX_HOURS);
+      console.log(`💾 Stats cached (6 hours TTL): ${cacheKey}`);
+    } catch (err) {
+      // ignore cache errors
+    }
+
     res.json(result);
   } catch (error) {
     console.error('❌ Stats error:', error);
@@ -3202,36 +3266,72 @@ app.post('/api/campaigns/:id/view', async (req, res) => {
 // 15. SUPPORT TICKETS
 // ============================================================
 
-// ── Get tickets ── (authenticated, with ban check + rate limit)
+// ── Get tickets ── (authenticated, with ban check + rate limit + pagination)
 app.get('/api/support', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
     if (!(await checkRateLimit(uid, 'support-get', 10, 60))) {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
-    const cacheKey = `support:user:${uid}`;
+
+    // ── Pagination parameters ──
+    let limit = parseInt(req.query.limit) || 20;
+    const MAX_LIMIT = 50;
+    if (limit > MAX_LIMIT) limit = MAX_LIMIT;
+    const lastId = req.query.lastId || null;
+
+    // ── Build cache key with pagination ──
+    const cacheKey = `support:user:${uid}:limit:${limit}:lastId:${lastId || 'null'}`;
+    const SIX_HOURS = 6 * 60 * 60;
+
     const result = await getOrSetCache(cacheKey, async () => {
-      console.log(`📡 Fetching support tickets for user ${uid} from Firestore...`);
-      const snapshot = await db.collection('supportTickets')
+      console.log(`📡 Fetching support tickets for user ${uid} (limit=${limit}, lastId=${lastId})...`);
+
+      let query = db.collection('supportTickets')
         .where('userId', '==', uid)
         .orderBy('createdAt', 'desc')
-        .get();
+        .limit(limit + 1);
 
+      if (lastId) {
+        const lastDoc = await db.collection('supportTickets').doc(lastId).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      }
+
+      const snapshot = await query.get();
       const tickets = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        tickets.push({
-          id: doc.id,
-          title: data.title || '',
-          description: data.description || '',
-          image: data.image || '',
-          status: data.status || 'open',
-          createdAt: data.createdAt || null,
-          updatedAt: data.updatedAt || null,
-        });
-      });
-      return { success: true, tickets };
-    });
+      let hasMore = false;
+      let nextId = null;
+
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i++) {
+        if (i < limit) {
+          const doc = docs[i];
+          const data = doc.data();
+          tickets.push({
+            id: doc.id,
+            title: data.title || '',
+            description: data.description || '',
+            image: data.image || '',
+            status: data.status || 'open',
+            createdAt: data.createdAt || null,
+            updatedAt: data.updatedAt || null,
+          });
+          nextId = doc.id;
+        } else {
+          hasMore = true;
+        }
+      }
+
+      return {
+        success: true,
+        tickets,
+        hasMore,
+        lastId: nextId,
+      };
+    }, SIX_HOURS);
+
     res.json(result);
   } catch (error) {
     console.error('Get support tickets error:', error);
@@ -3291,6 +3391,7 @@ app.get('/api/comments', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
     const cacheKey = 'comments:all';
+    const SIX_HOURS = 6 * 60 * 60;
     const result = await getOrSetCache(cacheKey, async () => {
       console.log('📡 Fetching comments from Firestore...');
       const snapshot = await db.collection('comments')
@@ -3302,7 +3403,7 @@ app.get('/api/comments', async (req, res) => {
         comments.push({ id: doc.id, ...doc.data() });
       });
       return { success: true, comments };
-    });
+    }, SIX_HOURS);
     res.json(result);
   } catch (error) {
     console.error('❌ Get comments error:', error);
@@ -4652,8 +4753,16 @@ async function populateExchange(data) {
 async function updateUserExchangeCache(uid, updateFn) {
   try {
     const pattern = `exchanges:${uid}:*`;
-    const keys = await redis.keys(pattern);
+    let cursor = '0';
+    let keys = [];
+    do {
+      const reply = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = reply[0];
+      keys = keys.concat(reply[1]);
+    } while (cursor !== '0');
+
     if (keys.length === 0) return;
+
     for (const key of keys) {
       const cached = await redis.get(key);
       if (!cached) continue;
@@ -4740,7 +4849,7 @@ app.post('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
 
 // ─────────────────────────────────────────────
 // 2. LIST USER'S TASKS (paginated)
-// ─────────────────────────────────────────────
+// ────────────────────────────────────────
 // ── List user's tasks (paginated, with filters) ──
 app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
   try {
@@ -4748,7 +4857,7 @@ app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     const status = req.query.status; // 'active' or 'inactive' or 'all'
     const platform = req.query.platform || null;
     const taskType = req.query.taskType || null;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const lastId = req.query.lastId || null;
 
     if (!(await checkRateLimit(uid, 'social-task-list', 20, 60))) {
@@ -4756,6 +4865,7 @@ app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
     }
 
     const cacheKey = `social-tasks:${uid}:${status || 'all'}:${platform || 'all'}:${taskType || 'all'}:${limit}:${lastId || 'null'}`;
+    const SIX_HOURS = 6 * 60 * 60;
 
     const result = await getOrSetCache(cacheKey, async () => {
       console.log(`🔁 Fetching tasks for user ${uid} with filters: status=${status}, platform=${platform}, taskType=${taskType}`);
@@ -4812,8 +4922,7 @@ app.get('/api/social-tasks', verifyToken, checkBanned, async (req, res) => {
         hasMore,
         lastId: nextId,
       };
-    });
-
+    }, SIX_HOURS);
     res.json(result);
   } catch (error) {
     console.error('List tasks error:', error);
@@ -5195,6 +5304,7 @@ app.get('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many requests.' });
     }
     const cacheKey = `exchanges:${uid}:${status || 'all'}:${limit}:${lastId || 'null'}`;
+    const SIX_HOURS = 6 * 60 * 60;
     const result = await getOrSetCache(cacheKey, async () => {
       const statuses = status ? [status] : ['active', 'completed', 'cancelled'];
       let baseQuery = db.collection('exchanges')
@@ -5217,7 +5327,7 @@ app.get('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
       const nextId = paginated.length > 0 ? paginated[paginated.length - 1].id : null;
       const populated = await Promise.all(paginated.map(populateExchange));
       return { success: true, exchanges: populated, hasMore, lastId: nextId };
-    });
+    }, SIX_HOURS);
     res.json(result);
   } catch (error) {
     console.error('List exchanges error:', error);
@@ -5406,30 +5516,6 @@ async function getProductMakerInfo(uid) {
   return result;
 }
 
-// ── Helper: Get product with maker info ──
-async function getProductWithMaker(productDoc) {
-  const data = productDoc.data();
-  const maker = await getProductMakerInfo(data.makerUid);
-  return {
-    id: productDoc.id,
-    ...data,
-    maker,
-  };
-}
-
-// ── Helper: Get user vote status ──
-async function getUserVoteStatus(productId, uid, deviceId) {
-  if (uid) {
-    const doc = await db.collection('productVotes').doc(`${productId}_user_${uid}`).get();
-    if (doc.exists) return true;
-  }
-  if (deviceId) {
-    const doc = await db.collection('productVotes').doc(`${productId}_device_${deviceId}`).get();
-    if (doc.exists) return true;
-  }
-  return false;
-}
-
 // ─────────────────────────────────────────────
 // PRODUCT TREND – SORTED SETS (Fanout‑on‑write)
 // ─────────────────────────────────────────────
@@ -5481,14 +5567,6 @@ async function getProductDetails(productId) {
   const product = { id: productId, ...data, maker };
   await cacheProductDetails(productId, product);
   return product;
-}
-
-// ── Helper: Invalidate product caches ──
-async function invalidateProductCaches(productId, makerUid) {
-  await invalidateKey(`product:${productId}`);
-  if (makerUid) {
-    await invalidateKey(`productstrend:my-products:${makerUid}`);
-  }
 }
 
 // ─────────────────────────────────────────────
