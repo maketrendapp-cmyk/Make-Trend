@@ -4,6 +4,13 @@ const withPWA = require('next-pwa')({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
+  // ── Custom service worker for FCM push notifications ──
+  // This tells next-pwa to build a custom worker from the 'worker' folder
+  // and output it to 'public' (the built file will be firebase-messaging-sw.js)
+  customWorkerSrc: 'worker',
+  customWorkerDest: 'public',
+  // If you have multiple custom workers, you can specify a file instead:
+  // customWorkerSrc: 'worker/firebase-messaging-sw.js',
 });
 
 /** @type {import('next').NextConfig} */
@@ -75,13 +82,13 @@ const nextConfig = {
         source: '/groweachother/:path*',
         destination: '/groweachother/:path*',
       },
-//community page 🤩
-{
+      // ── Community page ──
+      {
         source: '/community/:path*',
         destination: '/community/:path*',
       },
-//user profile 
-{
+      // ── User profile ──
+      {
         source: '/userinfo/:path*',
         destination: '/userinfo/:path*',
       },
