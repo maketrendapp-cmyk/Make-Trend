@@ -135,7 +135,7 @@ export default function Profile() {
       {
         icon: FiUser,
         label: 'View Profile',
-        href: isAuthenticated && displayUser.uid ? `/userprofile/${displayUser.uid}` : '/login?redirect=/profile',
+        href: isAuthenticated && displayUser.uid ? `/userinfo/${displayUser.uid}` : '/login?redirect=/profile',
         highlight: true,
       },
       {
