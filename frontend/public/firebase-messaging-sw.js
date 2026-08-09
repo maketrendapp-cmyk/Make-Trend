@@ -1,9 +1,8 @@
 // public/firebase-messaging-sw.js
-// Use a specific version (9.23.0 works) – avoid `9.x.x`
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
-// ── Complete config (include authDomain & storageBucket – safe to add) ──
+// ── Hardcoded Firebase config (safe to expose) ──
 firebase.initializeApp({
   apiKey: "AIzaSyCPQ7tqjbA2HELnJd0-wEF1g_w1oIh7oe8",
   authDomain: "make-trend.firebaseapp.com",
@@ -15,23 +14,19 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// ── Optional: log that the worker started (visible in browser console) ──
-console.log('✅ Firebase messaging service worker loaded');
-
 // ── Background message handler ──
 messaging.onBackgroundMessage((payload) => {
-  console.log('📩 Background message:', payload);
   const title = payload.notification?.title || 'MakeTrend';
   const options = {
     body: payload.notification?.body || 'You have a new notification',
-    icon: '/logo.png',
+    icon: '/favicon.ico',      // ✅ Uses your favicon
+    badge: '/favicon.ico',     // ✅ Same for badge
     data: payload.data || {},
-    badge: '/logo.png',
   };
   self.registration.showNotification(title, options);
 });
 
-// ── Notification click handler ──
+// ── Click handler – opens the redirect URL ──
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.redirectUrl || '/';
