@@ -13,6 +13,7 @@ import {
   TwitterAuthProvider,
   FacebookAuthProvider,
 } from 'firebase/auth';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging'; // ✅ ADD THIS
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -27,9 +28,12 @@ const firebaseConfig = {
 // Initialize Firebase (singleton)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
+const messaging = getMessaging(app); // ✅ ADD THIS
 
+// ── Export everything ──
 export {
   auth,
+  messaging, // ✅ EXPORT MESSAGING
   onAuthStateChanged,
   onIdTokenChanged,
   signInWithEmailAndPassword,
@@ -40,4 +44,6 @@ export {
   GoogleAuthProvider,
   TwitterAuthProvider,
   FacebookAuthProvider,
+  getToken, // ✅ EXPORT getToken
+  onMessage, // ✅ EXPORT onMessage
 };
