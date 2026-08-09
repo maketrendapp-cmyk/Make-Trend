@@ -293,8 +293,10 @@ async function invalidateUserExchanges(uid) {
 }
 
 // ── Helper: Create notification (internal, used by other endpoints) ──
+// Also sends push notifications via FCM to all registered devices.
 async function createNotification({ userId, type, title, description, redirectUrl, fromUserId = null }) {
   try {
+    // 1. Save to Firestore
     const data = {
       userId,
       type, // 'personal' or 'system'
@@ -307,8 +309,55 @@ async function createNotification({ userId, type, title, description, redirectUr
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     await db.collection('notifications').add(data);
-    // Invalidate cache for this user
     await invalidatePattern(`notifications:user:${userId}:*`);
+
+    // 2. Send push notification via Firebase Cloud Messaging
+    try {
+      const userDoc = await db.collection('users').doc(userId).get();
+      const tokens = userDoc.data()?.fcmTokens || [];
+      if (tokens.length === 0) return; // no devices registered
+
+      const message = {
+        notification: {
+          title: title.slice(0, 100),
+          body: description ? description.slice(0, 200) : 'You have a new notification',
+        },
+        data: {
+          redirectUrl: redirectUrl || '',
+          type: type,
+        },
+        tokens: tokens, // up to 100 tokens per call
+      };
+
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log(`📨 Push sent: ${response.successCount} succeeded, ${response.failureCount} failed`);
+
+      // ── Clean up invalid tokens ──
+      if (response.failureCount > 0) {
+        const invalidTokens = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            const error = resp.error;
+            if (error.code === 'messaging/registration-token-not-registered' ||
+                error.code === 'messaging/invalid-registration-token') {
+              invalidTokens.push(tokens[idx]);
+            }
+          }
+        });
+        if (invalidTokens.length > 0) {
+          const userRef = db.collection('users').doc(userId);
+          for (const token of invalidTokens) {
+            await userRef.update({
+              fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
+            });
+          }
+          console.log(`🧹 Removed ${invalidTokens.length} invalid FCM tokens`);
+        }
+      }
+    } catch (pushError) {
+      console.error('❌ Push notification error:', pushError);
+      // Do not block the main operation if push fails
+    }
   } catch (error) {
     console.error('Error creating notification:', error);
   }
@@ -2274,6 +2323,21 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
     } catch (err) {
       console.error('❌ Cache invalidation error:', err);
       // Continue even if cache fails – data is already in Firestore
+    }
+
+    // ── Send notification to the creator ──
+    try {
+      await createNotification({
+        userId: uid,
+        type: 'personal',
+        title: 'Campaign Created! 🎉',
+        description: `Your campaign "${finalTitle}" is now live. Share it with your audience!`,
+        redirectUrl: `/${templateData.slug || 'campaign'}/${campaignId}`,
+        fromUserId: uid,
+      });
+      console.log(`📬 Notification sent to ${uid} for campaign ${campaignId}`);
+    } catch (notifError) {
+      console.error('Failed to send campaign creation notification:', notifError);
     }
 
     // ── Respond to client ──
@@ -7780,7 +7844,47 @@ app.use((err, req, res, next) => {
 });
 
 
+// ── Save FCM Token (authenticated) ──
+app.post('/api/auth/fcm-token', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Token required' });
+    }
 
+    await db.collection('users').doc(uid).update({
+      fcmTokens: admin.firestore.FieldValue.arrayUnion(token),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Save FCM token error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save token' });
+  }
+});
+
+// ── Remove FCM Token (on logout) ──
+app.delete('/api/auth/fcm-token', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Token required' });
+    }
+
+    await db.collection('users').doc(uid).update({
+      fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Remove FCM token error:', error);
+    res.status(500).json({ success: false, error: 'Failed to remove token' });
+  }
+});
 
 // ============================================================
 // 19. START SERVER (unchanged)
