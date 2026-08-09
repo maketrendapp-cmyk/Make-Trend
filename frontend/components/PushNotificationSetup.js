@@ -1,24 +1,24 @@
 // components/PushNotificationSetup.js
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthScreen';
-import { messaging, getToken, onMessage } from '../services/firebase';
+import { auth, messaging, getToken, onMessage } from '../services/firebase';
 import toast from 'react-hot-toast';
 
 export default function PushNotificationSetup() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const tokenRef = useRef(null);
   const [setupAttempted, setSetupAttempted] = useState(false);
 
-  // ── Manual retry function (exposed via toast action) ──
+  // ── Manual retry function ──
   const retrySetup = () => {
     setSetupAttempted(false);
-    // Re-run the effect by toggling a state? We'll just re-run manually.
-    // We'll call the setup function directly.
     performSetup();
   };
 
   const performSetup = async () => {
-    if (!isAuthenticated || !user) {
+    const firebaseUser = auth.currentUser;
+
+    if (!isAuthenticated || !firebaseUser) {
       toast.error('Please log in first');
       return;
     }
@@ -44,7 +44,7 @@ export default function PushNotificationSetup() {
         return;
       }
 
-      // ── 3. Get token (hardcoded VAPID as fallback) ──
+      // ── 3. Get FCM token (hardcoded VAPID as fallback) ──
       const vapidKey = process.env.NEXT_PUBLIC_FCM_VAPID_KEY || 'BIwsoKSztzXOFZ2buSvIho2u7YnMgzSh2mBYZP6OkBgWcOfi0hj4zMUtJD3hraDiO6Lsl31qgLIJGN6rwdUbyXQ';
       const token = await getToken(messaging, { vapidKey });
 
@@ -56,8 +56,8 @@ export default function PushNotificationSetup() {
       tokenRef.current = token;
       toast.success('FCM token obtained!', { id: 'push-setup' });
 
-      // ── 4. Send token to backend ──
-      const idToken = await user.getIdToken();
+      // ── 4. Send token to backend using Firebase auth token ──
+      const idToken = await firebaseUser.getIdToken();
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/fcm-token`, {
         method: 'POST',
         headers: {
@@ -122,8 +122,7 @@ export default function PushNotificationSetup() {
         ), { duration: 5000 });
       });
 
-      // Cleanup listener on unmount
-      return () => unsubscribe();
+      return unsubscribe;
     } catch (error) {
       console.error('Push setup error:', error);
       toast.error(`Error: ${error.message || 'Unknown error'}`, { id: 'push-setup' });
@@ -132,15 +131,14 @@ export default function PushNotificationSetup() {
 
   // ── Auto‑run when authenticated ──
   useEffect(() => {
-    if (isAuthenticated && user && !setupAttempted) {
+    if (isAuthenticated && !setupAttempted) {
       performSetup();
     }
-    // Also handle logout: remove token
-    if (!isAuthenticated && tokenRef.current) {
-      // Remove token (optional – we'll just clear ref)
+    // On logout, clear token ref (optional)
+    if (!isAuthenticated) {
       tokenRef.current = null;
     }
-  }, [isAuthenticated, user, setupAttempted]);
+  }, [isAuthenticated, setupAttempted]);
 
   return null;
 }
