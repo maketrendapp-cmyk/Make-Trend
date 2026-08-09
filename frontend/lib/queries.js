@@ -738,7 +738,7 @@ export function useAddComment() {
   });
 }
 
-// 7. Delete a post – invalidates feed + single post
+// 7. Delete a post – invalidates feed + single post + myPosts (with reset for infinite queries)
 export function useDeletePost() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -751,9 +751,14 @@ export function useDeletePost() {
       return data;
     },
     onSuccess: (data, postId) => {
-      queryClient.invalidateQueries(['posts']);
-      queryClient.invalidateQueries(['post', postId]);
-      queryClient.invalidateQueries(['myPosts']); // Add this line
+      // Use object syntax (matching useDeleteProduct pattern)
+      queryClient.invalidateQueries({ queryKey: ['posts'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['post', postId], refetchType: 'active' });
+      
+      // For infinite queries, invalidate AND reset to clear all pages
+      queryClient.invalidateQueries({ queryKey: ['myPosts'], refetchType: 'active' });
+      queryClient.resetQueries({ queryKey: ['myPosts'] });
+      
       toast.success('Post deleted');
     },
     onError: (error) => {
