@@ -1,5 +1,5 @@
 // pages/community/myposts.js
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,6 +10,7 @@ import {
   useMyPosts,
   useLikePost,
   useDeletePost,
+  useInvalidateQueries,
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -25,6 +26,9 @@ import {
   FiEdit,
   FiTrash2,
   FiX,
+  FiSearch,
+  FiFilter,
+  FiChevronDown,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -50,6 +54,7 @@ const POST_TYPE_LABELS = {
 };
 
 const CATEGORIES = [
+  { value: 'all', label: '📌 All Categories' },
   { value: 'general', label: '📌 General' },
   { value: 'web-dev', label: '💻 Web Dev' },
   { value: 'design', label: '🎨 Design' },
@@ -63,20 +68,88 @@ const CATEGORIES = [
   { value: 'other', label: '📌 Other' },
 ];
 
+const POST_TYPES = [
+  { value: 'all', label: 'All Types' },
+  { value: 'general', label: 'General' },
+  { value: 'launch', label: '🚀 Launch' },
+  { value: 'update', label: '📢 Update' },
+  { value: 'job', label: '💼 Job' },
+  { value: 'question', label: '❓ Question' },
+  { value: 'event', label: '📅 Event' },
+  { value: 'promotional', label: '💎 Promotional' },
+];
+
 export default function MyPosts() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  const { invalidateMyPosts } = useInvalidateQueries();
   const likeMutation = useLikePost();
   const deletePostMutation = useDeletePost();
 
-  // ── Fetch profile and posts ──
-  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-  const { data: posts, isLoading: postsLoading, isError, refetch: refetchPosts } = useMyPosts(isAuthenticated);
+  // ── Filter state ──
+  const [searchInput, setSearchInput] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [appliedFilters, setAppliedFilters] = useState({ category: 'all', type: 'all', search: '' });
 
+  // ── Fetch profile ──
+  const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
+
+  // ── Fetch posts with filters ──
+  const {
+    data,
+    isLoading: postsLoading,
+    isError,
+    refetch: refetchPosts,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMyPosts(
+    {
+      category: appliedFilters.category !== 'all' ? appliedFilters.category : undefined,
+      type: appliedFilters.type !== 'all' ? appliedFilters.type : undefined,
+      search: appliedFilters.search || undefined,
+    },
+    isAuthenticated
+  );
+
+  const posts = data?.pages?.flatMap((page) => page.posts) || [];
   const isLoading = profileLoading || postsLoading;
 
-  // ── Custom delete confirmation modal state ──
+  // ── Delete modal state ──
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null });
+
+  // ── Intersection Observer for infinite scroll ──
+  const observerRef = useRef(null);
+  const lastElementRef = useCallback(
+    (node) => {
+      if (isFetchingNextPage) return;
+      if (observerRef.current) observerRef.current.disconnect();
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasNextPage) {
+          fetchNextPage();
+        }
+      });
+      if (node) observerRef.current.observe(node);
+    },
+    [isFetchingNextPage, hasNextPage, fetchNextPage]
+  );
+
+  // ── Apply filters ──
+  const applyFilters = () => {
+    setAppliedFilters({
+      category: categoryFilter,
+      type: typeFilter,
+      search: searchInput.trim(),
+    });
+  };
+
+  const clearFilters = () => {
+    setCategoryFilter('all');
+    setTypeFilter('all');
+    setSearchInput('');
+    setAppliedFilters({ category: 'all', type: 'all', search: '' });
+  };
 
   // ── Like handler ──
   const handleLike = (postId) => {
@@ -87,18 +160,18 @@ export default function MyPosts() {
     likeMutation.mutate(postId);
   };
 
-  // ── Delete handler (opens modal) ──
+  // ── Delete handlers ──
   const handleDeleteClick = (postId) => {
     setDeleteModal({ isOpen: true, postId });
   };
 
-  // ── Confirm delete ──
   const confirmDelete = () => {
     if (deleteModal.postId) {
       deletePostMutation.mutate(deleteModal.postId, {
         onSuccess: () => {
           setDeleteModal({ isOpen: false, postId: null });
-          toast.success('Post deleted successfully');
+          invalidateMyPosts();
+          toast.success('Post deleted');
         },
         onError: (error) => {
           toast.error(error.message || 'Failed to delete post');
@@ -108,7 +181,6 @@ export default function MyPosts() {
     }
   };
 
-  // ── Cancel delete ──
   const cancelDelete = () => {
     setDeleteModal({ isOpen: false, postId: null });
   };
@@ -118,7 +190,7 @@ export default function MyPosts() {
     const url = `${window.location.origin}/community/post/${postId}`;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success('Link copied to clipboard!');
+      toast.success('Link copied!');
     } catch {
       const textArea = document.createElement('textarea');
       textArea.value = url;
@@ -186,7 +258,6 @@ export default function MyPosts() {
     );
   }
 
-  // ── Not authenticated ──
   if (!isAuthenticated) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 text-center">
@@ -203,7 +274,6 @@ export default function MyPosts() {
     );
   }
 
-  // ── Error state ──
   if (isError) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 text-center">
@@ -220,10 +290,11 @@ export default function MyPosts() {
     );
   }
 
-  // ── Use profile data for post author info ──
   const authorName = profile?.fullname || profile?.username || 'Anonymous';
   const authorAvatar = profile?.avatar || '';
   const authorUid = user?.uid;
+
+  const hasActiveFilters = appliedFilters.category !== 'all' || appliedFilters.type !== 'all' || appliedFilters.search;
 
   return (
     <>
@@ -240,9 +311,7 @@ export default function MyPosts() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">My Posts</h1>
-              <p className="text-sm text-slate-400">
-                {profile?.fullname || profile?.username || 'Your'} posts
-              </p>
+              <p className="text-sm text-slate-400">{posts.length} posts</p>
             </div>
           </div>
           <Link
@@ -284,22 +353,93 @@ export default function MyPosts() {
           </div>
         )}
 
+        {/* ── Filters ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-3">
+            {/* Search */}
+            <div className="flex-1 relative">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search your posts..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+              />
+            </div>
+
+            {/* Category */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full md:w-44 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none"
+            >
+              {CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+
+            {/* Type */}
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="w-full md:w-44 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none"
+            >
+              {POST_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+
+            {/* Buttons */}
+            <button
+              onClick={applyFilters}
+              className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium whitespace-nowrap"
+            >
+              Apply
+            </button>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition text-sm font-medium whitespace-nowrap"
+              >
+                <FiX className="inline w-4 h-4 mr-1" /> Clear
+              </button>
+            )}
+          </div>
+          {hasActiveFilters && (
+            <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400">
+              Filters active: {appliedFilters.category !== 'all' && `Category: ${appliedFilters.category} `}
+              {appliedFilters.type !== 'all' && `Type: ${appliedFilters.type} `}
+              {appliedFilters.search && `Search: "${appliedFilters.search}"`}
+            </div>
+          )}
+        </div>
+
         {/* ── Posts List ── */}
-        {posts && posts.length === 0 ? (
+        {posts.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">📝</div>
-            <h3 className="text-lg font-semibold text-slate-900">No posts yet</h3>
-            <p className="text-slate-500 text-sm">Share your first post with the community!</p>
-            <Link
-              href="/community/create"
-              className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
-            >
-              <FiPlus className="w-4 h-4" /> Create Post
-            </Link>
+            <h3 className="text-lg font-semibold text-slate-900">
+              {hasActiveFilters ? 'No matching posts' : 'No posts yet'}
+            </h3>
+            <p className="text-slate-500 text-sm">
+              {hasActiveFilters
+                ? 'Try adjusting your filters.'
+                : 'Share your first post with the community!'}
+            </p>
+            {!hasActiveFilters && (
+              <Link
+                href="/community/create"
+                className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+              >
+                <FiPlus className="w-4 h-4" /> Create Post
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-5">
-            {posts.map((post) => {
+            {posts.map((post, index) => {
               const isLiked = post.userLiked || false;
               const postTypeIcon = POST_TYPE_ICONS[post.type] || '📌';
               const postTypeLabel = POST_TYPE_LABELS[post.type] || 'General';
@@ -311,8 +451,9 @@ export default function MyPosts() {
                 <div
                   key={post.id}
                   className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition"
+                  ref={index === posts.length - 1 ? lastElementRef : null}
                 >
-                  {/* ── Post Header (using profile data) ── */}
+                  {/* ── Post Header ── */}
                   <div className="flex items-start gap-3">
                     <Link href={`/userinfo/${authorUid}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
@@ -434,7 +575,6 @@ export default function MyPosts() {
                       <span>{post.commentsCount || 0}</span>
                     </Link>
 
-                    {/* ── EDIT ── */}
                     <Link
                       href={`/community/edit/${post.id}`}
                       className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition"
@@ -443,7 +583,6 @@ export default function MyPosts() {
                       <span>Edit</span>
                     </Link>
 
-                    {/* ── DELETE ── */}
                     <button
                       onClick={() => handleDeleteClick(post.id)}
                       disabled={deletePostMutation.isLoading}
@@ -457,7 +596,6 @@ export default function MyPosts() {
                       <span>Delete</span>
                     </button>
 
-                    {/* ── SHARE ── */}
                     <button
                       onClick={() => handleShare(post.id)}
                       className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition ml-auto"
@@ -472,7 +610,27 @@ export default function MyPosts() {
           </div>
         )}
 
-        {/* ── Custom Delete Confirmation Modal ── */}
+        {/* ── Infinite scroll loading ── */}
+        {hasNextPage && (
+          <div className="py-6 flex justify-center">
+            {isFetchingNextPage ? (
+              <div className="flex items-center gap-2 text-slate-400">
+                <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
+                Loading more...
+              </div>
+            ) : (
+              <div className="h-4" />
+            )}
+          </div>
+        )}
+
+        {!hasNextPage && posts.length > 0 && (
+          <p className="text-center text-xs text-slate-400 py-6">
+            You've seen all your posts 🎉
+          </p>
+        )}
+
+        {/* ── Delete Modal ── */}
         {deleteModal.isOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fadeIn">
