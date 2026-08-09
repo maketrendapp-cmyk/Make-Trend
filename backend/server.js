@@ -2066,8 +2066,9 @@ app.get('/api/campaigns/:id', async (req, res) => {
       }
       result = { success: true, campaign: { id: doc.id, ...campaignData } };
       try {
-        await redis.set(cacheKey, JSON.stringify(result));
-        console.log(`💾 Campaign cached (60s TTL): ${id}`);
+        const SIX_HOURS = 6 * 60 * 60; // 21600 seconds
+        await redis.set(cacheKey, JSON.stringify(result), 'EX', SIX_HOURS);
+        console.log(`💾 Campaign cached (6 hours TTL): ${id}`);
       } catch (err) { /* ignore */ }
     }
 
