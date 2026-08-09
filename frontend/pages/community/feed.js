@@ -1,5 +1,5 @@
 // pages/community/feed.js
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,7 +18,8 @@ import {
   FiExternalLink,
   FiPlay,
   FiChevronUp,
-  FiUser, // 👈 added for My Posts button
+  FiUser,
+  FiSearch,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -89,16 +90,28 @@ export default function CommunityFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const likeMutation = useLikePost();
 
+  // ── Filter state ──
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [appliedCategory, setAppliedCategory] = useState('all');
   const [appliedType, setAppliedType] = useState('all');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [expandedPosts, setExpandedPosts] = useState(new Set());
 
-  const likeMutation = useLikePost();
+  // ── Build filters object ──
+  const filters = useMemo(() => {
+    const f = {};
+    if (appliedCategory !== 'all') f.category = appliedCategory;
+    if (appliedType !== 'all') f.type = appliedType;
+    if (searchQuery.trim()) f.search = searchQuery.trim();
+    return f;
+  }, [appliedCategory, appliedType, searchQuery]);
 
+  // ── React Query ──
   const {
     data,
     isLoading,
@@ -108,18 +121,11 @@ export default function CommunityFeed() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePosts(
-    appliedCategory === 'all' ? null : appliedCategory,
-    appliedType === 'all' ? null : appliedType,
-    true
-  );
+  } = usePosts(filters, true);
 
   const posts = data?.pages?.flatMap((page) => page.posts) || [];
 
-  const getFeedQueryKey = () => {
-    return ['posts', appliedCategory === 'all' ? 'all' : appliedCategory, appliedType === 'all' ? 'all' : appliedType];
-  };
-
+  // ── Apply filters ──
   const applyFilters = () => {
     setAppliedCategory(selectedCategory);
     setAppliedType(selectedType);
@@ -131,9 +137,23 @@ export default function CommunityFeed() {
     setSelectedType('all');
     setAppliedCategory('all');
     setAppliedType('all');
+    setSearchInput('');
+    setSearchQuery('');
     setIsFilterOpen(false);
   };
 
+  const handleSearch = () => {
+    setSearchQuery(searchInput);
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+
+  // ── Intersection Observer for infinite scroll ──
   const observerRef = useRef(null);
   const lastElementRef = useCallback(
     (node) => {
@@ -149,14 +169,14 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler: optimistic update + localStorage ──
+  // ── Like handler with fixed query key ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
 
-    const queryKey = getFeedQueryKey();
+    const queryKey = ['posts', filters];
     const currentData = queryClient.getQueryData(queryKey);
     if (!currentData) {
       toast.error('Post not found');
@@ -371,6 +391,8 @@ export default function CommunityFeed() {
     );
   }
 
+  const hasActiveFilters = appliedCategory !== 'all' || appliedType !== 'all' || searchQuery;
+
   return (
     <>
       <Meta
@@ -395,7 +417,6 @@ export default function CommunityFeed() {
                 >
                   <span>+</span> Create Post
                 </Link>
-                {/* ── NEW: My Posts button ── */}
                 <Link
                   href="/community/myposts"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium"
@@ -410,11 +431,53 @@ export default function CommunityFeed() {
             >
               <FiFilter className="w-4 h-4" />
               Filters
-              {(appliedCategory !== 'all' || appliedType !== 'all') && (
+              {hasActiveFilters && (
                 <span className="w-2 h-2 bg-purple-600 rounded-full" />
               )}
             </button>
           </div>
+        </div>
+
+        {/* ── Search Bar ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mb-4">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search posts or @username..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+              />
+              {searchInput && (
+                <button
+                  onClick={() => setSearchInput('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={handleSearch}
+              className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5"
+            >
+              <FiSearch className="w-4 h-4" /> Search
+            </button>
+          </div>
+          {searchQuery && (
+            <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
+              <span>Searching for: <strong className="text-slate-600">{searchQuery}</strong></span>
+              <button
+                onClick={() => { setSearchInput(''); setSearchQuery(''); }}
+                className="text-red-500 hover:text-red-700 font-medium"
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Filter Panel ── */}
@@ -480,7 +543,7 @@ export default function CommunityFeed() {
         )}
 
         {/* ── Active filters indicator ── */}
-        {(appliedCategory !== 'all' || appliedType !== 'all') && (
+        {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <span className="text-xs text-slate-500 font-medium">Active filters:</span>
             {appliedCategory !== 'all' && (
@@ -511,6 +574,17 @@ export default function CommunityFeed() {
                 </button>
               </span>
             )}
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
+                Search: {searchQuery}
+                <button
+                  onClick={() => { setSearchInput(''); setSearchQuery(''); }}
+                  className="hover:text-red-500"
+                >
+                  <FiX className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             <button
               onClick={clearFilters}
               className="text-xs text-red-500 hover:text-red-700 font-medium"
@@ -527,10 +601,12 @@ export default function CommunityFeed() {
             <h3 className="text-lg font-semibold text-slate-900">No posts found</h3>
             <p className="text-slate-500 text-sm">
               {isAuthenticated
-                ? 'Be the first to share something!'
+                ? searchQuery
+                  ? 'No results match your search. Try adjusting your query.'
+                  : 'Be the first to share something!'
                 : 'Sign in to join the conversation.'}
             </p>
-            {isAuthenticated && (
+            {isAuthenticated && !searchQuery && (
               <Link
                 href="/community/create"
                 className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
@@ -690,7 +766,7 @@ export default function CommunityFeed() {
                     </div>
                   )}
 
-                  {/* ── Actions with border styling ── */}
+                  {/* ── Actions ── */}
                   <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => handleLike(post.id)}
