@@ -14,7 +14,6 @@ export default function DesktopNav({
   firstLetter,
   isPro,
   handleLogout,
-  unreadCount = 0, // optional, for badge
 }) {
   const router = useRouter();
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -39,7 +38,7 @@ export default function DesktopNav({
 
   return (
     <div className="flex items-center gap-3">
-      {/* ── Home Button ── */}
+      {/* ── Home ── */}
       <Link
         href="/"
         className={`
@@ -54,12 +53,12 @@ export default function DesktopNav({
         <span>Home</span>
       </Link>
 
-      {/* ── Notification Icon (only if authenticated) ── */}
+      {/* ── Notification (no badge, no API call) ── */}
       {isAuthenticated && (
         <Link
           href="/notifications"
           className={`
-            relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200
+            flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200
             ${isActive('/notifications')
               ? 'bg-purple-100 text-purple-700 shadow-sm'
               : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -68,15 +67,10 @@ export default function DesktopNav({
           aria-label="Notifications"
         >
           <FiBell className="w-5 h-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
         </Link>
       )}
 
-      {/* ── User Avatar / Dropdown ── */}
+      {/* ── User Dropdown ── */}
       {isAuthenticated ? (
         <div className="relative" ref={dropdownRef}>
           <button
