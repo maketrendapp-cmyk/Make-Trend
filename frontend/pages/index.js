@@ -1,4 +1,3 @@
-
 // pages/index.js
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
@@ -17,8 +16,10 @@ import {
   FiArrowRight,
   FiEdit,
   FiShare2,
+  FiMessageCircle,
+  FiHeart,
 } from 'react-icons/fi';
-import { FaRocket } from 'react-icons/fa';
+import { FaRocket, FaHandshake } from 'react-icons/fa';
 
 // ── Custom hooks ──
 function useFadeUp(threshold = 0.1) {
@@ -111,14 +112,12 @@ export default function Home({ initialFeaturedTemplates }) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // ── Hydrate React Query cache with pre‑fetched data ──
+  // ── Hydrate React Query cache ──
   useEffect(() => {
     queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
   }, [initialFeaturedTemplates, queryClient]);
 
-  // ── React Query data ──
   const { data: featuredTemplates, isLoading: featuredLoading } = useFeaturedTemplates({}, initialFeaturedTemplates);
-
   const hasInitialData = initialFeaturedTemplates && initialFeaturedTemplates.length > 0;
   const isLoading = featuredLoading && !hasInitialData;
 
@@ -134,6 +133,9 @@ export default function Home({ initialFeaturedTemplates }) {
   const carouselFade = useFadeUp(0.1);
   const featuresFade = useFadeUp(0.1);
   const ctaFade = useFadeUp(0.1);
+  const communityFade = useFadeUp(0.1);
+  const growFade = useFadeUp(0.1);
+  const productFade = useFadeUp(0.1);
 
   // ── Stats ──
   const stats = [
@@ -148,7 +150,7 @@ export default function Home({ initialFeaturedTemplates }) {
   const counter4 = useCounter(1200);
   const counters = [counter1, counter2, counter3, counter4];
 
-  // ── Carousel auto‑slide ──
+  // ── Carousel ──
   useEffect(() => {
     if (featuredTemplates?.length > 1 && !isHovering) {
       carouselIntervalRef.current = setInterval(() => {
@@ -182,11 +184,8 @@ export default function Home({ initialFeaturedTemplates }) {
     const touchEndX = e.changedTouches[0].clientX;
     const diff = touchStartXRef.current - touchEndX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        nextSlide();
-      } else {
-        prevSlide();
-      }
+      if (diff > 0) nextSlide();
+      else prevSlide();
     }
   };
 
@@ -194,7 +193,6 @@ export default function Home({ initialFeaturedTemplates }) {
     router.push(`/createcampaign?slug=${slug}`);
   };
 
-  // ── Search handler ──
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -204,7 +202,7 @@ export default function Home({ initialFeaturedTemplates }) {
     }
   };
 
-  // ── Render carousel with Next.js Image Optimization ──
+  // ── Render carousel ──
   const renderCarousel = () => {
     if (isLoading) {
       return (
@@ -368,7 +366,7 @@ export default function Home({ initialFeaturedTemplates }) {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Make Trend",
-"alternateName": "MakeTrend",
+    "alternateName": "MakeTrend",
     "url": siteUrl,
     "description": "Create viral share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates.",
     "potentialAction": {
@@ -395,8 +393,8 @@ export default function Home({ initialFeaturedTemplates }) {
   return (
     <>
       <Meta
-        title="Viral Campaign Maker Platform for Creators"
-        description="Create share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates."
+        title="Viral Campaign Maker – Community, Growth & Product Launch"
+        description="Create share‑to‑unlock campaigns, connect with creators in the Community, grow your social presence with Grow Together, and launch your products on ProductTrend – all on Make Trend."
         url="/"
         image="https://maketrend.app/og-image.png"
         type="website"
@@ -437,9 +435,10 @@ export default function Home({ initialFeaturedTemplates }) {
             </h1>
             <p className="mt-4 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto">
               Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2 minutes.
+              Plus, connect with the community, grow your social presence, and launch your own products.
             </p>
 
-            {/* ── Search Bar ── */}
+            {/* ── Search ── */}
             <div className="max-w-xl mx-auto mt-8">
               <form onSubmit={handleSearch} className="flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition focus-within:ring-2 focus-within:ring-purple-300 focus-within:border-purple-400">
                 <input
@@ -503,7 +502,7 @@ export default function Home({ initialFeaturedTemplates }) {
           </div>
         </section>
 
-        {/* ── Featured Carousel ── */}
+        {/* ── Featured Templates Carousel ── */}
         <section
           ref={carouselFade.ref}
           className={`py-16 px-4 transition-all duration-700 ${
@@ -562,12 +561,12 @@ export default function Home({ initialFeaturedTemplates }) {
           </div>
         </section>
 
-        {/* ── Why Make Trend ── */}
+        {/* ── Why Make Trend? ── */}
         <section className="py-16 px-4 bg-gray-50/50">
           <div className="max-w-6xl mx-auto">
             <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">Why Make Trend?</h2>
             <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
-              Everything you need to launch, track, and grow your campaigns – all in one place.
+              Everything you need to launch, track, and grow your campaigns – plus connect with the community.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
@@ -592,11 +591,86 @@ export default function Home({ initialFeaturedTemplates }) {
                 <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
                   <FiUsers />
                 </div>
-                <h3 className="font-bold text-slate-900">Grow Your Audience</h3>
+                <h3 className="font-bold text-slate-900">Community & Growth</h3>
                 <p className="text-slate-500 text-sm mt-1">
-                  Built‑in referral tracking and social sharing features to expand your reach.
+                  Connect with creators, exchange tasks, and launch products – all in one ecosystem.
                 </p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── NEW: Community, Grow Together, ProductTrend ── */}
+        <section className="py-16 px-4 bg-white/80">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              
+              {/* Community Feed */}
+              <div
+                ref={communityFade.ref}
+                className={`bg-white rounded-3xl border border-slate-200 p-8 text-center shadow-sm hover:shadow-lg transition-all duration-500 ${
+                  communityFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                }`}
+              >
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
+                  <FiUsers className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Community Feed</h3>
+                <p className="text-slate-500 text-sm mt-2">
+                  Connect with other creators, share updates, and discover trending content. Like, comment, and grow together.
+                </p>
+                <button
+                  onClick={() => router.push('/community')}
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-700 transition"
+                >
+                  Explore Community <FiArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Grow Together */}
+              <div
+                ref={growFade.ref}
+                className={`bg-gradient-to-br from-green-50/80 to-emerald-50/80 rounded-3xl border border-green-200/60 p-8 text-center shadow-sm hover:shadow-lg transition-all duration-500 ${
+                  growFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                }`}
+              >
+                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-green-600">
+                  <FaHandshake className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Grow Together</h3>
+                <p className="text-slate-500 text-sm mt-2">
+                  Exchange social tasks with other creators. Help each other grow by completing tasks like follows, likes, and shares.
+                </p>
+                <button
+                  onClick={() => router.push('/groweachother')}
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:text-green-700 transition"
+                >
+                  Start Growing <FiArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* ProductTrend */}
+              <div
+                ref={productFade.ref}
+                className={`bg-gradient-to-br from-indigo-50/80 to-blue-50/80 rounded-3xl border border-indigo-200/60 p-8 text-center shadow-sm hover:shadow-lg transition-all duration-500 ${
+                  productFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                }`}
+              >
+                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-600">
+                  <FaRocket className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">ProductTrend</h3>
+                <p className="text-slate-500 text-sm mt-2">
+                  Launch your own product, get upvotes, and showcase your work to the community. The next big thing starts here.
+                </p>
+                <button
+                  onClick={() => router.push('/productstrend')}
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition"
+                >
+                  Launch Product <FiArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
             </div>
           </div>
         </section>
@@ -611,7 +685,7 @@ export default function Home({ initialFeaturedTemplates }) {
           <div className="max-w-4xl mx-auto bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl p-8 sm:p-12 text-center text-white shadow-xl">
             <h2 className="text-3xl font-bold">Ready to Make Your Trend?</h2>
             <p className="mt-2 text-purple-100 max-w-2xl mx-auto">
-              Join thousands of creators who are already launching successful campaigns with Make Trend.
+              Join thousands of creators who are already launching successful campaigns, connecting with the community, and growing their presence on Make Trend.
             </p>
             <button
               onClick={() => router.push('/create')}
@@ -638,7 +712,7 @@ export default function Home({ initialFeaturedTemplates }) {
   );
 }
 
-// ── Pre‑fetch featured templates at build time ──
+// ── ISR ──
 export async function getStaticProps() {
   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
   if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
