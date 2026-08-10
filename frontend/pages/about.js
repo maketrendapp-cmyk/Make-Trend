@@ -1,25 +1,47 @@
-// pages/index.js
-import { useState, useRef, useCallback, useEffect } from 'react';
+// pages/about.js
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useQueryClient } from '@tanstack/react-query';
 import Head from 'next/head';
-import Image from 'next/image';
 import Meta from '../components/Meta';
-import { useFeaturedTemplates } from '../lib/queries';
 import {
+  FiTarget,
   FiZap,
   FiTrendingUp,
   FiUsers,
-  FiChevronRight,
-  FiChevronLeft,
-  FiSearch,
   FiArrowRight,
-  FiEdit,
-  FiShare2,
+  FiChevronRight,
+  FiStar,
+  FiSend,
+  FiUser,
   FiMessageCircle,
+  FiSearch,
+  FiAward,
   FiHeart,
+  FiShield,
+  FiGlobe,
+  FiBookOpen,
+  FiPlus,
+  FiMinus,
+  FiMapPin,
+  FiClock,
+  FiMail,
+  FiTwitter,
+  FiInstagram,
+  FiYoutube,
+  FiFacebook,
+  FiCalendar,
+  FiDollarSign,
+  FiRss,
+  FiLink,
+  FiGithub,
 } from 'react-icons/fi';
-import { FaRocket, FaHandshake } from 'react-icons/fa';
+import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin, FaCoins, FaRocket as FaRocketLaunch } from 'react-icons/fa';
+import { useAuth } from '../components/AuthScreen';
+import { useComments, useInvalidateQueries } from '../lib/queries';
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 
 // ── Custom hooks ──
 function useFadeUp(threshold = 0.1) {
@@ -81,118 +103,149 @@ function useCounter(target, duration = 2000, startOnView = true) {
   return { count, ref };
 }
 
-// ── Emoji mapping for categories ──
-const getCategoryEmoji = (cat) => {
-  const emojis = {
-    giveaway: '🎁',
-    simcard: '📱',
-    contest: '🏆',
-    growth: '📈',
-    engagement: '💬',
-    followers: '👥',
-    views: '👁️',
-    likes: '❤️',
-    tiktok: '🎵',
-    instagram: '📸',
-    youtube: '▶️',
-    default: '✨',
-  };
-  return emojis[cat?.toLowerCase()] || emojis.default;
-};
+// ── StarRating component ──
+function StarRating({ rating, setRating, readonly = false }) {
+  const stars = [];
+  for (let i = 1; i <= 5; i++) {
+    stars.push(
+      <button
+        key={i}
+        type="button"
+        onClick={() => !readonly && setRating(i)}
+        className={`text-2xl transition-all ${i <= rating ? 'text-yellow-400' : 'text-gray-300'} ${!readonly && 'hover:scale-110'}`}
+        disabled={readonly}
+        aria-label={`Rate ${i} stars`}
+      >
+        ★
+      </button>
+    );
+  }
+  return <div className="flex gap-0.5">{stars}</div>;
+}
 
-const platformBadgeStyles = {
-  tiktok: 'bg-black text-white',
-  instagram: 'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white',
-  youtube: 'bg-[#FF0000] text-white',
-  facebook: 'bg-[#1877F2] text-white',
-  all: 'bg-slate-800 text-white',
-};
+// ── FAQ Accordion Item ──
+function FaqItem({ question, answer, isOpen, toggle }) {
+  return (
+    <div className="border-b border-gray-200 last:border-0">
+      <button
+        onClick={toggle}
+        className="w-full flex items-center justify-between py-4 text-left hover:text-purple-600 transition group"
+      >
+        <span className="font-medium text-gray-800 group-hover:text-purple-600">{question}</span>
+        <span className="text-gray-400 group-hover:text-purple-600 transition">
+          {isOpen ? <FiMinus className="w-5 h-5" /> : <FiPlus className="w-5 h-5" />}
+        </span>
+      </button>
+      {isOpen && (
+        <div className="pb-4 text-gray-600 text-sm leading-relaxed animate-fadeIn">
+          {answer}
+        </div>
+      )}
+    </div>
+  );
+}
 
-export default function Home({ initialFeaturedTemplates }) {
+// ── Milestone card ──
+function Milestone({ year, title, description, icon }) {
+  return (
+    <div className="flex gap-4 items-start">
+      <div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-xl">
+        {icon}
+      </div>
+      <div>
+        <div className="text-sm font-bold text-purple-600">{year}</div>
+        <h4 className="font-bold text-gray-800">{title}</h4>
+        <p className="text-sm text-gray-500">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function About() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-
-  // ── Hydrate React Query cache ──
-  useEffect(() => {
-    queryClient.setQueryData(['featuredTemplates'], initialFeaturedTemplates);
-  }, [initialFeaturedTemplates, queryClient]);
-
-  const { data: featuredTemplates, isLoading: featuredLoading } = useFeaturedTemplates({}, initialFeaturedTemplates);
-  const hasInitialData = initialFeaturedTemplates && initialFeaturedTemplates.length > 0;
-  const isLoading = featuredLoading && !hasInitialData;
-
-  const [carouselIndex, setCarouselIndex] = useState(0);
-  const [isHovering, setIsHovering] = useState(false);
+  const { user } = useAuth();
+  const { data: comments = [], isLoading: commentsLoading } = useComments();
+  const { invalidateComments } = useInvalidateQueries();
+  const [commentName, setCommentName] = useState('');
+  const [commentText, setCommentText] = useState('');
+  const [commentRating, setCommentRating] = useState(5);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const carouselIntervalRef = useRef(null);
-  const touchStartXRef = useRef(0);
+  const [openFaqIndex, setOpenFaqIndex] = useState(null);
+  const loadingComments = commentsLoading;
+
+  const toggleFaq = (index) => {
+    setOpenFaqIndex(openFaqIndex === index ? null : index);
+  };
 
   // ── Fade‑up hooks ──
   const heroFade = useFadeUp(0.1);
-  const statsFade = useFadeUp(0.1);
-  const carouselFade = useFadeUp(0.1);
+  const whatIsFade = useFadeUp(0.1);
+  const storyFade = useFadeUp(0.1);
+  const missionFade = useFadeUp(0.1);
+  const valuesFade = useFadeUp(0.1);
   const featuresFade = useFadeUp(0.1);
+  const exploreFade = useFadeUp(0.1); // NEW
+  const milestonesFade = useFadeUp(0.1);
+  const statsFade = useFadeUp(0.1);
+  const partnersFade = useFadeUp(0.1);
+  const testimonialsFade = useFadeUp(0.1);
+  const faqFade = useFadeUp(0.1);
   const ctaFade = useFadeUp(0.1);
-  const communityFade = useFadeUp(0.1);
-  const growFade = useFadeUp(0.1);
-  const productFade = useFadeUp(0.1);
+  const earnFade = useFadeUp(0.1);
 
-  // ── Stats ──
+  // ── Stats counters ──
   const stats = [
-    { label: 'Campaigns Created', target: 5000, suffix: '+' },
-    { label: 'Total Shares', target: 10000, suffix: 'K+' },
-    { label: 'Templates', target: 500, suffix: '+' },
-    { label: 'Active Users', target: 1200, suffix: '+' },
+    { label: 'Campaigns Launched', target: 1200, suffix: '+' },
+    { label: 'Active Users', target: 500, suffix: '+' },
+    { label: 'Templates Available', target: 50, suffix: '+' },
+    { label: 'Total Shares', target: 10000, suffix: '+' },
   ];
-  const counter1 = useCounter(5000);
-  const counter2 = useCounter(10000);
-  const counter3 = useCounter(500);
-  const counter4 = useCounter(1200);
-  const counters = [counter1, counter2, counter3, counter4];
+  const counters = stats.map(s => useCounter(s.target));
 
-  // ── Carousel ──
-  useEffect(() => {
-    if (featuredTemplates?.length > 1 && !isHovering) {
-      carouselIntervalRef.current = setInterval(() => {
-        setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-      }, 2000);
+  // ── Submit comment ──
+  const handleSubmitComment = async (e) => {
+    e.preventDefault();
+    setSubmitMessage('');
+    if (commentName.trim().length < 2) {
+      setSubmitMessage('Please enter your name (at least 2 characters).');
+      return;
     }
-    return () => {
-      if (carouselIntervalRef.current) clearInterval(carouselIntervalRef.current);
-    };
-  }, [featuredTemplates?.length, isHovering]);
-
-  const goToSlide = useCallback((index) => {
-    setCarouselIndex(index);
-  }, []);
-
-  const nextSlide = useCallback(() => {
-    if (!featuredTemplates?.length) return;
-    setCarouselIndex((prev) => (prev + 1) % featuredTemplates.length);
-  }, [featuredTemplates?.length]);
-
-  const prevSlide = useCallback(() => {
-    if (!featuredTemplates?.length) return;
-    setCarouselIndex((prev) => (prev - 1 + featuredTemplates.length) % featuredTemplates.length);
-  }, [featuredTemplates?.length]);
-
-  const handleTouchStart = (e) => {
-    touchStartXRef.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartXRef.current - touchEndX;
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) nextSlide();
-      else prevSlide();
+    if (commentText.trim().length < 3) {
+      setSubmitMessage('Please enter a comment (at least 3 characters).');
+      return;
+    }
+    if (commentRating < 1 || commentRating > 5) {
+      setSubmitMessage('Please select a rating.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const payload = { name: commentName.trim(), comment: commentText.trim(), rating: commentRating };
+      const res = await fetch(`${BACKEND_URL}/api/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSubmitMessage('✅ Thank you for your feedback!');
+        setCommentName(''); setCommentText(''); setCommentRating(5);
+        await invalidateComments();
+        setTimeout(() => setSubmitMessage(''), 5000);
+      } else {
+        setSubmitMessage(data.error || 'Failed to submit comment.');
+      }
+    } catch (err) {
+      console.error('Submit error:', err);
+      setSubmitMessage('Network error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleUseTemplate = (slug) => {
-    router.push(`/createcampaign?slug=${slug}`);
-  };
-
+  // ── Search ──
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -202,497 +255,809 @@ export default function Home({ initialFeaturedTemplates }) {
     }
   };
 
-  // ── Render carousel ──
-  const renderCarousel = () => {
-    if (isLoading) {
-      return (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 sm:p-6 animate-pulse">
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-            <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-200 rounded-xl" />
-            <div className="flex-1 space-y-3">
-              <div className="h-6 bg-slate-200 rounded w-3/4" />
-              <div className="h-4 bg-slate-200 rounded w-1/2" />
-              <div className="h-4 bg-slate-200 rounded w-2/3" />
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <div className="h-9 bg-slate-200 rounded-xl" />
-                <div className="h-9 bg-slate-200 rounded-xl" />
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
+  // ── Data ──
+  const coreValues = [
+    { icon: <FiHeart className="w-5 h-5" />, title: 'User‑First', description: 'We build everything with our users in mind.' },
+    { icon: <FiZap className="w-5 h-5" />, title: 'Innovation', description: 'We constantly improve and adapt to trends.' },
+    { icon: <FiShield className="w-5 h-5" />, title: 'Trust & Transparency', description: 'Your data is safe and we communicate openly.' },
+    { icon: <FiGlobe className="w-5 h-5" />, title: 'Global Community', description: 'We connect creators from all over the world.' },
+  ];
 
-    if (!featuredTemplates || featuredTemplates.length === 0) {
-      return (
-        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
-          <p className="text-slate-500">No featured templates available.</p>
-        </div>
-      );
-    }
+  const features = [
+    { icon: <FaRocket className="w-5 h-5" />, title: 'Launch Campaigns Instantly', description: 'Choose from professionally designed templates and launch in under 60 seconds.' },
+    { icon: <FaChartLine className="w-5 h-5" />, title: 'Real‑Time Analytics', description: 'Track views, unlocks, shares, and completions – all in one dashboard.' },
+    { icon: <FaUserFriends className="w-5 h-5" />, title: 'Referral & Affiliate System', description: 'Grow your network with built‑in referral tracking and rewards.' },
+    { icon: <FaLock className="w-5 h-5" />, title: 'Secure & Private', description: 'Your data is encrypted and protected. We never share with third parties.' },
+    { icon: <FaCrown className="w-5 h-5" />, title: 'Pro Features', description: 'Unlock advanced templates, priority support, and more.' },
+    { icon: <FiTrendingUp className="w-5 h-5" />, title: 'Trending Insights', description: 'Discover what’s trending and optimise your campaigns.' },
+  ];
 
-    return (
-      <div
-        className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm"
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div
-          className="flex transition-transform duration-500 ease-in-out"
-          style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
-        >
-          {featuredTemplates.map((template, index) => (
-            <div key={template.id} className="w-full flex-shrink-0">
-              <div className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                  <div className="w-full sm:w-56 h-48 sm:h-auto bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm relative">
-                    {template.image ? (
-                      <Image
-                        src={template.image}
-                        alt={template.title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 640px) 100vw, 224px"
-                        priority={index === 0}
-                        loading={index === 0 ? 'eager' : 'lazy'}
-                        quality={80}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-5xl text-slate-300">🎨</div>
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                        {template.platform && (
-                          <span
-                            className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
-                              platformBadgeStyles[template.platform] || 'bg-slate-800 text-white'
-                            }`}
-                          >
-                            {template.platform}
-                          </span>
-                        )}
-                        <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded flex items-center">
-                          👥 {template.usageCount || 0} uses
-                        </span>
-                        {template.category && (
-                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                            {getCategoryEmoji(template.category)} {template.category}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-2xl font-bold text-slate-900">{template.title}</h3>
-                      <p className="text-slate-500 text-sm mt-1 line-clamp-2">
-                        {template.description || 'Launch your campaign with this template.'}
-                      </p>
-                      {template.reward && (
-                        <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-0.5 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-lg w-fit">
-                          🎁 {template.reward}
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => router.push(`/${template.slug}`)}
-                        className="flex items-center justify-center gap-1 text-[11px] font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl py-2 transition active:scale-95"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        Preview
-                      </button>
-                      <button
-                        onClick={() => handleUseTemplate(template.slug)}
-                        className="flex items-center justify-center gap-1 text-[11px] font-black text-white bg-purple-600 hover:bg-purple-700 rounded-xl py-2 transition shadow-sm active:scale-95"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                        </svg>
-                        Use Template
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+  // ── NEW: Explore More sections ──
+  const exploreSections = [
+    {
+      icon: <FiRss className="w-5 h-5" />,
+      title: 'Community Feed',
+      href: '/community',
+      description: 'Discover posts from the Make Trend community – product launches, updates, questions, and more. Like, comment, and share to grow together.',
+      color: 'from-purple-500 to-pink-500',
+      tag: 'Social Hub',
+    },
+    {
+      icon: <FiUsers className="w-5 h-5" />,
+      title: 'Grow Together',
+      href: '/groweachother',
+      description: 'Exchange tasks with other creators. Add a task you need help with, and complete someone else’s in return. Grow your social presence together.',
+      color: 'from-green-500 to-emerald-500',
+      tag: 'Task Exchange',
+    },
+    {
+      icon: <FaRocketLaunch className="w-5 h-5" />,
+      title: 'ProductTrend',
+      href: '/productstrend',
+      description: 'Launch your product, get upvotes and feedback from the community. Discover trending products and connect with makers.',
+      color: 'from-orange-500 to-red-500',
+      tag: 'Product Hunt Style',
+    },
+  ];
 
-        {featuredTemplates.length > 1 && (
-          <>
-            <button
-              onClick={prevSlide}
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
-              aria-label="Previous"
-            >
-              <FiChevronLeft className="w-5 h-5 text-slate-700" />
-            </button>
-            <button
-              onClick={nextSlide}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-md hover:bg-white transition-all z-10"
-              aria-label="Next"
-            >
-              <FiChevronRight className="w-5 h-5 text-slate-700" />
-            </button>
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
-              {featuredTemplates.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goToSlide(idx)}
-                  className={`h-2 rounded-full transition-all ${
-                    idx === carouselIndex ? 'bg-purple-600 w-6' : 'bg-slate-300 w-2'
-                  }`}
-                  aria-label={`Go to slide ${idx + 1}`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
+  const milestones = [
+    { year: '2025', title: 'Platform Launch', description: 'Make Trend goes live with 20+ templates and share‑to‑unlock campaigns.', icon: '🚀' },
+    { year: '2025', title: '1,000 Campaigns Created', description: 'Users launched over 1,000 campaigns in the first month.', icon: '📈' },
+    { year: '2025', title: 'Pro Plan Released', description: 'Advanced templates, analytics, and priority support for pro users.', icon: '👑' },
+    { year: '2026', title: '10K+ Shares & Community Launch', description: 'Total shares hit 10,000, plus we launched Community Feed, Grow Together, and ProductTrend.', icon: '🌟' },
+  ];
 
-  const formatNumber = (value, label) => {
-    if (label === 'Total Shares') return (value / 1000).toFixed(1) + 'K';
-    return value + '+';
-  };
+  const faqs = [
+    { 
+      question: 'What is Make Trend?', 
+      answer: 'Make Trend is a campaign creation platform that lets you launch share‑to‑unlock campaigns in minutes. Choose from 50+ templates, customize your campaign, share your link, and track real‑time analytics – all without any coding skills. We also offer a Community Feed, Grow Together task exchange, and ProductTrend for launching products.'
+    },
+    { 
+      question: 'What is the Community Feed?', 
+      answer: 'The Community Feed is where you can discover posts from other creators – product launches, updates, questions, and more. You can like, comment, and share posts, and connect with like‑minded people in the Make Trend ecosystem.'
+    },
+    { 
+      question: 'What is Grow Together?', 
+      answer: 'Grow Together is a task exchange system where you can add a social task (like "Subscribe to my YouTube") and complete someone else’s task in return. It’s a fair exchange – you help others grow, and they help you back. Perfect for growing your social presence organically.'
+    },
+    { 
+      question: 'What is ProductTrend?', 
+      answer: 'ProductTrend is a Product Hunt‑style platform where you can launch your product, get upvotes and feedback from the community. It’s a great way to get early adopters, validate ideas, and connect with makers.'
+    },
+    { 
+      question: 'Do I need to pay to use Make Trend?', 
+      answer: 'No! Make Trend offers a generous free plan with access to many templates and core features. You can create campaigns, share them, and track basic metrics without paying anything. Pro plans unlock advanced templates, analytics, and priority support for power users.'
+    },
+    { 
+      question: 'How do I earn real money with Make Trend?', 
+      answer: 'Every view, share, unlock, and completion your campaign receives earns you MT Coins. You can withdraw these coins as real cash – 2500 MT Coins = $15. You also earn 100 MT Coins for every referral, and you can watch ads to earn extra coins.'
+    },
+  ];
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://maketrend.app';
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Make Trend",
-    "alternateName": "MakeTrend",
-    "url": siteUrl,
-    "description": "Create viral share‑to‑unlock campaigns, grow your audience, and track real‑time analytics – all with free, professionally designed templates.",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": {
-        "@type": "EntryPoint",
-        "urlTemplate": `${siteUrl}/create?search={search_term_string}`
-      },
-      "query-input": "required name=search_term_string"
-    }
-  };
+  // ── Partners ──
+  const partners = [
+    { name: 'TikTok' },
+    { name: 'Instagram' },
+    { name: 'YouTube' },
+    { name: 'Facebook' },
+    { name: 'Twitter' },
+  ];
+
+  const usps = [
+    { title: 'Free to Start', description: 'Create campaigns without any upfront cost.' },
+    { title: 'No Coding Needed', description: 'Drag, drop, and customise – no technical skills required.' },
+    { title: 'Real‑Time Data', description: 'See your metrics update instantly as your campaign goes live.' },
+    { title: 'Global Reach', description: 'Share your campaigns with anyone, anywhere.' },
+  ];
+
+  // ── Current year ──
+  const currentYear = new Date().getFullYear();
+
+  // ── Structured Data (JSON‑LD) ──
+  const siteUrl = 'https://maketrend.app';
   const organizationData = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Make Trend",
     "url": siteUrl,
-    "logo": `${siteUrl}/favicon.ico`,
+    "logo": `${siteUrl}/og-image.png`,
+    "description": "Make Trend helps creators launch viral share‑to‑unlock campaigns with free templates, real‑time analytics, community feed, task exchange, and product launching.",
     "sameAs": [
       "https://twitter.com/maketrend",
-      "https://instagram.com/maketrend"
-    ]
+      "https://instagram.com/maketrend",
+      "https://youtube.com/@rockyxsiyu"
+    ],
+    "founder": {
+      "@type": "Person",
+      "name": "Rocky Axis",
+      "url": "https://youtube.com/@rockyxsiyu"
+    }
+  };
+  const webpageData = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "About Make Trend – Viral Campaign Platform",
+    "description": "Make Trend helps creators launch viral share‑to‑unlock campaigns. Free templates, real‑time analytics, and built‑in referral tracking.",
+    "url": `${siteUrl}/about`,
+    "mainEntity": {
+      "@type": "Organization",
+      "name": "Make Trend"
+    }
+  };
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
   };
 
   return (
     <>
       <Meta
-        title="Viral Campaign Maker – Community, Growth & Product Launch"
-        description="Create share‑to‑unlock campaigns, connect with creators in the Community, grow your social presence with Grow Together, and launch your products on ProductTrend – all on Make Trend."
-        url="/"
+        title="About Make Trend – Viral Campaign Platform"
+        description="Make Trend helps creators launch viral share‑to‑unlock campaigns in minutes. Free templates, real‑time analytics, community feed, task exchange, and product launching."
         image="https://maketrend.app/og-image.png"
-        type="website"
+        url="https://maketrend.app/about"
+        extraKeywords={['campaign platform', 'viral campaigns', 'share to unlock', 'creator tools', 'growth platform', 'community feed', 'grow together', 'product hunt']}
       />
       <Head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }}
-        />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageData) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       </Head>
-      <main className="min-h-screen bg-gradient-to-b from-white to-gray-50/80">
-        
+
+      <div className="min-h-screen bg-white">
         {/* ── Hero ── */}
         <section
           ref={heroFade.ref}
-          className={`relative overflow-hidden px-4 pt-12 pb-16 sm:pt-20 sm:pb-24 transition-all duration-700 ${
+          className={`relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 text-white py-16 sm:py-20 transition-all duration-700 ${
             heroFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="absolute inset-0 opacity-30 pointer-events-none">
-            <div className="absolute top-10 left-10 w-64 h-64 bg-purple-200/20 rounded-full blur-3xl" />
-            <div className="absolute bottom-10 right-10 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl" />
+          <div className="absolute inset-0 opacity-10">
+            <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+              <circle cx="200" cy="200" r="300" fill="white" />
+              <circle cx="800" cy="700" r="350" fill="white" />
+              <circle cx="500" cy="500" r="200" fill="white" opacity="0.5" />
+            </svg>
           </div>
-
-          <div className="max-w-6xl mx-auto text-center relative z-10">
-            <div className="inline-block mb-4 px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full tracking-wider uppercase">
-              🚀 Launch viral campaigns in minutes
-            </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight">
-              Create & Share{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
-                Trending Campaigns
-              </span>
-            </h1>
-            <p className="mt-4 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto">
-              Choose a template, customise it, share your unique link, and watch your metrics climb – all in under 2 minutes.
-              Plus, connect with the community, grow your social presence, and launch your own products.
-            </p>
-
-            {/* ── Search ── */}
-            <div className="max-w-xl mx-auto mt-8">
-              <form onSubmit={handleSearch} className="flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition focus-within:ring-2 focus-within:ring-purple-300 focus-within:border-purple-400">
+          <div className="absolute top-0 left-0 w-64 h-64 bg-purple-300/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-pink-300/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md mx-auto mb-6">
+              <form onSubmit={handleSearch} className="flex items-center bg-white/20 backdrop-blur-sm rounded-full p-1 border border-white/20">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search templates, rewards..."
-                  className="flex-1 bg-transparent px-6 py-3 text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+                  placeholder="Search templates..."
+                  className="flex-1 bg-transparent px-4 py-2 text-white placeholder-white/70 outline-none text-sm"
                 />
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-2.5 rounded-full mr-1 transition text-sm"
-                >
-                  <FiSearch className="w-4 h-4" /> Search
+                <button type="submit" className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition" aria-label="Search">
+                  <FiSearch className="w-4 h-4" />
                 </button>
               </form>
             </div>
+            <div className="text-center">
+              <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+                <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-white/10">
+                  <FiCalendar className="w-3.5 h-3.5" />
+                  Est. 2025
+                </span>
+                <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium border border-white/10">
+                  <FiClock className="w-3.5 h-3.5" />
+                  Updated {currentYear}
+                </span>
+              </div>
 
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <button
-                onClick={() => router.push('/create')}
-                className="px-6 py-3 bg-purple-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2"
-              >
-                Browse All Templates <FiChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => router.push('/about')}
-                className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-              >
-                Learn More
-              </button>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight">
+                About{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-300">
+                  Make Trend
+                </span>
+              </h1>
+              <p className="mt-4 text-lg sm:text-xl max-w-3xl mx-auto text-indigo-100">
+                We empower creators, marketers, and entrepreneurs to launch viral campaigns, grow their audience, and earn real rewards.
+              </p>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <Link href="/create">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-purple-700 font-semibold rounded-full hover:bg-gray-100 transition shadow-lg cursor-pointer text-sm">
+                    Start Creating <FiArrowRight className="w-4 h-4" />
+                  </span>
+                </Link>
+                <Link href="/community">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
+                    Community
+                  </span>
+                </Link>
+                <Link href="/groweachother">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
+                    Grow Together
+                  </span>
+                </Link>
+                <Link href="/productstrend">
+                  <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
+                    ProductTrend
+                  </span>
+                </Link>
+                {!user && (
+                  <Link href="/login">
+                    <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
+                      Login
+                    </span>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
-          <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-200/30 rounded-full blur-3xl pointer-events-none" />
+        </section>
+
+        {/* ── Our Story ── */}
+        <section
+          ref={storyFade.ref}
+          className={`py-12 bg-white transition-all duration-700 ${
+            storyFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <FiBookOpen className="w-10 h-10 text-purple-600 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Story</h2>
+            <p className="text-gray-600 text-base leading-relaxed max-w-2xl mx-auto">
+              Make Trend was born from a simple idea: <strong>campaign creation should be easy, fast, and effective</strong>.
+              We saw creators struggling with complex tools and expensive agencies, so we built a platform that gives anyone the power to launch share‑to‑unlock campaigns in minutes.
+              Today, we’re proud to help thousands of users grow their audience, connect with other creators, and earn real money – all in one place.
+            </p>
+
+            <div className="mt-6 pt-6 border-t border-gray-200 max-w-md mx-auto">
+              <p className="text-sm text-gray-500">
+                Built with ❤️ by{' '}
+                <a
+                  href="https://youtube.com/@rockyxsiyu?si=lk_b1rkizInBvZu8"
+                  target="_blank"
+                  rel="noopener noreferrer me"
+                  className="text-purple-600 hover:underline font-medium"
+                >
+                  Rocky Axis
+                </a>
+              </p>
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <a
+                  href="https://youtube.com/@rockyxsiyu?si=lk_b1rkizInBvZu8"
+                  target="_blank"
+                  rel="noopener noreferrer me"
+                  className="text-gray-400 hover:text-red-600 transition"
+                  aria-label="YouTube"
+                >
+                  <FiYoutube className="w-5 h-5" />
+                </a>
+                <span className="text-xs text-gray-300">|</span>
+                <a
+                  href="https://youtube.com/@rockyxsiyu?si=lk_b1rkizInBvZu8"
+                  target="_blank"
+                  rel="noopener noreferrer me"
+                  className="text-xs text-gray-400 hover:text-purple-600 transition"
+                >
+                  Subscribe on YouTube
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── What is Make Trend? ── */}
+        <section
+          ref={whatIsFade.ref}
+          className={`py-12 bg-gray-50 transition-all duration-700 ${
+            whatIsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">The Platform</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">Everything You Need to Grow</h2>
+              <p className="text-gray-500 max-w-2xl mx-auto mt-1">
+                Make Trend is a complete ecosystem for creators – campaigns, community, and rewards.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition hover:-translate-y-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+                    <FiZap className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-gray-800">Viral Campaigns</h3>
+                </div>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Launch share‑to‑unlock campaigns with 50+ templates. Set share targets, add tasks, and track real‑time analytics – all in under 60 seconds.
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition hover:-translate-y-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
+                    <FiUsers className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-gray-800">Community & Social</h3>
+                </div>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Connect with creators through the Community Feed, exchange tasks with Grow Together, and launch products with ProductTrend.
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition hover:-translate-y-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+                    <FiDollarSign className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-gray-800">Earn Real Money</h3>
+                </div>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Every view, share, unlock, and completion earns you MT Coins. Refer friends and get bonuses. Withdraw your earnings anytime.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-center mt-6">
+              <Link href="/create">
+                <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-full hover:bg-purple-700 transition shadow-sm text-sm">
+                  Start Your Campaign <FiArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Mission & Vision ── */}
+        <section
+          ref={missionFade.ref}
+          className={`py-12 bg-white transition-all duration-700 ${
+            missionFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <FiTarget className="w-6 h-6 text-purple-600" />
+                  <h2 className="text-2xl font-bold text-gray-900">Our Mission</h2>
+                </div>
+                <p className="text-gray-600 text-base leading-relaxed">
+                  To democratise campaign creation – giving everyone, from individuals to enterprises,
+                  the tools they need to tell their story and grow their audience without technical complexity.
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <FiZap className="w-6 h-6 text-purple-600" />
+                  <h2 className="text-2xl font-bold text-gray-900">Our Vision</h2>
+                </div>
+                <p className="text-gray-600 text-base leading-relaxed">
+                  A world where every idea can become a trending movement. We envision a platform where creativity meets data – and everyone wins.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Core Values ── */}
+        <section
+          ref={valuesFade.ref}
+          className={`py-12 bg-gray-50 transition-all duration-700 ${
+            valuesFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Our Core Values</h2>
+            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">The principles that guide everything we do.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {coreValues.map((val, idx) => (
+                <div key={idx} className="text-center p-5 bg-white rounded-2xl border border-gray-100 hover:shadow-md transition hover:-translate-y-1">
+                  <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    {val.icon}
+                  </div>
+                  <h4 className="font-bold text-gray-800 text-sm">{val.title}</h4>
+                  <p className="text-gray-500 text-xs mt-1">{val.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── What We Do (Features) ── */}
+        <section
+          ref={featuresFade.ref}
+          className={`py-12 bg-white transition-all duration-700 ${
+            featuresFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">What We Do</h2>
+            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">Everything you need to create, launch, and grow campaigns.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {features.map((feature, idx) => (
+                <div key={idx} className="bg-gray-50 p-5 rounded-2xl border border-gray-100 hover:shadow-md transition hover:-translate-y-0.5">
+                  <div className="w-11 h-11 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mb-3">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">{feature.title}</h3>
+                  <p className="text-gray-500 text-sm mt-1">{feature.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── NEW: Explore More – Community, Grow Together, ProductTrend ─── */}
+        <section
+          ref={exploreFade.ref}
+          className={`py-12 bg-gradient-to-br from-gray-50 to-purple-50/30 transition-all duration-700 ${
+            exploreFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Explore More</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">Beyond Campaigns</h2>
+              <p className="text-gray-500 max-w-2xl mx-auto mt-1">
+                Make Trend is more than campaigns – it's a complete ecosystem for creators.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {exploreSections.map((section, idx) => (
+                <Link key={idx} href={section.href}>
+                  <div className="group bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer h-full flex flex-col">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${section.color} flex items-center justify-center text-white mb-4 group-hover:scale-110 transition`}>
+                      {section.icon}
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">{section.title}</h3>
+                      <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {section.tag}
+                      </span>
+                    </div>
+                    <p className="text-gray-500 text-sm leading-relaxed flex-1">{section.description}</p>
+                    <div className="mt-4 flex items-center text-purple-600 font-medium text-sm group-hover:gap-1 transition-all">
+                      Explore <FiArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Milestones ── */}
+        <section
+          ref={milestonesFade.ref}
+          className={`py-12 bg-white transition-all duration-700 ${
+            milestonesFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Our Journey</h2>
+            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">Key milestones in our story.</p>
+            <div className="space-y-6 relative before:absolute before:left-6 before:top-0 before:h-full before:w-0.5 before:bg-purple-200 before:content-[''] pl-8">
+              {milestones.map((m, idx) => (
+                <Milestone key={idx} year={m.year} title={m.title} description={m.description} icon={m.icon} />
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* ── Stats ── */}
         <section
           ref={statsFade.ref}
-          className={`border-y border-slate-200/60 bg-white/50 backdrop-blur-sm py-6 transition-all duration-700 ${
+          className={`py-12 bg-gray-50 transition-all duration-700 ${
             statsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-            {stats.map((stat, index) => {
-              const { count, ref } = counters[index];
-              const displayValue = formatNumber(count, stat.label);
-              return (
-                <div key={index} ref={ref} className="group">
-                  <p className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent transition-all duration-500 group-hover:scale-105">
-                    {displayValue}
-                  </p>
-                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mt-0.5">
-                    {stat.label}
-                  </p>
-                  <div className="w-12 h-0.5 mx-auto mt-1 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-full transition-all duration-500 group-hover:w-16" />
-                </div>
-              );
-            })}
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Make Trend in Numbers</h2>
+            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">Real metrics from real creators.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {stats.map((stat, idx) => {
+                const { count, ref } = counters[idx];
+                const displayValue = stat.label === 'Total Shares' ? (count / 1000).toFixed(1) + 'K' : count + stat.suffix;
+                return (
+                  <div key={idx} ref={ref} className="text-center p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
+                    <p className="text-3xl font-extrabold text-purple-600">{displayValue}</p>
+                    <p className="text-xs text-gray-500 mt-1 font-medium">{stat.label}</p>
+                    <div className="w-12 h-0.5 mx-auto mt-2 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-full" />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </section>
 
-        {/* ── Featured Templates Carousel ── */}
+        {/* ── Partners / Trusted By ── */}
         <section
-          ref={carouselFade.ref}
-          className={`py-16 px-4 transition-all duration-700 ${
-            carouselFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          ref={partnersFade.ref}
+          className={`py-12 bg-white transition-all duration-700 ${
+            partnersFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                  <span>⭐ Featured Templates</span>
-                </h2>
-                <p className="text-slate-500 text-sm mt-0.5">Hand‑picked templates to get you started</p>
-              </div>
-              <button
-                onClick={() => router.push('/create')}
-                className="text-sm font-semibold text-purple-600 hover:underline flex items-center gap-1"
-              >
-                View all <FiChevronRight className="w-4 h-4" />
-              </button>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Trusted by Creators Worldwide</h2>
+            <p className="text-gray-500 text-sm mb-6">Used by marketers, influencers, and entrepreneurs everywhere.</p>
+            <div className="flex flex-wrap justify-center items-center gap-8 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500">
+              {partners.map((p, idx) => (
+                <div key={idx} className="text-gray-400 font-bold text-lg">{p.name}</div>
+              ))}
             </div>
-            {renderCarousel()}
           </div>
         </section>
 
-        {/* ── How It Works ── */}
-        <section className="py-16 px-4 bg-white/80">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">How It Works</h2>
-            <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
-              Launch your first campaign in three simple steps.
+        {/* ── Why Choose Us (USPs) ── */}
+        <section className="py-12 bg-gray-50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Why Choose Make Trend</h2>
+            <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">The smart choice for modern campaign creators.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {usps.map((usp, idx) => (
+                <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 text-center hover:shadow-md transition">
+                  <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <FiAward className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-bold text-gray-800">{usp.title}</h4>
+                  <p className="text-sm text-gray-500 mt-1">{usp.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Earn Real Money with Make Trend ── */}
+        <section
+          ref={earnFade.ref}
+          className={`py-12 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 transition-all duration-700 ${
+            earnFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-white rounded-3xl shadow-xl border border-amber-200/50 p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="flex-shrink-0 w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white text-3xl shadow-lg">
+                  <FiDollarSign />
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
+                    Earn Real Money with <span className="text-amber-600">Make Trend</span>
+                  </h2>
+                  <p className="text-gray-600 text-sm md:text-base leading-relaxed mt-2">
+                    Create your campaign, set tasks, share count, and final redirect URL. Grow your social accounts 
+                    by adding tasks like <strong>“Subscribe to my channel,” “Follow me,” “Like my video,”</strong> and more. 
+                    Every view, share, unlock, and completion your campaign receives earns you MT Coins – 
+                    which you can withdraw as real cash, anytime.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                    <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+                      <FaCoins className="text-amber-600" /> MT Coins
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                      <FiUsers /> Referral Program
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span className="inline-flex items-center gap-1.5 bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                      <FaCrown /> Pro Perks
+                    </span>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Link href="/create">
+                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-full hover:shadow-lg transition shadow-sm text-sm cursor-pointer">
+                        Start Earning <FiArrowRight className="w-4 h-4" />
+                      </span>
+                    </Link>
+                    <Link href="/withdraw">
+                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-amber-600 font-semibold rounded-full border border-amber-200 hover:bg-amber-50 transition text-sm cursor-pointer">
+                        Withdraw
+                      </span>
+                    </Link>
+                    <Link href="/refer-earn">
+                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 font-semibold rounded-full border border-blue-200 hover:bg-blue-50 transition text-sm cursor-pointer">
+                        Refer & Earn
+                      </span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick perks grid */}
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-amber-100 pt-5">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FaRocket className="text-amber-500 flex-shrink-0" />
+                  <span>Double benefit: grow audience & earn cash</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FiUsers className="text-amber-500 flex-shrink-0" />
+                  <span>100 MT Coins per referral</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FiClock className="text-amber-500 flex-shrink-0" />
+                  <span>Withdraw 24/7 – 2500 MT Coins = $15</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Testimonials (Comments) ── */}
+        <section
+          ref={testimonialsFade.ref}
+          className={`py-12 bg-gray-50 transition-all duration-700 ${
+            testimonialsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">What Our Users Say</h2>
+            <p className="text-center text-gray-500 mb-6">Real stories from real creators.</p>
+
+            {/* Comment Form */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Leave a Review</h3>
+              <form onSubmit={handleSubmitComment} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
+                  <input
+                    type="text"
+                    value={commentName}
+                    onChange={(e) => setCommentName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Your Comment *</label>
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Share your experience with Make Trend..."
+                    rows="3"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
+                  <StarRating rating={commentRating} setRating={setCommentRating} />
+                </div>
+                {submitMessage && (
+                  <div className={`text-sm ${submitMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                    {submitMessage}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition disabled:opacity-50 shadow-sm"
+                >
+                  <FiSend className="w-4 h-4" />
+                  {isSubmitting ? 'Submitting...' : 'Submit Review'}
+                </button>
+                <p className="text-xs text-gray-400 mt-2">Your name and comment will be publicly visible.</p>
+              </form>
+            </div>
+
+            {/* Comments List */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <FiMessageCircle className="w-5 h-5 text-purple-600" />
+                Latest Reviews ({comments?.length || 0})
+              </h3>
+              {loadingComments ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 animate-pulse">
+                      <div className="h-4 w-1/3 bg-gray-200 rounded mb-2" />
+                      <div className="h-3 w-2/3 bg-gray-200 rounded mb-1" />
+                      <div className="h-3 w-1/2 bg-gray-200 rounded" />
+                    </div>
+                  ))}
+                </div>
+              ) : comments && comments.length === 0 ? (
+                <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-gray-200">
+                  <p className="text-gray-500">No reviews yet. Be the first!</p>
+                </div>
+              ) : comments && comments.length > 0 ? (
+                <div className="space-y-3">
+                  {comments.map((c) => (
+                    <div key={c.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">
+                            {c.name?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                          <span className="font-medium text-gray-800 text-sm">{c.name || 'Anonymous'}</span>
+                        </div>
+                        <StarRating rating={c.rating || 5} readonly />
+                      </div>
+                      <p className="text-gray-600 text-sm mt-1">{c.comment || ''}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {c.createdAt?.toDate?.()?.toLocaleDateString() || 'Just now'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        {/* ── FAQ ── */}
+        <section
+          ref={faqFade.ref}
+          className={`py-12 bg-white transition-all duration-700 ${
+            faqFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Frequently Asked Questions</h2>
+            <p className="text-center text-gray-500 mb-8">Got questions? We’ve got answers.</p>
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 shadow-sm">
+              {faqs.map((faq, idx) => (
+                <FaqItem
+                  key={idx}
+                  question={faq.question}
+                  answer={faq.answer}
+                  isOpen={openFaqIndex === idx}
+                  toggle={() => toggleFaq(idx)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Careers / Join Us ── */}
+        <section className="py-12 bg-gray-50 border-t border-gray-100">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <FiUsers className="w-10 h-10 text-purple-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900">Join Our Team</h2>
+            <p className="text-gray-500 text-sm max-w-2xl mx-auto mt-2">
+              We’re always looking for passionate people to help us build the future of campaign creation.
+              If you’re a developer, designer, or creator, we’d love to hear from you.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FaRocket className="w-8 h-8" />
-                </div>
-                <h3 className="font-bold text-slate-900">1. Choose a Template</h3>
-                <p className="text-slate-500 text-sm mt-1">Pick from our library of professionally designed templates.</p>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FiEdit className="w-8 h-8" />
-                </div>
-                <h3 className="font-bold text-slate-900">2. Customise & Launch</h3>
-                <p className="text-slate-500 text-sm mt-1">Customise the title, description, reward, and features.</p>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FiShare2 className="w-8 h-8" />
-                </div>
-                <h3 className="font-bold text-slate-900">3. Share & Grow</h3>
-                <p className="text-slate-500 text-sm mt-1">Share your unique link and watch your metrics climb.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Why Make Trend? ── */}
-        <section className="py-16 px-4 bg-gray-50/50">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">Why Make Trend?</h2>
-            <p className="text-slate-500 text-center max-w-2xl mx-auto mb-10">
-              Everything you need to launch, track, and grow your campaigns – plus connect with the community.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FiZap />
-                </div>
-                <h3 className="font-bold text-slate-900">Launch in Minutes</h3>
-                <p className="text-slate-500 text-sm mt-1">
-                  Choose a template, customise it, and share your campaign in under 2 minutes.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FiTrendingUp />
-                </div>
-                <h3 className="font-bold text-slate-900">Real‑Time Analytics</h3>
-                <p className="text-slate-500 text-sm mt-1">
-                  Track views, shares, unlocks, and completions as they happen.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-sm hover:shadow-md transition">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-purple-600 text-2xl">
-                  <FiUsers />
-                </div>
-                <h3 className="font-bold text-slate-900">Community & Growth</h3>
-                <p className="text-slate-500 text-sm mt-1">
-                  Connect with creators, exchange tasks, and launch products – all in one ecosystem.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── NEW: Community, Grow Together, ProductTrend ── */}
-        <section className="py-16 px-4 bg-white/80">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              
-              {/* Community Feed */}
-              <div
-                ref={communityFade.ref}
-                className={`bg-white rounded-3xl border border-slate-200 p-8 text-center shadow-sm hover:shadow-lg transition-all duration-500 ${
-                  communityFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                }`}
-              >
-                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600">
-                  <FiUsers className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">Community Feed</h3>
-                <p className="text-slate-500 text-sm mt-2">
-                  Connect with other creators, share updates, and discover trending content. Like, comment, and grow together.
-                </p>
-                <button
-                  onClick={() => router.push('/community')}
-                  className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-700 transition"
-                >
-                  Explore Community <FiArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Grow Together */}
-              <div
-                ref={growFade.ref}
-                className={`bg-gradient-to-br from-green-50/80 to-emerald-50/80 rounded-3xl border border-green-200/60 p-8 text-center shadow-sm hover:shadow-lg transition-all duration-500 ${
-                  growFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                }`}
-              >
-                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-green-600">
-                  <FaHandshake className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">Grow Together</h3>
-                <p className="text-slate-500 text-sm mt-2">
-                  Exchange social tasks with other creators. Help each other grow by completing tasks like follows, likes, and shares.
-                </p>
-                <button
-                  onClick={() => router.push('/groweachother')}
-                  className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:text-green-700 transition"
-                >
-                  Start Growing <FiArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* ProductTrend */}
-              <div
-                ref={productFade.ref}
-                className={`bg-gradient-to-br from-indigo-50/80 to-blue-50/80 rounded-3xl border border-indigo-200/60 p-8 text-center shadow-sm hover:shadow-lg transition-all duration-500 ${
-                  productFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                }`}
-              >
-                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-600">
-                  <FaRocket className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">ProductTrend</h3>
-                <p className="text-slate-500 text-sm mt-2">
-                  Launch your own product, get upvotes, and showcase your work to the community. The next big thing starts here.
-                </p>
-                <button
-                  onClick={() => router.push('/productstrend')}
-                  className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition"
-                >
-                  Launch Product <FiArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
-            </div>
+            <Link href="/contact">
+              <span className="inline-flex items-center gap-2 mt-4 px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-full hover:bg-purple-700 transition shadow-sm text-sm">
+                Join Us <FiArrowRight className="w-4 h-4" />
+              </span>
+            </Link>
           </div>
         </section>
 
         {/* ── CTA ── */}
         <section
           ref={ctaFade.ref}
-          className={`py-16 px-4 transition-all duration-700 ${
+          className={`py-12 bg-gradient-to-r from-purple-600 to-indigo-600 transition-all duration-700 ${
             ctaFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="max-w-4xl mx-auto bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl p-8 sm:p-12 text-center text-white shadow-xl">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
             <h2 className="text-3xl font-bold">Ready to Make Your Trend?</h2>
-            <p className="mt-2 text-purple-100 max-w-2xl mx-auto">
-              Join thousands of creators who are already launching successful campaigns, connecting with the community, and growing their presence on Make Trend.
+            <p className="mt-2 text-indigo-100 max-w-2xl mx-auto">
+              Join thousands of creators who are already launching successful campaigns with Make Trend.
             </p>
-            <button
-              onClick={() => router.push('/create')}
-              className="mt-6 px-8 py-3 bg-white text-purple-700 font-bold rounded-xl shadow-lg hover:shadow-xl hover:bg-gray-50 transition-all inline-flex items-center gap-2"
-            >
-              Get Started for Free <FiArrowRight className="w-5 h-5" />
-            </button>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link href="/create">
+                <span className="inline-flex items-center gap-2 px-6 py-3 bg-white text-purple-700 font-semibold rounded-full hover:bg-gray-50 transition shadow-lg cursor-pointer text-sm">
+                  Get Started Free <FiArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
+              <Link href="/community">
+                <span className="inline-flex items-center gap-2 px-6 py-3 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
+                  Explore Community
+                </span>
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -701,30 +1066,15 @@ export default function Home({ initialFeaturedTemplates }) {
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <span>© {new Date().getFullYear()} Make Trend. All rights reserved.</span>
             <div className="flex gap-4">
-              <a href="/terms" className="hover:text-slate-700 transition">Terms</a>
-              <a href="/privacy" className="hover:text-slate-700 transition">Privacy</a>
-              <a href="/support" className="hover:text-slate-700 transition">Support</a>
+              <Link href="/terms"><span className="hover:text-slate-700 transition">Terms</span></Link>
+              <Link href="/privacy"><span className="hover:text-slate-700 transition">Privacy</span></Link>
+              <Link href="/support"><span className="hover:text-slate-700 transition">Support</span></Link>
+              <Link href="/contact"><span className="hover:text-slate-700 transition">Contact</span></Link>
+              <Link href="/community"><span className="hover:text-slate-700 transition">Community</span></Link>
             </div>
           </div>
         </footer>
-      </main>
+      </div>
     </>
   );
-}
-
-// ── ISR ──
-export async function getStaticProps() {
-  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-  if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
-  
-  const res = await fetch(`${BACKEND_URL}/api/templates?highlight=true&limit=10`);
-  const data = await res.json();
-  const featuredTemplates = data.templates || [];
-
-  return {
-    props: {
-      initialFeaturedTemplates: featuredTemplates,
-    },
-    revalidate: 60,
-  };
 }
