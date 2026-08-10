@@ -32,8 +32,11 @@ import {
   FiFacebook,
   FiCalendar,
   FiDollarSign,
+  FiRss,
+  FiLink,
+  FiGithub,
 } from 'react-icons/fi';
-import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin, FaCoins } from 'react-icons/fa';
+import { FaRocket, FaChartLine, FaUserFriends, FaLock, FaCrown, FaLinkedin, FaCoins, FaRocket as FaRocketLaunch } from 'react-icons/fa';
 import { useAuth } from '../components/AuthScreen';
 import { useComments, useInvalidateQueries } from '../lib/queries';
 
@@ -183,13 +186,14 @@ export default function About() {
   const missionFade = useFadeUp(0.1);
   const valuesFade = useFadeUp(0.1);
   const featuresFade = useFadeUp(0.1);
+  const exploreFade = useFadeUp(0.1); // NEW
   const milestonesFade = useFadeUp(0.1);
   const statsFade = useFadeUp(0.1);
   const partnersFade = useFadeUp(0.1);
   const testimonialsFade = useFadeUp(0.1);
   const faqFade = useFadeUp(0.1);
   const ctaFade = useFadeUp(0.1);
-  const earnFade = useFadeUp(0.1); // new
+  const earnFade = useFadeUp(0.1);
 
   // ── Stats counters ──
   const stats = [
@@ -268,41 +272,69 @@ export default function About() {
     { icon: <FiTrendingUp className="w-5 h-5" />, title: 'Trending Insights', description: 'Discover what’s trending and optimise your campaigns.' },
   ];
 
+  // ── NEW: Explore More sections ──
+  const exploreSections = [
+    {
+      icon: <FiRss className="w-5 h-5" />,
+      title: 'Community Feed',
+      href: '/community',
+      description: 'Discover posts from the Make Trend community – product launches, updates, questions, and more. Like, comment, and share to grow together.',
+      color: 'from-purple-500 to-pink-500',
+      tag: 'Social Hub',
+    },
+    {
+      icon: <FiUsers className="w-5 h-5" />,
+      title: 'Grow Together',
+      href: '/groweachother',
+      description: 'Exchange tasks with other creators. Add a task you need help with, and complete someone else’s in return. Grow your social presence together.',
+      color: 'from-green-500 to-emerald-500',
+      tag: 'Task Exchange',
+    },
+    {
+      icon: <FaRocketLaunch className="w-5 h-5" />,
+      title: 'ProductTrend',
+      href: '/productstrend',
+      description: 'Launch your product, get upvotes and feedback from the community. Discover trending products and connect with makers.',
+      color: 'from-orange-500 to-red-500',
+      tag: 'Product Hunt Style',
+    },
+  ];
+
   const milestones = [
     { year: '2025', title: 'Platform Launch', description: 'Make Trend goes live with 20+ templates and share‑to‑unlock campaigns.', icon: '🚀' },
     { year: '2025', title: '1,000 Campaigns Created', description: 'Users launched over 1,000 campaigns in the first month.', icon: '📈' },
     { year: '2025', title: 'Pro Plan Released', description: 'Advanced templates, analytics, and priority support for pro users.', icon: '👑' },
-    { year: '2026', title: '10K+ Shares', description: 'Total shares across all campaigns hit 10,000.', icon: '🌟' },
+    { year: '2026', title: '10K+ Shares & Community Launch', description: 'Total shares hit 10,000, plus we launched Community Feed, Grow Together, and ProductTrend.', icon: '🌟' },
   ];
 
   const faqs = [
     { 
       question: 'What is Make Trend?', 
-      answer: 'Make Trend is a campaign creation platform that lets you launch share‑to‑unlock campaigns in minutes. Choose from 50+ templates, customize your campaign, share your link, and track real‑time analytics – all without any coding skills.'
+      answer: 'Make Trend is a campaign creation platform that lets you launch share‑to‑unlock campaigns in minutes. Choose from 50+ templates, customize your campaign, share your link, and track real‑time analytics – all without any coding skills. We also offer a Community Feed, Grow Together task exchange, and ProductTrend for launching products.'
+    },
+    { 
+      question: 'What is the Community Feed?', 
+      answer: 'The Community Feed is where you can discover posts from other creators – product launches, updates, questions, and more. You can like, comment, and share posts, and connect with like‑minded people in the Make Trend ecosystem.'
+    },
+    { 
+      question: 'What is Grow Together?', 
+      answer: 'Grow Together is a task exchange system where you can add a social task (like "Subscribe to my YouTube") and complete someone else’s task in return. It’s a fair exchange – you help others grow, and they help you back. Perfect for growing your social presence organically.'
+    },
+    { 
+      question: 'What is ProductTrend?', 
+      answer: 'ProductTrend is a Product Hunt‑style platform where you can launch your product, get upvotes and feedback from the community. It’s a great way to get early adopters, validate ideas, and connect with makers.'
     },
     { 
       question: 'Do I need to pay to use Make Trend?', 
       answer: 'No! Make Trend offers a generous free plan with access to many templates and core features. You can create campaigns, share them, and track basic metrics without paying anything. Pro plans unlock advanced templates, analytics, and priority support for power users.'
     },
     { 
-      question: 'How do I create a campaign?', 
-      answer: 'Simply browse our template library, select one, customise the title, description, reward, share count, tasks, and redirect URL. Click "Create Campaign" and you\'ll get a unique link to share with your audience. It takes less than 60 seconds.'
-    },
-    { 
-      question: 'Is my data safe?', 
-      answer: 'Absolutely. We use Firebase Authentication and Firestore with strict security rules. Your personal information is never shared with third parties without your explicit consent.'
-    },
-    { 
-      question: 'Can I track my campaign performance?', 
-      answer: 'Yes! Our dashboard shows real‑time stats: total campaigns, views, shares, unlocks, completions, and success rates. You can also copy share links directly from the dashboard.'
-    },
-    { 
-      question: 'What platforms does Make Trend support?', 
-      answer: 'Our templates are optimised for TikTok, Instagram, YouTube, Facebook, and more. You can also customise campaigns for any platform by editing the tasks and redirect URLs.'
+      question: 'How do I earn real money with Make Trend?', 
+      answer: 'Every view, share, unlock, and completion your campaign receives earns you MT Coins. You can withdraw these coins as real cash – 2500 MT Coins = $15. You also earn 100 MT Coins for every referral, and you can watch ads to earn extra coins.'
     },
   ];
 
-  // ── Partners (text only, no placeholder images) ──
+  // ── Partners ──
   const partners = [
     { name: 'TikTok' },
     { name: 'Instagram' },
@@ -329,7 +361,7 @@ export default function About() {
     "name": "Make Trend",
     "url": siteUrl,
     "logo": `${siteUrl}/og-image.png`,
-    "description": "Make Trend helps creators launch viral share‑to‑unlock campaigns with free templates, real‑time analytics, and referral tracking.",
+    "description": "Make Trend helps creators launch viral share‑to‑unlock campaigns with free templates, real‑time analytics, community feed, task exchange, and product launching.",
     "sameAs": [
       "https://twitter.com/maketrend",
       "https://instagram.com/maketrend",
@@ -369,10 +401,10 @@ export default function About() {
     <>
       <Meta
         title="About Make Trend – Viral Campaign Platform"
-        description="Make Trend helps creators launch viral share‑to‑unlock campaigns in minutes. Free templates, real‑time analytics, and built‑in referral tracking."
+        description="Make Trend helps creators launch viral share‑to‑unlock campaigns in minutes. Free templates, real‑time analytics, community feed, task exchange, and product launching."
         image="https://maketrend.app/og-image.png"
         url="https://maketrend.app/about"
-        extraKeywords={['campaign platform', 'viral campaigns', 'share to unlock', 'creator tools', 'growth platform']}
+        extraKeywords={['campaign platform', 'viral campaigns', 'share to unlock', 'creator tools', 'growth platform', 'community feed', 'grow together', 'product hunt']}
       />
       <Head>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }} />
@@ -431,7 +463,7 @@ export default function About() {
                 </span>
               </h1>
               <p className="mt-4 text-lg sm:text-xl max-w-3xl mx-auto text-indigo-100">
-                We empower creators, marketers, and entrepreneurs to launch viral campaigns that drive real results.
+                We empower creators, marketers, and entrepreneurs to launch viral campaigns, grow their audience, and earn real rewards.
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <Link href="/create">
@@ -439,19 +471,19 @@ export default function About() {
                     Start Creating <FiArrowRight className="w-4 h-4" />
                   </span>
                 </Link>
-                <Link href="/">
+                <Link href="/community">
                   <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
-                    Home
+                    Community
                   </span>
                 </Link>
-                <Link href="/follow">
+                <Link href="/groweachother">
                   <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
-                    Follow Us
+                    Grow Together
                   </span>
                 </Link>
-                <Link href="/support">
+                <Link href="/productstrend">
                   <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
-                    Support
+                    ProductTrend
                   </span>
                 </Link>
                 {!user && (
@@ -479,7 +511,7 @@ export default function About() {
             <p className="text-gray-600 text-base leading-relaxed max-w-2xl mx-auto">
               Make Trend was born from a simple idea: <strong>campaign creation should be easy, fast, and effective</strong>.
               We saw creators struggling with complex tools and expensive agencies, so we built a platform that gives anyone the power to launch share‑to‑unlock campaigns in minutes.
-              Today, we’re proud to help thousands of users grow their audience and turn their ideas into movements.
+              Today, we’re proud to help thousands of users grow their audience, connect with other creators, and earn real money – all in one place.
             </p>
 
             <div className="mt-6 pt-6 border-t border-gray-200 max-w-md mx-auto">
@@ -527,52 +559,47 @@ export default function About() {
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8">
-              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">What is Make Trend?</span>
-              <h2 className="text-3xl font-bold text-gray-900 mt-2">A Campaign Platform Built for Growth</h2>
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">The Platform</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">Everything You Need to Grow</h2>
               <p className="text-gray-500 max-w-2xl mx-auto mt-1">
-                Make Trend is a smart campaign-building platform designed for creators, gamers, marketers, and online businesses.
+                Make Trend is a complete ecosystem for creators – campaigns, community, and rewards.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition hover:-translate-y-1">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
                     <FiZap className="w-5 h-5" />
                   </div>
-                  <h3 className="font-bold text-gray-800">What It Does</h3>
+                  <h3 className="font-bold text-gray-800">Viral Campaigns</h3>
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  Make Trend lets you launch share‑to‑unlock campaigns without starting from scratch. 
-                  Choose from 50+ ready-made templates, customize your campaign, set share targets, 
-                  add tasks, and define redirect links – all in under 60 seconds.
+                  Launch share‑to‑unlock campaigns with 50+ templates. Set share targets, add tasks, and track real‑time analytics – all in under 60 seconds.
                 </p>
               </div>
 
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition hover:-translate-y-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center">
                     <FiUsers className="w-5 h-5" />
                   </div>
-                  <h3 className="font-bold text-gray-800">Who It's For</h3>
+                  <h3 className="font-bold text-gray-800">Community & Social</h3>
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  Built for <strong>creators, gamers, YouTubers, marketers, community owners, photographers, and businesses</strong> 
-                  who want to grow their audience, increase engagement, and drive traffic through interactive campaigns.
+                  Connect with creators through the Community Feed, exchange tasks with Grow Together, and launch products with ProductTrend.
                 </p>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition hover:-translate-y-1 md:col-span-2 max-w-2xl mx-auto">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition hover:-translate-y-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
-                    <FiTrendingUp className="w-5 h-5" />
+                  <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+                    <FiDollarSign className="w-5 h-5" />
                   </div>
-                  <h3 className="font-bold text-gray-800">How It Helps You Grow</h3>
+                  <h3 className="font-bold text-gray-800">Earn Real Money</h3>
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  The real power of Make Trend isn't just a beautiful page – it's a system that <strong>encourages people to engage, share, and help campaigns spread organically</strong>. 
-                  Whether you're running a gaming tournament, a quiz challenge, a spin & win, or a lucky draw, 
-                  Make Trend turns a simple idea into an interactive campaign that people actually participate in and share.
+                  Every view, share, unlock, and completion earns you MT Coins. Refer friends and get bonuses. Withdraw your earnings anytime.
                 </p>
               </div>
             </div>
@@ -667,10 +694,50 @@ export default function About() {
           </div>
         </section>
 
+        {/* ─── NEW: Explore More – Community, Grow Together, ProductTrend ─── */}
+        <section
+          ref={exploreFade.ref}
+          className={`py-12 bg-gradient-to-br from-gray-50 to-purple-50/30 transition-all duration-700 ${
+            exploreFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Explore More</span>
+              <h2 className="text-3xl font-bold text-gray-900 mt-2">Beyond Campaigns</h2>
+              <p className="text-gray-500 max-w-2xl mx-auto mt-1">
+                Make Trend is more than campaigns – it's a complete ecosystem for creators.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {exploreSections.map((section, idx) => (
+                <Link key={idx} href={section.href}>
+                  <div className="group bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer h-full flex flex-col">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${section.color} flex items-center justify-center text-white mb-4 group-hover:scale-110 transition`}>
+                      {section.icon}
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">{section.title}</h3>
+                      <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {section.tag}
+                      </span>
+                    </div>
+                    <p className="text-gray-500 text-sm leading-relaxed flex-1">{section.description}</p>
+                    <div className="mt-4 flex items-center text-purple-600 font-medium text-sm group-hover:gap-1 transition-all">
+                      Explore <FiArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── Milestones ── */}
         <section
           ref={milestonesFade.ref}
-          className={`py-12 bg-gray-50 transition-all duration-700 ${
+          className={`py-12 bg-white transition-all duration-700 ${
             milestonesFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
@@ -688,7 +755,7 @@ export default function About() {
         {/* ── Stats ── */}
         <section
           ref={statsFade.ref}
-          className={`py-12 bg-white transition-all duration-700 ${
+          className={`py-12 bg-gray-50 transition-all duration-700 ${
             statsFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
@@ -700,7 +767,7 @@ export default function About() {
                 const { count, ref } = counters[idx];
                 const displayValue = stat.label === 'Total Shares' ? (count / 1000).toFixed(1) + 'K' : count + stat.suffix;
                 return (
-                  <div key={idx} ref={ref} className="text-center p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
+                  <div key={idx} ref={ref} className="text-center p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
                     <p className="text-3xl font-extrabold text-purple-600">{displayValue}</p>
                     <p className="text-xs text-gray-500 mt-1 font-medium">{stat.label}</p>
                     <div className="w-12 h-0.5 mx-auto mt-2 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-full" />
@@ -714,7 +781,7 @@ export default function About() {
         {/* ── Partners / Trusted By ── */}
         <section
           ref={partnersFade.ref}
-          className={`py-12 bg-gray-50 transition-all duration-700 ${
+          className={`py-12 bg-white transition-all duration-700 ${
             partnersFade.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
@@ -730,13 +797,13 @@ export default function About() {
         </section>
 
         {/* ── Why Choose Us (USPs) ── */}
-        <section className="py-12 bg-white">
+        <section className="py-12 bg-gray-50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-center text-gray-900 mb-3">Why Choose Make Trend</h2>
             <p className="text-center text-gray-500 mb-8 max-w-2xl mx-auto">The smart choice for modern campaign creators.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {usps.map((usp, idx) => (
-                <div key={idx} className="bg-gray-50 p-5 rounded-2xl border border-gray-100 text-center hover:shadow-md transition">
+                <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 text-center hover:shadow-md transition">
                   <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
                     <FiAward className="w-5 h-5" />
                   </div>
@@ -748,7 +815,7 @@ export default function About() {
           </div>
         </section>
 
-        {/* ─── NEW: Earn Real Money with Make Trend ─── */}
+        {/* ── Earn Real Money with Make Trend ── */}
         <section
           ref={earnFade.ref}
           className={`py-12 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 transition-all duration-700 ${
@@ -795,6 +862,11 @@ export default function About() {
                         Withdraw
                       </span>
                     </Link>
+                    <Link href="/refer-earn">
+                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 font-semibold rounded-full border border-blue-200 hover:bg-blue-50 transition text-sm cursor-pointer">
+                        Refer & Earn
+                      </span>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -807,11 +879,11 @@ export default function About() {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <FiUsers className="text-amber-500 flex-shrink-0" />
-                  <span>Refer friends → unlock Pro features</span>
+                  <span>100 MT Coins per referral</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <FiClock className="text-amber-500 flex-shrink-0" />
-                  <span>Withdraw 24/7</span>
+                  <span>Withdraw 24/7 – 2500 MT Coins = $15</span>
                 </div>
               </div>
             </div>
@@ -974,10 +1046,15 @@ export default function About() {
             <p className="mt-2 text-indigo-100 max-w-2xl mx-auto">
               Join thousands of creators who are already launching successful campaigns with Make Trend.
             </p>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Link href="/create">
                 <span className="inline-flex items-center gap-2 px-6 py-3 bg-white text-purple-700 font-semibold rounded-full hover:bg-gray-50 transition shadow-lg cursor-pointer text-sm">
                   Get Started Free <FiArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
+              <Link href="/community">
+                <span className="inline-flex items-center gap-2 px-6 py-3 bg-purple-800/40 backdrop-blur-sm text-white font-semibold rounded-full hover:bg-purple-800/60 transition border border-white/20 cursor-pointer text-sm">
+                  Explore Community
                 </span>
               </Link>
             </div>
@@ -993,6 +1070,7 @@ export default function About() {
               <Link href="/privacy"><span className="hover:text-slate-700 transition">Privacy</span></Link>
               <Link href="/support"><span className="hover:text-slate-700 transition">Support</span></Link>
               <Link href="/contact"><span className="hover:text-slate-700 transition">Contact</span></Link>
+              <Link href="/community"><span className="hover:text-slate-700 transition">Community</span></Link>
             </div>
           </div>
         </footer>
