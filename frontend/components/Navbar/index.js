@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../AuthScreen';
-import { useProfile, useSystemNotifications } from '../../lib/queries'; // import useSystemNotifications
+import { useProfile } from '../../lib/queries';
 import { useState, useEffect } from 'react';
 import MobileNav from './MobileNav';
 import DesktopNav from './DesktopNav';
@@ -13,8 +13,6 @@ export default function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-  // Fetch unread system notifications count
-  const { data: systemData } = useSystemNotifications(isAuthenticated);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
@@ -39,7 +37,6 @@ export default function Navbar() {
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || 'U';
   const isPro = profile?.plan === 'pro' || false;
   const isProfileLoading = profileLoading || (user && !profile);
-  const unreadCount = systemData?.unreadCount || 0; // gets unread system notifications count
 
   const isActive = (path) => router.pathname === path;
 
@@ -85,7 +82,6 @@ export default function Navbar() {
                 firstLetter={firstLetter}
                 isPro={isPro}
                 handleLogout={handleLogout}
-                unreadCount={unreadCount} // pass count
               />
             </div>
 
@@ -164,7 +160,6 @@ export default function Navbar() {
         avatarUrl={avatarUrl}
         firstLetter={firstLetter}
         handleLogout={handleLogout}
-        unreadCount={unreadCount}
       />
     </>
   );
