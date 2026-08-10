@@ -1,4 +1,3 @@
-
 // components/Sidebar.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -19,8 +18,9 @@ import {
   FiGrid,
   FiLogOut,
   FiSettings,
+  FiUsers,         // for community feed
 } from 'react-icons/fi';
-import { FaCrown } from 'react-icons/fa';
+import { FaCrown, FaRocket } from 'react-icons/fa'; // for ProductTrend
 
 export default function Sidebar() {
   const router = useRouter();
@@ -43,14 +43,20 @@ export default function Sidebar() {
     }
   };
 
-  const isActive = (path) => router.pathname === path;
+  // Improved active detection: highlight sub‑pages
+  const isActive = (path) => {
+    if (path === '/') {
+      return router.pathname === '/';
+    }
+    return router.pathname.startsWith(path);
+  };
 
   const menuGroups = [
     {
       title: 'Main Menu',
       items: [
         { href: '/', label: 'Home', icon: FiHome },
-        { href: '/create', label: 'Create', icon: FiPlus },
+        { href: '/create', label: 'Create Campaign', icon: FiPlus },
         ...(isAuthenticated
           ? [
               { href: '/stats', label: 'Dashboard', icon: FiBarChart2 },
@@ -63,6 +69,9 @@ export default function Sidebar() {
     {
       title: 'Community',
       items: [
+        { href: '/community', label: 'Community Feed', icon: FiUsers },
+        { href: '/groweachother', label: 'Grow Together', icon: FiUsers },
+        { href: '/productstrend', label: 'Launch Products', icon: FaRocket },
         { href: '/follow', label: 'Follow Us', icon: FiHeart },
         { href: '/refer-earn', label: 'Refer & Earn', icon: FiAward },
       ],
@@ -87,10 +96,9 @@ export default function Sidebar() {
   ];
 
   return (
-    // Changed to simply `h-full` so it perfectly fills the space it's given
     <aside className="flex flex-col w-[260px] h-full bg-white border-r border-gray-200 shadow-[2px_0_8px_-4px_rgba(0,0,0,0.05)]">
       
-      {/* ── Scrollable Navigation ── */}
+      {/* Scrollable Navigation */}
       <nav 
         className="flex-1 overflow-y-auto px-3 py-3 space-y-4"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -136,7 +144,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* ── Fixed Footer: User Info + Logout ── */}
+      {/* Fixed Footer: User Info + Logout */}
       <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-white">
         {isAuthenticated ? (
           <div className="flex flex-col gap-3">
