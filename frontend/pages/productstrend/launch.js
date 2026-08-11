@@ -42,6 +42,7 @@ import {
   FiShare2,
   FiAtSign,
   FiShoppingBag,
+  FiTrendingUp, // ✅ added for earnings icon
 } from 'react-icons/fi';
 import { FaRocket, FaTwitter as FaTwitterBrand } from 'react-icons/fa';
 
@@ -622,6 +623,18 @@ export default function LaunchProduct() {
               </h1>
               <p className="text-sm text-slate-500">
                 {isEditing ? 'Update your product details' : 'Share your creation with the community'}
+              </p>
+            </div>
+          </div>
+
+          {/* ── Earnings Notice ── */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <FiTrendingUp className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-purple-800">Earn MT Coins from upvotes!</p>
+              <p className="text-slate-600 text-sm">
+                You earn <span className="font-bold text-purple-700">1 MT Coin</span> for every upvote your product receives. 
+                Share your product and watch your earnings grow!
               </p>
             </div>
           </div>
