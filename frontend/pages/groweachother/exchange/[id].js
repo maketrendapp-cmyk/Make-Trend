@@ -21,6 +21,7 @@ import {
   FiInfo,
   FiAlertTriangle,
   FiRefreshCw,
+  FiAward,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -33,6 +34,7 @@ import {
   FaGithub,
   FaLink,
 } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -96,7 +98,10 @@ export default function ExchangeDetail() {
   } = useExchangeDetail(id, isAuthenticated);
 
   // ── Mutation for status updates ──
-  const { mutate: updateStatus, isLoading: isSubmitting } = useUpdateExchangeStatus();
+  const { mutateAsync: updateStatusAsync } = useUpdateExchangeStatus();
+
+  // ── Local loading state to prevent double clicks ──
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── State for cancel confirmation modal ──
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -127,16 +132,39 @@ export default function ExchangeDetail() {
   };
 
   // ── Handlers for status updates ──
-  const handleMarkDone = () => {
+  const handleMarkDone = async () => {
     if (!id) return;
-    updateStatus({ id, status: 'done' });
+    if (isSubmitting) return; // prevent double clicks
+
+    setIsSubmitting(true);
+    try {
+      await updateStatusAsync({ id, status: 'done' });
+      toast.success('✅ You marked their task as Done!');
+      await refetch();
+    } catch (err) {
+      console.error('Error updating status:', err);
+      toast.error(err.message || 'Failed to update status');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!id) return;
-    updateStatus({ id, status: 'cancel' }, {
-      onSuccess: () => setShowCancelModal(false),
-    });
+    if (isSubmitting) return; // prevent double clicks
+
+    setIsSubmitting(true);
+    try {
+      await updateStatusAsync({ id, status: 'cancel' });
+      toast.success('Exchange cancelled successfully');
+      setShowCancelModal(false);
+      await refetch();
+    } catch (err) {
+      console.error('Error cancelling exchange:', err);
+      toast.error(err.message || 'Failed to cancel exchange');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getPlatformIcon = (platform) => PLATFORM_ICONS[platform?.toLowerCase()] || FaLink;
@@ -273,6 +301,9 @@ export default function ExchangeDetail() {
     if (!userObj) return null;
     return userObj.avatar || userObj.photoURL || null;
   };
+
+  // ── Both users have marked "done" → completed ──
+  const bothDone = myStatus === 'done' && otherStatus === 'done';
 
   return (
     <>
@@ -497,9 +528,19 @@ export default function ExchangeDetail() {
                 <div className="py-2">
                   <p className="text-emerald-700 font-bold flex items-center justify-center gap-2 text-base"><FiCheck className="w-5 h-5" /> Exchange Successfully Completed!</p>
                   <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">Both sides have verified and completed their tasks.</p>
-                  {anyTaskMissing && (
-                    <p className="text-xs text-amber-600 mt-1">⚠️ One task was later deleted, but the exchange was already completed.</p>
-                  )}
+                  
+                  {/* 🪙 2 MT Coins Reward Banner */}
+                  <div className="mt-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <FiAward className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-amber-800">🎉 Reward Unlocked!</p>
+                      <p className="text-xs text-amber-700">
+                        Both you and <strong>{otherUser?.fullname || otherUser?.username || 'your partner'}</strong> received <strong className="font-bold">2 MT Coins</strong> each for completing this exchange!
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ) : isCancelled ? (
                 <div className="py-2">
@@ -517,10 +558,23 @@ export default function ExchangeDetail() {
                       <button
                         onClick={handleMarkDone}
                         disabled={isSubmitting}
-                        className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-bold text-sm hover:shadow-md transition shadow-sm disabled:opacity-50 active:scale-95"
+                        className={`w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm transition shadow-sm active:scale-95 ${
+                          isSubmitting
+                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                            : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:shadow-md'
+                        }`}
                       >
-                        {isSubmitting ? <FiLoader className="w-5 h-5 animate-spin" /> : <FiCheckCircle className="w-5 h-5" />}
-                        {isSubmitting ? 'Updating...' : 'I Completed Their Task'}
+                        {isSubmitting ? (
+                          <>
+                            <FiLoader className="w-5 h-5 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <FiCheckCircle className="w-5 h-5" />
+                            I Completed Their Task
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={() => setShowCancelModal(true)}
@@ -537,12 +591,18 @@ export default function ExchangeDetail() {
                           <FiAlertTriangle className="w-5 h-5" /> Cannot complete – a task is missing.
                         </p>
                       ) : myStatus === 'done' ? (
-                        <p className="text-emerald-700 font-bold flex items-center justify-center gap-2 text-sm sm:text-base"><FiCheckCircle className="w-5 h-5" /> You've marked their task as Done!</p>
+                        <p className="text-emerald-700 font-bold flex items-center justify-center gap-2 text-sm sm:text-base">
+                          <FiCheckCircle className="w-5 h-5" /> You've marked their task as Done!
+                        </p>
                       ) : (
-                        <p className="text-amber-700 font-bold flex items-center justify-center gap-2 text-sm sm:text-base"><FiClock className="w-5 h-5" /> Waiting for you to complete their task.</p>
+                        <p className="text-amber-700 font-bold flex items-center justify-center gap-2 text-sm sm:text-base">
+                          <FiClock className="w-5 h-5" /> Waiting for you to complete their task.
+                        </p>
                       )}
                       {myStatus === 'done' && otherStatus === 'waiting' && (
-                        <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">Waiting for {otherUser?.fullname || otherUser?.username || 'your partner'} to verify and complete yours.</p>
+                        <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">
+                          Waiting for {otherUser?.fullname || otherUser?.username || 'your partner'} to verify and complete yours.
+                        </p>
                       )}
                     </div>
                   )}
@@ -566,12 +626,17 @@ export default function ExchangeDetail() {
               <button
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2 shadow-sm ${
+                  isSubmitting
+                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
               >
                 {isSubmitting ? <FiLoader className="w-4 h-4 animate-spin" /> : 'Yes, Cancel'}
               </button>
               <button
                 onClick={() => setShowCancelModal(false)}
+                disabled={isSubmitting}
                 className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-200 transition"
               >
                 Go Back
