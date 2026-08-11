@@ -3926,7 +3926,19 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalCompletions
     );
 
-    // ── 2. Get user document ──
+    // ── 2. Calculate total likes from community posts (NEW) ──
+    const postsSnapshot = await db.collection('posts')
+      .where('userId', '==', uid)
+      .where('status', '==', 'active')
+      .select('likes')
+      .get();
+
+    let totalLikes = 0;
+    postsSnapshot.forEach(doc => {
+      totalLikes += doc.data().likes || 0;
+    });
+
+    // ── 3. Get user document ──
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -3935,9 +3947,10 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
     const data = userDoc.data();
     let mtCoinsEarned = data.mtCoinsEarned || 0;
     let mtCoinsSpent = data.mtCoinsSpent || 0;
-    let statsEarned = data.statsEarned ?? 0;   // new field
+    let statsEarned = data.statsEarned ?? 0;
+    let communityLikesEarned = data.communityLikesEarned ?? 0; // NEW field
 
-    // ── 3. MIGRATION: Initialize if mtCoinsEarned is missing ──
+    // ── 4. MIGRATION: Initialize if mtCoinsEarned is missing ──
     if (data.mtCoinsEarned === undefined && data.mtCoinsSpent === undefined) {
       const withdrawSnapshot = await db.collection('withdrawals')
         .where('userId', '==', uid)
@@ -3953,19 +3966,22 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       mtCoinsSpent = totalWithdrawn;
       // Set initial mtCoinsEarned to at least stats + withdrawals + current balance
       mtCoinsEarned = Math.max(earnedFromStats, totalWithdrawn + currentAvailable);
-      statsEarned = earnedFromStats;   // baseline
+      statsEarned = earnedFromStats;
+      // Set communityLikesEarned to current total likes – no retroactive coins
+      communityLikesEarned = totalLikes;
 
       await db.collection('users').doc(uid).update({
         mtCoinsEarned,
         mtCoinsSpent,
-        statsEarned: statsEarned,
+        statsEarned,
+        communityLikesEarned,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // ── 4. Normal delta update ──
-      const delta = earnedFromStats - statsEarned;
-      if (delta > 0) {
-        mtCoinsEarned += delta;
+      // ── 5. Normal delta update for campaign stats ──
+      const deltaStats = earnedFromStats - statsEarned;
+      if (deltaStats > 0) {
+        mtCoinsEarned += deltaStats;
         statsEarned = earnedFromStats;
         await db.collection('users').doc(uid).update({
           mtCoinsEarned,
@@ -3973,7 +3989,18 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
-      // If delta <= 0, do nothing – stats haven't increased
+
+      // ── 6. Normal delta update for community likes (NEW) ──
+      const deltaLikes = totalLikes - communityLikesEarned;
+      if (deltaLikes > 0) {
+        mtCoinsEarned += deltaLikes;
+        communityLikesEarned = totalLikes;
+        await db.collection('users').doc(uid).update({
+          mtCoinsEarned,
+          communityLikesEarned,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     }
 
     const available = mtCoinsEarned - mtCoinsSpent;
@@ -3991,6 +4018,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
           completions: totalCompletions,
           shares: totalShares,
           unlocks: totalUnlocks,
+          likes: totalLikes, // NEW: total likes across all user's posts
         },
       },
     });
