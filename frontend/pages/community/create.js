@@ -279,6 +279,18 @@ export default function CreatePost() {
             {isEdit ? 'Update your post' : 'Share something with the community'}
           </p>
 
+          {/* ── EARNING SCHEME NOTICE ── */}
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <span className="text-purple-600 text-xl">💰</span>
+            <div>
+              <p className="font-semibold text-purple-800">Earn MT Coins from likes!</p>
+              <p className="text-slate-600 text-sm">
+                You earn <span className="font-bold text-purple-700">1 MT Coin</span> for every like your post receives. 
+                Share quality content and watch your earnings grow!
+              </p>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* ── Post Type ── */}
             <div>
