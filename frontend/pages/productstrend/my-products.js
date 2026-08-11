@@ -329,7 +329,7 @@ export default function MyProducts() {
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg text-center">
           <div className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 mb-1">
             <FiAward className="w-4 h-4" />
-            <span>Total earnings from product upvotes</span>
+            <span>Total earnings from product likes(upvotes)</span>
           </div>
           <p className="text-5xl font-bold tracking-tight">
             {mtCoinsLoading ? '...' : earnedFromProducts}
