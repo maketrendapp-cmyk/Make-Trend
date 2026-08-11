@@ -11,7 +11,7 @@ import {
   useLikePost,
   useDeletePost,
   useInvalidateQueries,
-  useMtCoins,
+  useMtCoins, // ✅ still here
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -19,6 +19,7 @@ import {
   FiShare2,
   FiLoader,
   FiRefreshCw,
+  FiUser,
   FiClock,
   FiExternalLink,
   FiPlus,
@@ -27,12 +28,14 @@ import {
   FiTrash2,
   FiX,
   FiSearch,
+  FiFilter,        // ← restored
+  FiChevronDown,   // ← restored
   FiAward,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ... (POST_TYPE_ICONS, POST_TYPE_LABELS, CATEGORIES, POST_TYPES unchanged)
+// ... all your constants (POST_TYPE_ICONS, CATEGORIES, etc.) unchanged ...
 
 export default function MyPosts() {
   const router = useRouter();
@@ -50,10 +53,10 @@ export default function MyPosts() {
   // ── Fetch profile ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
 
-  // ── Fetch MT Coins (for earnings from posts) ──
+  // ── Fetch MT Coins ──
   const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
 
-  // ── Fetch posts with filters ──
+  // ── Fetch posts ──
   const {
     data,
     isLoading: postsLoading,
@@ -78,7 +81,7 @@ export default function MyPosts() {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null });
   const [deletingPostId, setDeletingPostId] = useState(null);
 
-  // ── Intersection Observer for infinite scroll ──
+  // ── Intersection Observer ──
   const observerRef = useRef(null);
   const lastElementRef = useCallback(
     (node) => {
@@ -94,7 +97,7 @@ export default function MyPosts() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Apply filters ──
+  // ── Filters ──
   const applyFilters = () => {
     setAppliedFilters({
       category: categoryFilter,
@@ -196,7 +199,7 @@ export default function MyPosts() {
     }
   };
 
-  // ── Loading state ──
+  // ── Loading ──
   if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
@@ -264,7 +267,7 @@ export default function MyPosts() {
     <>
       <Meta title="My Posts – Make Trend Community" />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* ── Simplified Header ── */}
+        {/* ── Header ── */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
             <Link
@@ -283,7 +286,7 @@ export default function MyPosts() {
           </Link>
         </div>
 
-        {/* ── User Avatar & Name (compact) ── */}
+        {/* ── User Avatar & Name ── */}
         {profile && (
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden border-2 border-purple-100">
@@ -321,7 +324,7 @@ export default function MyPosts() {
           <p className="text-xs text-white/50 mt-2">1 like = 1 MT Coin</p>
         </div>
 
-        {/* ── Filters ── (unchanged) */}
+        {/* ── Filters ── (original, no changes) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1 relative">
@@ -377,7 +380,7 @@ export default function MyPosts() {
           )}
         </div>
 
-        {/* ── Posts List ── (unchanged) */}
+        {/* ── Posts List ── (original, unchanged) */}
         {posts.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">📝</div>
