@@ -5,6 +5,12 @@ import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
 import { getToken } from '../../lib/api';
 import {
+  useGrowFeed,
+  useAvailableTasks,
+  useInvalidateQueries,
+  useMtCoins, // ✅ NEW
+} from '../../lib/queries';
+import {
   FiHeart,
   FiUser,
   FiCheckCircle,
@@ -17,6 +23,8 @@ import {
   FiRepeat,
   FiFilter,
   FiLogIn,
+  FiAlertCircle, // ✅ NEW
+  FiInfo, // ✅ NEW
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -29,7 +37,7 @@ import {
   FaGithub,
   FaLink,
 } from 'react-icons/fa';
-import { useGrowFeed, useAvailableTasks, useInvalidateQueries } from '../../lib/queries';
+import toast from 'react-hot-toast';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -95,26 +103,29 @@ export default function GrowFeed() {
     refetch,
     isError,
     error,
-  } = useGrowFeed(filters, true); // always enabled, public
+  } = useGrowFeed(filters, true);
+
+  // ── MT Coins balance ──
+  const { data: mtCoinsData, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
   // ── Flatten and filter tasks ──
   const allTasks = data?.pages?.flatMap((page) => page.tasks) || [];
-  // If user is authenticated, hide tasks they have already exchanged.
-  // For guests, hasExchange is always false, so no filtering needed.
   const tasks = isAuthenticated
     ? allTasks.filter(task => !task.hasExchange)
     : allTasks;
 
   const hasMore = hasNextPage;
 
-  // ── Modal state (only for logged-in users) ──
+  // ── Modal state ──
   const [showModal, setShowModal] = useState(false);
   const [selectedTargetTask, setSelectedTargetTask] = useState(null);
   const [selectedMyTask, setSelectedMyTask] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
+  // ── NEW: Confirmation step ──
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
-  // ── Available tasks for modal (only if authenticated) ──
+  // ── Available tasks for modal ──
   const {
     data: availableTasksData,
     refetch: refetchAvailable,
@@ -122,7 +133,10 @@ export default function GrowFeed() {
   } = useAvailableTasks(isAuthenticated && !!user);
   const myTasks = availableTasksData || [];
 
-  // ── Intersection Observer for infinite scroll ──
+  const availableCoins = (mtCoinsData?.available ?? 0);
+  const hasEnoughCoins = availableCoins >= 1;
+
+  // ── Intersection Observer ──
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -177,17 +191,28 @@ export default function GrowFeed() {
     setSelectedTargetTask(task);
     setSelectedMyTask(null);
     setModalError('');
+    setShowConfirmation(false);
     await refetchAvailable();
+    await refetchMtCoins();
     setShowModal(true);
   };
 
-  // ── Create exchange ──
-  const handleCreateExchange = async () => {
+  // ── NEW: Handle "Create Exchange" click – opens confirmation ──
+  const handleCreateExchangeClick = () => {
     if (!selectedMyTask) {
       setModalError('Please select a task to exchange.');
       return;
     }
+    if (!hasEnoughCoins) {
+      setModalError(`Insufficient MT Coins. You need 1 coin to create an exchange. You have ${availableCoins} coins.`);
+      return;
+    }
+    // Open confirmation step
+    setShowConfirmation(true);
+  };
 
+  // ── NEW: Confirm and create exchange ──
+  const handleConfirmExchange = async () => {
     setSubmitting(true);
     setModalError('');
 
@@ -211,17 +236,27 @@ export default function GrowFeed() {
         throw new Error(data.error || 'Failed to create exchange');
       }
 
+      toast.success('Exchange created! 1 MT Coin was deducted from your balance.');
       setShowModal(false);
+      setShowConfirmation(false);
       setSelectedTargetTask(null);
       setSelectedMyTask(null);
       invalidateGrowFeed();
       refetch();
+      refetchMtCoins();
     } catch (err) {
       console.error('Create exchange error:', err);
       setModalError(err.message || 'Failed to create exchange');
+      setShowConfirmation(false);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // ── NEW: Go back from confirmation ──
+  const handleBackFromConfirmation = () => {
+    setShowConfirmation(false);
+    setModalError('');
   };
 
   // ── Helpers ──
@@ -285,7 +320,6 @@ export default function GrowFeed() {
     );
   }
 
-  // Determine if we have any visible tasks after filtering.
   const hasVisibleTasks = tasks.length > 0;
 
   return (
@@ -436,7 +470,7 @@ export default function GrowFeed() {
                   key={task.id}
                   className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all"
                 >
-                  {/* Owner Header – clickable to profile */}
+                  {/* Owner Header */}
                   <div className="flex items-center justify-between mb-4">
                     <div
                       className="flex items-center gap-3 cursor-pointer"
@@ -506,7 +540,6 @@ export default function GrowFeed() {
                         <FiUser className="w-3.5 h-3.5" /> Your Task
                       </span>
                     ) : task.hasExchange ? (
-                      // This case shouldn't occur because we filtered them out, but keep for safety.
                       <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 text-xs font-semibold rounded-xl">
                         <FiCheckCircle className="w-3.5 h-3.5" /> Exchanged
                       </span>
@@ -547,112 +580,206 @@ export default function GrowFeed() {
         </div>
       </div>
 
-      {/* ── Help To Grow Modal (only shown if authenticated) ── */}
+      {/* ── Help To Grow Modal ── */}
       {showModal && isAuthenticated && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Help To Grow</h2>
-              <button
-                onClick={() => {
-                  setShowModal(false);
-                  setSelectedTargetTask(null);
-                  setSelectedMyTask(null);
-                  setModalError('');
-                }}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"
-              >
-                <FiX className="w-5 h-5" />
-              </button>
-            </div>
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
+            {!showConfirmation ? (
+              // ── Step 1: Select Your Task ──
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-900">Help To Grow</h2>
+                  <button
+                    onClick={() => {
+                      setShowModal(false);
+                      setSelectedTargetTask(null);
+                      setSelectedMyTask(null);
+                      setModalError('');
+                    }}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"
+                  >
+                    <FiX className="w-5 h-5" />
+                  </button>
+                </div>
 
-            <div className="mb-4 p-3.5 bg-purple-50/80 border border-purple-100 rounded-2xl">
-              <p className="text-xs sm:text-sm text-purple-900 font-medium leading-relaxed">
-                You're helping <strong>{selectedTargetTask?.owner?.fullname || selectedTargetTask?.owner?.username}</strong>
-                {' '}with their <strong>{selectedTargetTask?.taskType}</strong> on{' '}
-                <strong>{selectedTargetTask?.platform}</strong>.
-              </p>
-            </div>
+                <div className="mb-4 p-3.5 bg-purple-50/80 border border-purple-100 rounded-2xl">
+                  <p className="text-xs sm:text-sm text-purple-900 font-medium leading-relaxed">
+                    You're helping <strong>{selectedTargetTask?.owner?.fullname || selectedTargetTask?.owner?.username}</strong>
+                    {' '}with their <strong>{selectedTargetTask?.taskType}</strong> on{' '}
+                    <strong>{selectedTargetTask?.platform}</strong>.
+                  </p>
+                </div>
 
-            <p className="text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wider mb-2.5">
-              Select your task to return the favor:
-            </p>
+                {/* ── Coin Balance Display ── */}
+                <div className={`mb-4 p-3 rounded-2xl border ${hasEnoughCoins ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Available MT Coins</span>
+                    <span className={`text-lg font-bold ${hasEnoughCoins ? 'text-green-700' : 'text-red-700'}`}>
+                      {mtCoinsLoading ? '...' : availableCoins}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <FiInfo className={`w-3.5 h-3.5 ${hasEnoughCoins ? 'text-green-500' : 'text-red-500'}`} />
+                    <p className={`text-xs ${hasEnoughCoins ? 'text-green-600' : 'text-red-600'}`}>
+                      {hasEnoughCoins
+                        ? 'You have enough coins. 1 MT Coin will be deducted.'
+                        : `You need 1 MT Coin. You have ${availableCoins} coins.`}
+                    </p>
+                  </div>
+                </div>
 
-            {myTasks.length === 0 ? (
-              <div className="text-center py-6 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-gray-500 text-xs sm:text-sm font-medium mb-3">You don't have any active tasks available.</p>
-                <button
-                  onClick={() => {
-                    setShowModal(false);
-                    router.push('/groweachother/my-tasks');
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-xs font-bold shadow-sm"
-                >
-                  <FiPlus className="w-4 h-4" />
-                  Create Task First
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2 mb-4 max-h-56 overflow-y-auto pr-1">
-                {myTasks.map((task) => {
-                  const Icon = getPlatformIcon(task.platform);
-                  const colorClass = getPlatformColor(task.platform);
-                  return (
+                <p className="text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wider mb-2.5">
+                  Select your task to return the favor:
+                </p>
+
+                {myTasks.length === 0 ? (
+                  <div className="text-center py-6 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p className="text-gray-500 text-xs sm:text-sm font-medium mb-3">You don't have any active tasks available.</p>
                     <button
-                      key={task.id}
-                      onClick={() => setSelectedMyTask(task)}
-                      className={`w-full text-left p-3 rounded-2xl border transition-all ${
-                        selectedMyTask?.id === task.id
-                          ? 'border-purple-500 bg-purple-50/60 shadow-sm'
-                          : 'border-gray-200/80 hover:border-purple-200 hover:bg-purple-50/30'
-                      }`}
+                      onClick={() => {
+                        setShowModal(false);
+                        router.push('/groweachother/my-tasks');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-xs font-bold shadow-sm"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200/60 shadow-sm ${colorClass}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
-                            {task.platform} – {task.taskType}
-                          </p>
-                          {task.title && (
-                            <p className="text-[11px] text-gray-500 truncate">{task.title}</p>
-                          )}
-                        </div>
-                        {selectedMyTask?.id === task.id && (
-                          <FiCheckCircle className="w-5 h-5 text-purple-600 ml-auto flex-shrink-0" />
-                        )}
-                      </div>
+                      <FiPlus className="w-4 h-4" />
+                      Create Task First
                     </button>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                ) : (
+                  <div className="space-y-2 mb-4 max-h-56 overflow-y-auto pr-1">
+                    {myTasks.map((task) => {
+                      const Icon = getPlatformIcon(task.platform);
+                      const colorClass = getPlatformColor(task.platform);
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={() => {
+                            setSelectedMyTask(task);
+                            setModalError('');
+                          }}
+                          className={`w-full text-left p-3 rounded-2xl border transition-all ${
+                            selectedMyTask?.id === task.id
+                              ? 'border-purple-500 bg-purple-50/60 shadow-sm'
+                              : 'border-gray-200/80 hover:border-purple-200 hover:bg-purple-50/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200/60 shadow-sm ${colorClass}`}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                                {task.platform} – {task.taskType}
+                              </p>
+                              {task.title && (
+                                <p className="text-[11px] text-gray-500 truncate">{task.title}</p>
+                              )}
+                            </div>
+                            {selectedMyTask?.id === task.id && (
+                              <FiCheckCircle className="w-5 h-5 text-purple-600 ml-auto flex-shrink-0" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-            {modalError && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-bold">
-                {modalError}
-              </div>
-            )}
+                {modalError && (
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-bold">
+                    {modalError}
+                  </div>
+                )}
 
-            <button
-              onClick={handleCreateExchange}
-              disabled={!selectedMyTask || submitting || myTasks.length === 0}
-              className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
-                !selectedMyTask || submitting || myTasks.length === 0
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-md active:scale-95'
-              }`}
-            >
-              {submitting ? (
-                <>
-                  <FiLoader className="w-4 h-4 animate-spin" />
-                  Creating Exchange...
-                </>
-              ) : (
-                'Create Exchange'
-              )}
-            </button>
+                <button
+                  onClick={handleCreateExchangeClick}
+                  disabled={!selectedMyTask || submitting || myTasks.length === 0 || !hasEnoughCoins}
+                  className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
+                    !selectedMyTask || submitting || myTasks.length === 0 || !hasEnoughCoins
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-md active:scale-95'
+                  }`}
+                >
+                  {submitting ? (
+                    <>
+                      <FiLoader className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Continue to Confirm'
+                  )}
+                </button>
+              </>
+            ) : (
+              // ── Step 2: Confirmation ──
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-900">Confirm Exchange</h2>
+                  <button
+                    onClick={handleBackFromConfirmation}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"
+                    disabled={submitting}
+                  >
+                    <FiX className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl">
+                  <div className="flex items-start gap-3">
+                    <FiAlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-yellow-800">1 MT Coin will be deducted</p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        You have <strong>{availableCoins}</strong> MT Coins available.
+                        After this exchange, you'll have <strong>{availableCoins - 1}</strong> coins.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4 p-3.5 bg-purple-50/80 border border-purple-100 rounded-2xl">
+                  <p className="text-xs sm:text-sm text-purple-900 font-medium leading-relaxed">
+                    You'll help <strong>{selectedTargetTask?.owner?.fullname || selectedTargetTask?.owner?.username}</strong>
+                    {' '}with <strong>{selectedTargetTask?.taskType}</strong> on{' '}
+                    <strong>{selectedTargetTask?.platform}</strong>.
+                  </p>
+                  <p className="text-xs text-purple-700 mt-1">
+                    Your task: <strong>{selectedMyTask?.platform} – {selectedMyTask?.taskType}</strong>
+                  </p>
+                </div>
+
+                {modalError && (
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-bold">
+                    {modalError}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleBackFromConfirmation}
+                    disabled={submitting}
+                    className="flex-1 py-3.5 rounded-2xl font-bold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleConfirmExchange}
+                    disabled={submitting}
+                    className="flex-1 py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-md transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <FiLoader className="w-4 h-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Confirm & Exchange'
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
