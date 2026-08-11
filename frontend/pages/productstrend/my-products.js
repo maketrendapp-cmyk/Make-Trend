@@ -10,6 +10,7 @@ import {
   useMyProducts,
   useDeleteProduct,
   useInvalidateQueries,
+  useMtCoins, // ✅ added
 } from '../../lib/queries';
 import {
   FiGrid,
@@ -28,8 +29,9 @@ import {
   FiUser,
   FiFilter,
   FiChevronDown,
-  FiAlertTriangle,      // ← import added
-FiTag,  // ← ADD THIS
+  FiAlertTriangle,
+  FiTag,
+  FiAward, // ✅ added for earnings icon
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -85,6 +87,9 @@ export default function MyProducts() {
     status: statusFilter || undefined,
     category: categoryFilter || undefined,
   };
+
+  // ── Fetch MT Coins (for earnings from products) ──
+  const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
 
   // ── React Query: My Products (infinite) ──
   const {
@@ -285,6 +290,7 @@ export default function MyProducts() {
   }
 
   const hasFilters = statusFilter || categoryFilter || searchTerm;
+  const earnedFromProducts = mtCoinsData?.earnedFromProducts ?? 0;
 
   return (
     <>
@@ -317,6 +323,19 @@ export default function MyProducts() {
           >
             <FiPlus className="w-4 h-4" /> Launch New
           </button>
+        </div>
+
+        {/* ── Earnings from Products Card ── */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg text-center">
+          <div className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 mb-1">
+            <FiAward className="w-4 h-4" />
+            <span>Total earnings from product upvotes</span>
+          </div>
+          <p className="text-5xl font-bold tracking-tight">
+            {mtCoinsLoading ? '...' : earnedFromProducts}
+          </p>
+          <p className="text-sm text-white/70 mt-1">MT Coins</p>
+          <p className="text-xs text-white/50 mt-2">1 upvote = 1 MT Coin</p>
         </div>
 
         {/* ── Filters & Search ── */}
