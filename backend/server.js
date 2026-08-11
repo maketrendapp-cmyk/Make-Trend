@@ -5565,7 +5565,7 @@ app.get('/api/exchanges/:id', verifyToken, checkBanned, async (req, res) => {
 // ─────────────────────────────────────────────
 // 9. UPDATE EXCHANGE STATUS (Done / Cancel)
 // ─────────────────────────────────────────────
-// ── Update exchange status (Done / Cancel) ──
+// ── Update exchange status (Done / Cancel) with 2 MT Coin reward on completion ──
 app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -5597,7 +5597,7 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
       return res.status(400).json({ success: false, error: `Exchange already ${data.overallStatus}` });
     }
 
-    // ── ✅ NEW: Check if tasks exist ──
+    // ── Check if tasks exist ──
     const [taskADoc, taskBDoc] = await Promise.all([
       db.collection('socialTasks').doc(data.userATaskId).get(),
       db.collection('socialTasks').doc(data.userBTaskId).get(),
@@ -5609,19 +5609,27 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
       });
     }
 
+    // ── Prepare update data (statuses) ──
     const updateData = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+    let willBeCompleted = false;
 
     if (status === 'done') {
       if (side === 'A') {
         if (data.userAStatus === 'done') return res.status(400).json({ success: false, error: 'Already done' });
         updateData.userAStatus = 'done';
+        // Determine new overall status
+        const newA = 'done';
+        const newB = data.userBStatus;
+        willBeCompleted = (newA === 'done' && newB === 'done');
+        updateData.overallStatus = willBeCompleted ? 'completed' : 'active';
       } else {
         if (data.userBStatus === 'done') return res.status(400).json({ success: false, error: 'Already done' });
         updateData.userBStatus = 'done';
+        const newA = data.userAStatus;
+        const newB = 'done';
+        willBeCompleted = (newA === 'done' && newB === 'done');
+        updateData.overallStatus = willBeCompleted ? 'completed' : 'active';
       }
-      const newA = side === 'A' ? 'done' : data.userAStatus;
-      const newB = side === 'B' ? 'done' : data.userBStatus;
-      updateData.overallStatus = (newA === 'done' && newB === 'done') ? 'completed' : 'active';
     } else {
       // cancel
       if (side === 'A') {
@@ -5634,6 +5642,42 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
       updateData.overallStatus = 'cancelled';
     }
 
+    // ── 🔥 NEW: If this update completes the exchange, award 2 MT Coins to both users ──
+    if (willBeCompleted && !data.rewardGiven) {
+      // Award coins using a transaction to ensure atomicity
+      await db.runTransaction(async (transaction) => {
+        // Award to userA
+        const userARef = db.collection('users').doc(data.userAUid);
+        const userADoc = await transaction.get(userARef);
+        if (!userADoc.exists) throw new Error('User A not found');
+        transaction.update(userARef, {
+          mtCoinsEarned: admin.firestore.FieldValue.increment(2),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Award to userB
+        const userBRef = db.collection('users').doc(data.userBUid);
+        const userBDoc = await transaction.get(userBRef);
+        if (!userBDoc.exists) throw new Error('User B not found');
+        transaction.update(userBRef, {
+          mtCoinsEarned: admin.firestore.FieldValue.increment(2),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Mark reward as given on the exchange
+        transaction.update(docRef, { rewardGiven: true });
+      });
+
+      // Invalidate MT Coins caches for both users
+      await invalidateKey(`mtcoins:user:${data.userAUid}`);
+      await invalidateKey(`mtcoins:user:${data.userBUid}`);
+    }
+
+    // ── Apply status updates (if not already done inside transaction) ──
+    // Note: If willBeCompleted, we already updated rewardGiven inside transaction, but we still need to apply status updates.
+    // We update status fields outside transaction to avoid conflicts (or inside, but we did separately).
+    // To be safe, we update statuses after transaction, but we already have updateData.
+    // We'll apply status updates now.
     await docRef.update(updateData);
 
     // ── Invalidate caches for both users ──
@@ -5646,7 +5690,7 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
     const updatedDoc = await docRef.get();
     const populated = await populateExchange({ id: doc.id, ...updatedDoc.data() });
 
-    // ── Invalidate exchange caches in‑place (from your existing helper) ──
+    // ── Invalidate exchange caches in‑place ──
     await updateUserExchangeCache(data.userAUid, (cacheData) => {
       if (!cacheData.exchanges) return null;
       cacheData.exchanges = cacheData.exchanges.map(ex =>
@@ -5662,10 +5706,10 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
       return cacheData;
     });
 
-    res.json({ success: true, exchange: populated });
+    res.json({ success: true, exchange: populated, rewardGiven: willBeCompleted });
   } catch (error) {
     console.error('Update exchange error:', error);
-    res.status(500).json({ success: false, error: 'Failed to update exchange' });
+    res.status(500).json({ success: false, error: error.message || 'Failed to update exchange' });
   }
 });
 
