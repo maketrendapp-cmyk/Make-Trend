@@ -5329,7 +5329,7 @@ app.get('/api/grow-feed', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// 6. CREATE EXCHANGE (with duplicate prevention & in‑place cache updates)
+// 6. CREATE EXCHANGE (with 1 MT Coin cost + balance check)
 // ─────────────────────────────────────────────
 app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
   try {
@@ -5348,6 +5348,7 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
         error: 'Daily exchange limit reached (max 1000 exchanges per day). Come back tomorrow!'
       });
     }
+
     const targetTaskDoc = await db.collection('socialTasks').doc(targetTaskId).get();
     if (!targetTaskDoc.exists) return res.status(404).json({ success: false, error: 'Target task not found' });
     const targetTask = targetTaskDoc.data();
@@ -5361,7 +5362,6 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
     if (!yourTask.active) return res.status(400).json({ success: false, error: 'Your task is inactive' });
 
     // ── Prevent duplicate exchange (same pair of tasks, any status) ──
-    // Users can reuse tasks with different partners, but cannot create the exact same pair again.
     const existingPair = await db.collection('exchanges')
       .where('userATaskId', '==', yourTaskId)
       .where('userBTaskId', '==', targetTaskId)
@@ -5377,23 +5377,61 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
       return res.status(409).json({ success: false, error: 'An exchange already exists between these two tasks.' });
     }
 
-    // ── Create exchange ──
-    const exchangeData = {
-      userAUid: uid,
-      userBUid: targetTask.uid,
-      userATaskId: yourTaskId,
-      userBTaskId: targetTaskId,
-      userAStatus: 'waiting',
-      userBStatus: 'waiting',
-      overallStatus: 'active',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-    const exchangeRef = await db.collection('exchanges').add(exchangeData);
-    const newExchange = { id: exchangeRef.id, ...exchangeData };
+    // ── 🔥 NEW: Check MT Coin balance and deduct 1 coin (atomic transaction) ──
+    const EXCHANGE_COST = 1;
+    let exchangeRef;
+    let populatedNewExchange;
+    let newExchangeData;
+
+    await db.runTransaction(async (transaction) => {
+      // 1. Get user document
+      const userRef = db.collection('users').doc(uid);
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error('User not found');
+      }
+      const userData = userDoc.data();
+
+      // 2. Calculate available balance
+      const earned = userData.mtCoinsEarned || 0;
+      const spent = userData.mtCoinsSpent || 0;
+      const available = earned - spent;
+
+      // 3. Check if user has enough coins
+      if (available < EXCHANGE_COST) {
+        throw new Error(`Insufficient MT Coins. You need ${EXCHANGE_COST} coin(s) to create an exchange. You have ${available} coins.`);
+      }
+
+      // 4. Deduct 1 coin by incrementing spent
+      transaction.update(userRef, {
+        mtCoinsSpent: admin.firestore.FieldValue.increment(EXCHANGE_COST),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // 5. Create exchange document
+      const exchangeData = {
+        userAUid: uid,
+        userBUid: targetTask.uid,
+        userATaskId: yourTaskId,
+        userBTaskId: targetTaskId,
+        userAStatus: 'waiting',
+        userBStatus: 'waiting',
+        overallStatus: 'active',
+        coinCost: EXCHANGE_COST, // record the cost for transparency
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      exchangeRef = db.collection('exchanges').doc();
+      transaction.set(exchangeRef, exchangeData);
+
+      // Store for later use
+      newExchangeData = { id: exchangeRef.id, ...exchangeData };
+    });
+
+    // ── Populate exchange (outside transaction) ──
+    populatedNewExchange = await populateExchange(newExchangeData);
 
     // ── Update exchange caches in‑place ──
-    const populatedNewExchange = await populateExchange(newExchange);
     await updateUserExchangeCache(uid, (data) => {
       if (!data.exchanges) return null;
       data.exchanges = [populatedNewExchange, ...data.exchanges];
@@ -5405,23 +5443,20 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
       return data;
     });
 
-
     // ── Invalidate per‑user exchange caches ──
     await invalidateUserExchanges(uid);
     await invalidateUserExchanges(targetTask.uid);
 
+    // ── Invalidate MT Coins cache ──
+    await invalidateKey(`mtcoins:user:${uid}`);
+
     // ── Send notifications with improved descriptions ──
     try {
-      // Fetch both users' info for better messages
       const [initiatorInfo, targetUserInfo] = await Promise.all([
         getUserInfo(uid),
         getUserInfo(targetTask.uid),
       ]);
-
-      // Task title fallback
       const taskTitle = yourTask.title || 'your task';
-
-      // 1. To the target user (the one whose task is being requested)
       await createNotification({
         userId: targetTask.uid,
         type: 'personal',
@@ -5430,27 +5465,31 @@ app.post('/api/exchanges', verifyToken, checkBanned, async (req, res) => {
         redirectUrl: `/groweachother/exchange/${exchangeRef.id}`,
         fromUserId: uid,
       });
-
-      // 2. To the initiator (confirmation)
       await createNotification({
         userId: uid,
         type: 'personal',
         title: 'Exchange Initiated! 🚀',
-        description: `You started an exchange for "${taskTitle}" with @${targetUserInfo.username || targetTask.uid}.`,
+        description: `You started an exchange for "${taskTitle}" with @${targetUserInfo.username || targetTask.uid}. (Cost: 1 MT Coin)`,
         redirectUrl: `/groweachother/exchange/${exchangeRef.id}`,
         fromUserId: uid,
       });
-
       console.log(`📬 Exchange notifications sent for ${exchangeRef.id}`);
     } catch (notifError) {
       console.error('❌ Failed to send exchange notifications:', notifError);
-      // Do not block the response
     }
 
-    res.status(201).json({ success: true, exchange: populatedNewExchange });
+    res.status(201).json({
+      success: true,
+      exchange: populatedNewExchange,
+      coinCost: EXCHANGE_COST,
+      message: `Exchange created successfully. 1 MT Coin was deducted from your balance.`,
+    });
   } catch (error) {
     console.error('Create exchange error:', error);
-    res.status(500).json({ success: false, error: 'Failed to create exchange' });
+    if (error.message && error.message.includes('Insufficient MT Coins')) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    res.status(500).json({ success: false, error: error.message || 'Failed to create exchange' });
   }
 });
 
