@@ -3938,6 +3938,17 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalLikes += doc.data().likes || 0;
     });
 
+    // ── 2b. Calculate total upvotes from products ──
+    const productsSnapshot = await db.collection('products')
+      .where('makerUid', '==', uid)
+      .select('upvotes')
+      .get();
+
+    let totalUpvotes = 0;
+    productsSnapshot.forEach(doc => {
+      totalUpvotes += doc.data().upvotes || 0;
+    });
+
     // ── 3. Get user document ──
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists) {
@@ -3949,6 +3960,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
     let mtCoinsSpent = data.mtCoinsSpent || 0;
     let statsEarned = data.statsEarned ?? 0;
     let communityLikesEarned = data.communityLikesEarned ?? 0;
+    let productUpvotesEarned = data.productUpvotesEarned ?? 0; // 🔥 NEW
 
     // ── 4. MIGRATION: Initialize if mtCoinsEarned is missing ──
     if (data.mtCoinsEarned === undefined && data.mtCoinsSpent === undefined) {
@@ -3967,12 +3979,14 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       mtCoinsEarned = Math.max(earnedFromStats, totalWithdrawn + currentAvailable);
       statsEarned = earnedFromStats;
       communityLikesEarned = totalLikes;
+      productUpvotesEarned = totalUpvotes; // 🔥 NEW
 
       await db.collection('users').doc(uid).update({
         mtCoinsEarned,
         mtCoinsSpent,
         statsEarned,
         communityLikesEarned,
+        productUpvotesEarned, // 🔥 NEW
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
@@ -3999,12 +4013,24 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
+
+      // ── 7. Normal delta update for product upvotes (NEW) ──
+      const deltaUpvotes = totalUpvotes - productUpvotesEarned;
+      if (deltaUpvotes > 0) {
+        mtCoinsEarned += deltaUpvotes;
+        productUpvotesEarned = totalUpvotes;
+        await db.collection('users').doc(uid).update({
+          mtCoinsEarned,
+          productUpvotesEarned,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     }
 
     const available = mtCoinsEarned - mtCoinsSpent;
     const usdValue = (available / 2500) * 15;
 
-    // ── 7. RESPONSE with earning breakdown ──
+    // ── 8. RESPONSE with earning breakdown ──
     res.json({
       success: true,
       mtCoins: {
@@ -4015,8 +4041,9 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
         usdValue: parseFloat(usdValue.toFixed(2)),
 
         // 📊 Breakdown by source
-        earnedFromPosts: communityLikesEarned,      // 🔥 ONLY from community post likes
-        earnedFromCampaigns: statsEarned,           // From campaign stats
+        earnedFromPosts: communityLikesEarned,         // from community post likes
+        earnedFromProducts: productUpvotesEarned,      // 🔥 NEW: from product upvotes
+        earnedFromCampaigns: statsEarned,              // from campaign stats
 
         // 📈 Stats for display
         stats: {
@@ -4025,6 +4052,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
           shares: totalShares,
           unlocks: totalUnlocks,
           likes: totalLikes,
+          upvotes: totalUpvotes, // 🔥 NEW: total upvotes across all products
         },
       },
     });
