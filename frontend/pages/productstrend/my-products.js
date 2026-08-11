@@ -335,7 +335,7 @@ export default function MyProducts() {
             {mtCoinsLoading ? '...' : earnedFromProducts}
           </p>
           <p className="text-sm text-white/70 mt-1">MT Coins</p>
-          <p className="text-xs text-white/50 mt-2">1 upvote = 1 MT Coin</p>
+          <p className="text-xs text-white/50 mt-2">1 like = 1 MT Coin</p>
         </div>
 
         {/* ── Filters & Search ── */}
