@@ -11,7 +11,7 @@ import {
   useLikePost,
   useDeletePost,
   useInvalidateQueries,
-  useMtCoins, // ✅ NEW import
+  useMtCoins,
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -30,6 +30,7 @@ import {
   FiSearch,
   FiFilter,
   FiChevronDown,
+  FiAward, // for earnings icon
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -122,7 +123,6 @@ export default function MyPosts() {
 
   // ── Delete modal state ──
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null });
-  // ── Track which post is currently being deleted (for per‑button loading) ──
   const [deletingPostId, setDeletingPostId] = useState(null);
 
   // ── Intersection Observer for infinite scroll ──
@@ -174,7 +174,6 @@ export default function MyPosts() {
   const confirmDelete = () => {
     if (deleteModal.postId) {
       setDeletingPostId(deleteModal.postId);
-      
       deletePostMutation.mutate(deleteModal.postId, {
         onSuccess: () => {
           setDeleteModal({ isOpen: false, postId: null });
@@ -304,8 +303,11 @@ export default function MyPosts() {
   const authorName = profile?.fullname || profile?.username || 'Anonymous';
   const authorAvatar = profile?.avatar || '';
   const authorUid = user?.uid;
-
   const hasActiveFilters = appliedFilters.category !== 'all' || appliedFilters.type !== 'all' || appliedFilters.search;
+
+  // Calculate total likes from posts (for display)
+  const totalLikes = posts.reduce((acc, post) => acc + (post.likes || 0), 0);
+  const earnedFromPosts = mtCoinsData?.earnedFromPosts ?? 0;
 
   return (
     <>
@@ -333,47 +335,82 @@ export default function MyPosts() {
           </Link>
         </div>
 
-        {/* ── User info card with earnings badge ── */}
+        {/* ── Professional User Info Card with Earnings ── */}
         {profile && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-slate-200 overflow-hidden">
-              {profile.avatar ? (
-                <Image
-                  src={profile.avatar}
-                  alt={profile.fullname || 'User'}
-                  width={56}
-                  height={56}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-600 text-lg font-bold">
-                  {profile.fullname?.[0] || profile.username?.[0] || 'U'}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-5">
+              {/* Avatar */}
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden border-2 border-purple-100">
+                  {profile.avatar ? (
+                    <Image
+                      src={profile.avatar}
+                      alt={profile.fullname || 'User'}
+                      width={64}
+                      height={64}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-600 text-xl font-bold">
+                      {profile.fullname?.[0] || profile.username?.[0] || 'U'}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-slate-900">{profile.fullname || profile.username || 'Anonymous'}</p>
-                {/* 💰 Earnings from posts badge */}
-                <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  💰 {mtCoinsLoading ? '...' : (mtCoinsData?.earnedFromPosts ?? 0)} from posts
-                </span>
               </div>
-              <p className="text-sm text-slate-500">@{profile.username || 'user'}</p>
-              {profile.bio && <p className="text-sm text-slate-600 mt-1">{profile.bio}</p>}
-              {profile.createdAt && (
-                <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                  <FiClock className="w-3 h-3" /> Joined {formatDate(profile.createdAt)}
+
+              {/* Name & Bio */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl font-bold text-slate-900">
+                    {profile.fullname || profile.username || 'Anonymous'}
+                  </h2>
+                  <span className="text-sm text-slate-500">@{profile.username || 'user'}</span>
+                </div>
+                {profile.bio && <p className="text-sm text-slate-600 mt-1">{profile.bio}</p>}
+                {profile.createdAt && (
+                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                    <FiClock className="w-3 h-3" /> Joined {formatDate(profile.createdAt)}
+                  </p>
+                )}
+              </div>
+
+              {/* ── Earnings Stat Box ── */}
+              <div className="flex-shrink-0 bg-purple-50 border border-purple-200 rounded-xl px-5 py-3 min-w-[140px] text-center">
+                <p className="text-xs font-medium text-purple-600 uppercase tracking-wider flex items-center justify-center gap-1">
+                  <FiAward className="w-3 h-3" /> Earnings
                 </p>
-              )}
+                <p className="text-2xl font-bold text-purple-700">
+                  {mtCoinsLoading ? '...' : earnedFromPosts}
+                </p>
+                <p className="text-xs text-purple-500">MT Coins from likes</p>
+                {totalLikes > 0 && (
+                  <p className="text-[10px] text-purple-400 mt-1">
+                    {totalLikes} total likes • 1 coin each
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Optional: small stats row (for extra info) */}
+            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-6 text-xs text-slate-500">
+              <div>
+                <span className="font-medium text-slate-700">{posts.length}</span> posts
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">{totalLikes}</span> total likes
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">
+                  {mtCoinsLoading ? '...' : earnedFromPosts}
+                </span> coins earned
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── Filters ── */}
+        {/* ── Filters ── (unchanged) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm">
           <div className="flex flex-col md:flex-row gap-3">
-            {/* Search */}
             <div className="flex-1 relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -385,8 +422,6 @@ export default function MyPosts() {
                 onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
               />
             </div>
-
-            {/* Category */}
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -396,8 +431,6 @@ export default function MyPosts() {
                 <option key={cat.value} value={cat.value}>{cat.label}</option>
               ))}
             </select>
-
-            {/* Type */}
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
@@ -407,8 +440,6 @@ export default function MyPosts() {
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
-
-            {/* Buttons */}
             <button
               onClick={applyFilters}
               className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium whitespace-nowrap"
@@ -433,7 +464,7 @@ export default function MyPosts() {
           )}
         </div>
 
-        {/* ── Posts List ── */}
+        {/* ── Posts List ── (unchanged) */}
         {posts.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">📝</div>
@@ -471,7 +502,7 @@ export default function MyPosts() {
                   className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition"
                   ref={index === posts.length - 1 ? lastElementRef : null}
                 >
-                  {/* ── Post Header ── */}
+                  {/* Post header, content, actions – unchanged */}
                   <div className="flex items-start gap-3">
                     <Link href={`/userinfo/${authorUid}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
@@ -513,7 +544,6 @@ export default function MyPosts() {
                     </div>
                   </div>
 
-                  {/* ── Post Content ── */}
                   <Link href={`/community/post/${post.id}`} className="block mt-3">
                     <h2 className="text-lg font-bold text-slate-900 hover:text-purple-600 transition">
                       {post.title}
@@ -523,7 +553,6 @@ export default function MyPosts() {
                     </p>
                   </Link>
 
-                  {/* ── Image ── */}
                   {hasImage && (
                     <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                       <div className="relative aspect-video max-h-80">
@@ -539,7 +568,6 @@ export default function MyPosts() {
                     </Link>
                   )}
 
-                  {/* ── Video ── */}
                   {isVideo && (
                     <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
                       <video
@@ -552,7 +580,6 @@ export default function MyPosts() {
                     </Link>
                   )}
 
-                  {/* ── CTA Button ── */}
                   {hasCTA && (
                     <div className="mt-3">
                       <a
@@ -566,7 +593,6 @@ export default function MyPosts() {
                     </div>
                   )}
 
-                  {/* ── Actions ── */}
                   <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => handleLike(post.id)}
@@ -601,7 +627,6 @@ export default function MyPosts() {
                       <span>Edit</span>
                     </Link>
 
-                    {/* ── Delete button with per‑post loading ── */}
                     <button
                       onClick={() => handleDeleteClick(post.id)}
                       disabled={deletePostMutation.isLoading || isDeletingThisPost}
@@ -629,7 +654,6 @@ export default function MyPosts() {
           </div>
         )}
 
-        {/* ── Infinite scroll loading ── */}
         {hasNextPage && (
           <div className="py-6 flex justify-center">
             {isFetchingNextPage ? (
