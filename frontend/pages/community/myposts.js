@@ -11,6 +11,7 @@ import {
   useLikePost,
   useDeletePost,
   useInvalidateQueries,
+  useMtCoins, // ✅ NEW import
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -95,6 +96,9 @@ export default function MyPosts() {
   // ── Fetch profile ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
 
+  // ── Fetch MT Coins (for earnings from posts) ──
+  const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
+
   // ── Fetch posts with filters ──
   const {
     data,
@@ -169,7 +173,6 @@ export default function MyPosts() {
 
   const confirmDelete = () => {
     if (deleteModal.postId) {
-      // Set the deleting post ID to disable its button and show spinner
       setDeletingPostId(deleteModal.postId);
       
       deletePostMutation.mutate(deleteModal.postId, {
@@ -190,7 +193,6 @@ export default function MyPosts() {
 
   const cancelDelete = () => {
     setDeleteModal({ isOpen: false, postId: null });
-    // Reset deletingPostId in case it was set
     setDeletingPostId(null);
   };
 
@@ -331,7 +333,7 @@ export default function MyPosts() {
           </Link>
         </div>
 
-        {/* ── User info card ── */}
+        {/* ── User info card with earnings badge ── */}
         {profile && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-slate-200 overflow-hidden">
@@ -349,8 +351,14 @@ export default function MyPosts() {
                 </div>
               )}
             </div>
-            <div>
-              <p className="font-semibold text-slate-900">{profile.fullname || profile.username || 'Anonymous'}</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-slate-900">{profile.fullname || profile.username || 'Anonymous'}</p>
+                {/* 💰 Earnings from posts badge */}
+                <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  💰 {mtCoinsLoading ? '...' : (mtCoinsData?.earnedFromPosts ?? 0)} from posts
+                </span>
+              </div>
               <p className="text-sm text-slate-500">@{profile.username || 'user'}</p>
               {profile.bio && <p className="text-sm text-slate-600 mt-1">{profile.bio}</p>}
               {profile.createdAt && (
