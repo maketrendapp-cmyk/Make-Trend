@@ -633,7 +633,7 @@ export default function LaunchProduct() {
             <div>
               <p className="font-semibold text-purple-800">Earn MT Coins from upvotes!</p>
               <p className="text-slate-600 text-sm">
-                You earn <span className="font-bold text-purple-700">1 MT Coin</span> for every upvote your product receives. 
+                You earn <span className="font-bold text-purple-700">1 MT Coin</span> for every likes(upvotes) your product receives. 
                 Share your product and watch your earnings grow!
               </p>
             </div>
