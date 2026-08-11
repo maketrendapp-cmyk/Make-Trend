@@ -11,7 +11,7 @@ import {
   useLikePost,
   useDeletePost,
   useInvalidateQueries,
-  useMtCoins, // ✅ still here
+  useMtCoins, // ✅ this is already in your queries.js
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -28,14 +28,60 @@ import {
   FiTrash2,
   FiX,
   FiSearch,
-  FiFilter,        // ← restored
-  FiChevronDown,   // ← restored
+  FiFilter,
+  FiChevronDown,
   FiAward,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ... all your constants (POST_TYPE_ICONS, CATEGORIES, etc.) unchanged ...
+// ─── ALL YOUR ORIGINAL CONSTANTS (unchanged) ──────────────────
+const POST_TYPE_ICONS = {
+  general: '📌',
+  launch: '🚀',
+  update: '📢',
+  job: '💼',
+  question: '❓',
+  event: '📅',
+  promotional: '💎',
+};
+
+const POST_TYPE_LABELS = {
+  general: 'General',
+  launch: 'Launch',
+  update: 'Update',
+  job: 'Job',
+  question: 'Question',
+  event: 'Event',
+  promotional: 'Promotional',
+};
+
+const CATEGORIES = [
+  { value: 'all', label: '📌 All Categories' },
+  { value: 'general', label: '📌 General' },
+  { value: 'web-dev', label: '💻 Web Dev' },
+  { value: 'design', label: '🎨 Design' },
+  { value: 'ai', label: '🤖 AI' },
+  { value: 'gaming', label: '🎮 Gaming' },
+  { value: 'content', label: '👑 Content' },
+  { value: 'startup', label: '🚀 Startup' },
+  { value: 'social', label: '📱 Social' },
+  { value: 'coding', label: '💻 Coding' },
+  { value: 'marketing', label: '📊 Marketing' },
+  { value: 'other', label: '📌 Other' },
+];
+
+const POST_TYPES = [
+  { value: 'all', label: 'All Types' },
+  { value: 'general', label: 'General' },
+  { value: 'launch', label: '🚀 Launch' },
+  { value: 'update', label: '📢 Update' },
+  { value: 'job', label: '💼 Job' },
+  { value: 'question', label: '❓ Question' },
+  { value: 'event', label: '📅 Event' },
+  { value: 'promotional', label: '💎 Promotional' },
+];
+// ─── END OF CONSTANTS ──────────────────────────────────────────
 
 export default function MyPosts() {
   const router = useRouter();
@@ -199,7 +245,7 @@ export default function MyPosts() {
     }
   };
 
-  // ── Loading ──
+  // ── Loading state ──
   if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
@@ -267,7 +313,7 @@ export default function MyPosts() {
     <>
       <Meta title="My Posts – Make Trend Community" />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* ── Header ── */}
+        {/* ── Simplified Header ── */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
             <Link
@@ -324,7 +370,7 @@ export default function MyPosts() {
           <p className="text-xs text-white/50 mt-2">1 like = 1 MT Coin</p>
         </div>
 
-        {/* ── Filters ── (original, no changes) */}
+        {/* ── Filters ── (unchanged) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1 relative">
@@ -380,7 +426,7 @@ export default function MyPosts() {
           )}
         </div>
 
-        {/* ── Posts List ── (original, unchanged) */}
+        {/* ── Posts List ── (unchanged) */}
         {posts.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">📝</div>
