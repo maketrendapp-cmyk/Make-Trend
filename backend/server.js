@@ -3926,7 +3926,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalCompletions
     );
 
-    // ── 2. Calculate total likes from community posts (NEW) ──
+    // ── 2. Calculate total likes from community posts ──
     const postsSnapshot = await db.collection('posts')
       .where('userId', '==', uid)
       .where('status', '==', 'active')
@@ -3948,7 +3948,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
     let mtCoinsEarned = data.mtCoinsEarned || 0;
     let mtCoinsSpent = data.mtCoinsSpent || 0;
     let statsEarned = data.statsEarned ?? 0;
-    let communityLikesEarned = data.communityLikesEarned ?? 0; // NEW field
+    let communityLikesEarned = data.communityLikesEarned ?? 0;
 
     // ── 4. MIGRATION: Initialize if mtCoinsEarned is missing ──
     if (data.mtCoinsEarned === undefined && data.mtCoinsSpent === undefined) {
@@ -3964,10 +3964,8 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
 
       const currentAvailable = data.mtCoins || 0;
       mtCoinsSpent = totalWithdrawn;
-      // Set initial mtCoinsEarned to at least stats + withdrawals + current balance
       mtCoinsEarned = Math.max(earnedFromStats, totalWithdrawn + currentAvailable);
       statsEarned = earnedFromStats;
-      // Set communityLikesEarned to current total likes – no retroactive coins
       communityLikesEarned = totalLikes;
 
       await db.collection('users').doc(uid).update({
@@ -3990,7 +3988,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
         });
       }
 
-      // ── 6. Normal delta update for community likes (NEW) ──
+      // ── 6. Normal delta update for community likes ──
       const deltaLikes = totalLikes - communityLikesEarned;
       if (deltaLikes > 0) {
         mtCoinsEarned += deltaLikes;
@@ -4006,19 +4004,27 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
     const available = mtCoinsEarned - mtCoinsSpent;
     const usdValue = (available / 2500) * 15;
 
+    // ── 7. RESPONSE with earning breakdown ──
     res.json({
       success: true,
       mtCoins: {
+        // 💰 Overall balance
         earned: mtCoinsEarned,
         spent: mtCoinsSpent,
         available: available,
         usdValue: parseFloat(usdValue.toFixed(2)),
+
+        // 📊 Breakdown by source
+        earnedFromPosts: communityLikesEarned,      // 🔥 ONLY from community post likes
+        earnedFromCampaigns: statsEarned,           // From campaign stats
+
+        // 📈 Stats for display
         stats: {
           views: totalViews,
           completions: totalCompletions,
           shares: totalShares,
           unlocks: totalUnlocks,
-          likes: totalLikes, // NEW: total likes across all user's posts
+          likes: totalLikes,
         },
       },
     });
