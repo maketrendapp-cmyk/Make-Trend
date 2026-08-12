@@ -47,6 +47,7 @@ const TOP_NAV_ONLY_PAGES = [
   '/groweachother',
   '/productstrend',
   '/community',
+'/rockyaxis',
   '/userinfo',
   '/404',
 ];
