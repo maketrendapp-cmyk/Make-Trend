@@ -21,14 +21,12 @@ import {
   FaSpinner,
   FaArrowRight,
   FaArrowLeft,
-  FaInfoCircle,
   FaPhone,
   FaUniversity,
   FaCreditCard,
   FaBitcoin,
   FaPaypal,
   FaBuilding,
-  FaGift,
   FaShareAlt,
   FaUnlock,
   FaCoins,
@@ -38,8 +36,6 @@ import {
   FaPlusCircle,
   FaGoogle,
   FaMobile,
-  FaMoneyBillWave,
-  FaGlobe,
   FaHeart,
   FaThumbsUp,
   FaExchangeAlt,
@@ -376,27 +372,6 @@ export default function Withdraw() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-slate-800">How MT Coins Are Earned</h3>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  <span className="inline-flex items-center gap-1 bg-purple-50 px-3 py-1.5 rounded-full text-purple-700 border border-purple-200">
-                    <FaEye className="text-purple-500" /> View
-                  </span>
-                  <span className="text-slate-300">+</span>
-                  <span className="inline-flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-full text-blue-700 border border-blue-200">
-                    <FaShareAlt className="text-blue-500" /> Share
-                  </span>
-                  <span className="text-slate-300">+</span>
-                  <span className="inline-flex items-center gap-1 bg-amber-50 px-3 py-1.5 rounded-full text-amber-700 border border-amber-200">
-                    <FaUnlock className="text-amber-500" /> Unlock
-                  </span>
-                  <span className="text-slate-300">+</span>
-                  <span className="inline-flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-full text-emerald-700 border border-emerald-200">
-                    <FaCheckCircle className="text-emerald-500" /> Complete
-                  </span>
-                  <span className="text-slate-300 font-bold">=</span>
-                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-50 to-amber-50 px-3 py-1.5 rounded-full text-amber-800 border border-amber-300 font-bold">
-                    <FaCoins className="text-amber-500" /> 1 MT Coin
-                  </span>
-                </div>
 
                 {/* ─── Explanation with Links ─── */}
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -410,10 +385,10 @@ export default function Withdraw() {
                       <strong>Views + Shares + Unlocks + Completions</strong> → 1 MT Coin
                     </p>
                     <button
-                      onClick={() => router.push('/campaigns')}
+                      onClick={() => router.push('/stats')}
                       className="mt-2 text-xs font-medium text-purple-600 hover:text-purple-800 underline-offset-2 hover:underline transition"
                     >
-                      Go to Campaigns →
+                      View Campaign Stats →
                     </button>
                   </div>
 
@@ -473,23 +448,6 @@ export default function Withdraw() {
                 {/* ─── Total Accumulated ─── */}
                 <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200/60 text-center">
                   <p className="text-sm font-medium text-slate-700">
-                    <span className="font-bold text-amber-600">1 MT Coin</span> = 
-                    <span className="mx-1 text-slate-400">|</span>
-                    <span className="text-purple-600">1 View</span>
-                    <span className="mx-1 text-slate-300">+</span>
-                    <span className="text-blue-600">1 Share</span>
-                    <span className="mx-1 text-slate-300">+</span>
-                    <span className="text-amber-600">1 Unlock</span>
-                    <span className="mx-1 text-slate-300">+</span>
-                    <span className="text-emerald-600">1 Completion</span>
-                    <span className="mx-2 text-slate-300">|</span>
-                    <span className="text-pink-500">1 Post Like</span>
-                    <span className="mx-2 text-slate-300">|</span>
-                    <span className="text-blue-500">1 Product Upvote</span>
-                    <span className="mx-2 text-slate-300">|</span>
-                    <span className="text-green-500">1 Exchange Completed</span>
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
                     Collect <strong>{WITHDRAWAL_AMOUNT.toLocaleString()} MT Coins</strong> and withdraw <strong>${USD_AMOUNT}.00</strong> – 24/7 available
                   </p>
                 </div>
