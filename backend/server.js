@@ -393,13 +393,18 @@ async function createNotification({ userId, type, title, description, redirectUr
 // 1. FIREBASE ADMIN SDK
 // ============================================================
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    }),
-  });
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      }),
+    });
+  } catch (err) {
+    console.error('❌ Firebase initialization failed:', err.message);
+    // Optionally exit or continue if you have a fallback
+  }
 }
 const db = admin.firestore();
 console.log('✅ Firebase Admin SDK initialized');
@@ -407,12 +412,16 @@ console.log('✅ Firebase Admin SDK initialized');
 // ============================================================
 // 2. CLOUDINARY
 // ============================================================
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-console.log('✅ Cloudinary initialized');
+try {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  console.log('✅ Cloudinary initialized');
+} catch (err) {
+  console.warn('⚠️ Cloudinary initialization failed:', err.message);
+}
 
 // ============================================================
 // 3. MULTER SETUP
@@ -435,6 +444,16 @@ const upload = multer({
 // 4. EXPRESS APP
 // ============================================================
 const app = express();
+// ── Global error handlers to prevent crashes ──
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
+  // Do not exit – log and continue
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 Unhandled Rejection at:', promise, 'reason:', reason);
+  // Do not exit
+});
 app.set('trust proxy', 1);
 
 // ── Enforce HTTPS in production ──
