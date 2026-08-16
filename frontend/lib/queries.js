@@ -625,13 +625,13 @@ export function useDeleteProduct() {
       return data;
     },
     onSuccess: () => {
-      // Use object form to invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['productFeed'] });
       queryClient.invalidateQueries({ queryKey: ['myProducts'] });
-      toast.success('Product deleted');
+      // Toast removed – component will handle it
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to delete product');
+      // Toast removed – component will handle it
+      console.error('Delete product error:', error);
     },
   });
 }
@@ -999,7 +999,11 @@ export function useInvalidateQueries() {
     invalidateExchangeDetail: (id) => queryClient.invalidateQueries(['exchangeDetail', id]),
     invalidateProductFeed: () => queryClient.invalidateQueries(['productFeed']),
     invalidateProductDetail: (id) => queryClient.invalidateQueries(['productDetail', id]),
-    invalidateMyProducts: () => queryClient.invalidateQueries({ queryKey: ['myProducts'] }),
+    invalidateMyProducts: () => {
+  queryClient.invalidateQueries({ queryKey: ['myProducts'], exact: false, refetchType: 'all' });
+  // Force refetch all pages immediately
+  queryClient.refetchQueries({ queryKey: ['myProducts'], exact: false });
+},
     invalidateProductComments: (id) => queryClient.invalidateQueries(['productComments', id]),
     invalidateNotifications: () => queryClient.invalidateQueries(['notifications']),
     invalidateSystemNotifications: () => queryClient.invalidateQueries(['systemNotifications']),
