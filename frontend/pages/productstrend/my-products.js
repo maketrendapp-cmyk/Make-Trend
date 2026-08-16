@@ -153,15 +153,24 @@ export default function MyProducts() {
     });
 
     try {
-      await deleteMutation.mutateAsync(productId);
-      await invalidateMyProducts();
-      await refetch();
-      toast.success('Product deleted');
-      setDeleteModal(null);
-    } catch (err) {
-      await refetch();
-      toast.error('Failed to delete product');
-    } finally {
+  await deleteMutation.mutateAsync(productId);
+  // Invalidate and reset the infinite query
+  await invalidateMyProducts();
+  // Reset the query data to clear all cached pages
+  queryClient.setQueryData(
+    ['myProducts', { status: statusFilter || undefined, category: categoryFilter || undefined }],
+    (oldData) => {
+      if (!oldData) return oldData;
+      return { ...oldData, pages: oldData.pages.slice(0, 1) }; // keep only first page
+    }
+  );
+  await refetch({ force: true });
+  toast.success('Product deleted');
+  setDeleteModal(null);
+} catch (err) {
+  await refetch();
+  toast.error('Failed to delete product');
+} finally {
       setIsDeleting(false);
     }
   };
