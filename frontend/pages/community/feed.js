@@ -136,12 +136,18 @@ export default function CommunityFeed() {
   }, [appliedCategory, appliedType, searchQuery]);
 
   // ── Featured feed: top 100 most‑liked ──
+  const featuredFilters = useMemo(() => ({
+    ...filters,
+    sort: 'most-liked',
+    limit: 100,
+  }), [filters]);
+
   const {
     data: featuredData,
     isLoading: featuredLoading,
     isError: featuredError,
     refetch: refetchFeatured,
-  } = usePosts({ ...filters, sort: 'most-liked', limit: 100 }, true);
+  } = usePosts(featuredFilters, true);
 
   const featuredPosts = featuredData?.pages?.[0]?.posts || [];
 
@@ -215,105 +221,150 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler (unchanged) ──
+  // ── Like handler with proper query keys ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
 
-    const queryKey = ['posts', filters];
+    // Define query keys for regular and featured feeds
+    const regularQueryKey = ['posts', { ...filters, sort: undefined, limit: 20 }];
+    const featuredQueryKey = ['posts', featuredFilters];
+
+    // Helper to find the post in cache
+    const findPostInCache = (queryKey) => {
+      const data = queryClient.getQueryData(queryKey);
+      if (!data) return null;
+      let found = null;
+      for (const page of data.pages) {
+        const idx = page.posts.findIndex(p => p.id === postId);
+        if (idx !== -1) {
+          found = { page, idx, queryKey };
+          break;
+        }
+      }
+      return found;
+    };
+
+    // Try to find in regular feed first, then featured
+    let found = findPostInCache(regularQueryKey);
+    let isFeatured = false;
+    if (!found) {
+      found = findPostInCache(featuredQueryKey);
+      if (found) isFeatured = true;
+    }
+
+    if (!found) {
+      // If not in cache, we just invalidate and refetch via mutation
+      likeMutation.mutate(postId, {
+        onSuccess: () => {
+          queryClient.invalidateQueries(regularQueryKey);
+          queryClient.invalidateQueries(featuredQueryKey);
+          queryClient.invalidateQueries(['post', postId]);
+          toast.success('Liked!');
+        },
+        onError: (err) => {
+          toast.error(err.message || 'Failed to like');
+        },
+      });
+      return;
+    }
+
+    const { page, idx, queryKey } = found;
+    const currentPost = page.posts[idx];
+    const newVoted = !currentPost.userLiked;
+    const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
+    const updatedPost = { ...currentPost, userLiked: newVoted, likes: newLikes };
+
+    // Optimistic update for the found feed
     const currentData = queryClient.getQueryData(queryKey);
-    if (!currentData) {
-      toast.error('Post not found');
-      return;
+    if (currentData) {
+      const newPages = currentData.pages.map((p) => {
+        if (p === page) {
+          return {
+            ...p,
+            posts: p.posts.map((pp) => (pp.id === postId ? updatedPost : pp)),
+          };
+        }
+        return p;
+      });
+      queryClient.setQueryData(queryKey, { ...currentData, pages: newPages });
     }
 
-    let foundPost = null;
-    let pageIndex = -1;
-    let postIndex = -1;
-    for (let i = 0; i < currentData.pages.length; i++) {
-      const page = currentData.pages[i];
-      const idx = page.posts.findIndex(p => p.id === postId);
-      if (idx !== -1) {
-        foundPost = page.posts[idx];
-        pageIndex = i;
-        postIndex = idx;
-        break;
-      }
+    // Also update the other feed if it contains the post
+    const otherQueryKey = isFeatured ? regularQueryKey : featuredQueryKey;
+    const otherData = queryClient.getQueryData(otherQueryKey);
+    if (otherData) {
+      const otherPages = otherData.pages.map((p) => {
+        const idx2 = p.posts.findIndex(pp => pp.id === postId);
+        if (idx2 !== -1) {
+          const newPosts = [...p.posts];
+          newPosts[idx2] = updatedPost;
+          return { ...p, posts: newPosts };
+        }
+        return p;
+      });
+      queryClient.setQueryData(otherQueryKey, { ...otherData, pages: otherPages });
     }
 
-    if (!foundPost) {
-      toast.error('Post not found');
-      return;
-    }
-
-    const newVoted = !foundPost.userLiked;
-    const newLikes = newVoted ? foundPost.likes + 1 : foundPost.likes - 1;
-    const updatedPost = { ...foundPost, userLiked: newVoted, likes: newLikes };
-
-    const newPages = currentData.pages.map((page, idx) => {
-      if (idx === pageIndex) {
-        return {
-          ...page,
-          posts: page.posts.map((p, pIdx) => (pIdx === postIndex ? updatedPost : p)),
-        };
-      }
-      return page;
-    });
-    queryClient.setQueryData(queryKey, { ...currentData, pages: newPages });
+    // Update single post cache
     queryClient.setQueryData(['post', postId], updatedPost);
     setLocalVote(postId, newVoted, newLikes);
 
+    // Send mutation
     likeMutation.mutate(postId, {
       onSuccess: (data) => {
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
-        const currentDataAfter = queryClient.getQueryData(queryKey);
-        if (currentDataAfter) {
-          const syncedPages = currentDataAfter.pages.map((page, idx) => {
-            if (idx === pageIndex) {
-              return {
-                ...page,
-                posts: page.posts.map((p, pIdx) => {
-                  if (pIdx === postIndex) {
-                    return { ...p, userLiked: serverVoted, likes: serverLikes };
-                  }
-                  return p;
-                }),
-              };
-            }
-            return page;
-          });
-          queryClient.setQueryData(queryKey, { ...currentDataAfter, pages: syncedPages });
-        }
-        const currentPost = queryClient.getQueryData(['post', postId]);
-        if (currentPost) {
-          queryClient.setQueryData(['post', postId], { ...currentPost, userLiked: serverVoted, likes: serverLikes });
-        }
+        const finalPost = { ...currentPost, userLiked: serverVoted, likes: serverLikes };
+
+        // Sync both caches
+        [regularQueryKey, featuredQueryKey].forEach(key => {
+          const cache = queryClient.getQueryData(key);
+          if (cache) {
+            const newPages = cache.pages.map((p) => {
+              const idx2 = p.posts.findIndex(pp => pp.id === postId);
+              if (idx2 !== -1) {
+                const newPosts = [...p.posts];
+                newPosts[idx2] = finalPost;
+                return { ...p, posts: newPosts };
+              }
+              return p;
+            });
+            queryClient.setQueryData(key, { ...cache, pages: newPages });
+          }
+        });
+
+        // Sync single post
+        queryClient.setQueryData(['post', postId], finalPost);
         setLocalVote(postId, serverVoted, serverLikes);
       },
       onError: (error) => {
-        const revertData = queryClient.getQueryData(queryKey);
-        if (revertData) {
-          const revertPages = revertData.pages.map((page, idx) => {
-            if (idx === pageIndex) {
-              return {
-                ...page,
-                posts: page.posts.map((p, pIdx) => (pIdx === postIndex ? foundPost : p)),
-              };
-            }
-            return page;
-          });
-          queryClient.setQueryData(queryKey, { ...revertData, pages: revertPages });
-        }
-        queryClient.setQueryData(['post', postId], foundPost);
-        setLocalVote(postId, foundPost.userLiked, foundPost.likes);
+        // Revert both caches
+        [regularQueryKey, featuredQueryKey].forEach(key => {
+          const cache = queryClient.getQueryData(key);
+          if (cache) {
+            const newPages = cache.pages.map((p) => {
+              const idx2 = p.posts.findIndex(pp => pp.id === postId);
+              if (idx2 !== -1) {
+                const newPosts = [...p.posts];
+                newPosts[idx2] = currentPost;
+                return { ...p, posts: newPosts };
+              }
+              return p;
+            });
+            queryClient.setQueryData(key, { ...cache, pages: newPages });
+          }
+        });
+        queryClient.setQueryData(['post', postId], currentPost);
+        setLocalVote(postId, currentPost.userLiked, currentPost.likes);
         toast.error(error.message || 'Failed to like');
       },
     });
   };
 
+  // ── Share handler ──
   const handleShare = async (postId) => {
     const url = `${window.location.origin}/community/post/${postId}`;
     try {
@@ -330,6 +381,7 @@ export default function CommunityFeed() {
     }
   };
 
+  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Just now';
     try {
