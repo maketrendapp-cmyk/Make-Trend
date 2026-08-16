@@ -702,7 +702,8 @@ export function usePost(id, enabled = true) {
   return useQuery({
     queryKey: ['post', id],
     queryFn: async () => {
-      const data = await apiRequest(`/posts/${id}`, {}, null);
+      const token = await getToken().catch(() => null);
+      const data = await apiRequest(`/posts/${id}`, {}, token);
       return data.post;
     },
     enabled: !!id && enabled,
