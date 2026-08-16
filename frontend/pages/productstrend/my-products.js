@@ -11,7 +11,7 @@ import {
   useDeleteProduct,
   useInvalidateQueries,
   useMtCoins,
-  useBuyUpvotes, // ✅ new hook
+  useBuyUpvotes,
 } from '../../lib/queries';
 import {
   FiGrid,
@@ -33,7 +33,7 @@ import {
   FiAlertTriangle,
   FiTag,
   FiAward,
-  FiTrendingUp, // ✅ for boost icon
+  FiTrendingUp,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -49,8 +49,9 @@ const STATUS_LABELS = {
   rejected: '❌ Rejected',
 };
 
+// ✅ Updated STATUS_OPTIONS with 'all' value
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
+  { value: 'all', label: 'All Statuses' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
@@ -73,7 +74,7 @@ const CATEGORY_OPTIONS = [
   { value: 'Other', label: 'Other' },
 ];
 
-const UPVOTE_COST = 5; // MT Coins per upvote
+const UPVOTE_COST = 5;
 const MAX_UPVOTES = 1000;
 
 export default function MyProducts() {
@@ -85,16 +86,18 @@ export default function MyProducts() {
   const buyUpvotesMutation = useBuyUpvotes();
 
   // ── Filter state ──
-  const [statusFilter, setStatusFilter] = useState('');
+  // ✅ Default statusFilter to 'all'
+  const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // ✅ Filters always include status (no undefined)
   const filters = {
-    status: statusFilter || undefined,
+    status: statusFilter,
     category: categoryFilter || undefined,
   };
 
-  // ── Fetch MT Coins (for earnings & balance) ──
+  // ── Fetch MT Coins ──
   const { data: mtCoinsData, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
   // ── React Query: My Products (infinite) ──
@@ -140,7 +143,8 @@ export default function MyProducts() {
     setIsDeleting(true);
 
     const productId = deleteModal.id;
-    const queryKey = ['myProducts', { status: statusFilter || undefined, category: categoryFilter || undefined }];
+    // ✅ queryKey uses statusFilter directly
+    const queryKey = ['myProducts', { status: statusFilter, category: categoryFilter || undefined }];
 
     // Optimistically remove from cache
     queryClient.setQueryData(queryKey, (oldData) => {
@@ -153,24 +157,23 @@ export default function MyProducts() {
     });
 
     try {
-  await deleteMutation.mutateAsync(productId);
-  // Invalidate and reset the infinite query
-  await invalidateMyProducts();
-  // Reset the query data to clear all cached pages
-  queryClient.setQueryData(
-    ['myProducts', { status: statusFilter || undefined, category: categoryFilter || undefined }],
-    (oldData) => {
-      if (!oldData) return oldData;
-      return { ...oldData, pages: oldData.pages.slice(0, 1) }; // keep only first page
-    }
-  );
-  await refetch({ force: true });
-  toast.success('Product deleted');
-  setDeleteModal(null);
-} catch (err) {
-  await refetch();
-  toast.error('Failed to delete product');
-} finally {
+      await deleteMutation.mutateAsync(productId);
+      await invalidateMyProducts();
+      // Reset the query data to clear all cached pages
+      queryClient.setQueryData(
+        ['myProducts', { status: statusFilter, category: categoryFilter || undefined }],
+        (oldData) => {
+          if (!oldData) return oldData;
+          return { ...oldData, pages: oldData.pages.slice(0, 1) };
+        }
+      );
+      await refetch({ force: true });
+      toast.success('Product deleted');
+      setDeleteModal(null);
+    } catch (err) {
+      await refetch();
+      toast.error('Failed to delete product');
+    } finally {
       setIsDeleting(false);
     }
   };
@@ -196,7 +199,6 @@ export default function MyProducts() {
         amount: boostAmount,
       });
       toast.success(`Added ${boostAmount} upvotes to "${boostProduct.name}"!`);
-      // Refresh product list and MT Coins
       await refetch();
       await refetchMtCoins();
       setBoostProduct(null);
@@ -208,7 +210,7 @@ export default function MyProducts() {
     }
   };
 
-  // ── Intersection Observer for infinite scroll ──
+  // ── Intersection Observer ──
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -259,8 +261,9 @@ export default function MyProducts() {
     }
   };
 
+  // ✅ clearFilters resets statusFilter to 'all'
   const clearFilters = () => {
-    setStatusFilter('');
+    setStatusFilter('all');
     setCategoryFilter('');
     setSearchTerm('');
   };
@@ -342,7 +345,7 @@ export default function MyProducts() {
     );
   }
 
-  const hasFilters = statusFilter || categoryFilter || searchTerm;
+  const hasFilters = statusFilter !== 'all' || categoryFilter || searchTerm;
   const earnedFromProducts = mtCoinsData?.earnedFromProducts ?? 0;
   const availableCoins = mtCoinsData?.available ?? 0;
 
@@ -463,7 +466,7 @@ export default function MyProducts() {
             <div className="mt-3 pt-3 border-t border-slate-100">
               <p className="text-xs text-slate-400">
                 Showing {filteredProducts.length} of {allProducts.length} products
-                {statusFilter && <span className="ml-2">• Status: {statusFilter}</span>}
+                {statusFilter && statusFilter !== 'all' && <span className="ml-2">• Status: {statusFilter}</span>}
                 {categoryFilter && <span className="ml-2">• Category: {categoryFilter}</span>}
                 {searchTerm && <span className="ml-2">• Search: "{searchTerm}"</span>}
               </p>
