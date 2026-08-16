@@ -24,11 +24,12 @@ import {
   FiClock,
   FiMessageCircle,
   FiExternalLink,
+  FiBox, // professional placeholder
 } from 'react-icons/fi';
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
-// ── localStorage helpers (shared with product detail) ──
+// ── localStorage helpers ──
 const getLocalVote = (productId) => {
   try {
     const raw = localStorage.getItem(`upvote_${productId}`);
@@ -43,19 +44,186 @@ const setLocalVote = (productId, voted, upvotes) => {
   } catch (e) {}
 };
 
-// ── Client‑side sort helpers ──
-const sortProducts = (products, sortBy) => {
-  const copy = [...products];
-  switch (sortBy) {
-    case 'oldest':
-      return copy.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-    case 'most-upvoted':
-      return copy.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
-    case 'most-commented':
-      return copy.sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0));
-    case 'newest':
-    default:
-      return copy.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+// ── Product Card Component (reusable for featured & regular) ──
+const ProductCard = React.forwardRef(({ 
+  product, 
+  isFeatured = false, 
+  rank = null, 
+  isTop3 = false,
+  onUpvote,
+  isAuthenticated,
+  isUpvoting,
+}) => {
+  const isLiked = product.userVoted || false;
+  const upvotes = product.upvotes || 0;
+
+  // ── Determine card style based on rank ──
+  let cardClasses = 'bg-white rounded-2xl border p-4 hover:shadow-md transition flex items-center gap-4';
+  let badge = null;
+  let badgeClasses = '';
+
+  if (isFeatured && rank) {
+    if (rank === 1) {
+      cardClasses += ' border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-md';
+      badge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">
+          👑 #1
+        </span>
+      );
+    } else if (rank === 2) {
+      cardClasses += ' border-slate-400 bg-gradient-to-br from-slate-50 to-gray-100 shadow-md';
+      badge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-300 text-slate-700">
+          🥈 #2
+        </span>
+      );
+    } else if (rank === 3) {
+      cardClasses += ' border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-md';
+      badge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">
+          🥉 #3
+        </span>
+      );
+    } else {
+      cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
+      badge = (
+        <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+          #{rank}
+        </span>
+      );
+    }
+  } else {
+    cardClasses += ' border-slate-200';
+  }
+
+  // ── Professional placeholder ──
+  const imagePlaceholder = product.logo || product.imageUrl;
+  const hasImage = !!imagePlaceholder;
+
+  return (
+    <div ref={ref} className={cardClasses}>
+      {/* Image / Logo */}
+      <Link href={`/productstrend/${product.id}`} className="flex-shrink-0">
+        {hasImage ? (
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
+            <Image
+              src={imagePlaceholder}
+              alt={product.name}
+              width={64}
+              height={64}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.style.display = 'none';
+                // fallback to icon
+                const parent = e.target.parentElement;
+                if (parent) {
+                  parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>`;
+                }
+              }}
+            />
+          </div>
+        ) : (
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-3xl text-slate-400 border border-slate-200 shadow-sm">
+            <FiBox className="w-7 h-7" />
+          </div>
+        )}
+      </Link>
+
+      <div className="flex-1 min-w-0">
+        {/* Header with badge and upvote button */}
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <Link href={`/productstrend/${product.id}`} className="block">
+              <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition truncate">
+                {product.name}
+              </h3>
+            </Link>
+            {isFeatured && badge && (
+              <div className="flex items-center gap-2 mt-0.5">
+                {badge}
+                <span className="text-xs text-purple-400">🔥 Featured</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => onUpvote(product.id)}
+            disabled={!isAuthenticated || isUpvoting}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition text-xs font-medium flex-shrink-0 ${
+              isLiked
+                ? 'bg-purple-100 border-purple-300 text-purple-700'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-purple-50 hover:border-purple-200'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <FiHeart className={`w-3.5 h-3.5 ${isLiked ? 'fill-purple-600 text-purple-600' : ''}`} />
+            <span>{upvotes}</span>
+          </button>
+        </div>
+
+        <p className="text-sm text-slate-500 line-clamp-2 mt-1">{product.tagline}</p>
+
+        <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
+          <span className="flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+              {product.maker?.avatar ? (
+                <Image
+                  src={product.maker.avatar}
+                  alt={product.maker.username || 'User'}
+                  width={20}
+                  height={20}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <FiUser className="w-3 h-3 text-slate-500" />
+              )}
+            </span>
+            <span className="font-medium text-slate-600">
+              {product.maker?.username || 'Anonymous'}
+            </span>
+          </span>
+          <span className="flex items-center gap-1">
+            <FiClock className="w-3 h-3" />
+            {formatDate(product.createdAt)}
+          </span>
+          <span className="flex items-center gap-1">
+            <FiMessageCircle className="w-3 h-3" />
+            {product.commentsCount || 0}
+          </span>
+          {product.category && (
+            <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              {product.category}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+ProductCard.displayName = 'ProductCard';
+
+// ── Helper: format date ──
+const formatDate = (timestamp) => {
+  if (!timestamp) return 'Recently';
+  try {
+    let date;
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      date = timestamp.toDate();
+    } else if (timestamp.seconds !== undefined) {
+      date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+    } else if (timestamp._seconds !== undefined) {
+      date = new Date(timestamp._seconds * 1000);
+    } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      date = new Date(timestamp);
+    } else if (timestamp instanceof Date) {
+      date = timestamp;
+    } else {
+      date = new Date(timestamp);
+    }
+    if (isNaN(date.getTime())) return 'Recently';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return 'Recently';
   }
 };
 
@@ -69,90 +237,77 @@ export default function ProductTrendFeed() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
-  const [sortBy, setSortBy] = useState('newest');
+  const [sortBy, setSortBy] = useState('most-upvoted'); // default to most upvoted
 
-  // ── Memoize backend filters to avoid unnecessary refetches ──
-  const backendFilters = useMemo(() => {
+  // ── Memoize backend filters for regular feed ──
+  const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
     if (category !== 'All') filters.category = category;
-    if (sortBy) filters.sort = sortBy;
+    filters.sort = 'newest'; // regular feed is always newest
     return filters;
-  }, [searchQuery, category, sortBy]);
+  }, [searchQuery, category]);
 
-  // ── React Query feed ──
+  // ── Featured filters (top 100 most-upvoted) ──
+  const featuredFilters = useMemo(() => {
+    const filters = {};
+    if (category !== 'All') filters.category = category;
+    filters.sort = 'most-upvoted';
+    filters.limit = 100;
+    return filters;
+  }, [category]);
+
+  // ── React Query: Featured feed ──
   const {
-    data,
+    data: featuredData,
+    isLoading: featuredLoading,
+    refetch: refetchFeatured,
+  } = useProductFeed(featuredFilters, true);
+
+  const featuredProducts = featuredData?.pages?.[0]?.products || [];
+  const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
+
+  // ── React Query: Regular feed (newest) ──
+  const {
+    data: regularData,
     fetchNextPage,
     hasNextPage,
-    isLoading,
-    isFetching,
+    isLoading: regularLoading,
     isFetchingNextPage,
-    refetch,
-    isError,
-    error,
-  } = useProductFeed(backendFilters, true);
+    refetch: refetchRegular,
+    isError: regularError,
+  } = useProductFeed(regularFilters, true);
 
-  const rawProducts = data?.pages?.flatMap((page) => page.products) || [];
+  const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
+  const regularProducts = useMemo(() => {
+    return regularProductsAll.filter(p => !featuredIds.has(p.id));
+  }, [regularProductsAll, featuredIds]);
+
   const hasMore = hasNextPage;
-
-  // ── Client‑side filtered preview (instant, no backend wait) ──
-  const clientFilteredProducts = useMemo(() => {
-    let result = rawProducts;
-
-    // 1. Search (local)
-    if (searchInput.trim()) {
-      const term = searchInput.trim().toLowerCase();
-      result = result.filter((p) =>
-        p.name?.toLowerCase().includes(term) ||
-        p.tagline?.toLowerCase().includes(term) ||
-        p.description?.toLowerCase().includes(term)
-      );
-    }
-
-    // 2. Category (local)
-    if (category !== 'All') {
-      result = result.filter((p) => p.category === category);
-    }
-
-    // 3. Sort (local)
-    result = sortProducts(result, sortBy);
-
-    return result;
-  }, [rawProducts, searchInput, category, sortBy]);
-
-  // ── Always show local filter when searchInput is active, otherwise show raw (backend‑filtered) ──
-  const displayProducts = searchInput.trim() ? clientFilteredProducts : rawProducts;
-  const isPreview = isFetching && searchQuery.trim();
+  const isLoading = featuredLoading && regularLoading && !regularProductsAll.length && !featuredProducts.length;
+  const isError = regularError && !regularProducts.length;
 
   // ── Upvote mutation ──
   const upvoteMutation = useUpvoteProduct();
 
-  // ── Intersection Observer ──
+  // ── Intersection Observer for regular feed ──
   const observerRef = useRef(null);
-
-  React.useEffect(() => {
-    if (isFetchingNextPage || !hasMore || displayProducts.length === 0) return;
-
-    const lastElement = document.querySelector('#feed-end');
-    if (!lastElement) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(lastElement);
-    observerRef.current = observer;
-
-    return () => {
+  const lastElementRef = useCallback(
+    (node) => {
+      if (isFetchingNextPage) return;
       if (observerRef.current) observerRef.current.disconnect();
-    };
-  }, [isFetchingNextPage, hasMore, displayProducts.length, fetchNextPage]);
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore) {
+            fetchNextPage();
+          }
+        },
+        { threshold: 0.1 }
+      );
+      if (node) observerRef.current.observe(node);
+    },
+    [isFetchingNextPage, hasMore, fetchNextPage]
+  );
 
   // ── Scroll to top ──
   const scrollToTop = useCallback(() => {
@@ -164,7 +319,7 @@ export default function ProductTrendFeed() {
     setSearchInput('');
     setSearchQuery('');
     setCategory('All');
-    setSortBy('newest');
+    setSortBy('most-upvoted'); // reset to most-upvoted
     scrollToTop();
   };
 
@@ -193,28 +348,48 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Optimistic upvote toggle with ID‑based cache updates ──
+  // ── Optimistic upvote toggle ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
       return;
     }
 
-    // Find the current product data
+    // Find product in either featured or regular caches
     let currentProduct = null;
-    let currentPage = null;
-    let pageIndex = -1;
-    let productIndex = -1;
+    let currentFeedData = null;
+    let currentPageIndex = -1;
+    let currentProductIndex = -1;
+    let isFeaturedCache = false;
 
-    if (data?.pages) {
-      for (let i = 0; i < data.pages.length; i++) {
-        const page = data.pages[i];
+    // Check regular feed cache
+    const regData = queryClient.getQueryData(['productFeed', regularFilters]);
+    if (regData) {
+      for (let i = 0; i < regData.pages.length; i++) {
+        const page = regData.pages[i];
         const idx = page.products.findIndex(p => p.id === productId);
         if (idx !== -1) {
           currentProduct = page.products[idx];
-          pageIndex = i;
-          productIndex = idx;
+          currentFeedData = regData;
+          currentPageIndex = i;
+          currentProductIndex = idx;
+          isFeaturedCache = false;
           break;
+        }
+      }
+    }
+
+    // If not found, check featured cache
+    if (!currentProduct) {
+      const featData = queryClient.getQueryData(['productFeed', featuredFilters]);
+      if (featData && featData.pages && featData.pages[0]) {
+        const idx = featData.pages[0].products.findIndex(p => p.id === productId);
+        if (idx !== -1) {
+          currentProduct = featData.pages[0].products[idx];
+          currentFeedData = featData;
+          currentPageIndex = 0;
+          currentProductIndex = idx;
+          isFeaturedCache = true;
         }
       }
     }
@@ -224,38 +399,33 @@ export default function ProductTrendFeed() {
       return;
     }
 
-    // Toggle
     const prevUpvotes = currentProduct.upvotes || 0;
     const prevUserVoted = currentProduct.userVoted || false;
     const newUserVoted = !prevUserVoted;
     const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
+    const updatedProduct = { ...currentProduct, upvotes: newUpvotes, userVoted: newUserVoted };
 
-    const updatedProduct = {
-      ...currentProduct,
-      upvotes: newUpvotes,
-      userVoted: newUserVoted,
-    };
-
-    // ── Update localStorage ──
+    // Update localStorage
     setLocalVote(productId, newUserVoted, newUpvotes);
 
-    // ── Update feed cache optimistically ──
-    const newPages = data.pages.map((page, idx) => {
-      if (idx === pageIndex) {
-        return {
-          ...page,
-          products: page.products.map((p, pIdx) =>
-            pIdx === productIndex ? updatedProduct : p
-          ),
-        };
-      }
-      return page;
-    });
-
-    queryClient.setQueryData(['productFeed', backendFilters], {
-      pages: newPages,
-      pageParams: data.pageParams,
-    });
+    // Update cache (either regular or featured)
+    if (currentFeedData) {
+      const newPages = currentFeedData.pages.map((page, idx) => {
+        if (idx === currentPageIndex) {
+          return {
+            ...page,
+            products: page.products.map((p, pIdx) =>
+              pIdx === currentProductIndex ? updatedProduct : p
+            ),
+          };
+        }
+        return page;
+      });
+      queryClient.setQueryData(['productFeed', currentFeedData.queryKey?.[1] || (isFeaturedCache ? featuredFilters : regularFilters)], {
+        ...currentFeedData,
+        pages: newPages,
+      });
+    }
 
     // Also update product detail cache
     queryClient.setQueryData(['productDetail', productId], updatedProduct);
@@ -263,14 +433,13 @@ export default function ProductTrendFeed() {
     // ── Call the mutation ──
     upvoteMutation.mutate(productId, {
       onSuccess: (result) => {
-        // ── Server returns { action: 'added'|'removed', upvotes: number } ──
         const serverVoted = result.action === 'added';
         const serverUpvotes = result.upvotes;
 
-        // ── Update feed cache by scanning for the product ID ──
-        const currentFeedData = queryClient.getQueryData(['productFeed', backendFilters]);
-        if (currentFeedData) {
-          const updatedPages = currentFeedData.pages.map((page) => {
+        // Update both caches if present
+        const regData2 = queryClient.getQueryData(['productFeed', regularFilters]);
+        if (regData2) {
+          const updatedPages = regData2.pages.map((page) => {
             const products = page.products.map((p) => {
               if (p.id === productId) {
                 return { ...p, upvotes: serverUpvotes, userVoted: serverVoted };
@@ -279,88 +448,85 @@ export default function ProductTrendFeed() {
             });
             return { ...page, products };
           });
-          queryClient.setQueryData(['productFeed', backendFilters], {
-            ...currentFeedData,
+          queryClient.setQueryData(['productFeed', regularFilters], {
+            ...regData2,
             pages: updatedPages,
           });
         }
 
-        // ── Update detail cache ──
-        const detailData = queryClient.getQueryData(['productDetail', productId]);
-        if (detailData) {
-          queryClient.setQueryData(['productDetail', productId], {
-            ...detailData,
-            upvotes: serverUpvotes,
-            userVoted: serverVoted,
-          });
-        }
-
-        // ── Update localStorage with server values ──
-        setLocalVote(productId, serverVoted, serverUpvotes);
-      },
-      onError: () => {
-        // ── Revert optimistic update ──
-        // Revert feed cache
-        const currentFeedData = queryClient.getQueryData(['productFeed', backendFilters]);
-        if (currentFeedData) {
-          const revertedPages = currentFeedData.pages.map((page) => {
+        const featData2 = queryClient.getQueryData(['productFeed', featuredFilters]);
+        if (featData2) {
+          const updatedPages = featData2.pages.map((page) => {
             const products = page.products.map((p) => {
               if (p.id === productId) {
-                return { ...p, upvotes: prevUpvotes, userVoted: prevUserVoted };
+                return { ...p, upvotes: serverUpvotes, userVoted: serverVoted };
               }
               return p;
             });
             return { ...page, products };
           });
-          queryClient.setQueryData(['productFeed', backendFilters], {
-            ...currentFeedData,
+          queryClient.setQueryData(['productFeed', featuredFilters], {
+            ...featData2,
+            pages: updatedPages,
+          });
+        }
+
+        // Update detail cache
+        const detail = queryClient.getQueryData(['productDetail', productId]);
+        if (detail) {
+          queryClient.setQueryData(['productDetail', productId], {
+            ...detail,
+            upvotes: serverUpvotes,
+            userVoted: serverVoted,
+          });
+        }
+
+        setLocalVote(productId, serverVoted, serverUpvotes);
+      },
+      onError: () => {
+        // Revert all caches
+        const revertProduct = { ...currentProduct, upvotes: prevUpvotes, userVoted: prevUserVoted };
+        const regData3 = queryClient.getQueryData(['productFeed', regularFilters]);
+        if (regData3) {
+          const revertedPages = regData3.pages.map((page) => {
+            const products = page.products.map((p) => {
+              if (p.id === productId) {
+                return revertProduct;
+              }
+              return p;
+            });
+            return { ...page, products };
+          });
+          queryClient.setQueryData(['productFeed', regularFilters], {
+            ...regData3,
             pages: revertedPages,
           });
         }
-
-        // Revert detail cache
-        const detailData = queryClient.getQueryData(['productDetail', productId]);
-        if (detailData) {
-          queryClient.setQueryData(['productDetail', productId], {
-            ...detailData,
-            upvotes: prevUpvotes,
-            userVoted: prevUserVoted,
+        const featData3 = queryClient.getQueryData(['productFeed', featuredFilters]);
+        if (featData3) {
+          const revertedPages = featData3.pages.map((page) => {
+            const products = page.products.map((p) => {
+              if (p.id === productId) {
+                return revertProduct;
+              }
+              return p;
+            });
+            return { ...page, products };
+          });
+          queryClient.setQueryData(['productFeed', featuredFilters], {
+            ...featData3,
+            pages: revertedPages,
           });
         }
-
-        // Revert localStorage
+        queryClient.setQueryData(['productDetail', productId], revertProduct);
         setLocalVote(productId, prevUserVoted, prevUpvotes);
         toast.error('Failed to upvote');
       },
     });
   };
 
-  // ── Format date ──
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'Recently';
-    try {
-      let date;
-      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-        date = timestamp.toDate();
-      } else if (timestamp.seconds !== undefined) {
-        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
-      } else if (timestamp._seconds !== undefined) {
-        date = new Date(timestamp._seconds * 1000);
-      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
-        date = new Date(timestamp);
-      } else if (timestamp instanceof Date) {
-        date = timestamp;
-      } else {
-        date = new Date(timestamp);
-      }
-      if (isNaN(date.getTime())) return 'Recently';
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch {
-      return 'Recently';
-    }
-  };
-
-  if (isLoading && !rawProducts.length) {
+  // ── Loading state ──
+  if (isLoading && !featuredProducts.length && !regularProducts.length) {
     return (
       <>
         <Meta title="Product Feed – ProductTrend" />
@@ -381,18 +547,24 @@ export default function ProductTrendFeed() {
     );
   }
 
-  if (isError && !rawProducts.length) {
+  if (isError && !regularProducts.length && !featuredProducts.length) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <p className="text-red-600 font-medium">Failed to load products.</p>
-          <button onClick={() => refetch()} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
+          <button
+            onClick={() => { refetchFeatured(); refetchRegular(); }}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
+          >
             <FiRefreshCw className="w-4 h-4" /> Retry
           </button>
         </div>
       </div>
     );
   }
+
+  const hasFeatured = featuredProducts.length > 0;
+  const hasActiveFilters = searchQuery || category !== 'All' || sortBy !== 'most-upvoted';
 
   return (
     <>
@@ -481,9 +653,9 @@ export default function ProductTrendFeed() {
                   onChange={(e) => handleSortChange(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
                 >
+                  <option value="most-upvoted">Most Upvoted</option>
                   <option value="newest">Newest</option>
                   <option value="oldest">Oldest</option>
-                  <option value="most-upvoted">Most Upvoted</option>
                   <option value="most-commented">Most Comments</option>
                 </select>
                 <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -492,7 +664,7 @@ export default function ProductTrendFeed() {
           </div>
 
           {/* Active filters chips */}
-          {(searchQuery || category !== 'All' || sortBy !== 'newest') && (
+          {(searchQuery || category !== 'All' || sortBy !== 'most-upvoted') && (
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
               <div className="flex flex-wrap gap-2">
                 {searchQuery && (
@@ -507,10 +679,10 @@ export default function ProductTrendFeed() {
                     <FiX className="w-3 h-3 cursor-pointer" onClick={() => setCategory('All')} />
                   </span>
                 )}
-                {sortBy !== 'newest' && (
+                {sortBy !== 'most-upvoted' && (
                   <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
                     {sortBy.replace('-', ' ')}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setSortBy('newest')} />
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setSortBy('most-upvoted')} />
                   </span>
                 )}
               </div>
@@ -521,150 +693,103 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* Preview indicator */}
-        {isPreview && (
-          <div className="mb-4 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-2">
-            <FiLoader className="w-4 h-4 animate-spin" />
-            Showing filtered preview from current feed – searching server...
+        {/* ── FEATURED PRODUCTS (Top 100) ── */}
+        {hasFeatured && (
+          <div className="mb-10">
+            <div className="flex items-center gap-2 mb-4">
+              <FiTrendingUp className="text-purple-600 text-xl" />
+              <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
+              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                Top {featuredProducts.length}
+              </span>
+            </div>
+            <div className="space-y-4">
+              {featuredProducts.map((product, idx) => {
+                const rank = idx + 1;
+                const isTop3 = rank <= 3;
+                return (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    isFeatured
+                    rank={rank}
+                    isTop3={isTop3}
+                    onUpvote={handleUpvote}
+                    isAuthenticated={isAuthenticated}
+                    isUpvoting={upvoteMutation.isLoading}
+                  />
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Products List */}
-        {displayProducts.length === 0 && !isFetchingNextPage ? (
-          <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
-            <div className="text-5xl mb-4">🔍</div>
-            <h3 className="text-lg font-semibold text-slate-900">No products found</h3>
-            <p className="text-slate-500 text-sm">
-              {searchInput || category !== 'All' || sortBy !== 'newest'
-                ? 'No matches in current feed. Try adjusting your search or wait for server results.'
-                : 'Try adjusting your filters or launch a new product.'}
-            </p>
-            {isAuthenticated && (
-              <button
-                onClick={() => router.push('/productstrend/launch')}
-                className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
-              >
-                Launch Product
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {displayProducts.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white rounded-2xl border border-slate-200 hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4"
-              >
-                <Link href={`/productstrend/${product.id}`} className="flex-shrink-0">
-                  {product.logo ? (
-                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
-                      <Image
-                        src={product.logo}
-                        alt={product.name}
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : product.imageUrl ? (
-                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
-                      <Image
-                        src={product.imageUrl}
-                        alt={product.name}
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-100 flex items-center justify-center text-2xl text-slate-300 border border-slate-200">
-                      🚀
-                    </div>
-                  )}
-                </Link>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Link href={`/productstrend/${product.id}`} className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition truncate">
-                        {product.name}
-                      </h3>
-                    </Link>
-                    <button
-                      onClick={() => handleUpvote(product.id)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition text-xs font-medium flex-shrink-0 ${
-                        product.userVoted
-                          ? 'bg-purple-100 border-purple-300 text-purple-700'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-purple-50 hover:border-purple-200'
-                      }`}
-                      disabled={upvoteMutation.isLoading || !isAuthenticated}
-                    >
-                      <FiHeart className={`w-3.5 h-3.5 ${product.userVoted ? 'fill-purple-600 text-purple-600' : ''}`} />
-                      <span>{product.upvotes || 0}</span>
-                    </button>
-                  </div>
-                  <p className="text-sm text-slate-500 line-clamp-2 mt-1">
-                    {product.tagline}
-                  </p>
-                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                        {product.maker?.avatar ? (
-                          <Image
-                            src={product.maker.avatar}
-                            alt={product.maker.username || 'User'}
-                            width={20}
-                            height={20}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <FiUser className="w-3 h-3 text-slate-500 mx-auto mt-0.5" />
-                        )}
-                      </span>
-                      <span className="font-medium text-slate-600">
-                        {product.maker?.username || 'Anonymous'}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FiClock className="w-3 h-3" />
-                      {formatDate(product.createdAt)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FiMessageCircle className="w-3 h-3" />
-                      {product.commentsCount || 0}
-                    </span>
-                    {product.category && (
-                      <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                        {product.category}
-                      </span>
-                    )}
-                  </div>
+        {/* ── REGULAR PRODUCTS (Newest) ── */}
+        <div>
+          {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
+            <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
+              <div className="text-5xl mb-4">📭</div>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {hasFeatured ? 'No more products' : 'No products found'}
+              </h3>
+              <p className="text-slate-500 text-sm">
+                {searchQuery
+                  ? 'No results match your search. Try adjusting your query.'
+                  : isAuthenticated
+                  ? 'Be the first to launch a product!'
+                  : 'Sign in to join the community.'}
+              </p>
+              {isAuthenticated && !searchQuery && (
+                <button
+                  onClick={() => router.push('/productstrend/launch')}
+                  className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+                >
+                  Launch Product
+                </button>
+              )}
+            </div>
+          ) : (
+            <div>
+              {hasFeatured && regularProducts.length > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
                 </div>
+              )}
+              <div className="space-y-4">
+                {regularProducts.map((product, index) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    isFeatured={false}
+                    onUpvote={handleUpvote}
+                    isAuthenticated={isAuthenticated}
+                    isUpvoting={upvoteMutation.isLoading}
+                    ref={index === regularProducts.length - 1 ? lastElementRef : undefined}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
 
-        {hasMore && (
-          <div id="feed-end" className="py-8 flex justify-center">
-            {isFetchingNextPage ? (
-              <div className="flex items-center gap-2 text-slate-400">
-                <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
-                Loading more...
-              </div>
-            ) : (
-              <div className="h-4" />
-            )}
-          </div>
-        )}
+          {hasMore && (
+            <div className="py-6 flex justify-center">
+              {isFetchingNextPage ? (
+                <div className="flex items-center gap-2 text-slate-400">
+                  <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
+                  Loading more...
+                </div>
+              ) : (
+                <div className="h-4" />
+              )}
+            </div>
+          )}
 
-        {!hasMore && displayProducts.length > 0 && (
-          <p className="text-center text-xs text-slate-400 py-6">
-            You've reached the end 🎉
-          </p>
-        )}
+          {!hasMore && regularProducts.length > 0 && (
+            <p className="text-center text-xs text-slate-400 py-6">
+              You've reached the end 🎉
+            </p>
+          )}
+        </div>
       </div>
     </>
   );
