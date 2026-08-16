@@ -655,10 +655,11 @@ export function useBuyUpvotes() {
       queryClient.invalidateQueries(['mtCoins']);
       queryClient.invalidateQueries(['myProducts']);
       queryClient.invalidateQueries(['notifications']);
-      toast.success(data.message || 'Upvotes purchased successfully!');
+      // Toast handled in component
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to buy upvotes');
+      // Toast handled in component
+      console.error('Buy upvote error:', error);
     },
   });
 }
