@@ -10,7 +10,8 @@ import {
   useMyProducts,
   useDeleteProduct,
   useInvalidateQueries,
-  useMtCoins, // ✅ added
+  useMtCoins,
+  useBuyUpvotes, // ✅ new hook
 } from '../../lib/queries';
 import {
   FiGrid,
@@ -31,7 +32,8 @@ import {
   FiChevronDown,
   FiAlertTriangle,
   FiTag,
-  FiAward, // ✅ added for earnings icon
+  FiAward,
+  FiTrendingUp, // ✅ for boost icon
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -71,12 +73,16 @@ const CATEGORY_OPTIONS = [
   { value: 'Other', label: 'Other' },
 ];
 
+const UPVOTE_COST = 5; // MT Coins per upvote
+const MAX_UPVOTES = 1000;
+
 export default function MyProducts() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const { invalidateMyProducts } = useInvalidateQueries();
   const deleteMutation = useDeleteProduct();
+  const buyUpvotesMutation = useBuyUpvotes();
 
   // ── Filter state ──
   const [statusFilter, setStatusFilter] = useState('');
@@ -88,8 +94,8 @@ export default function MyProducts() {
     category: categoryFilter || undefined,
   };
 
-  // ── Fetch MT Coins (for earnings from products) ──
-  const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
+  // ── Fetch MT Coins (for earnings & balance) ──
+  const { data: mtCoinsData, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
   // ── React Query: My Products (infinite) ──
   const {
@@ -119,6 +125,11 @@ export default function MyProducts() {
   // ── Delete modal state ──
   const [deleteModal, setDeleteModal] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // ── Boost modal state ──
+  const [boostProduct, setBoostProduct] = useState(null);
+  const [boostAmount, setBoostAmount] = useState(10);
+  const [isBoosting, setIsBoosting] = useState(false);
 
   const confirmDelete = (product) => {
     setDeleteModal(product);
@@ -152,6 +163,39 @@ export default function MyProducts() {
       toast.error('Failed to delete product');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // ── Handle Boost Purchase ──
+  const handleBoost = async () => {
+    if (!boostProduct) return;
+    if (boostAmount < 1 || boostAmount > MAX_UPVOTES) {
+      toast.error(`Amount must be between 1 and ${MAX_UPVOTES}`);
+      return;
+    }
+    const cost = boostAmount * UPVOTE_COST;
+    const available = mtCoinsData?.available || 0;
+    if (cost > available) {
+      toast.error(`Insufficient MT Coins. You need ${cost}, have ${available}`);
+      return;
+    }
+
+    setIsBoosting(true);
+    try {
+      await buyUpvotesMutation.mutateAsync({
+        productId: boostProduct.id,
+        amount: boostAmount,
+      });
+      toast.success(`Added ${boostAmount} upvotes to "${boostProduct.name}"!`);
+      // Refresh product list and MT Coins
+      await refetch();
+      await refetchMtCoins();
+      setBoostProduct(null);
+      setBoostAmount(10);
+    } catch (err) {
+      toast.error(err.message || 'Failed to boost product');
+    } finally {
+      setIsBoosting(false);
     }
   };
 
@@ -291,6 +335,7 @@ export default function MyProducts() {
 
   const hasFilters = statusFilter || categoryFilter || searchTerm;
   const earnedFromProducts = mtCoinsData?.earnedFromProducts ?? 0;
+  const availableCoins = mtCoinsData?.available ?? 0;
 
   return (
     <>
@@ -329,7 +374,7 @@ export default function MyProducts() {
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg text-center">
           <div className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 mb-1">
             <FiAward className="w-4 h-4" />
-            <span>Total earnings from product likes(upvotes)</span>
+            <span>Total earnings from product likes (upvotes)</span>
           </div>
           <p className="text-5xl font-bold tracking-tight">
             {mtCoinsLoading ? '...' : earnedFromProducts}
@@ -536,6 +581,14 @@ export default function MyProducts() {
                       >
                         <FiEdit2 className="inline w-3 h-3 mr-1" /> Edit
                       </Link>
+                      {product.status === 'approved' && (
+                        <button
+                          onClick={() => setBoostProduct(product)}
+                          className="flex-1 text-center text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition"
+                        >
+                          <FiTrendingUp className="inline w-3 h-3 mr-1" /> Boost
+                        </button>
+                      )}
                       <button
                         onClick={() => confirmDelete(product)}
                         className="flex-1 text-center text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition"
@@ -596,6 +649,92 @@ export default function MyProducts() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Boost Modal ── */}
+      {boostProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">🚀 Boost Product</h3>
+              <button
+                onClick={() => setBoostProduct(null)}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <FiX className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-slate-600">
+                <strong>{boostProduct.name}</strong>
+              </p>
+              <p className="text-xs text-slate-400">
+                Current upvotes: <strong>{boostProduct.upvotes || 0}</strong>
+              </p>
+            </div>
+
+            <div className="bg-purple-50 rounded-xl p-3 border border-purple-200 mb-4">
+              <p className="text-sm font-medium text-purple-800">Available MT Coins</p>
+              <p className="text-2xl font-bold text-purple-700">{availableCoins}</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Number of Upvotes (max {MAX_UPVOTES})
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={MAX_UPVOTES}
+                value={boostAmount}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setBoostAmount(Math.min(Math.max(val, 1), MAX_UPVOTES));
+                }}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+              />
+            </div>
+
+            <div className="flex justify-between text-sm text-slate-600 mb-4">
+              <span>Cost per upvote:</span>
+              <span className="font-medium">{UPVOTE_COST} MT Coins</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-slate-800 border-t border-slate-200 pt-3 mb-4">
+              <span>Total cost:</span>
+              <span className="text-purple-600">{boostAmount * UPVOTE_COST} MT Coins</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-400 mb-4">
+              <span>New upvotes:</span>
+              <span>{(boostProduct.upvotes || 0) + boostAmount}</span>
+            </div>
+
+            <button
+              onClick={handleBoost}
+              disabled={isBoosting || (boostAmount * UPVOTE_COST) > availableCoins}
+              className={`w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-medium transition flex items-center justify-center gap-2 ${
+                (isBoosting || (boostAmount * UPVOTE_COST) > availableCoins)
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:shadow-lg hover:-translate-y-0.5'
+              }`}
+            >
+              {isBoosting ? (
+                <>
+                  <FiLoader className="w-4 h-4 animate-spin" /> Processing...
+                </>
+              ) : (
+                <>
+                  <FiTrendingUp className="w-4 h-4" /> Buy Upvotes
+                </>
+              )}
+            </button>
+            {(boostAmount * UPVOTE_COST) > availableCoins && (
+              <p className="text-xs text-red-500 mt-2 text-center">
+                Insufficient MT Coins. You need {boostAmount * UPVOTE_COST}, have {availableCoins}.
+              </p>
+            )}
           </div>
         </div>
       )}
