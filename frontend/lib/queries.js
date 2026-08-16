@@ -707,7 +707,9 @@ export function usePost(id, enabled = true) {
       return data.post;
     },
     enabled: !!id && enabled,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // longer stale time
+    refetchOnWindowFocus: false, // prevent auto refetch
+    refetchOnMount: false, // prevent refetch on remount
   });
 }
 
