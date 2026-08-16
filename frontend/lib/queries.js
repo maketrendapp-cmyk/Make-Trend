@@ -636,6 +636,25 @@ export function useDeleteProduct() {
   });
 }
 
+// ── Buy Upvotes ──
+export function useBuyUpvotes() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, amount }) =>
+      apiRequest(`/api/productstrend/products/${productId}/buy-upvote`, {
+        method: 'POST',
+        body: { amount },
+      }),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries(['productDetail', variables.productId]);
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['mtCoins']);
+      queryClient.invalidateQueries(['myProducts']);
+      queryClient.invalidateQueries(['notifications']);
+    },
+  });
+}
+
 // ── 🌍 COMMUNITY POSTS QUERIES ──
 
 // 1. Fetch posts feed (infinite scroll, public, with category & type filters)
