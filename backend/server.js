@@ -5942,6 +5942,7 @@ async function addPostToFeedSets(postId, category, type, timestamp) {
   await pipeline.exec();
 }
 
+// Remove task ID from all relevant sorted sets
 async function removePostFromFeedSets(postId, category, type) {
   const keys = [
     getPostFeedKey(null, null),
@@ -5949,8 +5950,18 @@ async function removePostFromFeedSets(postId, category, type) {
     getPostFeedKey(null, type),
     getPostFeedKey(category, type),
   ];
+  
+  // Also remove from most-liked sorted sets
+  const likesKeys = [
+    `posts:feed:category:${category || 'all'}:type:${type || 'all'}:sort:likes`,
+    `posts:feed:category:${category || 'all'}:type:all:sort:likes`,
+    `posts:feed:category:all:type:${type || 'all'}:sort:likes`,
+    `posts:feed:category:all:type:all:sort:likes`,
+  ];
+  
+  const allKeys = [...keys, ...likesKeys];
   const pipeline = redis.pipeline();
-  for (const key of keys) {
+  for (const key of allKeys) {
     pipeline.zrem(key, postId);
   }
   await pipeline.exec();
