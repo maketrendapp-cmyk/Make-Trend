@@ -640,17 +640,25 @@ export function useDeleteProduct() {
 export function useBuyUpvotes() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ productId, amount }) =>
-      apiRequest(`/productstrend/products/${productId}/buy-upvote`, {
+    mutationFn: async ({ productId, amount }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/productstrend/products/${productId}/buy-upvote`, {
         method: 'POST',
         body: { amount },
-      }),
+      }, token);
+      return data;
+    },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(['productDetail', variables.productId]);
       queryClient.invalidateQueries(['productFeed']);
       queryClient.invalidateQueries(['mtCoins']);
       queryClient.invalidateQueries(['myProducts']);
       queryClient.invalidateQueries(['notifications']);
+      toast.success(data.message || 'Upvotes purchased successfully!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to buy upvotes');
     },
   });
 }
