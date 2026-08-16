@@ -97,7 +97,38 @@ export default function PostDetail() {
     }
   }, [post]);
 
-  // ── Like handler (optimistic) ──
+  // ── Helper: update post in all caches (detail + all feed pages) ──
+  const updatePostInAllCaches = useCallback((postId, updatedFields) => {
+    // 1. Update detail cache
+    const detailKey = ['post', postId];
+    const currentDetail = queryClient.getQueryData(detailKey);
+    if (currentDetail) {
+      queryClient.setQueryData(detailKey, { ...currentDetail, ...updatedFields });
+    }
+
+    // 2. Update all feed caches that contain this post
+    const allQueries = queryClient.getQueryCache().findAll({ queryKey: ['posts'] });
+    for (const query of allQueries) {
+      const data = query.state.data;
+      if (!data || !data.pages) continue;
+      let updated = false;
+      const newPages = data.pages.map((page) => {
+        const posts = page.posts.map((p) => {
+          if (p.id === postId) {
+            updated = true;
+            return { ...p, ...updatedFields };
+          }
+          return p;
+        });
+        return { ...page, posts };
+      });
+      if (updated) {
+        queryClient.setQueryData(query.queryKey, { ...data, pages: newPages });
+      }
+    }
+  }, [queryClient]);
+
+  // ── Like handler (optimistic, no refetch) ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
@@ -112,16 +143,7 @@ export default function PostDetail() {
     setIsLiked(newVoted);
     setLikesCount(newCount);
     setIsLiking(true);
-
-    // Update cache
-    const currentPost = queryClient.getQueryData(['post', id]);
-    if (currentPost) {
-      queryClient.setQueryData(['post', id], {
-        ...currentPost,
-        userLiked: newVoted,
-        likes: newCount,
-      });
-    }
+    updatePostInAllCaches(id, { userLiked: newVoted, likes: newCount });
 
     likeMutation.mutate(id, {
       onSuccess: (data) => {
@@ -129,35 +151,24 @@ export default function PostDetail() {
         const serverLikes = data.likes;
         setIsLiked(serverVoted);
         setLikesCount(serverLikes);
-        // Update cache with server values
-        const cached = queryClient.getQueryData(['post', id]);
-        if (cached) {
-          queryClient.setQueryData(['post', id], {
-            ...cached,
-            userLiked: serverVoted,
-            likes: serverLikes,
-          });
-        }
+        // Sync all caches with server values
+        updatePostInAllCaches(id, { userLiked: serverVoted, likes: serverLikes });
         setIsLiking(false);
       },
       onError: (error) => {
         // Revert
-        setIsLiked(!newVoted);
-        setLikesCount(newVoted ? newCount - 1 : newCount + 1);
-        const cached = queryClient.getQueryData(['post', id]);
-        if (cached) {
-          queryClient.setQueryData(['post', id], {
-            ...cached,
-            userLiked: !newVoted,
-            likes: newVoted ? newCount - 1 : newCount + 1,
-          });
-        }
+        const revertVoted = !newVoted;
+        const revertLikes = newVoted ? newCount - 1 : newCount + 1;
+        setIsLiked(revertVoted);
+        setLikesCount(revertLikes);
+        updatePostInAllCaches(id, { userLiked: revertVoted, likes: revertLikes });
         setIsLiking(false);
         toast.error(error.message || 'Failed to like');
       },
     });
   };
 
+  // ── Comment & share handlers ──
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || !isAuthenticated) return;
@@ -191,20 +202,15 @@ export default function PostDetail() {
     }
     queryClient.setQueryData(['postComments', id], { ...currentComments, pages: updatedPages });
 
-    // Also increment comments count
-    const currentPost = queryClient.getQueryData(['post', id]);
-    if (currentPost) {
-      queryClient.setQueryData(['post', id], {
-        ...currentPost,
-        commentsCount: (currentPost.commentsCount || 0) + 1,
-      });
-    }
+    // Also increment comments count in detail and feeds
+    updatePostInAllCaches(id, { commentsCount: (post?.commentsCount || 0) + 1 });
 
     try {
       await addCommentMutation.mutateAsync({ postId: id, content: text });
-      // Invalidate and refetch to sync with server
+      // Sync with server – we only need to refetch the first page of comments
       await queryClient.invalidateQueries({ queryKey: ['postComments', id] });
       await refetchComments({ refetchPage: (page, index) => index === 0 });
+      // Update comments count from server
       await refetchPost();
     } catch (error) {
       // Revert optimistic comment
@@ -222,13 +228,7 @@ export default function PostDetail() {
         queryClient.setQueryData(['postComments', id], { ...revert, pages: revertedPages });
       }
       // Revert comments count
-      const revertedPost = queryClient.getQueryData(['post', id]);
-      if (revertedPost) {
-        queryClient.setQueryData(['post', id], {
-          ...revertedPost,
-          commentsCount: (revertedPost.commentsCount || 0) - 1,
-        });
-      }
+      updatePostInAllCaches(id, { commentsCount: (post?.commentsCount || 0) });
       toast.error(error.message || 'Failed to add comment');
       setCommentText(text);
     }
@@ -280,7 +280,6 @@ export default function PostDetail() {
     }
   };
 
-  // ── Profile navigation ──
   const goToUserProfile = (uid) => {
     if (uid) router.push(`/userinfo/${uid}`);
   };
