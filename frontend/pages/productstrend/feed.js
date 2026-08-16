@@ -23,13 +23,12 @@ import {
   FiRefreshCw,
   FiClock,
   FiMessageCircle,
-  FiExternalLink,
   FiBox,
 } from 'react-icons/fi';
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
-// ── Helper: format date ── (must be defined before ProductCard)
+// ── Helper: format date ──
 const formatDate = (timestamp) => {
   if (!timestamp) return 'Recently';
   try {
@@ -70,10 +69,10 @@ const setLocalVote = (productId, voted, upvotes) => {
 };
 
 // ── Product Card Component ──
-const ProductCard = React.forwardRef(({ 
-  product, 
-  isFeatured = false, 
-  rank = null, 
+const ProductCard = React.forwardRef(({
+  product,
+  isFeatured = false,
+  rank = null,
   onUpvote,
   isAuthenticated,
   isUpvoting,
@@ -82,7 +81,6 @@ const ProductCard = React.forwardRef(({
   const upvotes = product.upvotes || 0;
   const hasImage = !!(product.logo || product.imageUrl);
 
-  // ── Determine card style based on rank ──
   let cardClasses = 'bg-white rounded-2xl border p-4 hover:shadow-md transition flex items-center gap-4';
   let badge = null;
 
@@ -151,7 +149,6 @@ const ProductCard = React.forwardRef(({
       </Link>
 
       <div className="flex-1 min-w-0">
-        {/* Header with badge and upvote button */}
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <Link href={`/productstrend/${product.id}`} className="block">
@@ -342,49 +339,44 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Optimistic upvote toggle ──
+  // ── Simple upvote handler (updates both caches if product exists) ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
       return;
     }
 
-    // Find product in either featured or regular caches
+    // Find product in regular feed
     let currentProduct = null;
-    let currentFeedData = null;
-    let currentPageIndex = -1;
-    let currentProductIndex = -1;
-    let isFeaturedCache = false;
+    let currentPage = null;
+    let pageIndex = -1;
+    let productIndex = -1;
 
-    // Check regular feed cache
-    const regData = queryClient.getQueryData(['productFeed', regularFilters]);
-    if (regData) {
-      for (let i = 0; i < regData.pages.length; i++) {
-        const page = regData.pages[i];
+    if (regularData?.pages) {
+      for (let i = 0; i < regularData.pages.length; i++) {
+        const page = regularData.pages[i];
         const idx = page.products.findIndex(p => p.id === productId);
         if (idx !== -1) {
           currentProduct = page.products[idx];
-          currentFeedData = regData;
-          currentPageIndex = i;
-          currentProductIndex = idx;
-          isFeaturedCache = false;
+          currentPage = page;
+          pageIndex = i;
+          productIndex = idx;
           break;
         }
       }
     }
 
-    // If not found, check featured cache
-    if (!currentProduct) {
-      const featData = queryClient.getQueryData(['productFeed', featuredFilters]);
-      if (featData && featData.pages && featData.pages[0]) {
-        const idx = featData.pages[0].products.findIndex(p => p.id === productId);
-        if (idx !== -1) {
-          currentProduct = featData.pages[0].products[idx];
-          currentFeedData = featData;
-          currentPageIndex = 0;
-          currentProductIndex = idx;
-          isFeaturedCache = true;
-        }
+    // If not in regular, check featured
+    let isFeaturedCache = false;
+    if (!currentProduct && featuredData?.pages) {
+      const page = featuredData.pages[0];
+      const idx = page.products.findIndex(p => p.id === productId);
+      if (idx !== -1) {
+        currentProduct = page.products[idx];
+        currentPage = page;
+        pageIndex = 0;
+        productIndex = idx;
+        isFeaturedCache = true;
       }
     }
 
@@ -393,35 +385,56 @@ export default function ProductTrendFeed() {
       return;
     }
 
+    // Toggle
     const prevUpvotes = currentProduct.upvotes || 0;
     const prevUserVoted = currentProduct.userVoted || false;
     const newUserVoted = !prevUserVoted;
     const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
-    const updatedProduct = { ...currentProduct, upvotes: newUpvotes, userVoted: newUserVoted };
 
-    // Update localStorage
+    const updatedProduct = {
+      ...currentProduct,
+      upvotes: newUpvotes,
+      userVoted: newUserVoted,
+    };
+
+    // ── Update localStorage ──
     setLocalVote(productId, newUserVoted, newUpvotes);
 
-    // Update cache (either regular or featured)
-    if (currentFeedData) {
-      const newPages = currentFeedData.pages.map((page, idx) => {
-        if (idx === currentPageIndex) {
+    // ── Update the cache where the product was found ──
+    const feedKey = isFeaturedCache ? ['productFeed', featuredFilters] : ['productFeed', regularFilters];
+    const feedData = queryClient.getQueryData(feedKey);
+    if (feedData) {
+      const newPages = feedData.pages.map((page, idx) => {
+        if (idx === pageIndex) {
           return {
             ...page,
             products: page.products.map((p, pIdx) =>
-              pIdx === currentProductIndex ? updatedProduct : p
+              pIdx === productIndex ? updatedProduct : p
             ),
           };
         }
         return page;
       });
-      queryClient.setQueryData(['productFeed', currentFeedData.queryKey?.[1] || (isFeaturedCache ? featuredFilters : regularFilters)], {
-        ...currentFeedData,
-        pages: newPages,
-      });
+      queryClient.setQueryData(feedKey, { ...feedData, pages: newPages });
     }
 
-    // Also update product detail cache
+    // ── Also update the other cache if the product exists there ──
+    const otherKey = isFeaturedCache ? ['productFeed', regularFilters] : ['productFeed', featuredFilters];
+    const otherData = queryClient.getQueryData(otherKey);
+    if (otherData) {
+      const otherPages = otherData.pages.map((page) => {
+        const idx = page.products.findIndex(p => p.id === productId);
+        if (idx !== -1) {
+          const newProducts = [...page.products];
+          newProducts[idx] = updatedProduct;
+          return { ...page, products: newProducts };
+        }
+        return page;
+      });
+      queryClient.setQueryData(otherKey, { ...otherData, pages: otherPages });
+    }
+
+    // ── Update product detail cache ──
     queryClient.setQueryData(['productDetail', productId], updatedProduct);
 
     // ── Call the mutation ──
@@ -429,89 +442,47 @@ export default function ProductTrendFeed() {
       onSuccess: (result) => {
         const serverVoted = result.action === 'added';
         const serverUpvotes = result.upvotes;
+        const finalProduct = { ...currentProduct, upvotes: serverUpvotes, userVoted: serverVoted };
 
-        // Update both caches if present
-        const regData2 = queryClient.getQueryData(['productFeed', regularFilters]);
-        if (regData2) {
-          const updatedPages = regData2.pages.map((page) => {
-            const products = page.products.map((p) => {
-              if (p.id === productId) {
-                return { ...p, upvotes: serverUpvotes, userVoted: serverVoted };
+        // Update both caches with server values
+        [['productFeed', regularFilters], ['productFeed', featuredFilters]].forEach((key) => {
+          const cache = queryClient.getQueryData(key);
+          if (cache) {
+            const newPages = cache.pages.map((page) => {
+              const idx = page.products.findIndex(p => p.id === productId);
+              if (idx !== -1) {
+                const newProducts = [...page.products];
+                newProducts[idx] = finalProduct;
+                return { ...page, products: newProducts };
               }
-              return p;
+              return page;
             });
-            return { ...page, products };
-          });
-          queryClient.setQueryData(['productFeed', regularFilters], {
-            ...regData2,
-            pages: updatedPages,
-          });
-        }
-
-        const featData2 = queryClient.getQueryData(['productFeed', featuredFilters]);
-        if (featData2) {
-          const updatedPages = featData2.pages.map((page) => {
-            const products = page.products.map((p) => {
-              if (p.id === productId) {
-                return { ...p, upvotes: serverUpvotes, userVoted: serverVoted };
-              }
-              return p;
-            });
-            return { ...page, products };
-          });
-          queryClient.setQueryData(['productFeed', featuredFilters], {
-            ...featData2,
-            pages: updatedPages,
-          });
-        }
+            queryClient.setQueryData(key, { ...cache, pages: newPages });
+          }
+        });
 
         // Update detail cache
-        const detail = queryClient.getQueryData(['productDetail', productId]);
-        if (detail) {
-          queryClient.setQueryData(['productDetail', productId], {
-            ...detail,
-            upvotes: serverUpvotes,
-            userVoted: serverVoted,
-          });
-        }
-
+        queryClient.setQueryData(['productDetail', productId], finalProduct);
         setLocalVote(productId, serverVoted, serverUpvotes);
       },
       onError: () => {
-        // Revert all caches
+        // Revert both caches
         const revertProduct = { ...currentProduct, upvotes: prevUpvotes, userVoted: prevUserVoted };
-        const regData3 = queryClient.getQueryData(['productFeed', regularFilters]);
-        if (regData3) {
-          const revertedPages = regData3.pages.map((page) => {
-            const products = page.products.map((p) => {
-              if (p.id === productId) {
-                return revertProduct;
+        [['productFeed', regularFilters], ['productFeed', featuredFilters]].forEach((key) => {
+          const cache = queryClient.getQueryData(key);
+          if (cache) {
+            const newPages = cache.pages.map((page) => {
+              const idx = page.products.findIndex(p => p.id === productId);
+              if (idx !== -1) {
+                const newProducts = [...page.products];
+                newProducts[idx] = revertProduct;
+                return { ...page, products: newProducts };
               }
-              return p;
+              return page;
             });
-            return { ...page, products };
-          });
-          queryClient.setQueryData(['productFeed', regularFilters], {
-            ...regData3,
-            pages: revertedPages,
-          });
-        }
-        const featData3 = queryClient.getQueryData(['productFeed', featuredFilters]);
-        if (featData3) {
-          const revertedPages = featData3.pages.map((page) => {
-            const products = page.products.map((p) => {
-              if (p.id === productId) {
-                return revertProduct;
-              }
-              return p;
-            });
-            return { ...page, products };
-          });
-          queryClient.setQueryData(['productFeed', featuredFilters], {
-            ...featData3,
-            pages: revertedPages,
-          });
-        }
+            queryClient.setQueryData(key, { ...cache, pages: newPages });
+          }
+        });
         queryClient.setQueryData(['productDetail', productId], revertProduct);
         setLocalVote(productId, prevUserVoted, prevUpvotes);
         toast.error('Failed to upvote');
@@ -558,7 +529,6 @@ export default function ProductTrendFeed() {
   }
 
   const hasFeatured = featuredProducts.length > 0;
-  const hasActiveFilters = searchQuery || category !== 'All' || sortBy !== 'most-upvoted';
 
   return (
     <>
@@ -698,20 +668,17 @@ export default function ProductTrendFeed() {
               </span>
             </div>
             <div className="space-y-4">
-              {featuredProducts.map((product, idx) => {
-                const rank = idx + 1;
-                return (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    isFeatured
-                    rank={rank}
-                    onUpvote={handleUpvote}
-                    isAuthenticated={isAuthenticated}
-                    isUpvoting={upvoteMutation.isLoading}
-                  />
-                );
-              })}
+              {featuredProducts.map((product, idx) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isFeatured
+                  rank={idx + 1}
+                  onUpvote={handleUpvote}
+                  isAuthenticated={isAuthenticated}
+                  isUpvoting={upvoteMutation.isLoading}
+                />
+              ))}
             </div>
           </div>
         )}
