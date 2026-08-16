@@ -945,6 +945,33 @@ async function checkActionCooldown(campaignId, deviceId, minInterval = 2) {
   }
 }
 
+// ── Update post likes in feed (remove + re‑add with new likes as score for "most-liked" feeds) ──
+async function updatePostLikesInFeed(postId, category, type, likes) {
+  // Remove from all feed sets
+  await removePostFromFeedSets(postId, category, type);
+  
+  // Re‑add with updated score
+  const timestamp = Date.now();
+  // We have multiple feed keys: all, category only, type only, category+type
+  // We need to update both the timestamp-based (newest) and likes-based (most-liked) feeds.
+  // For simplicity, we'll re-add to the existing feed keys with timestamp.
+  await addPostToFeedSets(postId, category, type, timestamp);
+  
+  // Additionally, we want to maintain a "most-liked" feed sorted by likes.
+  // We'll add a separate sorted set for most-liked.
+  const likesKeys = [
+    `posts:feed:category:all:type:all:sort:likes`,
+    `posts:feed:category:${category || 'all'}:type:all:sort:likes`,
+    `posts:feed:category:all:type:${type || 'all'}:sort:likes`,
+    `posts:feed:category:${category || 'all'}:type:${type || 'all'}:sort:likes`,
+  ];
+  const pipeline = redis.pipeline();
+  for (const key of likesKeys) {
+    pipeline.zadd(key, likes, postId);
+  }
+  await pipeline.exec();
+}
+
 
 
 // ============================================================
@@ -8172,6 +8199,147 @@ app.get('/api/my-posts', verifyToken, checkBanned, async (req, res) => {
   } catch (error) {
     console.error('❌ Get my posts error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 11. BUY LIKES FOR POST (MT Coins)
+// ─────────────────────────────────────────────
+app.post('/api/posts/:id/buy-like', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const { amount } = req.body;
+
+    // ── Validate amount ──
+    if (!amount || !Number.isInteger(amount) || amount < 1 || amount > 1000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount. Must be between 1 and 1000 likes.'
+      });
+    }
+
+    // ── Rate limit: 3 purchases per minute ──
+    if (!(await checkRateLimit(uid, 'buy-post-like', 3, 60))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many purchase attempts. Please wait a moment.'
+      });
+    }
+
+    // ── Daily limit: max 500 likes per day ──
+    if (!(await checkDailyLimit(uid, 'buy-post-like', 500))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily like purchase limit reached (max 500 per day). Come back tomorrow!'
+      });
+    }
+
+    // ── 1. Fetch post ──
+    const postRef = db.collection('posts').doc(id);
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+    const postData = postDoc.data();
+    if (postData.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'Post is not active' });
+    }
+
+    // ── 2. Verify ownership ──
+    if (postData.userId !== uid) {
+      return res.status(403).json({ success: false, error: 'You do not own this post' });
+    }
+
+    // ── 3. Check MT Coins balance ──
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = userDoc.data();
+    const earned = userData.mtCoinsEarned || 0;
+    const spent = userData.mtCoinsSpent || 0;
+    const available = earned - spent;
+    const cost = amount * 5; // 5 MT Coins per like
+
+    if (available < cost) {
+      return res.status(400).json({
+        success: false,
+        error: `Insufficient MT Coins. You need ${cost} coins, have ${available}`
+      });
+    }
+
+    // ── 4. Atomic transaction ──
+    let newLikes;
+    await db.runTransaction(async (transaction) => {
+      // Read current post (READ before writes)
+      const postSnap = await transaction.get(postRef);
+      if (!postSnap.exists) throw new Error('Post not found');
+      const currentLikes = postSnap.data().likes || 0;
+      newLikes = currentLikes + amount;
+
+      // Deduct coins
+      const userRef = db.collection('users').doc(uid);
+      transaction.update(userRef, {
+        mtCoinsSpent: admin.firestore.FieldValue.increment(cost),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Update post likes
+      transaction.update(postRef, {
+        likes: newLikes,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Log transaction
+      const txRef = db.collection('postLikePurchases').doc();
+      transaction.set(txRef, {
+        postId: id,
+        userId: uid,
+        amount: amount,
+        cost: cost,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    // ── 5. Update post detail cache ──
+    const updatedDoc = await postRef.get();
+    const updatedData = updatedDoc.data();
+    const user = await getUserInfo(uid);
+    const post = { id: updatedDoc.id, ...updatedData, user };
+    await cachePostDetails(id, post);
+
+    // ── 6. Update feed caches (remove + re‑add with new likes score) ──
+    await updatePostLikesInFeed(id, postData.category || 'general', postData.type || 'general', newLikes);
+
+    // ── 7. Invalidate user's own posts list ──
+    await invalidatePattern(`my-posts:${uid}:*`);
+
+    // ── 8. Invalidate MT Coins cache ──
+    await invalidateKey(`mtcoins:user:${uid}`);
+
+    // ── 9. Send notification ──
+    await createNotification({
+      userId: uid,
+      type: 'personal',
+      title: '📈 Post Boosted!',
+      description: `You purchased ${amount} likes for "${postData.title}". Total likes: ${newLikes}`,
+      redirectUrl: `/community/post/${id}`,
+      fromUserId: uid
+    });
+
+    // ── 10. Response ──
+    res.json({
+      success: true,
+      message: `Added ${amount} likes to your post!`,
+      newLikes: newLikes || postData.likes + amount,
+      coinsSpent: cost,
+      remainingCoins: available - cost
+    });
+
+  } catch (error) {
+    console.error('❌ Buy like error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to purchase likes' });
   }
 });
 
