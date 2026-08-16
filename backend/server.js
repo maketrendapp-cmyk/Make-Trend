@@ -5862,6 +5862,31 @@ async function addProductToFeedSets(productId, category, sort, timestamp) {
   await pipeline.exec();
 }
 
+// ── Update product upvotes in feed (remove + re‑add with new score) ──
+async function updateProductUpvotesInFeed(productId, category, upvotes) {
+  // Remove from all feed sets
+  await removeProductFromFeedSets(productId, category);
+  
+  // Re‑add with updated score
+  const timestamp = Date.now();
+  const sorts = ['newest', 'most-upvoted', 'most-commented'];
+  const keys = [];
+  for (const s of sorts) {
+    keys.push(getProductFeedKey(null, s));
+    keys.push(getProductFeedKey(category, s));
+  }
+  
+  const pipeline = redis.pipeline();
+  for (const key of keys) {
+    if (key.includes('most-upvoted')) {
+      pipeline.zadd(key, upvotes, productId);
+    } else {
+      pipeline.zadd(key, timestamp, productId);
+    }
+  }
+  await pipeline.exec();
+}
+
 async function removeProductFromFeedSets(productId, category) {
   const sorts = ['newest', 'most-upvoted', 'most-commented'];
   const keys = [];
@@ -6816,6 +6841,10 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
     const maker = await getProductMakerInfo(updatedData.makerUid);
     const product = { id: updatedDoc.id, ...updatedData, maker };
     await cacheProductDetails(id, product);
+
+    // ── 🔥 Update feed sorted sets (most‑upvoted) ──
+    const category = updatedData.category || 'Other';
+    await updateProductUpvotesInFeed(id, category, product.upvotes);
 
     // ── Invalidate user's vote cache ──
     if (uid) {
