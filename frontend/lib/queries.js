@@ -667,21 +667,21 @@ export function useBuyUpvotes() {
 // ── 🌍 COMMUNITY POSTS QUERIES ──
 
 // 1. Fetch posts feed (infinite scroll, public, with category & type filters)
-// Supports: search (text or @username), userId (filter by user)
+// Supports: search (text or @username), userId (filter by user), sort ('newest' or 'most-liked')
 export function usePosts(filters = {}, enabled = true) {
-  const { category, type, search, userId } = filters;
-  const queryKey = ['posts', { category, type, search, userId }];
+  const { category, type, search, userId, sort, limit = 20 } = filters;
+  const queryKey = ['posts', { category, type, search, userId, sort, limit }];
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam = null }) => {
-      const params = new URLSearchParams({ limit: 20 });
+      const params = new URLSearchParams({ limit: String(limit) });
       if (category && category !== 'all') params.append('category', category);
       if (type && type !== 'all') params.append('type', type);
       if (search) params.append('search', search);
       if (userId) params.append('userId', userId);
+      if (sort) params.append('sort', sort);
       if (pageParam) params.append('lastId', pageParam);
       const url = `/posts?${params.toString()}`;
-      // Send token if available (for userLiked flag)
       const token = await getToken().catch(() => null);
       const data = await apiRequest(url, {}, token);
       return {
@@ -691,7 +691,7 @@ export function usePosts(filters = {}, enabled = true) {
     },
     enabled,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
     keepPreviousData: true,
   });
