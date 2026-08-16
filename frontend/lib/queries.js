@@ -641,7 +641,7 @@ export function useBuyUpvotes() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ productId, amount }) =>
-      apiRequest(`/api/productstrend/products/${productId}/buy-upvote`, {
+      apiRequest(`/productstrend/products/${productId}/buy-upvote`, {
         method: 'POST',
         body: { amount },
       }),
