@@ -872,6 +872,33 @@ export function useMyPosts(filters = {}, enabled = true) {
   });
 }
 
+// ── Buy Likes for Post ──
+export function useBuyPostLike() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ postId, amount }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/posts/${postId}/buy-like`, {
+        method: 'POST',
+        body: { amount },
+      }, token);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries(['post', variables.postId]);
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['myPosts']);
+      queryClient.invalidateQueries(['mtCoins']);
+      queryClient.invalidateQueries(['notifications']);
+      toast.success(data.message || 'Likes purchased successfully!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to buy likes');
+    },
+  });
+}
+
 // ── 🔔 NOTIFICATION QUERIES ──
 
 // 1. Personal notifications (infinite scroll)
