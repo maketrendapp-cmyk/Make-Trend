@@ -11,7 +11,8 @@ import {
   useLikePost,
   useDeletePost,
   useInvalidateQueries,
-  useMtCoins, // ✅ this is already in your queries.js
+  useMtCoins,
+  useBuyPostLike, // ✅ import the new hook
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -31,6 +32,7 @@ import {
   FiFilter,
   FiChevronDown,
   FiAward,
+  FiTrendingUp, // ✅ import for boost icon
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -89,6 +91,7 @@ export default function MyPosts() {
   const { invalidateMyPosts } = useInvalidateQueries();
   const likeMutation = useLikePost();
   const deletePostMutation = useDeletePost();
+  const buyPostLike = useBuyPostLike(); // ✅ use the mutation
 
   // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
@@ -126,6 +129,11 @@ export default function MyPosts() {
   // ── Delete modal state ──
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null });
   const [deletingPostId, setDeletingPostId] = useState(null);
+
+  // ── Boost modal state ──
+  const [boostModal, setBoostModal] = useState({ isOpen: false, postId: null, postTitle: '' });
+  const [boostAmount, setBoostAmount] = useState(10);
+  const [isBoosting, setIsBoosting] = useState(false);
 
   // ── Intersection Observer ──
   const observerRef = useRef(null);
@@ -195,6 +203,38 @@ export default function MyPosts() {
   const cancelDelete = () => {
     setDeleteModal({ isOpen: false, postId: null });
     setDeletingPostId(null);
+  };
+
+  // ── Boost handlers ──
+  const handleBoostClick = (postId, postTitle) => {
+    setBoostModal({ isOpen: true, postId, postTitle });
+    setBoostAmount(10);
+  };
+
+  const handleBoostConfirm = () => {
+    if (!boostModal.postId) return;
+    setIsBoosting(true);
+    buyPostLike.mutate(
+      { postId: boostModal.postId, amount: boostAmount },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message || 'Likes purchased successfully!');
+          setBoostModal({ isOpen: false, postId: null, postTitle: '' });
+          setIsBoosting(false);
+          // Invalidate queries – handled inside mutation
+        },
+        onError: (err) => {
+          toast.error(err.message || 'Failed to buy likes');
+          setBoostModal({ isOpen: false, postId: null, postTitle: '' });
+          setIsBoosting(false);
+        },
+      }
+    );
+  };
+
+  const cancelBoost = () => {
+    setBoostModal({ isOpen: false, postId: null, postTitle: '' });
+    setIsBoosting(false);
   };
 
   // ── Share handler ──
@@ -313,7 +353,7 @@ export default function MyPosts() {
     <>
       <Meta title="My Posts – Make Trend Community" />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* ── Simplified Header ── */}
+        {/* ── Header ── */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
             <Link
@@ -357,7 +397,7 @@ export default function MyPosts() {
           </div>
         )}
 
-        {/* ── Focused Earnings Card ── */}
+        {/* ── Earnings Card ── */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg text-center">
           <div className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 mb-1">
             <FiAward className="w-4 h-4" />
@@ -426,7 +466,7 @@ export default function MyPosts() {
           )}
         </div>
 
-        {/* ── Posts List ── (unchanged) */}
+        {/* ── Posts List ── (with Boost button) */}
         {posts.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">📝</div>
@@ -464,7 +504,7 @@ export default function MyPosts() {
                   className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition"
                   ref={index === posts.length - 1 ? lastElementRef : null}
                 >
-                  {/* Post header, content, actions – unchanged */}
+                  {/* Post header */}
                   <div className="flex items-start gap-3">
                     <Link href={`/userinfo/${authorUid}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
@@ -555,6 +595,7 @@ export default function MyPosts() {
                     </div>
                   )}
 
+                  {/* ── Post Actions ── */}
                   <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => handleLike(post.id)}
@@ -588,6 +629,15 @@ export default function MyPosts() {
                       <FiEdit className="w-4 h-4" />
                       <span>Edit</span>
                     </Link>
+
+                    {/* ── Boost Button ── */}
+                    <button
+                      onClick={() => handleBoostClick(post.id, post.title)}
+                      className="flex items-center gap-1.5 text-sm text-purple-500 hover:text-purple-700 transition"
+                    >
+                      <FiTrendingUp className="w-4 h-4" />
+                      <span>Boost</span>
+                    </button>
 
                     <button
                       onClick={() => handleDeleteClick(post.id)}
@@ -662,7 +712,7 @@ export default function MyPosts() {
                 <button
                   onClick={confirmDelete}
                   disabled={deletePostMutation.isLoading || deletingPostId !== null}
-                  className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm font-medium flex items-center gap-2"
                 >
                   {deletePostMutation.isLoading || deletingPostId !== null ? (
                     <FiLoader className="w-4 h-4 animate-spin" />
@@ -670,6 +720,65 @@ export default function MyPosts() {
                     <FiTrash2 className="w-4 h-4" />
                   )}
                   Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Boost Modal ── */}
+        {boostModal.isOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fadeIn">
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <FiTrendingUp className="text-purple-500" /> Boost Post
+                </h3>
+                <button
+                  onClick={cancelBoost}
+                  className="text-slate-400 hover:text-slate-600 transition"
+                >
+                  <FiX className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-slate-600 text-sm mb-2">
+                Add extra likes to <strong>{boostModal.postTitle}</strong>.
+              </p>
+              <p className="text-xs text-slate-400 mb-4">
+                <span className="font-medium">5 MT Coins per like</span> (max 1000)
+              </p>
+              <div className="flex items-center gap-4 mb-4">
+                <label className="text-sm font-medium text-slate-700">Likes:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={boostAmount}
+                  onChange={(e) => setBoostAmount(Math.min(1000, Math.max(1, parseInt(e.target.value) || 1)))}
+                  className="w-24 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                />
+                <span className="text-sm font-medium text-purple-600">
+                  {boostAmount * 5} MT Coins
+                </span>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={cancelBoost}
+                  disabled={isBoosting}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBoostConfirm}
+                  disabled={isBoosting}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isBoosting ? (
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Boost Now'
+                  )}
                 </button>
               </div>
             </div>
