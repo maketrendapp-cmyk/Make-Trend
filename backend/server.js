@@ -945,25 +945,22 @@ async function checkActionCooldown(campaignId, deviceId, minInterval = 2) {
   }
 }
 
-// ── Update post likes in feed (remove + re‑add with new likes as score for "most-liked" feeds) ──
+// ── Update post likes in feed (for most-liked sorting) ──
 async function updatePostLikesInFeed(postId, category, type, likes) {
-  // Remove from all feed sets
+  // Remove from all feed sets (to clean up old entries)
   await removePostFromFeedSets(postId, category, type);
   
-  // Re‑add with updated score
+  // Re‑add with new likes as score for the "most-liked" feeds
   const timestamp = Date.now();
-  // We have multiple feed keys: all, category only, type only, category+type
-  // We need to update both the timestamp-based (newest) and likes-based (most-liked) feeds.
-  // For simplicity, we'll re-add to the existing feed keys with timestamp.
+  // 1. Re‑add to the default newest feeds (timestamp based)
   await addPostToFeedSets(postId, category, type, timestamp);
   
-  // Additionally, we want to maintain a "most-liked" feed sorted by likes.
-  // We'll add a separate sorted set for most-liked.
+  // 2. Update the most-liked sorted sets with likes as score
   const likesKeys = [
-    `posts:feed:category:all:type:all:sort:likes`,
+    `posts:feed:category:${category || 'all'}:type:${type || 'all'}:sort:likes`,
     `posts:feed:category:${category || 'all'}:type:all:sort:likes`,
     `posts:feed:category:all:type:${type || 'all'}:sort:likes`,
-    `posts:feed:category:${category || 'all'}:type:${type || 'all'}:sort:likes`,
+    `posts:feed:category:all:type:all:sort:likes`,
   ];
   const pipeline = redis.pipeline();
   for (const key of likesKeys) {
@@ -7338,11 +7335,11 @@ app.post('/api/admin/system-notifications', verifyToken, checkBanned, async (req
 // 24. COMMUNITY – POSTS, COMMENTS, LIKES, PROFILES
 // ============================================================
 
-// ── GET POSTS FEED – supports: category, type, search, userId ──
+// ── GET POSTS FEED – supports: category, type, search, userId, and sort ──
 app.get('/api/posts', async (req, res) => {
   try {
     let limit = parseInt(req.query.limit) || 20;
-    const MAX_LIMIT = 50;
+    const MAX_LIMIT = 100; // increased to 100 for most-liked
     if (limit > MAX_LIMIT) limit = MAX_LIMIT;
 
     const lastId = req.query.lastId || null;
@@ -7350,6 +7347,7 @@ app.get('/api/posts', async (req, res) => {
     const type = req.query.type || null;
     const search = req.query.search || null;
     const userId = req.query.userId || null;
+    const sort = req.query.sort || 'newest'; // 'newest' or 'most-liked'
     const ip = getClientIp(req);
 
     if (!(await checkRateLimit(ip, 'posts-get', 30, 60))) {
@@ -7573,7 +7571,16 @@ if (search) {
     }
 
     // ── Normal feed: use sorted sets ──
-    const feedKey = getPostFeedKey(category || null, type || null);
+    // Determine which sorted set to use based on sort parameter
+    let feedKey;
+    if (sort === 'most-liked') {
+      // Use the most-liked sorted set (likes as score)
+      feedKey = `posts:feed:category:${category || 'all'}:type:${type || 'all'}:sort:likes`;
+    } else {
+      // Default: newest (timestamp based)
+      feedKey = getPostFeedKey(category || null, type || null);
+    }
+    
     let offset = 0;
     if (lastId) {
       const rank = await redis.zrevrank(feedKey, lastId);
@@ -7937,34 +7944,43 @@ app.post('/api/posts/:id/like', verifyToken, checkBanned, async (req, res) => {
     const likeRef = db.collection('postLikes').doc(`${id}_user_${uid}`);
 
     let result;
+    let category, type, newLikes;
     await db.runTransaction(async (transaction) => {
       const postDoc = await transaction.get(postRef);
       if (!postDoc.exists) throw new Error('Post not found');
 
       const postData = postDoc.data();
+      category = postData.category || 'general';
+      type = postData.type || 'general';
+
       const likeDoc = await transaction.get(likeRef);
       const isLiked = likeDoc.exists;
 
       if (isLiked) {
         transaction.delete(likeRef);
+        newLikes = postData.likes - 1;
         transaction.update(postRef, {
-          likes: postData.likes - 1,
+          likes: newLikes,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        result = { action: 'removed', likes: postData.likes - 1 };
+        result = { action: 'removed', likes: newLikes };
       } else {
         transaction.set(likeRef, {
           postId: id,
           userId: uid,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        newLikes = postData.likes + 1;
         transaction.update(postRef, {
-          likes: postData.likes + 1,
+          likes: newLikes,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        result = { action: 'added', likes: postData.likes + 1 };
+        result = { action: 'added', likes: newLikes };
       }
     });
+
+    // ── 🔥 Update the most‑liked Redis sorted set ──
+    await updatePostLikesInFeed(id, category, type, newLikes);
 
     // ── Update post detail cache ──
     const updatedDoc = await postRef.get();
