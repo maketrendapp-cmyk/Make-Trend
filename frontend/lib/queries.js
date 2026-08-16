@@ -480,7 +480,9 @@ export function useProductFeed(filters = {}, enabled = true) {
         ...(pageParam && { lastId: pageParam }),
       });
       const url = `/productstrend/feed?${params.toString()}`;
-      const data = await apiRequest(url, {}, null);
+      // ✅ Send token if available
+      const token = await getToken().catch(() => null);
+      const data = await apiRequest(url, {}, token);
       return {
         products: data.products || [],
         nextCursor: data.hasMore ? data.lastId : null,
@@ -499,7 +501,9 @@ export function useProductDetail(id, enabled = true) {
   return useQuery({
     queryKey: ['productDetail', id],
     queryFn: async () => {
-      const data = await apiRequest(`/productstrend/products/${id}`, {}, null);
+      // ✅ Send token if available
+      const token = await getToken().catch(() => null);
+      const data = await apiRequest(`/productstrend/products/${id}`, {}, token);
       return data.product;
     },
     enabled: !!id && enabled,
