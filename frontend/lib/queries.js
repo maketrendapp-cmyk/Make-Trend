@@ -802,18 +802,15 @@ export function useDeletePost() {
       return data;
     },
     onSuccess: (data, postId) => {
-      // Use object syntax (matching useDeleteProduct pattern)
       queryClient.invalidateQueries({ queryKey: ['posts'], refetchType: 'active' });
       queryClient.invalidateQueries({ queryKey: ['post', postId], refetchType: 'active' });
-      
-      // For infinite queries, invalidate AND reset to clear all pages
       queryClient.invalidateQueries({ queryKey: ['myPosts'], refetchType: 'active' });
       queryClient.resetQueries({ queryKey: ['myPosts'] });
-      
-      toast.success('Post deleted');
+      // Toast is handled in the component
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to delete post');
+      // Toast is handled in the component
+      console.error('Delete post error:', error);
     },
   });
 }
@@ -891,10 +888,11 @@ export function useBuyPostLike() {
       queryClient.invalidateQueries(['myPosts']);
       queryClient.invalidateQueries(['mtCoins']);
       queryClient.invalidateQueries(['notifications']);
-      toast.success(data.message || 'Likes purchased successfully!');
+      // Toast is handled in the component
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to buy likes');
+      // Toast is handled in the component
+      console.error('Buy like error:', error);
     },
   });
 }
