@@ -221,18 +221,16 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler with proper query keys ──
+  // ── Like handler ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
       return;
     }
 
-    // Define query keys for regular and featured feeds
     const regularQueryKey = ['posts', { ...filters, sort: undefined, limit: 20 }];
     const featuredQueryKey = ['posts', featuredFilters];
 
-    // Helper to find the post in cache
     const findPostInCache = (queryKey) => {
       const data = queryClient.getQueryData(queryKey);
       if (!data) return null;
@@ -247,7 +245,6 @@ export default function CommunityFeed() {
       return found;
     };
 
-    // Try to find in regular feed first, then featured
     let found = findPostInCache(regularQueryKey);
     let isFeatured = false;
     if (!found) {
@@ -256,13 +253,11 @@ export default function CommunityFeed() {
     }
 
     if (!found) {
-      // If not in cache, we just invalidate and refetch via mutation
       likeMutation.mutate(postId, {
         onSuccess: () => {
           queryClient.invalidateQueries(regularQueryKey);
           queryClient.invalidateQueries(featuredQueryKey);
           queryClient.invalidateQueries(['post', postId]);
-          toast.success('Liked!');
         },
         onError: (err) => {
           toast.error(err.message || 'Failed to like');
@@ -277,7 +272,6 @@ export default function CommunityFeed() {
     const newLikes = newVoted ? currentPost.likes + 1 : currentPost.likes - 1;
     const updatedPost = { ...currentPost, userLiked: newVoted, likes: newLikes };
 
-    // Optimistic update for the found feed
     const currentData = queryClient.getQueryData(queryKey);
     if (currentData) {
       const newPages = currentData.pages.map((p) => {
@@ -292,7 +286,6 @@ export default function CommunityFeed() {
       queryClient.setQueryData(queryKey, { ...currentData, pages: newPages });
     }
 
-    // Also update the other feed if it contains the post
     const otherQueryKey = isFeatured ? regularQueryKey : featuredQueryKey;
     const otherData = queryClient.getQueryData(otherQueryKey);
     if (otherData) {
@@ -308,18 +301,15 @@ export default function CommunityFeed() {
       queryClient.setQueryData(otherQueryKey, { ...otherData, pages: otherPages });
     }
 
-    // Update single post cache
     queryClient.setQueryData(['post', postId], updatedPost);
     setLocalVote(postId, newVoted, newLikes);
 
-    // Send mutation
     likeMutation.mutate(postId, {
       onSuccess: (data) => {
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
         const finalPost = { ...currentPost, userLiked: serverVoted, likes: serverLikes };
 
-        // Sync both caches
         [regularQueryKey, featuredQueryKey].forEach(key => {
           const cache = queryClient.getQueryData(key);
           if (cache) {
@@ -335,13 +325,10 @@ export default function CommunityFeed() {
             queryClient.setQueryData(key, { ...cache, pages: newPages });
           }
         });
-
-        // Sync single post
         queryClient.setQueryData(['post', postId], finalPost);
         setLocalVote(postId, serverVoted, serverLikes);
       },
       onError: (error) => {
-        // Revert both caches
         [regularQueryKey, featuredQueryKey].forEach(key => {
           const cache = queryClient.getQueryData(key);
           if (cache) {
@@ -364,7 +351,6 @@ export default function CommunityFeed() {
     });
   };
 
-  // ── Share handler ──
   const handleShare = async (postId) => {
     const url = `${window.location.origin}/community/post/${postId}`;
     try {
@@ -381,7 +367,6 @@ export default function CommunityFeed() {
     }
   };
 
-  // ── Format date ──
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Just now';
     try {
@@ -424,7 +409,7 @@ export default function CommunityFeed() {
     });
   };
 
-  // ── Skeleton loader ──
+  // ── Loading state ──
   if (isLoading) {
     return (
       <>
@@ -676,32 +661,37 @@ export default function CommunityFeed() {
           </div>
         )}
 
-        {/* ── FEATURED POSTS (Most Liked) ── */}
+        {/* ── FEATURED POSTS (Top Liked) ── */}
         {hasFeatured && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <FiTrendingUp className="text-purple-600 text-xl" />
-              <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
+              <h2 className="text-lg font-bold text-slate-900">🔥 Top Liked</h2>
               <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                 Top {featuredPosts.length}
               </span>
             </div>
             <div className="space-y-4">
-              {featuredPosts.map((post, idx) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  isLiked={post.userLiked || false}
-                  isAuthenticated={isAuthenticated}
-                  onLike={handleLike}
-                  onShare={handleShare}
-                  formatDate={formatDate}
-                  toggleExpand={toggleExpand}
-                  expandedPosts={expandedPosts}
-                  isFeatured
-                  rank={idx + 1}
-                />
-              ))}
+              {featuredPosts.map((post, idx) => {
+                const rank = idx + 1;
+                let isTop3 = rank <= 3;
+                return (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    isLiked={post.userLiked || false}
+                    isAuthenticated={isAuthenticated}
+                    onLike={handleLike}
+                    onShare={handleShare}
+                    formatDate={formatDate}
+                    toggleExpand={toggleExpand}
+                    expandedPosts={expandedPosts}
+                    isFeatured={!isTop3} // only apply featured style for ranks 4+
+                    rank={rank}
+                    isTop3={isTop3}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -796,7 +786,7 @@ export default function CommunityFeed() {
   );
 }
 
-// ── Post Card Component (to avoid duplication) ──
+// ── Post Card Component (Enhanced for Top 3) ──
 const PostCard = React.forwardRef(({
   post,
   isLiked,
@@ -807,7 +797,8 @@ const PostCard = React.forwardRef(({
   toggleExpand,
   expandedPosts,
   isFeatured = false,
-  rank,
+  rank = null,
+  isTop3 = false,
 }, ref) => {
   const postTypeIcon = POST_TYPE_ICONS[post.type] || '📌';
   const postTypeLabel = POST_TYPE_LABELS[post.type] || 'General';
@@ -823,14 +814,58 @@ const PostCard = React.forwardRef(({
   const truncateTitle = titleLength > 150;
   const truncateDesc = descLength > 400;
 
+  // ── Determine styling based on rank ──
+  let cardClasses = 'bg-white rounded-2xl border p-5 hover:shadow-md transition';
+  let badgeClasses = '';
+  let badgeIcon = null;
+  let rankBadge = null;
+
+  if (isTop3 && rank) {
+    if (rank === 1) {
+      cardClasses += ' border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-md';
+      badgeClasses = 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      badgeIcon = '👑';
+      rankBadge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">
+          👑 #1
+        </span>
+      );
+    } else if (rank === 2) {
+      cardClasses += ' border-slate-400 bg-gradient-to-br from-slate-50 to-gray-100 shadow-md';
+      badgeClasses = 'bg-slate-200 text-slate-700 border-slate-300';
+      badgeIcon = '🥈';
+      rankBadge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-300 text-slate-700">
+          🥈 #2
+        </span>
+      );
+    } else if (rank === 3) {
+      cardClasses += ' border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-md';
+      badgeClasses = 'bg-orange-100 text-orange-800 border-orange-300';
+      badgeIcon = '🥉';
+      rankBadge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">
+          🥉 #3
+        </span>
+      );
+    }
+  } else if (isFeatured) {
+    cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
+  } else {
+    cardClasses += ' border-slate-200';
+  }
+
   return (
-    <div
-      ref={ref}
-      className={`bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition ${
-        isFeatured ? 'border-purple-200 bg-gradient-to-br from-purple-50/50 to-white' : ''
-      }`}
-    >
-      {isFeatured && (
+    <div ref={ref} className={cardClasses}>
+      {/* Top rank badge (only for top 3) */}
+      {rankBadge && (
+        <div className="flex items-center justify-between mb-2">
+          {rankBadge}
+          <span className="text-xs text-slate-400">🔥 Featured</span>
+        </div>
+      )}
+
+      {isFeatured && !isTop3 && (
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
             #{rank}
