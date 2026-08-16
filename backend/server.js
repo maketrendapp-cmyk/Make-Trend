@@ -3977,7 +3977,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
 
     statsSnapshot.forEach(doc => {
       const data = doc.data();
-      if (data.status === 'deleted') return;
+      // Count ALL campaigns – including deleted – for MT Coins
       totalViews += data.views || 0;
       totalCompletions += data.completions || 0;
       totalShares += data.shares || 0;
@@ -3992,10 +3992,9 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
       totalCompletions
     );
 
-    // ── 2. Calculate total likes from community posts ──
+    // ── 2. Calculate total likes from community posts (including deleted) ──
     const postsSnapshot = await db.collection('posts')
       .where('userId', '==', uid)
-      .where('status', '==', 'active')
       .select('likes')
       .get();
 
@@ -6727,8 +6726,11 @@ app.delete('/api/productstrend/products/:id', verifyToken, checkBanned, async (r
     // ── Delete details cache ──
     await redis.del(`product:${id}`);
 
-    // ── Delete from Firestore ──
-    await docRef.delete();
+    // ── Soft delete: mark as deleted ──
+    await docRef.update({
+      status: 'deleted',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
     // ── Invalidate all user's own products list caches (with filters) ──
     await invalidatePattern(`productstrend:my-products:${uid}:*`);
