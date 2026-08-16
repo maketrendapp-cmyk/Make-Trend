@@ -6790,7 +6790,7 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
     res.status(500).json({ success: false, error: error.message });
   }
 });
-─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // 8. GET PRODUCT COMMENTS (public)
 // ─────────────────────────────────────────────
 // ── 8. GET PRODUCT COMMENTS (public, paginated) ──
