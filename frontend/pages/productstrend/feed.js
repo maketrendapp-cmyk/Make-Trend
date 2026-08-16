@@ -24,10 +24,35 @@ import {
   FiClock,
   FiMessageCircle,
   FiExternalLink,
-  FiBox, // professional placeholder
+  FiBox,
 } from 'react-icons/fi';
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
+
+// ── Helper: format date ── (must be defined before ProductCard)
+const formatDate = (timestamp) => {
+  if (!timestamp) return 'Recently';
+  try {
+    let date;
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      date = timestamp.toDate();
+    } else if (timestamp.seconds !== undefined) {
+      date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
+    } else if (timestamp._seconds !== undefined) {
+      date = new Date(timestamp._seconds * 1000);
+    } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      date = new Date(timestamp);
+    } else if (timestamp instanceof Date) {
+      date = timestamp;
+    } else {
+      date = new Date(timestamp);
+    }
+    if (isNaN(date.getTime())) return 'Recently';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return 'Recently';
+  }
+};
 
 // ── localStorage helpers ──
 const getLocalVote = (productId) => {
@@ -44,23 +69,22 @@ const setLocalVote = (productId, voted, upvotes) => {
   } catch (e) {}
 };
 
-// ── Product Card Component (reusable for featured & regular) ──
+// ── Product Card Component ──
 const ProductCard = React.forwardRef(({ 
   product, 
   isFeatured = false, 
   rank = null, 
-  isTop3 = false,
   onUpvote,
   isAuthenticated,
   isUpvoting,
-}) => {
+}, ref) => {
   const isLiked = product.userVoted || false;
   const upvotes = product.upvotes || 0;
+  const hasImage = !!(product.logo || product.imageUrl);
 
   // ── Determine card style based on rank ──
   let cardClasses = 'bg-white rounded-2xl border p-4 hover:shadow-md transition flex items-center gap-4';
   let badge = null;
-  let badgeClasses = '';
 
   if (isFeatured && rank) {
     if (rank === 1) {
@@ -96,10 +120,6 @@ const ProductCard = React.forwardRef(({
     cardClasses += ' border-slate-200';
   }
 
-  // ── Professional placeholder ──
-  const imagePlaceholder = product.logo || product.imageUrl;
-  const hasImage = !!imagePlaceholder;
-
   return (
     <div ref={ref} className={cardClasses}>
       {/* Image / Logo */}
@@ -107,7 +127,7 @@ const ProductCard = React.forwardRef(({
         {hasImage ? (
           <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
             <Image
-              src={imagePlaceholder}
+              src={product.logo || product.imageUrl}
               alt={product.name}
               width={64}
               height={64}
@@ -116,7 +136,6 @@ const ProductCard = React.forwardRef(({
               onError={(e) => {
                 e.target.onerror = null;
                 e.target.style.display = 'none';
-                // fallback to icon
                 const parent = e.target.parentElement;
                 if (parent) {
                   parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>`;
@@ -202,31 +221,6 @@ const ProductCard = React.forwardRef(({
 });
 ProductCard.displayName = 'ProductCard';
 
-// ── Helper: format date ──
-const formatDate = (timestamp) => {
-  if (!timestamp) return 'Recently';
-  try {
-    let date;
-    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-      date = timestamp.toDate();
-    } else if (timestamp.seconds !== undefined) {
-      date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1e6);
-    } else if (timestamp._seconds !== undefined) {
-      date = new Date(timestamp._seconds * 1000);
-    } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
-      date = new Date(timestamp);
-    } else if (timestamp instanceof Date) {
-      date = timestamp;
-    } else {
-      date = new Date(timestamp);
-    }
-    if (isNaN(date.getTime())) return 'Recently';
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return 'Recently';
-  }
-};
-
 export default function ProductTrendFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
@@ -237,14 +231,14 @@ export default function ProductTrendFeed() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
-  const [sortBy, setSortBy] = useState('most-upvoted'); // default to most upvoted
+  const [sortBy, setSortBy] = useState('most-upvoted');
 
   // ── Memoize backend filters for regular feed ──
   const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
     if (category !== 'All') filters.category = category;
-    filters.sort = 'newest'; // regular feed is always newest
+    filters.sort = 'newest';
     return filters;
   }, [searchQuery, category]);
 
@@ -319,7 +313,7 @@ export default function ProductTrendFeed() {
     setSearchInput('');
     setSearchQuery('');
     setCategory('All');
-    setSortBy('most-upvoted'); // reset to most-upvoted
+    setSortBy('most-upvoted');
     scrollToTop();
   };
 
@@ -706,14 +700,12 @@ export default function ProductTrendFeed() {
             <div className="space-y-4">
               {featuredProducts.map((product, idx) => {
                 const rank = idx + 1;
-                const isTop3 = rank <= 3;
                 return (
                   <ProductCard
                     key={product.id}
                     product={product}
                     isFeatured
                     rank={rank}
-                    isTop3={isTop3}
                     onUpvote={handleUpvote}
                     isAuthenticated={isAuthenticated}
                     isUpvoting={upvoteMutation.isLoading}
