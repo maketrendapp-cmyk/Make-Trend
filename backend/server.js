@@ -6257,17 +6257,22 @@ app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, 
     const result = await getOrSetCache(cacheKey, async () => {
       console.log(`📡 Fetching my products for user ${uid} (status=${status}, category=${category})...`);
 
-      let query = db.collection('products')
-        .where('makerUid', '==', uid)
-        .orderBy('createdAt', 'desc')
-        .limit(limit + 1);
+      let query = db.collection('products').where('makerUid', '==', uid);
 
-      if (status) {
+      // ── Status filter ──
+      if (status && status !== 'all') {
         query = query.where('status', '==', status);
+      } else {
+        // Default: exclude 'deleted'
+        query = query.where('status', '!=', 'deleted');
       }
+
       if (category) {
         query = query.where('category', '==', category);
       }
+
+      query = query.orderBy('createdAt', 'desc').limit(limit + 1);
+
       if (lastId) {
         const lastDoc = await db.collection('products').doc(lastId).get();
         if (lastDoc.exists) {
