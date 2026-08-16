@@ -12,7 +12,7 @@ import {
   useDeletePost,
   useInvalidateQueries,
   useMtCoins,
-  useBuyPostLike, // ✅ import the new hook
+  useBuyPostLike,
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -32,12 +32,12 @@ import {
   FiFilter,
   FiChevronDown,
   FiAward,
-  FiTrendingUp, // ✅ import for boost icon
+  FiTrendingUp,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ─── ALL YOUR ORIGINAL CONSTANTS (unchanged) ──────────────────
+// ─── CONSTANTS (unchanged) ──────────────────────────────────────
 const POST_TYPE_ICONS = {
   general: '📌',
   launch: '🚀',
@@ -83,7 +83,7 @@ const POST_TYPES = [
   { value: 'event', label: '📅 Event' },
   { value: 'promotional', label: '💎 Promotional' },
 ];
-// ─── END OF CONSTANTS ──────────────────────────────────────────
+// ─── END CONSTANTS ──────────────────────────────────────────────
 
 export default function MyPosts() {
   const router = useRouter();
@@ -91,7 +91,7 @@ export default function MyPosts() {
   const { invalidateMyPosts } = useInvalidateQueries();
   const likeMutation = useLikePost();
   const deletePostMutation = useDeletePost();
-  const buyPostLike = useBuyPostLike(); // ✅ use the mutation
+  const buyPostLike = useBuyPostLike();
 
   // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
@@ -99,13 +99,11 @@ export default function MyPosts() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [appliedFilters, setAppliedFilters] = useState({ category: 'all', type: 'all', search: '' });
 
-  // ── Fetch profile ──
+  // ── Profile & MT Coins ──
   const { data: profile, isLoading: profileLoading } = useProfile(isAuthenticated);
-
-  // ── Fetch MT Coins ──
   const { data: mtCoinsData, isLoading: mtCoinsLoading } = useMtCoins(isAuthenticated);
 
-  // ── Fetch posts ──
+  // ── Posts ──
   const {
     data,
     isLoading: postsLoading,
@@ -126,16 +124,16 @@ export default function MyPosts() {
   const posts = data?.pages?.flatMap((page) => page.posts) || [];
   const isLoading = profileLoading || postsLoading;
 
-  // ── Delete modal state ──
+  // ── Delete modal ──
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, postId: null });
   const [deletingPostId, setDeletingPostId] = useState(null);
 
-  // ── Boost modal state ──
+  // ── Boost modal ──
   const [boostModal, setBoostModal] = useState({ isOpen: false, postId: null, postTitle: '' });
   const [boostAmount, setBoostAmount] = useState(10);
   const [isBoosting, setIsBoosting] = useState(false);
 
-  // ── Intersection Observer ──
+  // ── Observer ──
   const observerRef = useRef(null);
   const lastElementRef = useCallback(
     (node) => {
@@ -167,7 +165,7 @@ export default function MyPosts() {
     setAppliedFilters({ category: 'all', type: 'all', search: '' });
   };
 
-  // ── Like handler ──
+  // ── Like ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/myposts');
@@ -176,7 +174,7 @@ export default function MyPosts() {
     likeMutation.mutate(postId);
   };
 
-  // ── Delete handlers ──
+  // ── Delete ──
   const handleDeleteClick = (postId) => {
     setDeleteModal({ isOpen: true, postId });
   };
@@ -205,7 +203,7 @@ export default function MyPosts() {
     setDeletingPostId(null);
   };
 
-  // ── Boost handlers ──
+  // ── Boost ──
   const handleBoostClick = (postId, postTitle) => {
     setBoostModal({ isOpen: true, postId, postTitle });
     setBoostAmount(10);
@@ -221,7 +219,6 @@ export default function MyPosts() {
           toast.success(data.message || 'Likes purchased successfully!');
           setBoostModal({ isOpen: false, postId: null, postTitle: '' });
           setIsBoosting(false);
-          // Invalidate queries – handled inside mutation
         },
         onError: (err) => {
           toast.error(err.message || 'Failed to buy likes');
@@ -237,7 +234,7 @@ export default function MyPosts() {
     setIsBoosting(false);
   };
 
-  // ── Share handler ──
+  // ── Share ──
   const handleShare = async (postId) => {
     const url = `${window.location.origin}/community/post/${postId}`;
     try {
@@ -285,7 +282,7 @@ export default function MyPosts() {
     }
   };
 
-  // ── Loading state ──
+  // ── Loading ──
   if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
@@ -346,14 +343,13 @@ export default function MyPosts() {
   const authorAvatar = profile?.avatar || '';
   const authorUid = user?.uid;
   const hasActiveFilters = appliedFilters.category !== 'all' || appliedFilters.type !== 'all' || appliedFilters.search;
-
   const earnedFromPosts = mtCoinsData?.earnedFromPosts ?? 0;
 
   return (
     <>
       <Meta title="My Posts – Make Trend Community" />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* ── Header ── */}
+        {/* ─── Header ─── */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
             <Link
@@ -372,7 +368,7 @@ export default function MyPosts() {
           </Link>
         </div>
 
-        {/* ── User Avatar & Name ── */}
+        {/* ─── Profile & Earnings ─── */}
         {profile && (
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden border-2 border-purple-100">
@@ -397,7 +393,6 @@ export default function MyPosts() {
           </div>
         )}
 
-        {/* ── Earnings Card ── */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg text-center">
           <div className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 mb-1">
             <FiAward className="w-4 h-4" />
@@ -410,7 +405,7 @@ export default function MyPosts() {
           <p className="text-xs text-white/50 mt-2">1 like = 1 MT Coin</p>
         </div>
 
-        {/* ── Filters ── (unchanged) */}
+        {/* ─── Filters ─── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1 relative">
@@ -466,7 +461,7 @@ export default function MyPosts() {
           )}
         </div>
 
-        {/* ── Posts List ── (with Boost button) */}
+        {/* ─── Posts ─── */}
         {posts.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-5xl mb-4">📝</div>
@@ -504,7 +499,7 @@ export default function MyPosts() {
                   className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition"
                   ref={index === posts.length - 1 ? lastElementRef : null}
                 >
-                  {/* Post header */}
+                  {/* Header */}
                   <div className="flex items-start gap-3">
                     <Link href={`/userinfo/${authorUid}`} className="flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
@@ -595,12 +590,13 @@ export default function MyPosts() {
                     </div>
                   )}
 
-                  {/* ── Post Actions ── */}
-                  <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100">
+                  {/* ─── ACTION BAR ─── (fixed layout) */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100 text-sm">
+                    {/* Like */}
                     <button
                       onClick={() => handleLike(post.id)}
                       disabled={!isAuthenticated}
-                      className={`flex items-center gap-1.5 text-sm transition ${
+                      className={`flex items-center gap-1.5 transition ${
                         isLiked
                           ? 'text-purple-600 font-semibold'
                           : 'text-slate-500 hover:text-purple-600'
@@ -614,35 +610,38 @@ export default function MyPosts() {
                       <span>{post.likes || 0}</span>
                     </button>
 
+                    {/* Comments */}
                     <Link
                       href={`/community/post/${post.id}`}
-                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition"
+                      className="flex items-center gap-1.5 text-slate-500 hover:text-purple-600 transition"
                     >
                       <FiMessageCircle className="w-4 h-4" />
                       <span>{post.commentsCount || 0}</span>
                     </Link>
 
+                    {/* Edit */}
                     <Link
                       href={`/community/edit/${post.id}`}
-                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition"
+                      className="flex items-center gap-1.5 text-slate-500 hover:text-purple-600 transition"
                     >
                       <FiEdit className="w-4 h-4" />
                       <span>Edit</span>
                     </Link>
 
-                    {/* ── Boost Button ── */}
+                    {/* Boost */}
                     <button
                       onClick={() => handleBoostClick(post.id, post.title)}
-                      className="flex items-center gap-1.5 text-sm text-purple-500 hover:text-purple-700 transition"
+                      className="flex items-center gap-1.5 text-purple-500 hover:text-purple-700 transition"
                     >
                       <FiTrendingUp className="w-4 h-4" />
                       <span>Boost</span>
                     </button>
 
+                    {/* Delete */}
                     <button
                       onClick={() => handleDeleteClick(post.id)}
                       disabled={deletePostMutation.isLoading || isDeletingThisPost}
-                      className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-1.5 text-red-500 hover:text-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isDeletingThisPost ? (
                         <FiLoader className="w-4 h-4 animate-spin" />
@@ -652,9 +651,10 @@ export default function MyPosts() {
                       <span>Delete</span>
                     </button>
 
+                    {/* Share – no longer pushed out */}
                     <button
                       onClick={() => handleShare(post.id)}
-                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-600 transition ml-auto"
+                      className="flex items-center gap-1.5 text-slate-500 hover:text-purple-600 transition"
                     >
                       <FiShare2 className="w-4 h-4" />
                       <span>Share</span>
@@ -685,7 +685,7 @@ export default function MyPosts() {
           </p>
         )}
 
-        {/* ── Delete Modal ── */}
+        {/* ─── DELETE MODAL ─── */}
         {deleteModal.isOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fadeIn">
@@ -726,7 +726,7 @@ export default function MyPosts() {
           </div>
         )}
 
-        {/* ── Boost Modal ── */}
+        {/* ─── BOOST MODAL ─── */}
         {boostModal.isOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fadeIn">
