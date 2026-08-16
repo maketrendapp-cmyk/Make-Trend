@@ -6990,6 +6990,13 @@ app.post('/api/productstrend/products/:id/buy-upvote', verifyToken, checkBanned,
     // ── 4. Atomic transaction ──
     let newUpvotes;
     await db.runTransaction(async (transaction) => {
+      // First, read the product to get current upvotes (READ before any writes)
+      const productRef2 = db.collection('products').doc(id);
+      const productSnap = await transaction.get(productRef2);
+      if (!productSnap.exists) throw new Error('Product not found');
+      const currentUpvotes = productSnap.data().upvotes || 0;
+      newUpvotes = currentUpvotes + amount;
+
       // 4a. Deduct coins from user (increase spent)
       const userRef = db.collection('users').doc(uid);
       transaction.update(userRef, {
@@ -6997,14 +7004,13 @@ app.post('/api/productstrend/products/:id/buy-upvote', verifyToken, checkBanned,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // 4b. Increment upvotes on product
-      const productRef2 = db.collection('products').doc(id);
+      // 4b. Update product with new upvotes (WRITE)
       transaction.update(productRef2, {
-        upvotes: admin.firestore.FieldValue.increment(amount),
+        upvotes: newUpvotes,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // 4c. Log transaction
+      // 4c. Log transaction (WRITE)
       const txRef = db.collection('productUpvotePurchases').doc();
       transaction.set(txRef, {
         productId: id,
@@ -7013,10 +7019,6 @@ app.post('/api/productstrend/products/:id/buy-upvote', verifyToken, checkBanned,
         cost: cost,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
-
-      // Get new upvotes for response
-      const updatedProduct = await transaction.get(productRef2);
-      newUpvotes = updatedProduct.data().upvotes;
     });
 
     // ── 5. Update product details cache ──
