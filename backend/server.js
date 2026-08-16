@@ -3673,9 +3673,9 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    const numCoins = Number(mtCoins);
-    if (!Number.isInteger(numCoins) || numCoins !== 2500) {
-      return res.status(400).json({ success: false, error: 'Withdrawal must be exactly 2,500 MT Coins ($15)' });
+        const numCoins = Number(mtCoins);
+    if (!Number.isInteger(numCoins) || numCoins !== 10000) {
+      return res.status(400).json({ success: false, error: 'Withdrawal must be exactly 10,000 MT Coins ($10)' });
     }
 
     // ── Validate method and required fields ──
@@ -3810,7 +3810,7 @@ app.post('/api/withdrawals', verifyToken, checkBanned, async (req, res) => {
       const withdrawalData = {
         userId: uid,
         mtCoins: numCoins,
-        amount: 15.00,
+        amount: 10.00,
         method,
         details: {
           ...details,
@@ -4028,7 +4028,7 @@ app.get('/api/mt-coins', verifyToken, checkBanned, async (req, res) => {
     }
 
     const available = mtCoinsEarned - mtCoinsSpent;
-    const usdValue = (available / 2500) * 15;
+    const usdValue = (available / 10000) * 10;
 
     // ── 8. RESPONSE with earning breakdown ──
     res.json({
@@ -5827,6 +5827,31 @@ async function getProductDetails(productId) {
   return product;
 }
 
+// ── Update product upvotes in feed (remove + re‑add with new score) ──
+async function updateProductUpvotesInFeed(productId, category, upvotes) {
+  // Remove from all feed sets
+  await removeProductFromFeedSets(productId, category);
+  
+  // Re‑add with updated score
+  const timestamp = Date.now();
+  const sorts = ['newest', 'most-upvoted', 'most-commented'];
+  const keys = [];
+  for (const s of sorts) {
+    keys.push(getProductFeedKey(null, s));
+    keys.push(getProductFeedKey(category, s));
+  }
+  
+  const pipeline = redis.pipeline();
+  for (const key of keys) {
+    if (key.includes('most-upvoted')) {
+      pipeline.zadd(key, upvotes, productId);
+    } else {
+      pipeline.zadd(key, timestamp, productId);
+    }
+  }
+  await pipeline.exec();
+}
+
 // ─────────────────────────────────────────────
 // COMMUNITY POSTS – SORTED SETS (Fanout‑on‑write)
 // ─────────────────────────────────────────────
@@ -6723,11 +6748,7 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// ─────────────────────────────────────────────
-// 8. GET PRODUCT COMMENTS
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
+─────────────────────────────────────────────
 // 8. GET PRODUCT COMMENTS (public)
 // ─────────────────────────────────────────────
 // ── 8. GET PRODUCT COMMENTS (public, paginated) ──
@@ -6856,6 +6877,147 @@ app.post('/api/productstrend/products/:id/comments', verifyToken, checkBanned, a
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// ─────────────────────────────────────────────
+// 10. BUY UPVOTES FOR PRODUCT (MT Coins)
+// ─────────────────────────────────────────────
+app.post('/api/productstrend/products/:id/buy-upvote', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const { amount } = req.body;
+
+    // ── Validate amount ──
+    if (!amount || !Number.isInteger(amount) || amount < 1 || amount > 1000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount. Must be between 1 and 1000 upvotes.'
+      });
+    }
+
+    // ── Rate limit: 3 purchases per minute ──
+    if (!(await checkRateLimit(uid, 'buy-upvote', 3, 60))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many purchase attempts. Please wait a moment.'
+      });
+    }
+
+    // ── Daily limit: max 500 upvotes per day ──
+    if (!(await checkDailyLimit(uid, 'buy-upvote', 500))) {
+      return res.status(429).json({
+        success: false,
+        error: 'Daily upvote purchase limit reached (max 500 per day). Come back tomorrow!'
+      });
+    }
+
+    // ── 1. Fetch product ──
+    const productRef = db.collection('products').doc(id);
+    const productDoc = await productRef.get();
+    if (!productDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    const productData = productDoc.data();
+
+    // ── 2. Verify ownership ──
+    if (productData.makerUid !== uid) {
+      return res.status(403).json({ success: false, error: 'You do not own this product' });
+    }
+    if (productData.status !== 'approved') {
+      return res.status(400).json({ success: false, error: 'Product is not approved' });
+    }
+
+    // ── 3. Check MT Coins balance ──
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const userData = userDoc.data();
+    const earned = userData.mtCoinsEarned || 0;
+    const spent = userData.mtCoinsSpent || 0;
+    const available = earned - spent;
+    const cost = amount * 5; // 5 MT Coins per upvote
+
+    if (available < cost) {
+      return res.status(400).json({
+        success: false,
+        error: `Insufficient MT Coins. You need ${cost} coins, have ${available}`
+      });
+    }
+
+    // ── 4. Atomic transaction ──
+    let newUpvotes;
+    await db.runTransaction(async (transaction) => {
+      // 4a. Deduct coins from user (increase spent)
+      const userRef = db.collection('users').doc(uid);
+      transaction.update(userRef, {
+        mtCoinsSpent: admin.firestore.FieldValue.increment(cost),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 4b. Increment upvotes on product
+      const productRef2 = db.collection('products').doc(id);
+      transaction.update(productRef2, {
+        upvotes: admin.firestore.FieldValue.increment(amount),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 4c. Log transaction
+      const txRef = db.collection('productUpvotePurchases').doc();
+      transaction.set(txRef, {
+        productId: id,
+        userId: uid,
+        amount: amount,
+        cost: cost,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Get new upvotes for response
+      const updatedProduct = await transaction.get(productRef2);
+      newUpvotes = updatedProduct.data().upvotes;
+    });
+
+    // ── 5. Update product details cache ──
+    const updatedDoc = await productRef.get();
+    const updatedData = updatedDoc.data();
+    const maker = await getProductMakerInfo(uid);
+    const product = { id: updatedDoc.id, ...updatedData, maker };
+    await cacheProductDetails(id, product);
+
+    // ── 6. Update feed caches (remove + re‑add with new score) ──
+    await updateProductUpvotesInFeed(id, productData.category || 'Other', newUpvotes);
+
+    // ── 7. Invalidate user's own products list ──
+    await invalidatePattern(`productstrend:my-products:${uid}:*`);
+
+    // ── 8. Invalidate MT Coins cache ──
+    await invalidateKey(`mtcoins:user:${uid}`);
+
+    // ── 9. Send notification ──
+    await createNotification({
+      userId: uid,
+      type: 'personal',
+      title: '🚀 Product Boosted!',
+      description: `You purchased ${amount} upvotes for "${productData.name}". Total upvotes: ${newUpvotes}`,
+      redirectUrl: `/productstrend/${id}`,
+      fromUserId: uid
+    });
+
+    // ── 10. Response ──
+    res.json({
+      success: true,
+      message: `Added ${amount} upvotes to product!`,
+      newUpvotes: newUpvotes || productData.upvotes + amount,
+      coinsSpent: cost,
+      remainingCoins: available - cost
+    });
+
+  } catch (error) {
+    console.error('❌ Buy upvote error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to purchase upvotes' });
+  }
+});
+
 
 // ============================================================
 // 23. NOTIFICATIONS
