@@ -88,7 +88,6 @@ export default function PostDetail() {
   // ── Like state ──
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const [isLiking, setIsLiking] = useState(false);
 
   useEffect(() => {
     if (post) {
@@ -97,23 +96,21 @@ export default function PostDetail() {
     }
   }, [post]);
 
-  // ── Simplified Like Handler (no cache sync, just like feed) ──
+  // ── Like handler – instant, non‑blocking, no disabled state ──
   const handleLike = () => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=/community/post/${id}`);
       return;
     }
-    if (isLiking) return;
 
     const newVoted = !isLiked;
     const newCount = newVoted ? likesCount + 1 : likesCount - 1;
 
-    // Optimistic update
+    // 1. Instant UI update (optimistic)
     setIsLiked(newVoted);
     setLikesCount(newCount);
-    setIsLiking(true);
 
-    // Update detail cache optimistically
+    // 2. Update detail cache optimistically
     const currentPost = queryClient.getQueryData(['post', id]);
     if (currentPost) {
       queryClient.setQueryData(['post', id], {
@@ -123,13 +120,14 @@ export default function PostDetail() {
       });
     }
 
+    // 3. Fire the API call (does NOT block UI)
     likeMutation.mutate(id, {
       onSuccess: (data) => {
+        // Sync with server values
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
         setIsLiked(serverVoted);
         setLikesCount(serverLikes);
-        // Update detail cache with server values
         const cached = queryClient.getQueryData(['post', id]);
         if (cached) {
           queryClient.setQueryData(['post', id], {
@@ -138,13 +136,11 @@ export default function PostDetail() {
             likes: serverLikes,
           });
         }
-        setIsLiking(false);
       },
       onError: (error) => {
-        // Revert
+        // Revert to previous state
         setIsLiked(!newVoted);
         setLikesCount(newVoted ? newCount - 1 : newCount + 1);
-        // Revert cache
         const cached = queryClient.getQueryData(['post', id]);
         if (cached) {
           queryClient.setQueryData(['post', id], {
@@ -153,13 +149,12 @@ export default function PostDetail() {
             likes: newVoted ? newCount - 1 : newCount + 1,
           });
         }
-        setIsLiking(false);
         toast.error(error.message || 'Failed to like');
       },
     });
   };
 
-  // ── Comment handler (unchanged) ──
+  // ── Comment handler ──
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || !isAuthenticated) return;
@@ -192,7 +187,7 @@ export default function PostDetail() {
     }
     queryClient.setQueryData(['postComments', id], { ...currentComments, pages: updatedPages });
 
-    // Increment comments count in detail cache
+    // Increment comments count
     const currentPost = queryClient.getQueryData(['post', id]);
     if (currentPost) {
       queryClient.setQueryData(['post', id], {
@@ -203,12 +198,10 @@ export default function PostDetail() {
 
     try {
       await addCommentMutation.mutateAsync({ postId: id, content: text });
-      // Refetch comments first page to sync
       await queryClient.invalidateQueries({ queryKey: ['postComments', id] });
       await refetchComments({ refetchPage: (page, index) => index === 0 });
-      await refetchPost(); // sync comment count
+      await refetchPost();
     } catch (error) {
-      // Revert optimistic comment
       const revert = queryClient.getQueryData(['postComments', id]);
       if (revert) {
         const revertedPages = revert.pages.map((page, idx) => {
@@ -222,7 +215,6 @@ export default function PostDetail() {
         });
         queryClient.setQueryData(['postComments', id], { ...revert, pages: revertedPages });
       }
-      // Revert comments count
       const revertedPost = queryClient.getQueryData(['post', id]);
       if (revertedPost) {
         queryClient.setQueryData(['post', id], {
@@ -509,16 +501,15 @@ export default function PostDetail() {
             </div>
           )}
 
-          {/* Actions */}
+          {/* ── Actions (Like button – no disabled state) ── */}
           <div className="flex items-center gap-6 mt-5 pt-4 border-t border-slate-100">
             <button
               onClick={handleLike}
-              disabled={!isAuthenticated || isLiking}
               className={`flex items-center gap-2 text-sm transition ${
                 isLiked
                   ? 'text-purple-600 font-semibold'
                   : 'text-slate-500 hover:text-purple-600'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {isLiked ? <FaHeart className="w-5 h-5 text-purple-600" /> : <FiHeart className="w-5 h-5" />}
               <span>{likesCount}</span>
