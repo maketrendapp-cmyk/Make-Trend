@@ -21,25 +21,48 @@ const sharp = require('sharp');
 // 0. REDIS CLIENT (with timeout guard)
 // ============================================================
 // ── Redis client with robust retry and longer timeouts ──
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  connectTimeout: 5000,        // 5 seconds to connect
-  commandTimeout: 3000,        // 3 seconds for commands
-  maxRetriesPerRequest: 3,     // retry failed requests up to 3 times
-  retryStrategy: (times) => {
-    // Exponential backoff: 50ms, 100ms, 200ms, 400ms, ... up to 30s
-    const delay = Math.min(times * 50, 30000);
-    console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
-    return delay;
-  },
-  keepAlive: 30000,            // keep connection alive
-});
-
-redis.on('error', (err) => {
-  console.warn('⚠️ Redis error (will retry):', err.message);
-});
-redis.on('connect', () => console.log('✅ Redis connected'));
-redis.on('ready', () => console.log('✅ Redis ready'));
-redis.on('reconnecting', () => console.log('🔄 Redis reconnecting...'));
+let redis;
+try {
+  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    connectTimeout: 5000,
+    commandTimeout: 3000,
+    maxRetriesPerRequest: 3,
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 50, 30000);
+      console.log(`🔄 Redis retry attempt ${times}, waiting ${delay}ms`);
+      return delay;
+    },
+    keepAlive: 30000,
+  });
+  redis.on('error', (err) => {
+    console.warn('⚠️ Redis error (will retry):', err.message);
+  });
+  redis.on('connect', () => console.log('✅ Redis connected'));
+  redis.on('ready', () => console.log('✅ Redis ready'));
+  redis.on('reconnecting', () => console.log('🔄 Redis reconnecting...'));
+} catch (err) {
+  console.warn('⚠️ Failed to create Redis client. Continuing without Redis cache.');
+  // No‑op dummy client (all methods return null or no‑op)
+  redis = {
+    get: () => null,
+    set: () => {},
+    del: () => {},
+    scan: () => ['0', []],
+    ttl: () => 0,
+    incr: () => 0,
+    expire: () => {},
+    hgetall: () => ({}),
+    hset: () => {},
+    hincrby: () => {},
+    sadd: () => 0,
+    zadd: () => {},
+    zrem: () => {},
+    zrevrange: () => [],
+    zrevrank: () => null,
+    pipeline: () => ({ exec: () => {} }),
+    on: () => {},
+  };
+}
 
 // ── Redis get with 1s timeout (increased from 500ms) ──
 async function redisGet(key) {
@@ -8243,13 +8266,21 @@ app.delete('/api/auth/fcm-token', verifyToken, checkBanned, async (req, res) => 
 });
 
 // ============================================================
-// 19. START SERVER (unchanged)
+// 19. START SERVER (or export for Vercel)
 // ============================================================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Backend running on port ${PORT}`);
-  console.log(`🔒 Allowed origins:`, allowedOrigins);
-  console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
-  console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
-  console.log(`📦 Redis: INDEFINITE CACHE with smart invalidation`);
-});
+const isVercel = process.env.VERCEL === '1';
+
+if (isVercel) {
+  // ── Serverless: export the app as the handler ──
+  module.exports = app;
+} else {
+  // ── Local / custom server: listen on a port ──
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend running on port ${PORT}`);
+    console.log(`🔒 Allowed origins:`, allowedOrigins);
+    console.log(`☁️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+    console.log(`✅ Security: Helmet, CORS, Rate Limiting, XSS Protection`);
+    console.log(`📦 Redis: INDEFINITE CACHE with smart invalidation`);
+  });
+}
