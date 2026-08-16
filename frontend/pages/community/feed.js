@@ -19,6 +19,7 @@ import {
   FiChevronUp,
   FiUser,
   FiSearch,
+  FiTrendingUp,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -26,7 +27,6 @@ import toast from 'react-hot-toast';
 // ── Helper: Get embed info for video URLs ──
 function getEmbedInfo(url) {
   if (!url) return null;
-  // YouTube: watch?v= or youtu.be/
   const ytRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?]+)/;
   const ytMatch = url.match(ytRegex);
   if (ytMatch) {
@@ -36,7 +36,6 @@ function getEmbedInfo(url) {
       id: ytMatch[1],
     };
   }
-  // Vimeo
   const vimeoRegex = /vimeo\.com\/(\d+)/;
   const vimeoMatch = url.match(vimeoRegex);
   if (vimeoMatch) {
@@ -46,7 +45,6 @@ function getEmbedInfo(url) {
       id: vimeoMatch[1],
     };
   }
-  // Add other platforms (Dailymotion, Twitch, etc.) if needed
   return null;
 }
 
@@ -128,7 +126,7 @@ export default function CommunityFeed() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [expandedPosts, setExpandedPosts] = useState(new Set());
 
-  // ── Build filters object ──
+  // ── Build filters for regular feed ──
   const filters = useMemo(() => {
     const f = {};
     if (appliedCategory !== 'all') f.category = appliedCategory;
@@ -137,19 +135,41 @@ export default function CommunityFeed() {
     return f;
   }, [appliedCategory, appliedType, searchQuery]);
 
-  // ── React Query ──
+  // ── Featured feed: top 100 most‑liked ──
   const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
+    data: featuredData,
+    isLoading: featuredLoading,
+    isError: featuredError,
+    refetch: refetchFeatured,
+  } = usePosts({ ...filters, sort: 'most-liked', limit: 100 }, true);
+
+  const featuredPosts = featuredData?.pages?.[0]?.posts || [];
+
+  // ── Regular feed: newest (infinite) ──
+  const {
+    data: regularData,
+    isLoading: regularLoading,
+    isError: regularError,
+    error: regularErrorObj,
+    refetch: refetchRegular,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
   } = usePosts(filters, true);
 
-  const posts = data?.pages?.flatMap((page) => page.posts) || [];
+  const regularPostsAll = regularData?.pages?.flatMap((page) => page.posts) || [];
+
+  // ── Build a set of featured post IDs to filter duplicates ──
+  const featuredIds = useMemo(() => new Set(featuredPosts.map(p => p.id)), [featuredPosts]);
+
+  // ── Filter regular posts to exclude featured ones ──
+  const regularPosts = useMemo(() => {
+    return regularPostsAll.filter(p => !featuredIds.has(p.id));
+  }, [regularPostsAll, featuredIds]);
+
+  // ── Combined loading/error states ──
+  const isLoading = featuredLoading && regularLoading && !regularPostsAll.length && !featuredPosts.length;
+  const isError = featuredError && regularError;
 
   // ── Apply filters ──
   const applyFilters = () => {
@@ -179,7 +199,7 @@ export default function CommunityFeed() {
     }
   };
 
-  // ── Intersection Observer for infinite scroll ──
+  // ── Intersection Observer for infinite scroll (only for regular posts) ──
   const observerRef = useRef(null);
   const lastElementRef = useCallback(
     (node) => {
@@ -195,7 +215,7 @@ export default function CommunityFeed() {
     [isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
-  // ── Like handler with fixed query key ──
+  // ── Like handler (unchanged) ──
   const handleLike = (postId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/community/feed');
@@ -209,7 +229,6 @@ export default function CommunityFeed() {
       return;
     }
 
-    // Find the post
     let foundPost = null;
     let pageIndex = -1;
     let postIndex = -1;
@@ -229,12 +248,10 @@ export default function CommunityFeed() {
       return;
     }
 
-    // Optimistic update
     const newVoted = !foundPost.userLiked;
     const newLikes = newVoted ? foundPost.likes + 1 : foundPost.likes - 1;
     const updatedPost = { ...foundPost, userLiked: newVoted, likes: newLikes };
 
-    // Update feed cache
     const newPages = currentData.pages.map((page, idx) => {
       if (idx === pageIndex) {
         return {
@@ -245,20 +262,13 @@ export default function CommunityFeed() {
       return page;
     });
     queryClient.setQueryData(queryKey, { ...currentData, pages: newPages });
-
-    // Update single post cache
     queryClient.setQueryData(['post', postId], updatedPost);
-
-    // Save to localStorage
     setLocalVote(postId, newVoted, newLikes);
 
-    // Call mutation to sync with backend
     likeMutation.mutate(postId, {
       onSuccess: (data) => {
         const serverVoted = data.action === 'added';
         const serverLikes = data.likes;
-
-        // Sync feed cache with server values
         const currentDataAfter = queryClient.getQueryData(queryKey);
         if (currentDataAfter) {
           const syncedPages = currentDataAfter.pages.map((page, idx) => {
@@ -277,18 +287,13 @@ export default function CommunityFeed() {
           });
           queryClient.setQueryData(queryKey, { ...currentDataAfter, pages: syncedPages });
         }
-
-        // Sync single post cache
         const currentPost = queryClient.getQueryData(['post', postId]);
         if (currentPost) {
           queryClient.setQueryData(['post', postId], { ...currentPost, userLiked: serverVoted, likes: serverLikes });
         }
-
-        // Sync localStorage
         setLocalVote(postId, serverVoted, serverLikes);
       },
       onError: (error) => {
-        // Revert optimistic update
         const revertData = queryClient.getQueryData(queryKey);
         if (revertData) {
           const revertPages = revertData.pages.map((page, idx) => {
@@ -368,7 +373,7 @@ export default function CommunityFeed() {
   };
 
   // ── Skeleton loader ──
-  if (isLoading && !posts.length) {
+  if (isLoading) {
     return (
       <>
         <Meta title="Community Feed – Make Trend" />
@@ -401,13 +406,13 @@ export default function CommunityFeed() {
   }
 
   // ── Error state ──
-  if (isError && !posts.length) {
+  if (isError && !regularPosts.length && !featuredPosts.length) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <p className="text-red-600 font-medium">Failed to load posts.</p>
           <button
-            onClick={() => refetch()}
+            onClick={() => { refetchFeatured(); refetchRegular(); }}
             className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
           >
             <FiRefreshCw className="w-4 h-4" /> Retry
@@ -418,6 +423,7 @@ export default function CommunityFeed() {
   }
 
   const hasActiveFilters = appliedCategory !== 'all' || appliedType !== 'all' || searchQuery;
+  const hasFeatured = featuredPosts.length > 0;
 
   return (
     <>
@@ -519,7 +525,6 @@ export default function CommunityFeed() {
               </button>
             </div>
 
-            {/* Category */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
               <div className="flex flex-wrap gap-2">
@@ -539,7 +544,6 @@ export default function CommunityFeed() {
               </div>
             </div>
 
-            {/* Post Type */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-700 mb-2">Post Type</label>
               <div className="flex flex-wrap gap-2">
@@ -620,253 +624,105 @@ export default function CommunityFeed() {
           </div>
         )}
 
-        {/* ── Posts List ── */}
-        {posts.length === 0 && !isLoading ? (
-          <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
-            <div className="text-5xl mb-4">📭</div>
-            <h3 className="text-lg font-semibold text-slate-900">No posts found</h3>
-            <p className="text-slate-500 text-sm">
-              {isAuthenticated
-                ? searchQuery
-                  ? 'No results match your search. Try adjusting your query.'
-                  : 'Be the first to share something!'
-                : 'Sign in to join the conversation.'}
-            </p>
-            {isAuthenticated && !searchQuery && (
-              <Link
-                href="/community/create"
-                className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
-              >
-                Create Post
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {posts.map((post, index) => {
-              const isLiked = post.userLiked || false;
-              const postTypeIcon = POST_TYPE_ICONS[post.type] || '📌';
-              const postTypeLabel = POST_TYPE_LABELS[post.type] || 'General';
-              const isVideo = post.videoUrl && post.videoUrl.trim() !== '';
-              const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
-              const hasCTA = post.ctaText && post.ctaUrl;
-              const isExpanded = expandedPosts.has(post.id);
-
-              const embedInfo = getEmbedInfo(post.videoUrl);
-              const isEmbeddable = embedInfo !== null;
-              const hasVideoUrl = isVideo; // same as isVideo
-
-              const titleLength = post.title?.length || 0;
-              const descLength = post.description?.length || 0;
-              const truncateTitle = titleLength > 150;
-              const truncateDesc = descLength > 400;
-
-              return (
-                <div
+        {/* ── FEATURED POSTS (Most Liked) ── */}
+        {hasFeatured && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <FiTrendingUp className="text-purple-600 text-xl" />
+              <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
+              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                Top {featuredPosts.length}
+              </span>
+            </div>
+            <div className="space-y-4">
+              {featuredPosts.map((post, idx) => (
+                <PostCard
                   key={post.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition"
-                  ref={index === posts.length - 1 ? lastElementRef : null}
+                  post={post}
+                  isLiked={post.userLiked || false}
+                  isAuthenticated={isAuthenticated}
+                  onLike={handleLike}
+                  onShare={handleShare}
+                  formatDate={formatDate}
+                  toggleExpand={toggleExpand}
+                  expandedPosts={expandedPosts}
+                  isFeatured
+                  rank={idx + 1}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── REGULAR POSTS (Newest) ── */}
+        <div>
+          {regularPosts.length === 0 && !regularLoading ? (
+            <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
+              <div className="text-5xl mb-4">📭</div>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {hasFeatured ? 'No more posts' : 'No posts found'}
+              </h3>
+              <p className="text-slate-500 text-sm">
+                {isAuthenticated
+                  ? searchQuery
+                    ? 'No results match your search. Try adjusting your query.'
+                    : 'Be the first to share something!'
+                  : 'Sign in to join the conversation.'}
+              </p>
+              {isAuthenticated && !searchQuery && !hasFeatured && (
+                <Link
+                  href="/community/create"
+                  className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
                 >
-                  {/* ── Post Header ── */}
-                  <div className="flex items-start gap-3">
-                    <Link href={`/userinfo/${post.userId}`} className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
-                        {post.user?.avatar ? (
-                          <Image
-                            src={post.user.avatar}
-                            alt={post.user.fullname || 'User'}
-                            width={40}
-                            height={40}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-600 text-sm font-bold">
-                            {post.user?.fullname?.[0] || post.user?.username?.[0] || 'U'}
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center flex-wrap gap-2">
-                        <Link
-                          href={`/userinfo/${post.userId}`}
-                          className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm"
-                        >
-                          {post.user?.fullname || post.user?.username || 'Anonymous'}
-                        </Link>
-                        <span className="text-xs text-slate-400">· {formatDate(post.createdAt)}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                          {postTypeIcon} {postTypeLabel}
-                        </span>
-                        {post.category && post.category !== 'general' && (
-                          <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">
-                            {CATEGORIES.find(c => c.value === post.category)?.label || post.category}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── Post Content ── */}
-                  <Link href={`/community/post/${post.id}`} className="block mt-3">
-                    {/* Title with "Read more" */}
-                    <h2 className="text-lg font-bold text-slate-900 hover:text-purple-600 transition">
-                      {truncateTitle && !isExpanded ? (
-                        <>
-                          {post.title.slice(0, 150)}...
-                          <span
-                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
-                            className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
-                          >
-                            Read more
-                          </span>
-                        </>
-                      ) : (
-                        post.title
-                      )}
-                    </h2>
-                    {/* Description with "Read more" */}
-                    <p className="text-slate-600 mt-1 text-sm whitespace-pre-wrap">
-                      {truncateDesc && !isExpanded ? (
-                        <>
-                          {post.description.slice(0, 400)}...
-                          <span
-                            onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
-                            className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
-                          >
-                            Read more
-                          </span>
-                        </>
-                      ) : (
-                        post.description
-                      )}
-                    </p>
-                    {(truncateTitle || truncateDesc) && isExpanded && (
-                      <button
-                        onClick={() => toggleExpand(post.id)}
-                        className="text-xs text-purple-600 hover:underline mt-1 flex items-center gap-0.5"
-                      >
-                        Show less <FiChevronUp className="w-3 h-3" />
-                      </button>
-                    )}
-                  </Link>
-
-                  {/* ── Image ── */}
-                  {hasImage && (
-                    <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                      <div className="relative aspect-video max-h-80">
-                        <Image
-                          src={post.imageUrl}
-                          alt={post.title}
-                          fill
-                          sizes="(max-width: 768px) 100vw, 600px"
-                          className="object-contain"
-                          loading="lazy"
-                        />
-                      </div>
-                    </Link>
-                  )}
-
-                  {/* ── Video / Embed ── */}
-                  {hasVideoUrl && (
-                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
-                      {isEmbeddable ? (
-                        <iframe
-                          src={embedInfo.embedUrl}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          loading="lazy"
-                          title={post.title || 'Video'}
-                        />
-                      ) : (
-                        <video
-                          src={post.videoUrl}
-                          controls
-                          className="w-full h-full"
-                          poster={post.imageUrl || undefined}
-                          playsInline
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  {/* ── CTA Button ── */}
-                  {hasCTA && (
-                    <div className="mt-3">
-                      <a
-                        href={post.ctaUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium"
-                      >
-                        {post.ctaText} <FiExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  )}
-
-                  {/* ── Actions ── */}
-                  <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
-                    <button
-                      onClick={() => handleLike(post.id)}
-                      disabled={!isAuthenticated}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition ${
-                        isLiked
-                          ? 'border-purple-300 bg-purple-50 text-purple-600'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {isLiked ? (
-                        <FaHeart className="w-4 h-4 text-purple-600" />
-                      ) : (
-                        <FiHeart className="w-4 h-4" />
-                      )}
-                      <span>{post.likes || 0}</span>
-                    </button>
-
-                    <Link
-                      href={`/community/post/${post.id}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm"
-                    >
-                      <FiMessageCircle className="w-4 h-4" />
-                      <span>{post.commentsCount || 0}</span>
-                    </Link>
-
-                    <button
-                      onClick={() => handleShare(post.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm ml-auto"
-                    >
-                      <FiShare2 className="w-4 h-4" />
-                      <span>Share</span>
-                    </button>
-                  </div>
+                  Create Post
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div>
+              {hasFeatured && regularPosts.length > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── Infinite scroll loading ── */}
-        {hasNextPage && (
-          <div className="py-6 flex justify-center">
-            {isFetchingNextPage ? (
-              <div className="flex items-center gap-2 text-slate-400">
-                <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
-                Loading more...
+              )}
+              <div className="space-y-5">
+                {regularPosts.map((post, index) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    isLiked={post.userLiked || false}
+                    isAuthenticated={isAuthenticated}
+                    onLike={handleLike}
+                    onShare={handleShare}
+                    formatDate={formatDate}
+                    toggleExpand={toggleExpand}
+                    expandedPosts={expandedPosts}
+                    ref={index === regularPosts.length - 1 ? lastElementRef : undefined}
+                  />
+                ))}
               </div>
-            ) : (
-              <div className="h-4" />
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {!hasNextPage && posts.length > 0 && (
-          <p className="text-center text-xs text-slate-400 py-6">
-            You've reached the end 🎉
-          </p>
-        )}
+          {hasNextPage && (
+            <div className="py-6 flex justify-center">
+              {isFetchingNextPage ? (
+                <div className="flex items-center gap-2 text-slate-400">
+                  <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
+                  Loading more...
+                </div>
+              ) : (
+                <div className="h-4" />
+              )}
+            </div>
+          )}
+
+          {!hasNextPage && regularPosts.length > 0 && (
+            <p className="text-center text-xs text-slate-400 py-6">
+              You've reached the end 🎉
+            </p>
+          )}
+        </div>
       </div>
 
       <style jsx>{`
@@ -887,3 +743,224 @@ export default function CommunityFeed() {
     </>
   );
 }
+
+// ── Post Card Component (to avoid duplication) ──
+const PostCard = React.forwardRef(({
+  post,
+  isLiked,
+  isAuthenticated,
+  onLike,
+  onShare,
+  formatDate,
+  toggleExpand,
+  expandedPosts,
+  isFeatured = false,
+  rank,
+}, ref) => {
+  const postTypeIcon = POST_TYPE_ICONS[post.type] || '📌';
+  const postTypeLabel = POST_TYPE_LABELS[post.type] || 'General';
+  const isVideo = post.videoUrl && post.videoUrl.trim() !== '';
+  const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
+  const hasCTA = post.ctaText && post.ctaUrl;
+  const isExpanded = expandedPosts.has(post.id);
+  const embedInfo = getEmbedInfo(post.videoUrl);
+  const isEmbeddable = embedInfo !== null;
+  const hasVideoUrl = isVideo;
+  const titleLength = post.title?.length || 0;
+  const descLength = post.description?.length || 0;
+  const truncateTitle = titleLength > 150;
+  const truncateDesc = descLength > 400;
+
+  return (
+    <div
+      ref={ref}
+      className={`bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition ${
+        isFeatured ? 'border-purple-200 bg-gradient-to-br from-purple-50/50 to-white' : ''
+      }`}
+    >
+      {isFeatured && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+            #{rank}
+          </span>
+          <span className="text-xs text-purple-400">🔥 Featured</span>
+        </div>
+      )}
+
+      {/* ── Post Header ── */}
+      <div className="flex items-start gap-3">
+        <Link href={`/userinfo/${post.userId}`} className="flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
+            {post.user?.avatar ? (
+              <Image
+                src={post.user.avatar}
+                alt={post.user.fullname || 'User'}
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-600 text-sm font-bold">
+                {post.user?.fullname?.[0] || post.user?.username?.[0] || 'U'}
+              </div>
+            )}
+          </div>
+        </Link>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center flex-wrap gap-2">
+            <Link
+              href={`/userinfo/${post.userId}`}
+              className="font-semibold text-slate-900 hover:text-purple-600 transition text-sm"
+            >
+              {post.user?.fullname || post.user?.username || 'Anonymous'}
+            </Link>
+            <span className="text-xs text-slate-400">· {formatDate(post.createdAt)}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              {postTypeIcon} {postTypeLabel}
+            </span>
+            {post.category && post.category !== 'general' && (
+              <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">
+                {CATEGORIES.find(c => c.value === post.category)?.label || post.category}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Post Content ── */}
+      <Link href={`/community/post/${post.id}`} className="block mt-3">
+        <h2 className="text-lg font-bold text-slate-900 hover:text-purple-600 transition">
+          {truncateTitle && !isExpanded ? (
+            <>
+              {post.title.slice(0, 150)}...
+              <span
+                onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
+                className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
+              >
+                Read more
+              </span>
+            </>
+          ) : (
+            post.title
+          )}
+        </h2>
+        <p className="text-slate-600 mt-1 text-sm whitespace-pre-wrap">
+          {truncateDesc && !isExpanded ? (
+            <>
+              {post.description.slice(0, 400)}...
+              <span
+                onClick={(e) => { e.preventDefault(); toggleExpand(post.id); }}
+                className="text-purple-600 hover:underline ml-1 text-sm font-normal cursor-pointer"
+              >
+                Read more
+              </span>
+            </>
+          ) : (
+            post.description
+          )}
+        </p>
+        {(truncateTitle || truncateDesc) && isExpanded && (
+          <button
+            onClick={() => toggleExpand(post.id)}
+            className="text-xs text-purple-600 hover:underline mt-1 flex items-center gap-0.5"
+          >
+            Show less <FiChevronUp className="w-3 h-3" />
+          </button>
+        )}
+      </Link>
+
+      {/* ── Image ── */}
+      {hasImage && (
+        <Link href={`/community/post/${post.id}`} className="block mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+          <div className="relative aspect-video max-h-80">
+            <Image
+              src={post.imageUrl}
+              alt={post.title}
+              fill
+              sizes="(max-width: 768px) 100vw, 600px"
+              className="object-contain"
+              loading="lazy"
+            />
+          </div>
+        </Link>
+      )}
+
+      {/* ── Video / Embed ── */}
+      {hasVideoUrl && (
+        <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
+          {isEmbeddable ? (
+            <iframe
+              src={embedInfo.embedUrl}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+              title={post.title || 'Video'}
+            />
+          ) : (
+            <video
+              src={post.videoUrl}
+              controls
+              className="w-full h-full"
+              poster={post.imageUrl || undefined}
+              playsInline
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── CTA Button ── */}
+      {hasCTA && (
+        <div className="mt-3">
+          <a
+            href={post.ctaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium"
+          >
+            {post.ctaText} <FiExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+
+      {/* ── Actions ── */}
+      <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
+        <button
+          onClick={() => onLike(post.id)}
+          disabled={!isAuthenticated}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition ${
+            isLiked
+              ? 'border-purple-300 bg-purple-50 text-purple-600'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          {isLiked ? (
+            <FaHeart className="w-4 h-4 text-purple-600" />
+          ) : (
+            <FiHeart className="w-4 h-4" />
+          )}
+          <span>{post.likes || 0}</span>
+        </button>
+
+        <Link
+          href={`/community/post/${post.id}`}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm"
+        >
+          <FiMessageCircle className="w-4 h-4" />
+          <span>{post.commentsCount || 0}</span>
+        </Link>
+
+        <button
+          onClick={() => onShare(post.id)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:border-purple-200 transition text-sm ml-auto"
+        >
+          <FiShare2 className="w-4 h-4" />
+          <span>Share</span>
+        </button>
+      </div>
+    </div>
+  );
+});
+PostCard.displayName = 'PostCard';
