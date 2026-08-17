@@ -5978,7 +5978,7 @@ async function addPostToFeedSets(postId, category, type, timestamp) {
   await pipeline.exec();
 }
 
-// Remove task ID from all relevant sorted sets
+// Remove task ID from all relevant sorted sets (including most-liked)
 async function removePostFromFeedSets(postId, category, type) {
   const keys = [
     getPostFeedKey(null, null),
