@@ -191,7 +191,7 @@ export default function ProductTrendFeed() {
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('most-upvoted');
 
-  // Build filters
+  // ── Build filters ──
   const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
@@ -208,14 +208,14 @@ export default function ProductTrendFeed() {
     return filters;
   }, [category]);
 
-  // Featured feed
+  // ── Featured feed ──
   const {
     data: featuredData,
     isLoading: featuredLoading,
     refetch: refetchFeatured,
   } = useProductFeed(featuredFilters, true);
 
-  // Regular feed
+  // ── Regular feed ──
   const {
     data: regularData,
     fetchNextPage,
@@ -273,6 +273,8 @@ export default function ProductTrendFeed() {
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
+      // ── Force refetch ──
+      refetchRegular();
       scrollToTop();
     }
   };
@@ -286,8 +288,7 @@ export default function ProductTrendFeed() {
 
   const handleCategoryChange = (val) => {
     setCategory(val);
-    // Reset query to clear cache and refetch for category change
-    queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
+    // ── Force refetch ──
     refetchRegular();
     refetchFeatured();
     scrollToTop();
@@ -295,8 +296,7 @@ export default function ProductTrendFeed() {
 
   const handleSortChange = (val) => {
     setSortBy(val);
-    // Reset query to clear cache and refetch for sort change
-    queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
+    // ── Force refetch ──
     refetchRegular();
     scrollToTop();
   };
@@ -440,7 +440,7 @@ export default function ProductTrendFeed() {
     });
   };
 
-  // Loading state
+  // ── Loading state ──
   if (isLoading && !featuredProducts.length && !regularProducts.length) {
     return (
       <>
@@ -475,7 +475,6 @@ export default function ProductTrendFeed() {
     );
   }
 
-  // Conditionally show featured section
   const showFeatured = sortBy === 'most-upvoted' && !searchQuery;
   const filterKey = `${sortBy}-${category}-${searchQuery}`;
 
@@ -588,7 +587,6 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* Featured section */}
         {showFeatured && featuredProducts.length > 0 && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
@@ -614,7 +612,6 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
-        {/* Regular products */}
         <div>
           {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
@@ -642,11 +639,11 @@ export default function ProductTrendFeed() {
                   <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
                 </div>
               )}
-              {/* ✅ THE FIX: key includes sortBy so React re-renders on sort change */}
+              {/* ✅ THE SIMPLE FIX: just use filterKey to force re-render */}
               <div key={filterKey} className="space-y-4">
                 {regularProducts.map((product, index) => (
                   <ProductCard
-                    key={`${product.id}-${sortBy}`} // ← THIS IS THE ONLY CHANGE
+                    key={product.id}
                     product={product}
                     isFeatured={false}
                     onUpvote={handleUpvote}
