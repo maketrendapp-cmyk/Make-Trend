@@ -1,5 +1,5 @@
 // pages/productstrend/feed.js
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -186,47 +186,37 @@ export default function ProductTrendFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
-  const { invalidateProductFeed } = useInvalidateQueries();
 
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('most-upvoted');
 
-  // 🔥 KEY FIX: unique key that changes on every filter change
-  const [queryKeySuffix, setQueryKeySuffix] = useState(0);
-
-  // Update the suffix whenever filters change
-  useEffect(() => {
-    setQueryKeySuffix(prev => prev + 1);
-  }, [searchQuery, category, sortBy]);
-
-  // Build filters with the unique key
+  // Build filters
   const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
     if (category !== 'All') filters.category = category;
     filters.sort = sortBy;
-    // Include the suffix to make this a brand new query
-    filters._key = queryKeySuffix;
     return filters;
-  }, [searchQuery, category, sortBy, queryKeySuffix]);
+  }, [searchQuery, category, sortBy]);
 
   const featuredFilters = useMemo(() => {
     const filters = {};
     if (category !== 'All') filters.category = category;
     filters.sort = 'most-upvoted';
     filters.limit = 100;
-    // No need for _key here because featured always uses most-upvoted
     return filters;
   }, [category]);
 
+  // Featured feed
   const {
     data: featuredData,
     isLoading: featuredLoading,
     refetch: refetchFeatured,
   } = useProductFeed(featuredFilters, true);
 
+  // Regular feed – we get refetch function
   const {
     data: regularData,
     fetchNextPage,
@@ -273,6 +263,7 @@ export default function ProductTrendFeed() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // ── Clear all filters ──
   const clearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -281,9 +272,13 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
+  // ── Trigger search ──
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
+      // ✅ Force refetch
+      queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
+      refetchRegular();
       scrollToTop();
     }
   };
@@ -295,16 +290,25 @@ export default function ProductTrendFeed() {
     }
   };
 
+  // ── Category change ──
   const handleCategoryChange = (val) => {
     setCategory(val);
+    // ✅ Same logic as before – works!
+    queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
+    refetchRegular();
     scrollToTop();
   };
 
+  // ── Sort change ──
   const handleSortChange = (val) => {
     setSortBy(val);
+    // ✅ Exact same pattern as category
+    queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
+    refetchRegular();
     scrollToTop();
   };
 
+  // ── Upvote handler (unchanged) ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
@@ -444,6 +448,7 @@ export default function ProductTrendFeed() {
     });
   };
 
+  // ── Loading state ──
   if (isLoading && !featuredProducts.length && !regularProducts.length) {
     return (
       <>
@@ -479,6 +484,7 @@ export default function ProductTrendFeed() {
   }
 
   const hasFeatured = featuredProducts.length > 0;
+  const filterKey = `${sortBy}-${category}-${searchQuery}`; // ✅ forces re‑render
 
   return (
     <>
@@ -639,7 +645,8 @@ export default function ProductTrendFeed() {
                   <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
                 </div>
               )}
-              <div className="space-y-4">
+              {/* ✅ KEY FORCES RE-RENDER */}
+              <div key={filterKey} className="space-y-4">
                 {regularProducts.map((product, index) => (
                   <ProductCard
                     key={product.id}
