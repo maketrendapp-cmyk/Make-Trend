@@ -5887,6 +5887,18 @@ async function updateProductUpvotesInFeed(productId, category, upvotes) {
   await pipeline.exec();
 }
 
+// ── Update product comments in feed (for most-commented sorting) ──
+async function updateProductCommentsInFeed(productId, category, comments) {
+  const commentKeys = [
+    getProductFeedKey(null, 'most-commented'),
+    getProductFeedKey(category, 'most-commented'),
+  ];
+  const pipeline = redis.pipeline();
+  for (const key of commentKeys) {
+    pipeline.zadd(key, comments, productId);
+  }
+  await pipeline.exec();
+}
 async function removeProductFromFeedSets(productId, category) {
   const sorts = ['newest', 'most-upvoted', 'most-commented'];
   const keys = [];
@@ -6495,9 +6507,14 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
 
     // ── Add to feed sorted sets ──
     const timestamp = Date.now();
+    // 1. 'newest' feed: use timestamp as score
     await addProductToFeedSets(newProduct.id, newProduct.category, 'newest', timestamp);
-    await addProductToFeedSets(newProduct.id, newProduct.category, 'most-upvoted', timestamp);
-    await addProductToFeedSets(newProduct.id, newProduct.category, 'most-commented', timestamp);
+    
+    // 2. 'most-upvoted' feed: use 0 (product starts with 0 upvotes)
+    await updateProductUpvotesInFeed(newProduct.id, newProduct.category, 0);
+    
+    // 3. 'most-commented' feed: use 0 (product starts with 0 comments)
+    await updateProductCommentsInFeed(newProduct.id, newProduct.category, 0);
 
     // ── Cache details ──
     await cacheProductDetails(newProduct.id, newProduct);
