@@ -235,9 +235,9 @@ export default function ProductTrendFeed() {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
     if (category !== 'All') filters.category = category;
-    filters.sort = 'newest';
+    filters.sort = sortBy;   // ✅ FIXED: use sortBy instead of hardcoded 'newest'
     return filters;
-  }, [searchQuery, category]);
+  }, [searchQuery, category, sortBy]); // ✅ Added sortBy dependency
 
   // ── Featured filters (top 100 most-upvoted) ──
   const featuredFilters = useMemo(() => {
@@ -258,7 +258,7 @@ export default function ProductTrendFeed() {
   const featuredProducts = featuredData?.pages?.[0]?.products || [];
   const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
 
-  // ── React Query: Regular feed (newest) ──
+  // ── React Query: Regular feed ──
   const {
     data: regularData,
     fetchNextPage,
@@ -683,7 +683,7 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
-        {/* ── REGULAR PRODUCTS (Newest) ── */}
+        {/* ── REGULAR PRODUCTS ── */}
         <div>
           {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
