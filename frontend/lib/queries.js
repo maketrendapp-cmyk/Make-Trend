@@ -9,8 +9,13 @@ if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const requestCache = new Map();
 
 async function apiRequest(endpoint, options = {}, token = null) {
+  const method = options.method || 'GET';
+  const bypassCache = options.cache === false;
   const cacheKey = `${endpoint}-${JSON.stringify(options)}-${token || 'no-token'}`;
-  if (requestCache.has(cacheKey)) return requestCache.get(cacheKey);
+  
+  if (method === 'GET' && !bypassCache && requestCache.has(cacheKey)) {
+    return requestCache.get(cacheKey);
+  }
 
   const url = `${BACKEND_URL}/api${endpoint}`;
   const headers = { 'Content-Type': 'application/json' };
@@ -21,8 +26,11 @@ async function apiRequest(endpoint, options = {}, token = null) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'API error');
 
-  requestCache.set(cacheKey, data);
-  setTimeout(() => requestCache.delete(cacheKey), 5000);
+  if (method === 'GET' && !bypassCache) {
+    requestCache.set(cacheKey, data);
+    setTimeout(() => requestCache.delete(cacheKey), 5000);
+  }
+  
   return data;
 }
 
@@ -117,7 +125,6 @@ export function useFeaturedTemplates(filters = {}, initialData = null) {
 // ── Campaigns (with server-side filters, search, and pagination) ──
 export function useCampaigns(filters = {}, enabled = true) {
   const { status, search, feature } = filters;
-  // Build a stable query key that includes all filter values
   const queryKey = ['campaigns', { status, search, feature }];
 
   return useInfiniteQuery({
@@ -149,7 +156,7 @@ export function useCampaigns(filters = {}, enabled = true) {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    keepPreviousData: true, // prevents flicker when filters change
+    keepPreviousData: true,
   });
 }
 
@@ -323,7 +330,6 @@ export function useReferrals(enabled = false) {
 
 // ── 🔥 GROW TOGETHER QUERIES ──
 
-// ── Grow Feed (infinite scroll with filters) – PUBLIC ──
 export function useGrowFeed(filters = {}, enabled = true) {
   const { platform, taskType } = filters;
   const queryKey = ['growFeed', { platform, taskType }];
@@ -335,7 +341,6 @@ export function useGrowFeed(filters = {}, enabled = true) {
       if (taskType) params.append('taskType', taskType);
       if (pageParam) params.append('lastTaskId', pageParam);
       const url = `/grow-feed?${params.toString()}`;
-      // Get token if logged in, otherwise null
       const token = await getToken().catch(() => null);
       const data = await apiRequest(url, {}, token);
       return {
@@ -351,8 +356,6 @@ export function useGrowFeed(filters = {}, enabled = true) {
   });
 }
 
-// 2. My Tasks
-// ── My Tasks (infinite scroll with filters) ──
 export function useMyTasks(filters = {}, enabled = true) {
   const { status, platform, taskType } = filters;
   const queryKey = ['myTasks', { status, platform, taskType }];
@@ -363,9 +366,7 @@ export function useMyTasks(filters = {}, enabled = true) {
       const token = await getToken();
       if (!token) return { tasks: [], nextCursor: null };
 
-      const params = new URLSearchParams({
-        limit: 20,
-      });
+      const params = new URLSearchParams({ limit: 20 });
       if (status && status !== 'all') params.append('status', status);
       if (platform) params.append('platform', platform);
       if (taskType) params.append('taskType', taskType);
@@ -385,7 +386,6 @@ export function useMyTasks(filters = {}, enabled = true) {
   });
 }
 
-// 3. Available Tasks (for modal selection)
 export function useAvailableTasks(enabled = true) {
   return useQuery({
     queryKey: ['availableTasks'],
@@ -401,7 +401,6 @@ export function useAvailableTasks(enabled = true) {
   });
 }
 
-// 4. My Exchanges (infinite scroll with status filter)
 export function useMyExchanges(status = '', enabled = true) {
   return useInfiniteQuery({
     queryKey: ['myExchanges', status],
@@ -424,7 +423,6 @@ export function useMyExchanges(status = '', enabled = true) {
   });
 }
 
-// 5. Exchange Detail
 export function useExchangeDetail(id, enabled = true) {
   return useQuery({
     queryKey: ['exchangeDetail', id],
@@ -440,7 +438,6 @@ export function useExchangeDetail(id, enabled = true) {
   });
 }
 
-// ── Update exchange status (done / cancel) ──
 export function useUpdateExchangeStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -454,9 +451,7 @@ export function useUpdateExchangeStatus() {
       return data;
     },
     onSuccess: (data, variables) => {
-      // Invalidate the exchange detail cache so the page refreshes
       queryClient.invalidateQueries(['exchangeDetail', variables.id]);
-      // Also invalidate exchanges list caches if needed
       queryClient.invalidateQueries(['myExchanges']);
       toast.success('Exchange status updated!');
     },
@@ -468,7 +463,6 @@ export function useUpdateExchangeStatus() {
 
 // ── 🚀 PRODUCT TREND QUERIES ──
 
-// 1. Product Feed (infinite scroll with filters) – PUBLIC
 export function useProductFeed(filters = {}, enabled = true) {
   const queryKey = ['productFeed', filters];
   return useInfiniteQuery({
@@ -480,9 +474,9 @@ export function useProductFeed(filters = {}, enabled = true) {
         ...(pageParam && { lastId: pageParam }),
       });
       const url = `/productstrend/feed?${params.toString()}`;
-      // ✅ Send token if available
       const token = await getToken().catch(() => null);
-      const data = await apiRequest(url, {}, token);
+      // ✅ cache: false ensures sorting changes bypass the local request map and fetch fresh sorted data from the backend
+      const data = await apiRequest(url, { cache: false }, token);
       return {
         products: data.products || [],
         nextCursor: data.hasMore ? data.lastId : null,
@@ -490,18 +484,15 @@ export function useProductFeed(filters = {}, enabled = true) {
     },
     enabled,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
     refetchOnWindowFocus: false,
-    keepPreviousData: true,
   });
 }
 
-// 2. Product Detail – PUBLIC
 export function useProductDetail(id, enabled = true) {
   return useQuery({
     queryKey: ['productDetail', id],
     queryFn: async () => {
-      // ✅ Send token if available
       const token = await getToken().catch(() => null);
       const data = await apiRequest(`/productstrend/products/${id}`, {}, token);
       return data.product;
@@ -511,7 +502,6 @@ export function useProductDetail(id, enabled = true) {
   });
 }
 
-// 3. My Products (infinite scroll with filters)
 export function useMyProducts(filters = {}, enabled = true) {
   const { status, category } = filters;
   const queryKey = ['myProducts', { status, category }];
@@ -522,9 +512,7 @@ export function useMyProducts(filters = {}, enabled = true) {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
-      const params = new URLSearchParams({
-        limit: 20,
-      });
+      const params = new URLSearchParams({ limit: 20 });
       if (status) params.append('status', status);
       if (category) params.append('category', category);
       if (pageParam) params.append('lastId', pageParam);
@@ -542,7 +530,6 @@ export function useMyProducts(filters = {}, enabled = true) {
   });
 }
 
-// 4. Product Comments – PUBLIC (infinite scroll)
 export function useProductComments(productId, enabled = true) {
   return useInfiniteQuery({
     queryKey: ['productComments', productId],
@@ -561,7 +548,6 @@ export function useProductComments(productId, enabled = true) {
   });
 }
 
-// 5. Launch Product Mutation
 export function useLaunchProduct() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -577,8 +563,6 @@ export function useLaunchProduct() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['productFeed'] });
       queryClient.invalidateQueries({ queryKey: ['myProducts'] });
-      // Optionally refetch the first page of myProducts immediately
-      queryClient.refetchQueries({ queryKey: ['myProducts'], type: 'active', exact: false });
       toast.success('Product launched successfully!');
     },
     onError: (error) => {
@@ -587,7 +571,6 @@ export function useLaunchProduct() {
   });
 }
 
-// 6. Upvote Product Mutation – Optimistic, no invalidations
 export function useUpvoteProduct() {
   return useMutation({
     mutationFn: async (productId) => {
@@ -601,7 +584,6 @@ export function useUpvoteProduct() {
   });
 }
 
-// 7. Add Product Comment Mutation – Optimistic, no invalidations
 export function useAddProductComment() {
   return useMutation({
     mutationFn: async ({ productId, text }) => {
@@ -616,7 +598,6 @@ export function useAddProductComment() {
   });
 }
 
-// 8. Delete Product Mutation
 export function useDeleteProduct() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -631,16 +612,13 @@ export function useDeleteProduct() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['productFeed'] });
       queryClient.invalidateQueries({ queryKey: ['myProducts'] });
-      // Toast removed – component will handle it
     },
     onError: (error) => {
-      // Toast removed – component will handle it
       console.error('Delete product error:', error);
     },
   });
 }
 
-// ── Buy Upvotes ──
 export function useBuyUpvotes() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -659,10 +637,8 @@ export function useBuyUpvotes() {
       queryClient.invalidateQueries(['mtCoins']);
       queryClient.invalidateQueries(['myProducts']);
       queryClient.invalidateQueries(['notifications']);
-      // Toast handled in component
     },
     onError: (error) => {
-      // Toast handled in component
       console.error('Buy upvote error:', error);
     },
   });
@@ -670,8 +646,6 @@ export function useBuyUpvotes() {
 
 // ── 🌍 COMMUNITY POSTS QUERIES ──
 
-// 1. Fetch posts feed (infinite scroll, public, with category & type filters)
-// Supports: search (text or @username), userId (filter by user), sort ('newest' or 'most-liked')
 export function usePosts(filters = {}, enabled = true) {
   const { category, type, search, userId, sort, limit = 20 } = filters;
   const queryKey = ['posts', { category, type, search, userId, sort, limit }];
@@ -697,11 +671,9 @@ export function usePosts(filters = {}, enabled = true) {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
-    keepPreviousData: true,
   });
 }
 
-// 2. Fetch a single post (public)
 export function usePost(id, enabled = true) {
   return useQuery({
     queryKey: ['post', id],
@@ -717,7 +689,6 @@ export function usePost(id, enabled = true) {
   });
 }
 
-// 3. Create a post (authenticated) – invalidates feed only
 export function useCreatePost() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -732,7 +703,7 @@ export function useCreatePost() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['posts']);
-      queryClient.invalidateQueries(['myPosts']); // Add this line
+      queryClient.invalidateQueries(['myPosts']); 
       toast.success('Post created successfully!');
     },
     onError: (error) => {
@@ -741,7 +712,6 @@ export function useCreatePost() {
   });
 }
 
-// 4. Update a post – invalidates feed + single post
 export function useUpdatePost() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -757,7 +727,7 @@ export function useUpdatePost() {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(['posts']);
       queryClient.invalidateQueries(['post', variables.id]);
-      queryClient.invalidateQueries(['myPosts']); // Add this line
+      queryClient.invalidateQueries(['myPosts']); 
       toast.success('Post updated successfully!');
     },
     onError: (error) => {
@@ -766,7 +736,6 @@ export function useUpdatePost() {
   });
 }
 
-// 5. Like/unlike a post – Simple mutation, UI updates handled by components
 export function useLikePost() {
   return useMutation({
     mutationFn: async (postId) => {
@@ -780,8 +749,6 @@ export function useLikePost() {
   });
 }
 
-
-// 6. Add a comment – simple mutation, UI updates handled by components
 export function useAddComment() {
   return useMutation({
     mutationFn: async ({ postId, content }) => {
@@ -796,7 +763,6 @@ export function useAddComment() {
   });
 }
 
-// 7. Delete a post – invalidates feed + single post + myPosts (with reset for infinite queries)
 export function useDeletePost() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -809,20 +775,17 @@ export function useDeletePost() {
       return data;
     },
     onSuccess: (data, postId) => {
-      queryClient.invalidateQueries({ queryKey: ['posts'], refetchType: 'active' });
-      queryClient.invalidateQueries({ queryKey: ['post', postId], refetchType: 'active' });
-      queryClient.invalidateQueries({ queryKey: ['myPosts'], refetchType: 'active' });
-      queryClient.resetQueries({ queryKey: ['myPosts'] });
-      // Toast is handled in the component
+      queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['post', postId]);
+      queryClient.invalidateQueries(['myPosts']); 
+      queryClient.resetQueries(['myPosts']);
     },
     onError: (error) => {
-      // Toast is handled in the component
       console.error('Delete post error:', error);
     },
   });
 }
 
-// 8. Get post comments (infinite scroll, public)
 export function usePostComments(postId, enabled = true) {
   const queryKey = ['postComments', postId];
   return useInfiniteQuery({
@@ -842,11 +805,9 @@ export function usePostComments(postId, enabled = true) {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    keepPreviousData: true,
   });
 }
 
-// 9. Get current user's posts (authenticated, with filters & pagination)
 export function useMyPosts(filters = {}, enabled = true) {
   const { category, type, search } = filters;
   const queryKey = ['myPosts', { category, type, search }];
@@ -876,7 +837,6 @@ export function useMyPosts(filters = {}, enabled = true) {
   });
 }
 
-// ── Buy Likes for Post ──
 export function useBuyPostLike() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -895,10 +855,8 @@ export function useBuyPostLike() {
       queryClient.invalidateQueries(['myPosts']);
       queryClient.invalidateQueries(['mtCoins']);
       queryClient.invalidateQueries(['notifications']);
-      // Toast is handled in the component
     },
     onError: (error) => {
-      // Toast is handled in the component
       console.error('Buy like error:', error);
     },
   });
@@ -906,7 +864,6 @@ export function useBuyPostLike() {
 
 // ── 🔔 NOTIFICATION QUERIES ──
 
-// 1. Personal notifications (infinite scroll)
 export function useNotifications(enabled = true) {
   return useInfiniteQuery({
     queryKey: ['notifications'],
@@ -929,7 +886,6 @@ export function useNotifications(enabled = true) {
   });
 }
 
-// 2. System notifications (global, read once per user)
 export function useSystemNotifications(enabled = true) {
   return useQuery({
     queryKey: ['systemNotifications'],
@@ -945,7 +901,6 @@ export function useSystemNotifications(enabled = true) {
   });
 }
 
-// 3. Mark a single notification as read
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -966,7 +921,6 @@ export function useMarkNotificationRead() {
   });
 }
 
-// 4. Mark all personal notifications as read
 export function useMarkAllNotificationsRead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -988,7 +942,6 @@ export function useMarkAllNotificationsRead() {
   });
 }
 
-// 5. Mark all system notifications as read
 export function useMarkSystemNotificationsRead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1009,7 +962,7 @@ export function useMarkSystemNotificationsRead() {
     },
   });
 }
-// ── Invalidation helper ──
+
 export function useInvalidateQueries() {
   const queryClient = useQueryClient();
   return {
@@ -1023,7 +976,7 @@ export function useInvalidateQueries() {
     invalidateMtCoins: () => queryClient.invalidateQueries(['mtCoins']),
     invalidateWithdrawals: () => queryClient.invalidateQueries(['withdrawals']),
     invalidateWithdrawalMethods: () => queryClient.invalidateQueries(['withdrawalMethods']),
-    invalidateReferrals: () => queryClient.invalidateQueries(['referrals']),
+    invalidateReferrals: () => queryClient.invalidateQueries({ queryKey: ['referrals'] }),
     invalidateDailyBonus: () => queryClient.invalidateQueries(['dailyBonus']),
     invalidateGrowFeed: () => queryClient.invalidateQueries(['growFeed']),
     invalidateMyTasks: () => queryClient.invalidateQueries(['myTasks']),
@@ -1033,10 +986,9 @@ export function useInvalidateQueries() {
     invalidateProductFeed: () => queryClient.invalidateQueries(['productFeed']),
     invalidateProductDetail: (id) => queryClient.invalidateQueries(['productDetail', id]),
     invalidateMyProducts: () => {
-  queryClient.invalidateQueries({ queryKey: ['myProducts'], exact: false, refetchType: 'all' });
-  // Force refetch all pages immediately
-  queryClient.refetchQueries({ queryKey: ['myProducts'], exact: false });
-},
+      queryClient.invalidateQueries({ queryKey: ['myProducts'], exact: false, refetchType: 'all' });
+      queryClient.refetchQueries({ queryKey: ['myProducts'], exact: false });
+    },
     invalidateProductComments: (id) => queryClient.invalidateQueries(['productComments', id]),
     invalidateNotifications: () => queryClient.invalidateQueries(['notifications']),
     invalidateSystemNotifications: () => queryClient.invalidateQueries(['systemNotifications']),
@@ -1065,14 +1017,12 @@ export function useInvalidateQueries() {
       queryClient.invalidateQueries(['myTasks']);
       queryClient.invalidateQueries(['availableTasks']);
       queryClient.invalidateQueries(['myExchanges']);
-     queryClient.invalidateQueries({ queryKey: ['productFeed'] });
-queryClient.invalidateQueries({ queryKey: ['myProducts'] });
+      queryClient.invalidateQueries(['productFeed']);
+      queryClient.invalidateQueries(['myProducts']);
       queryClient.invalidateQueries(['notifications']);
       queryClient.invalidateQueries(['systemNotifications']);
       queryClient.invalidateQueries(['posts']);
-      // Inside invalidateAll
       queryClient.invalidateQueries(['myPosts']);
-      // productDetail, productComments, post, postComments, userProfile keys are dynamic, so skip here
     },
   };
 }
