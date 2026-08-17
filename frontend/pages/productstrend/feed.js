@@ -273,8 +273,6 @@ export default function ProductTrendFeed() {
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
-      queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
-      refetchRegular();
       scrollToTop();
     }
   };
@@ -290,7 +288,6 @@ export default function ProductTrendFeed() {
     setCategory(val);
     queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
     refetchRegular();
-    // Also refetch featured so it updates for the new category
     refetchFeatured();
     scrollToTop();
   };
@@ -476,12 +473,8 @@ export default function ProductTrendFeed() {
     );
   }
 
-  // Conditionally show featured only when:
-  // - sort is 'most-upvoted' (featured is always most-upvoted)
-  // - category is 'All' (because if category is selected, featured shows top for that category, which is fine)
-  // - no search query (search results should not mix with featured)
+  // Only show featured when sorting by most-upvoted and no search
   const showFeatured = sortBy === 'most-upvoted' && !searchQuery;
-
   const filterKey = `${sortBy}-${category}-${searchQuery}`;
 
   return (
@@ -593,7 +586,6 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* ── FEATURED SECTION – only when it makes sense ── */}
         {showFeatured && featuredProducts.length > 0 && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
@@ -619,7 +611,6 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
-        {/* ── REGULAR PRODUCTS ── */}
         <div>
           {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
@@ -647,11 +638,11 @@ export default function ProductTrendFeed() {
                   <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
                 </div>
               )}
-              {/* ✅ Key forces re-render on filter change */}
+              {/* ✅ KEY FIX: Include index and filterKey in the key to force re-render on reorder */}
               <div key={filterKey} className="space-y-4">
                 {regularProducts.map((product, index) => (
                   <ProductCard
-                    key={product.id}
+                    key={`${product.id}-${index}-${filterKey}`}
                     product={product}
                     isFeatured={false}
                     onUpvote={handleUpvote}
