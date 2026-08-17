@@ -9,7 +9,6 @@ import { useAuth } from '../../components/AuthScreen';
 import {
   useProductFeed,
   useUpvoteProduct,
-  useInvalidateQueries,
 } from '../../lib/queries';
 import toast from 'react-hot-toast';
 import {
@@ -216,7 +215,7 @@ export default function ProductTrendFeed() {
     refetch: refetchFeatured,
   } = useProductFeed(featuredFilters, true);
 
-  // Regular feed – we get refetch function
+  // Regular feed
   const {
     data: regularData,
     fetchNextPage,
@@ -263,7 +262,6 @@ export default function ProductTrendFeed() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // ── Clear all filters ──
   const clearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -272,11 +270,9 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Trigger search ──
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
-      // ✅ Force refetch
       queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
       refetchRegular();
       scrollToTop();
@@ -290,25 +286,22 @@ export default function ProductTrendFeed() {
     }
   };
 
-  // ── Category change ──
   const handleCategoryChange = (val) => {
     setCategory(val);
-    // ✅ Same logic as before – works!
     queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
     refetchRegular();
+    // Also refetch featured so it updates for the new category
+    refetchFeatured();
     scrollToTop();
   };
 
-  // ── Sort change ──
   const handleSortChange = (val) => {
     setSortBy(val);
-    // ✅ Exact same pattern as category
     queryClient.resetQueries({ queryKey: ['productFeed'], exact: false });
     refetchRegular();
     scrollToTop();
   };
 
-  // ── Upvote handler (unchanged) ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
@@ -448,7 +441,7 @@ export default function ProductTrendFeed() {
     });
   };
 
-  // ── Loading state ──
+  // Loading state
   if (isLoading && !featuredProducts.length && !regularProducts.length) {
     return (
       <>
@@ -483,8 +476,13 @@ export default function ProductTrendFeed() {
     );
   }
 
-  const hasFeatured = featuredProducts.length > 0;
-  const filterKey = `${sortBy}-${category}-${searchQuery}`; // ✅ forces re‑render
+  // Conditionally show featured only when:
+  // - sort is 'most-upvoted' (featured is always most-upvoted)
+  // - category is 'All' (because if category is selected, featured shows top for that category, which is fine)
+  // - no search query (search results should not mix with featured)
+  const showFeatured = sortBy === 'most-upvoted' && !searchQuery;
+
+  const filterKey = `${sortBy}-${category}-${searchQuery}`;
 
   return (
     <>
@@ -595,12 +593,15 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {hasFeatured && (
+        {/* ── FEATURED SECTION – only when it makes sense ── */}
+        {showFeatured && featuredProducts.length > 0 && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
               <FiTrendingUp className="text-purple-600 text-xl" />
               <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
-              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Top {featuredProducts.length}</span>
+              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                Top {featuredProducts.length} {category !== 'All' ? `in ${category}` : ''}
+              </span>
             </div>
             <div className="space-y-4">
               {featuredProducts.map((product, idx) => (
@@ -618,12 +619,13 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
+        {/* ── REGULAR PRODUCTS ── */}
         <div>
           {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
               <div className="text-5xl mb-4">📭</div>
               <h3 className="text-lg font-semibold text-slate-900">
-                {hasFeatured ? 'No more products' : 'No products found'}
+                {showFeatured ? 'No more products' : 'No products found'}
               </h3>
               <p className="text-slate-500 text-sm">
                 {searchQuery
@@ -640,12 +642,12 @@ export default function ProductTrendFeed() {
             </div>
           ) : (
             <div>
-              {hasFeatured && regularProducts.length > 0 && (
+              {showFeatured && regularProducts.length > 0 && (
                 <div className="flex items-center gap-2 mb-4">
                   <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
                 </div>
               )}
-              {/* ✅ KEY FORCES RE-RENDER */}
+              {/* ✅ Key forces re-render on filter change */}
               <div key={filterKey} className="space-y-4">
                 {regularProducts.map((product, index) => (
                   <ProductCard
