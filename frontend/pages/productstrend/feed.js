@@ -2,15 +2,10 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import Image from 'next/image';
 import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
-import {
-  useProductFeed,
-  useUpvoteProduct,
-  useInvalidateQueries,
-} from '../../lib/queries';
+import { useProductFeed, useUpvoteProduct } from '../../lib/queries';
 import toast from 'react-hot-toast';
 import {
   FiTrendingUp,
@@ -20,15 +15,17 @@ import {
   FiSearch,
   FiX,
   FiLoader,
-  FiRefreshCw,
   FiClock,
   FiMessageCircle,
   FiBox,
+  FiPlus,
+  FiFilter,
+  FiRefreshCw,
 } from 'react-icons/fi';
+import { FaFire } from 'react-icons/fa';
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
-// ── Helper: format date ──
 const formatDate = (timestamp) => {
   if (!timestamp) return 'Recently';
   try {
@@ -53,22 +50,6 @@ const formatDate = (timestamp) => {
   }
 };
 
-// ── localStorage helpers ──
-const getLocalVote = (productId) => {
-  try {
-    const raw = localStorage.getItem(`upvote_${productId}`);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return null;
-};
-
-const setLocalVote = (productId, voted, upvotes) => {
-  try {
-    localStorage.setItem(`upvote_${productId}`, JSON.stringify({ voted, upvotes }));
-  } catch (e) {}
-};
-
-// ── Product Card Component ──
 const ProductCard = React.forwardRef(({
   product,
   isFeatured = false,
@@ -77,141 +58,94 @@ const ProductCard = React.forwardRef(({
   isAuthenticated,
   isUpvoting,
 }, ref) => {
+  const [imgFailed, setImgFailed] = useState(false);
   const isLiked = product.userVoted || false;
   const upvotes = product.upvotes || 0;
-  const hasImage = !!(product.logo || product.imageUrl);
+  const hasImage = !!(product.logo || product.imageUrl) && !imgFailed;
 
-  let cardClasses = 'bg-white rounded-2xl border p-4 hover:shadow-md transition flex items-center gap-4';
+  let cardClasses = 'bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 hover:shadow-xl hover:shadow-slate-200/40 transition-all duration-300 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 group';
   let badge = null;
 
   if (isFeatured && rank) {
     if (rank === 1) {
-      cardClasses += ' border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-md';
-      badge = (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">
-          👑 #1
-        </span>
-      );
+      cardClasses = 'bg-gradient-to-br from-amber-50/40 to-white rounded-3xl border border-amber-200/60 p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 group';
+      badge = <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-sm uppercase tracking-wider">👑 #1</span>;
     } else if (rank === 2) {
-      cardClasses += ' border-slate-400 bg-gradient-to-br from-slate-50 to-gray-100 shadow-md';
-      badge = (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-300 text-slate-700">
-          🥈 #2
-        </span>
-      );
+      cardClasses = 'bg-gradient-to-br from-slate-50/50 to-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 group';
+      badge = <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black bg-slate-200 text-slate-700 uppercase tracking-wider">🥈 #2</span>;
     } else if (rank === 3) {
-      cardClasses += ' border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-md';
-      badge = (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">
-          🥉 #3
-        </span>
-      );
+      cardClasses = 'bg-gradient-to-br from-orange-50/30 to-white rounded-3xl border border-orange-200/60 p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 group';
+      badge = <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black bg-orange-200 text-orange-800 uppercase tracking-wider">🥉 #3</span>;
     } else {
-      cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
-      badge = (
-        <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-          #{rank}
-        </span>
-      );
+      badge = <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black bg-purple-100 text-purple-700 uppercase tracking-wider">#{rank}</span>;
     }
-  } else {
-    cardClasses += ' border-slate-200';
   }
 
   return (
     <div ref={ref} className={cardClasses}>
-      {/* Image / Logo */}
-      <Link href={`/productstrend/${product.id}`} className="flex-shrink-0">
+      <Link href={`/productstrend/${product.id}`} className="flex-shrink-0 flex sm:block justify-between items-center">
         {hasImage ? (
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
-            <Image
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-[1.25rem] bg-slate-50 overflow-hidden border border-slate-100 shadow-sm flex items-center justify-center group-hover:scale-[1.03] transition-transform duration-300">
+            <img
               src={product.logo || product.imageUrl}
               alt={product.name}
-              width={64}
-              height={64}
               className="w-full h-full object-cover"
               loading="lazy"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.style.display = 'none';
-                const parent = e.target.parentElement;
-                if (parent) {
-                  parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>`;
-                }
-              }}
+              onError={() => setImgFailed(true)}
             />
           </div>
         ) : (
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-3xl text-slate-400 border border-slate-200 shadow-sm">
-            <FiBox className="w-7 h-7" />
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-[1.25rem] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-3xl text-slate-300 border border-slate-200 shadow-sm group-hover:scale-[1.03] transition-transform duration-300">
+            <FiBox className="w-8 h-8" />
           </div>
         )}
       </Link>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <Link href={`/productstrend/${product.id}`} className="block">
-              <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition truncate">
+      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+            <Link href={`/productstrend/${product.id}`} className="block min-w-0">
+              <h3 className="font-extrabold text-slate-900 text-lg sm:text-xl hover:text-purple-600 transition-colors truncate">
                 {product.name}
               </h3>
             </Link>
-            {isFeatured && badge && (
-              <div className="flex items-center gap-2 mt-0.5">
-                {badge}
-                <span className="text-xs text-purple-400">🔥 Featured</span>
-              </div>
+            {isFeatured && badge}
+          </div>
+
+          <p className="text-sm font-medium text-slate-500 line-clamp-2 leading-relaxed mb-3 pr-2">
+            {product.tagline}
+          </p>
+
+          <div className="flex items-center gap-3 text-xs font-semibold text-slate-400 flex-wrap">
+            <span className="flex items-center gap-2 bg-slate-50 border border-slate-100/80 px-2.5 py-1 rounded-lg">
+              <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                {product.maker?.avatar ? (
+                  <img src={product.maker.avatar} alt="Maker" className="w-full h-full object-cover" />
+                ) : (
+                  <FiUser className="w-3 h-3 text-slate-500" />
+                )}
+              </span>
+              <span className="text-slate-600 truncate max-w-[120px]">{product.maker?.username || 'Anonymous'}</span>
+            </span>
+            <span className="flex items-center gap-1.5"><FiMessageCircle className="w-3.5 h-3.5" />{product.commentsCount || 0}</span>
+            {product.category && (
+              <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg border border-slate-200/50">{product.category}</span>
             )}
           </div>
-          <button
-            onClick={() => onUpvote(product.id)}
-            disabled={!isAuthenticated || isUpvoting}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition text-xs font-medium flex-shrink-0 ${
-              isLiked
-                ? 'bg-purple-100 border-purple-300 text-purple-700'
-                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-purple-50 hover:border-purple-200'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            <FiHeart className={`w-3.5 h-3.5 ${isLiked ? 'fill-purple-600 text-purple-600' : ''}`} />
-            <span>{upvotes}</span>
-          </button>
         </div>
 
-        <p className="text-sm text-slate-500 line-clamp-2 mt-1">{product.tagline}</p>
-
-        <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-              {product.maker?.avatar ? (
-                <Image
-                  src={product.maker.avatar}
-                  alt={product.maker.username || 'User'}
-                  width={20}
-                  height={20}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <FiUser className="w-3 h-3 text-slate-500" />
-              )}
-            </span>
-            <span className="font-medium text-slate-600">
-              {product.maker?.username || 'Anonymous'}
-            </span>
-          </span>
-          <span className="flex items-center gap-1">
-            <FiClock className="w-3 h-3" />
-            {formatDate(product.createdAt)}
-          </span>
-          <span className="flex items-center gap-1">
-            <FiMessageCircle className="w-3 h-3" />
-            {product.commentsCount || 0}
-          </span>
-          {product.category && (
-            <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-              {product.category}
-            </span>
-          )}
-        </div>
+        <button
+          onClick={() => onUpvote(product.id)}
+          disabled={!isAuthenticated || isUpvoting}
+          className={`flex sm:flex-col items-center justify-center gap-2 sm:gap-1.5 px-6 py-3 sm:w-20 sm:py-3.5 rounded-[1.25rem] border-2 transition-all font-bold flex-shrink-0 active:scale-95 shadow-sm ${
+            isLiked
+              ? 'bg-purple-50 border-purple-500 text-purple-700 shadow-purple-500/10'
+              : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300 hover:bg-purple-50/50 hover:text-purple-600'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          <FiHeart className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${isLiked ? 'fill-purple-600 text-purple-600' : 'text-slate-400'}`} />
+          <span className="text-sm sm:text-base leading-none">{upvotes}</span>
+        </button>
       </div>
     </div>
   );
@@ -222,43 +156,35 @@ export default function ProductTrendFeed() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
-  const { invalidateProductFeed } = useInvalidateQueries();
 
-  // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('most-upvoted');
 
-  // ── Memoize backend filters for regular feed ──
+  // 1. Build exact filters to pass straight to the backend API
   const regularFilters = useMemo(() => {
-    const filters = {};
+    const filters = { sort: sortBy };
     if (searchQuery.trim()) filters.search = searchQuery.trim();
     if (category !== 'All') filters.category = category;
-    filters.sort = 'newest';
     return filters;
-  }, [searchQuery, category]);
+  }, [searchQuery, category, sortBy]);
 
-  // ── Featured filters (top 100 most-upvoted) ──
+  // 2. Fetch Featured ONLY when sorting by 'most-upvoted' and no search
+  const showFeatured = sortBy === 'most-upvoted' && !searchQuery;
   const featuredFilters = useMemo(() => {
-    const filters = {};
+    const filters = { sort: 'most-upvoted', limit: 100 };
     if (category !== 'All') filters.category = category;
-    filters.sort = 'most-upvoted';
-    filters.limit = 100;
     return filters;
   }, [category]);
 
-  // ── React Query: Featured feed ──
   const {
     data: featuredData,
     isLoading: featuredLoading,
     refetch: refetchFeatured,
-  } = useProductFeed(featuredFilters, true);
+  } = useProductFeed(featuredFilters, showFeatured);
 
-  const featuredProducts = featuredData?.pages?.[0]?.products || [];
-  const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
-
-  // ── React Query: Regular feed (newest) ──
+  // 3. Fetch regular feed with dynamic filters
   const {
     data: regularData,
     fetchNextPage,
@@ -269,19 +195,27 @@ export default function ProductTrendFeed() {
     isError: regularError,
   } = useProductFeed(regularFilters, true);
 
-  const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
+  const featuredProducts = showFeatured ? (featuredData?.pages?.[0]?.products || []) : [];
+  const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
+
+  const regularProductsAll = useMemo(() => {
+    return regularData?.pages?.flatMap((page) => page.products) || [];
+  }, [regularData]);
+
+  // Filter out featured from regular so they don't duplicate
   const regularProducts = useMemo(() => {
-    return regularProductsAll.filter(p => !featuredIds.has(p.id));
-  }, [regularProductsAll, featuredIds]);
+    if (showFeatured) {
+      return regularProductsAll.filter(p => !featuredIds.has(p.id));
+    }
+    return regularProductsAll;
+  }, [regularProductsAll, featuredIds, showFeatured]);
 
   const hasMore = hasNextPage;
-  const isLoading = featuredLoading && regularLoading && !regularProductsAll.length && !featuredProducts.length;
+  const isLoading = (featuredLoading || regularLoading) && !regularProductsAll.length && !featuredProducts.length;
   const isError = regularError && !regularProducts.length;
 
-  // ── Upvote mutation ──
   const upvoteMutation = useUpvoteProduct();
 
-  // ── Intersection Observer for regular feed ──
   const observerRef = useRef(null);
   const lastElementRef = useCallback(
     (node) => {
@@ -300,12 +234,10 @@ export default function ProductTrendFeed() {
     [isFetchingNextPage, hasMore, fetchNextPage]
   );
 
-  // ── Scroll to top ──
-  const scrollToTop = useCallback(() => {
+  const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  };
 
-  // ── Clear all filters ──
   const clearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -314,10 +246,9 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Trigger backend search ──
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
-      setSearchQuery(searchInput);
+      setSearchQuery(searchInput.trim());
       scrollToTop();
     }
   };
@@ -329,427 +260,300 @@ export default function ProductTrendFeed() {
     }
   };
 
-  const handleCategoryChange = (val) => {
-    setCategory(val);
-    scrollToTop();
-  };
-
-  const handleSortChange = (val) => {
-    setSortBy(val);
-    scrollToTop();
-  };
-
-  // ── Simple upvote handler (updates both caches if product exists) ──
+  // ✅ SIMPLIFIED: Safe, clean optimistic update that preserves array orders
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
       return;
     }
 
-    // Find product in regular feed
-    let currentProduct = null;
-    let currentPage = null;
-    let pageIndex = -1;
-    let productIndex = -1;
+    // 1. Optimistic Update (Scans all loaded queries to update the heart instantly)
+    queryClient.setQueriesData({ queryKey: ['productFeed'] }, (oldData) => {
+      if (!oldData || !oldData.pages) return oldData;
+      return {
+        ...oldData,
+        pages: oldData.pages.map(page => ({
+          ...page,
+          products: page.products.map(p => {
+            if (p.id === productId) {
+              const isVoted = !p.userVoted;
+              return { ...p, userVoted: isVoted, upvotes: p.upvotes + (isVoted ? 1 : -1) };
+            }
+            return p;
+          })
+        }))
+      };
+    });
 
-    if (regularData?.pages) {
-      for (let i = 0; i < regularData.pages.length; i++) {
-        const page = regularData.pages[i];
-        const idx = page.products.findIndex(p => p.id === productId);
-        if (idx !== -1) {
-          currentProduct = page.products[idx];
-          currentPage = page;
-          pageIndex = i;
-          productIndex = idx;
-          break;
-        }
-      }
-    }
-
-    // If not in regular, check featured
-    let isFeaturedCache = false;
-    if (!currentProduct && featuredData?.pages) {
-      const page = featuredData.pages[0];
-      const idx = page.products.findIndex(p => p.id === productId);
-      if (idx !== -1) {
-        currentProduct = page.products[idx];
-        currentPage = page;
-        pageIndex = 0;
-        productIndex = idx;
-        isFeaturedCache = true;
-      }
-    }
-
-    if (!currentProduct) {
-      toast.error('Product not found in cache');
-      return;
-    }
-
-    // Toggle
-    const prevUpvotes = currentProduct.upvotes || 0;
-    const prevUserVoted = currentProduct.userVoted || false;
-    const newUserVoted = !prevUserVoted;
-    const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
-
-    const updatedProduct = {
-      ...currentProduct,
-      upvotes: newUpvotes,
-      userVoted: newUserVoted,
-    };
-
-    // ── Update localStorage ──
-    setLocalVote(productId, newUserVoted, newUpvotes);
-
-    // ── Update the cache where the product was found ──
-    const feedKey = isFeaturedCache ? ['productFeed', featuredFilters] : ['productFeed', regularFilters];
-    const feedData = queryClient.getQueryData(feedKey);
-    if (feedData) {
-      const newPages = feedData.pages.map((page, idx) => {
-        if (idx === pageIndex) {
-          return {
-            ...page,
-            products: page.products.map((p, pIdx) =>
-              pIdx === productIndex ? updatedProduct : p
-            ),
-          };
-        }
-        return page;
-      });
-      queryClient.setQueryData(feedKey, { ...feedData, pages: newPages });
-    }
-
-    // ── Also update the other cache if the product exists there ──
-    const otherKey = isFeaturedCache ? ['productFeed', regularFilters] : ['productFeed', featuredFilters];
-    const otherData = queryClient.getQueryData(otherKey);
-    if (otherData) {
-      const otherPages = otherData.pages.map((page) => {
-        const idx = page.products.findIndex(p => p.id === productId);
-        if (idx !== -1) {
-          const newProducts = [...page.products];
-          newProducts[idx] = updatedProduct;
-          return { ...page, products: newProducts };
-        }
-        return page;
-      });
-      queryClient.setQueryData(otherKey, { ...otherData, pages: otherPages });
-    }
-
-    // ── Update product detail cache ──
-    queryClient.setQueryData(['productDetail', productId], updatedProduct);
-
-    // ── Call the mutation ──
+    // 2. Fire backend mutation
     upvoteMutation.mutate(productId, {
-      onSuccess: (result) => {
-        const serverVoted = result.action === 'added';
-        const serverUpvotes = result.upvotes;
-        const finalProduct = { ...currentProduct, upvotes: serverUpvotes, userVoted: serverVoted };
-
-        // Update both caches with server values
-        [['productFeed', regularFilters], ['productFeed', featuredFilters]].forEach((key) => {
-          const cache = queryClient.getQueryData(key);
-          if (cache) {
-            const newPages = cache.pages.map((page) => {
-              const idx = page.products.findIndex(p => p.id === productId);
-              if (idx !== -1) {
-                const newProducts = [...page.products];
-                newProducts[idx] = finalProduct;
-                return { ...page, products: newProducts };
-              }
-              return page;
-            });
-            queryClient.setQueryData(key, { ...cache, pages: newPages });
-          }
-        });
-
-        // Update detail cache
-        queryClient.setQueryData(['productDetail', productId], finalProduct);
-        setLocalVote(productId, serverVoted, serverUpvotes);
-      },
       onError: () => {
-        // Revert both caches
-        const revertProduct = { ...currentProduct, upvotes: prevUpvotes, userVoted: prevUserVoted };
-        [['productFeed', regularFilters], ['productFeed', featuredFilters]].forEach((key) => {
-          const cache = queryClient.getQueryData(key);
-          if (cache) {
-            const newPages = cache.pages.map((page) => {
-              const idx = page.products.findIndex(p => p.id === productId);
-              if (idx !== -1) {
-                const newProducts = [...page.products];
-                newProducts[idx] = revertProduct;
-                return { ...page, products: newProducts };
-              }
-              return page;
-            });
-            queryClient.setQueryData(key, { ...cache, pages: newPages });
-          }
-        });
-        queryClient.setQueryData(['productDetail', productId], revertProduct);
-        setLocalVote(productId, prevUserVoted, prevUpvotes);
         toast.error('Failed to upvote');
-      },
+        // Rollback on error
+        queryClient.invalidateQueries({ queryKey: ['productFeed'] });
+      }
     });
   };
 
-  // ── Loading state ──
-  if (isLoading && !featuredProducts.length && !regularProducts.length) {
-    return (
-      <>
-        <Meta title="Product Feed – ProductTrend" />
-        <div className="max-w-6xl mx-auto px-4 py-8 animate-pulse">
-          <div className="h-8 w-48 bg-slate-200 rounded-lg mb-6" />
-          <div className="flex flex-wrap gap-3 mb-6">
-            <div className="h-10 w-48 bg-slate-200 rounded-xl" />
-            <div className="h-10 w-32 bg-slate-200 rounded-xl" />
-            <div className="h-10 w-32 bg-slate-200 rounded-xl" />
-          </div>
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-4 h-24" />
-            ))}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  if (isError && !regularProducts.length && !featuredProducts.length) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8 text-center">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <p className="text-red-600 font-medium">Failed to load products.</p>
-          <button
-            onClick={() => { refetchFeatured(); refetchRegular(); }}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition"
-          >
-            <FiRefreshCw className="w-4 h-4" /> Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const hasFeatured = featuredProducts.length > 0;
-
   return (
     <>
-      <Meta title="Product Feed – ProductTrend" description="Discover and upvote the latest products." />
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <FiTrendingUp className="text-purple-600" />
-            Product Feed
-          </h1>
-          <div className="flex items-center gap-2">
-            {isAuthenticated ? (
-              <>
-                <button
-                  onClick={() => router.push('/productstrend/launch')}
-                  className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition shadow-sm text-sm"
-                >
-                  Launch Product
+      <Meta title="Product Feed – Make Trend" description="Discover and upvote the latest tech products, tools, and startups." />
+      <div className="min-h-screen bg-slate-50 pb-16">
+        
+        {/* ── Header Banner ── */}
+        <div className="bg-white border-b border-slate-200/80 pt-8 pb-6 px-4">
+          <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-black text-slate-900 flex items-center gap-3 tracking-tight">
+                <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
+                  <FiTrendingUp className="w-6 h-6" />
+                </div>
+                Product Directory
+              </h1>
+              <p className="text-sm sm:text-base font-medium text-slate-500 mt-2">Discover, upvote, and launch the best new products.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {isAuthenticated ? (
+                <>
+                  <button onClick={() => router.push('/productstrend/my-products')} className="px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition text-sm shadow-sm">
+                    My Products
+                  </button>
+                  <button onClick={() => router.push('/productstrend/launch')} className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg transition shadow-sm text-sm flex items-center gap-2 active:scale-95">
+                    <FiPlus className="w-5 h-5" /> Launch Product
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => router.push('/login?redirect=/productstrend/feed')} className="px-8 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition text-sm shadow-sm">
+                  Sign In to Upvote
                 </button>
-                <button
-                  onClick={() => router.push('/productstrend/my-products')}
-                  className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition text-sm"
-                >
-                  My Products
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => router.push('/login?redirect=/productstrend/feed')}
-                className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition text-sm"
-              >
-                Sign In to Upvote
-              </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── Search & Filters ── */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex flex-1 gap-2">
-              <div className="relative flex-1">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Search products..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-                />
-                {searchInput && (
-                  <button
-                    onClick={() => setSearchInput('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <FiX className="w-4 h-4" />
-                  </button>
-                )}
+        <div className="max-w-5xl mx-auto px-4 mt-8">
+          
+          {/* ── Search & Filters Bar ── */}
+          <div className="bg-white rounded-[2rem] border border-slate-200/80 p-5 shadow-sm mb-10">
+            <div className="flex flex-col md:flex-row gap-4">
+              
+              {/* Search Box */}
+              <div className="flex flex-1 gap-2">
+                <div className="relative flex-1">
+                  <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Search by name, tagline, or description..."
+                    className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-[1.25rem] text-sm font-semibold focus:bg-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
+                  />
+                  {searchInput && (
+                    <button onClick={() => setSearchInput('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-200 rounded-full p-1 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <button onClick={triggerSearch} className="px-8 py-3.5 bg-slate-900 text-white rounded-[1.25rem] hover:bg-slate-800 transition text-sm font-bold shadow-sm whitespace-nowrap active:scale-95">
+                  Search
+                </button>
               </div>
-              <button
-                onClick={triggerSearch}
-                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <FiSearch className="w-4 h-4" /> Search
-              </button>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <select
-                  value={category}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
-              <div className="relative">
+              {/* Sort Dropdown */}
+              <div className="relative min-w-[200px]">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <FiFilter className="w-4 h-4" />
+                </div>
                 <select
                   value={sortBy}
-                  onChange={(e) => handleSortChange(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  onChange={(e) => { setSortBy(e.target.value); scrollToTop(); }}
+                  className="w-full appearance-none bg-white border border-slate-200 rounded-[1.25rem] pl-11 pr-10 py-3.5 text-sm font-bold text-slate-700 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition cursor-pointer"
                 >
-                  <option value="most-upvoted">Most Upvoted</option>
-                  <option value="newest">Newest</option>
-                  <option value="oldest">Oldest</option>
-                  <option value="most-commented">Most Comments</option>
+                  <option value="most-upvoted">🔥 Most Upvoted</option>
+                  <option value="newest">✨ Newest Releases</option>
+                  <option value="oldest">🕰️ Oldest First</option>
+                  <option value="most-commented">💬 Most Discussed</option>
                 </select>
-                <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <FiChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none w-5 h-5" />
               </div>
             </div>
-          </div>
 
-          {/* Active filters chips */}
-          {(searchQuery || category !== 'All' || sortBy !== 'most-upvoted') && (
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-              <div className="flex flex-wrap gap-2">
-                {searchQuery && (
-                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                    Search: {searchQuery}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSearchInput(''); setSearchQuery(''); }} />
-                  </span>
-                )}
-                {category !== 'All' && (
-                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                    {category}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setCategory('All')} />
-                  </span>
-                )}
-                {sortBy !== 'most-upvoted' && (
-                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                    {sortBy.replace('-', ' ')}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setSortBy('most-upvoted')} />
-                  </span>
-                )}
-              </div>
-              <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 font-medium">
-                Clear All
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* ── FEATURED PRODUCTS (Top 100) ── */}
-        {hasFeatured && (
-          <div className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
-              <FiTrendingUp className="text-purple-600 text-xl" />
-              <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
-              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                Top {featuredProducts.length}
-              </span>
-            </div>
-            <div className="space-y-4">
-              {featuredProducts.map((product, idx) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isFeatured
-                  rank={idx + 1}
-                  onUpvote={handleUpvote}
-                  isAuthenticated={isAuthenticated}
-                  isUpvoting={upvoteMutation.isLoading}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── REGULAR PRODUCTS (Newest) ── */}
-        <div>
-          {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
-            <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
-              <div className="text-5xl mb-4">📭</div>
-              <h3 className="text-lg font-semibold text-slate-900">
-                {hasFeatured ? 'No more products' : 'No products found'}
-              </h3>
-              <p className="text-slate-500 text-sm">
-                {searchQuery
-                  ? 'No results match your search. Try adjusting your query.'
-                  : isAuthenticated
-                  ? 'Be the first to launch a product!'
-                  : 'Sign in to join the community.'}
-              </p>
-              {isAuthenticated && !searchQuery && (
-                <button
-                  onClick={() => router.push('/productstrend/launch')}
-                  className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
-                >
-                  Launch Product
-                </button>
-              )}
-            </div>
-          ) : (
-            <div>
-              {hasFeatured && regularProducts.length > 0 && (
-                <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
-                </div>
-              )}
-              <div className="space-y-4">
-                {regularProducts.map((product, index) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    isFeatured={false}
-                    onUpvote={handleUpvote}
-                    isAuthenticated={isAuthenticated}
-                    isUpvoting={upvoteMutation.isLoading}
-                    ref={index === regularProducts.length - 1 ? lastElementRef : undefined}
-                  />
+            {/* Category Pills (Horizontal Scroll) */}
+            <div className="mt-5 pt-5 border-t border-slate-100">
+              <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide snap-x">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => { setCategory(cat); scrollToTop(); }}
+                    className={`snap-start px-5 py-2.5 rounded-xl whitespace-nowrap text-sm font-bold transition shadow-sm border ${
+                      category === cat
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-purple-600/20'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700'
+                    }`}
+                  >
+                    {cat}
+                  </button>
                 ))}
               </div>
             </div>
-          )}
 
-          {hasMore && (
-            <div className="py-6 flex justify-center">
-              {isFetchingNextPage ? (
-                <div className="flex items-center gap-2 text-slate-400">
-                  <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
-                  Loading more...
+            {/* Active Filters Clear Bar */}
+            {(searchQuery || category !== 'All' || sortBy !== 'most-upvoted') && (
+              <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-100/80">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-slate-400 mr-1">Active Filters:</span>
+                  {searchQuery && (
+                    <span className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">
+                      Search: {searchQuery}
+                      <FiX className="w-3.5 h-3.5 cursor-pointer hover:text-purple-900" onClick={() => { setSearchInput(''); setSearchQuery(''); }} />
+                    </span>
+                  )}
+                  {category !== 'All' && (
+                    <span className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">
+                      {category}
+                      <FiX className="w-3.5 h-3.5 cursor-pointer hover:text-purple-900" onClick={() => setCategory('All')} />
+                    </span>
+                  )}
+                  {sortBy !== 'most-upvoted' && (
+                    <span className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">
+                      {sortBy.replace('-', ' ')}
+                      <FiX className="w-3.5 h-3.5 cursor-pointer hover:text-purple-900" onClick={() => setSortBy('most-upvoted')} />
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <div className="h-4" />
-              )}
+                <button onClick={clearFilters} className="text-xs font-bold text-red-500 hover:text-red-700 transition px-3 py-1.5 rounded-lg hover:bg-red-50">
+                  Clear All
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Content Area ── */}
+          {isLoading ? (
+            <div className="space-y-5 animate-pulse">
+              <div className="h-6 w-40 bg-slate-200 rounded-lg mb-6" />
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col sm:flex-row gap-6">
+                  <div className="w-20 h-20 bg-slate-200 rounded-[1.25rem] flex-shrink-0" />
+                  <div className="flex-1 space-y-3 pt-2">
+                    <div className="h-6 w-48 bg-slate-200 rounded" />
+                    <div className="h-4 w-full bg-slate-200 rounded" />
+                    <div className="h-4 w-32 bg-slate-200 rounded" />
+                  </div>
+                  <div className="w-20 h-20 bg-slate-200 rounded-[1.25rem] flex-shrink-0 hidden sm:block" />
+                </div>
+              ))}
             </div>
+          ) : isError && !regularProducts.length && !featuredProducts.length ? (
+            <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
+              <div className="text-5xl mb-4">⚠️</div>
+              <p className="text-slate-800 font-bold text-xl mb-2">Failed to load products.</p>
+              <p className="text-slate-500 font-medium mb-6">There was an issue connecting to the server.</p>
+              <button onClick={() => { refetchFeatured(); refetchRegular(); }} className="mt-2 inline-flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-sm">
+                <FiRefreshCw className="w-5 h-5" /> Try Again
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* ── Featured Section ── */}
+              {showFeatured && featuredProducts.length > 0 && (
+                <div className="mb-12">
+                  <div className="flex items-center gap-3 mb-6 px-1">
+                    <div className="p-2 bg-gradient-to-br from-amber-100 to-orange-100 rounded-xl shadow-sm border border-amber-200/50">
+                      <FaFire className="text-amber-500 w-5 h-5" />
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Featured Highlights</h2>
+                  </div>
+                  <div className="space-y-5">
+                    {featuredProducts.map((product, idx) => (
+                      <ProductCard
+                        key={`featured-${product.id}`}
+                        product={product}
+                        isFeatured
+                        rank={idx + 1}
+                        onUpvote={handleUpvote}
+                        isAuthenticated={isAuthenticated}
+                        isUpvoting={upvoteMutation.isLoading}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Regular Products Section ── */}
+              <div>
+                {regularProducts.length === 0 ? (
+                  <div className="text-center py-24 bg-white rounded-[2rem] border border-slate-200/80 shadow-sm">
+                    <div className="text-7xl mb-6 opacity-40">📭</div>
+                    <h3 className="text-2xl font-black text-slate-900 mb-2">
+                      {showFeatured ? 'No more products' : 'No products found'}
+                    </h3>
+                    <p className="text-slate-500 text-base font-medium max-w-sm mx-auto">
+                      {searchQuery
+                        ? 'No results match your search filters. Try adjusting your query.'
+                        : 'Be the first to launch a product in this category!'}
+                    </p>
+                    {isAuthenticated && !searchQuery && (
+                      <button onClick={() => router.push('/productstrend/launch')} className="mt-8 inline-flex items-center gap-2 px-8 py-3.5 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-md hover:shadow-purple-500/20 active:scale-95">
+                        <FiPlus className="w-5 h-5" /> Launch Your Product
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {showFeatured && regularProducts.length > 0 && (
+                      <div className="flex items-center gap-3 mb-6 px-1 mt-12 border-t border-slate-200 pt-10">
+                        <div className="p-2 bg-purple-100 rounded-xl border border-purple-200/50">
+                          <FiClock className="text-purple-600 w-5 h-5" />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Recent Launches</h2>
+                      </div>
+                    )}
+                    <div className="space-y-5">
+                      {regularProducts.map((product, index) => (
+                        <ProductCard
+                          key={`${product.id}-${index}`}
+                          product={product}
+                          isFeatured={false}
+                          onUpvote={handleUpvote}
+                          isAuthenticated={isAuthenticated}
+                          isUpvoting={upvoteMutation.isLoading}
+                          ref={index === regularProducts.length - 1 ? lastElementRef : undefined}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* ── Infinite Scroll Sentinel ── */}
+                {hasMore && (
+                  <div className="py-12 flex justify-center">
+                    {isFetchingNextPage ? (
+                      <div className="flex items-center gap-3 px-8 py-4 bg-white border border-slate-200 rounded-full shadow-sm text-sm font-bold text-purple-600">
+                        <FiLoader className="w-5 h-5 animate-spin" />
+                        Loading more products...
+                      </div>
+                    ) : (
+                      <div className="h-4" />
+                    )}
+                  </div>
+                )}
+
+                {!hasMore && regularProducts.length > 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-sm font-bold text-slate-400 bg-slate-100 inline-block px-8 py-3 rounded-full border border-slate-200/60">
+                      You've reached the end of the list 🎉
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
-          {!hasMore && regularProducts.length > 0 && (
-            <p className="text-center text-xs text-slate-400 py-6">
-              You've reached the end 🎉
-            </p>
-          )}
         </div>
       </div>
     </>
   );
 }
+
