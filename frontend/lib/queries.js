@@ -468,7 +468,7 @@ export function useUpdateExchangeStatus() {
 
 // ── 🚀 PRODUCT TREND QUERIES ──
 
-// 1. Product Feed (infinite scroll with filters) – PUBLIC
+// Product Feed (Fix: Removed keepPreviousData to ensure accurate fetching visually)
 export function useProductFeed(filters = {}, enabled = true) {
   const queryKey = ['productFeed', filters];
   return useInfiniteQuery({
@@ -480,7 +480,6 @@ export function useProductFeed(filters = {}, enabled = true) {
         ...(pageParam && { lastId: pageParam }),
       });
       const url = `/productstrend/feed?${params.toString()}`;
-      // ✅ Send token if available
       const token = await getToken().catch(() => null);
       const data = await apiRequest(url, {}, token);
       return {
@@ -492,7 +491,6 @@ export function useProductFeed(filters = {}, enabled = true) {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    keepPreviousData: true,
   });
 }
 
