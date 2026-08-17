@@ -6049,7 +6049,7 @@ app.get('/api/productstrend/feed', async (req, res) => {
       } catch (e) { /* ignore */ }
     }
 
-    // ── If search provided ──
+    // ── If search provided (unchanged) ──
     if (search) {
       const cacheKey = `productstrend:feed:search:${search}:category:${category || 'all'}:sort:${sort}:limit:${limit}:lastId:${lastId || 'null'}`;
       const result = await getOrSetCache(cacheKey, async () => {
@@ -6124,19 +6124,41 @@ app.get('/api/productstrend/feed', async (req, res) => {
       return res.json({ success: true, products: productsWithVote, hasMore: result.hasMore, lastId: result.lastId });
     }
 
-    // ── Non‑search ──
+    // ── 🔥 FIXED: Non‑search with proper sort handling ──
     const feedKey = getProductFeedKey(category || null, sort);
+
+    // Determine if we need ascending order (oldest) or descending (everything else)
+    const isAscending = sort === 'oldest';
+
     let offset = 0;
     if (lastId) {
-      const rank = await redis.zrevrank(feedKey, lastId);
-      if (rank !== null) offset = rank + 1;
+      if (isAscending) {
+        // For ascending, we use zrank
+        const rank = await redis.zrank(feedKey, lastId);
+        if (rank !== null) offset = rank + 1;
+      } else {
+        // For descending, we use zrevrank
+        const rank = await redis.zrevrank(feedKey, lastId);
+        if (rank !== null) offset = rank + 1;
+      }
     }
+
     const end = offset + limit - 1;
-    const productIds = await redis.zrevrange(feedKey, offset, end);
+    let productIds;
+    if (isAscending) {
+      productIds = await redis.zrange(feedKey, offset, end);
+    } else {
+      productIds = await redis.zrevrange(feedKey, offset, end);
+    }
 
     let hasMore = false;
     if (productIds.length === limit) {
-      const next = await redis.zrevrange(feedKey, offset + limit, offset + limit);
+      let next;
+      if (isAscending) {
+        next = await redis.zrange(feedKey, offset + limit, offset + limit);
+      } else {
+        next = await redis.zrevrange(feedKey, offset + limit, offset + limit);
+      }
       if (next.length > 0) hasMore = true;
     }
 
