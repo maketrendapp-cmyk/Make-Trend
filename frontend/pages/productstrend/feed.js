@@ -20,7 +20,9 @@ import {
   FiBox,
   FiPlus,
   FiFilter,
+  FiRefreshCw,
 } from 'react-icons/fi';
+import { FaFire } from 'react-icons/fa';
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
@@ -70,9 +72,10 @@ const ProductCard = React.forwardRef(({
   isAuthenticated,
   isUpvoting,
 }, ref) => {
+  const [imgFailed, setImgFailed] = useState(false);
   const isLiked = product.userVoted || false;
   const upvotes = product.upvotes || 0;
-  const hasImage = !!(product.logo || product.imageUrl);
+  const hasImage = !!(product.logo || product.imageUrl) && !imgFailed;
 
   let cardClasses = 'bg-white rounded-3xl border p-5 sm:p-6 hover:shadow-lg transition-all duration-300 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 group';
   let badge = null;
@@ -105,10 +108,7 @@ const ProductCard = React.forwardRef(({
               alt={product.name}
               className="w-full h-full object-cover"
               loading="lazy"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                e.target.parentElement.innerHTML = `<div class="text-3xl text-slate-300"><svg stroke="currentColor" fill="none" viewBox="0 0 24 24" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></div>`;
-              }}
+              onError={() => setImgFailed(true)}
             />
           </div>
         ) : (
@@ -184,7 +184,6 @@ export default function ProductTrendFeed() {
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('most-upvoted');
 
-  // Build filters dynamically
   const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
@@ -201,14 +200,12 @@ export default function ProductTrendFeed() {
     return filters;
   }, [category]);
 
-  // Featured feed
   const {
     data: featuredData,
     isLoading: featuredLoading,
     refetch: refetchFeatured,
   } = useProductFeed(featuredFilters, true);
 
-  // Regular feed
   const {
     data: regularData,
     fetchNextPage,
@@ -277,7 +274,6 @@ export default function ProductTrendFeed() {
     }
   };
 
-  // ✅ Fixed Handlers: ONLY update state. React Query auto-refetches when filter objects change!
   const handleCategoryChange = (val) => {
     setCategory(val);
     scrollToTop();
@@ -512,7 +508,7 @@ export default function ProductTrendFeed() {
               </div>
             </div>
 
-            {/* Category Pills (Horizontal Scroll) */}
+            {/* Category Pills */}
             <div className="mt-4 pt-4 border-t border-slate-100">
               <div className="flex overflow-x-auto gap-2.5 pb-2 scrollbar-hide snap-x">
                 {CATEGORIES.map((cat) => (
@@ -542,7 +538,7 @@ export default function ProductTrendFeed() {
             )}
           </div>
 
-          {/* ── Loading State ── */}
+          {/* ── Content Area ── */}
           {isLoading ? (
             <div className="space-y-4 animate-pulse">
               <div className="h-6 w-32 bg-slate-200 rounded-lg mb-6" />
@@ -568,7 +564,7 @@ export default function ProductTrendFeed() {
             </div>
           ) : (
             <>
-              {/* ── Featured Section ── */}
+              {/* Featured Section */}
               {showFeatured && featuredProducts.length > 0 && (
                 <div className="mb-10">
                   <div className="flex items-center gap-2 mb-5 px-1">
@@ -591,7 +587,7 @@ export default function ProductTrendFeed() {
                 </div>
               )}
 
-              {/* ── Regular Products Section ── */}
+              {/* Regular Section */}
               <div>
                 {regularProducts.length === 0 ? (
                   <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
@@ -618,7 +614,6 @@ export default function ProductTrendFeed() {
                         <h2 className="text-lg font-black text-slate-900 tracking-tight">Recent Launches</h2>
                       </div>
                     )}
-                    {/* KEY FIX: `filterKey` forces a clean rerender so old lists don't stick around visually */}
                     <div key={filterKey} className="space-y-4">
                       {regularProducts.map((product, index) => (
                         <ProductCard
@@ -635,7 +630,7 @@ export default function ProductTrendFeed() {
                   </>
                 )}
 
-                {/* ── Infinite Scroll Sentinel ── */}
+                {/* Infinite Scroll Sentinel */}
                 {hasMore && (
                   <div className="py-10 flex justify-center">
                     {isFetchingNextPage ? (
@@ -657,8 +652,8 @@ export default function ProductTrendFeed() {
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
         </div>
       </div>
