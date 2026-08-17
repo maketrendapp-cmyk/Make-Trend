@@ -1,5 +1,5 @@
 // pages/productstrend/feed.js
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -235,9 +235,9 @@ export default function ProductTrendFeed() {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
     if (category !== 'All') filters.category = category;
-    filters.sort = sortBy;   // ✅ FIXED: use sortBy instead of hardcoded 'newest'
+    filters.sort = sortBy;   // ✅ uses the actual sort state
     return filters;
-  }, [searchQuery, category, sortBy]); // ✅ Added sortBy dependency
+  }, [searchQuery, category, sortBy]);
 
   // ── Featured filters (top 100 most-upvoted) ──
   const featuredFilters = useMemo(() => {
@@ -255,9 +255,6 @@ export default function ProductTrendFeed() {
     refetch: refetchFeatured,
   } = useProductFeed(featuredFilters, true);
 
-  const featuredProducts = featuredData?.pages?.[0]?.products || [];
-  const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
-
   // ── React Query: Regular feed ──
   const {
     data: regularData,
@@ -268,6 +265,24 @@ export default function ProductTrendFeed() {
     refetch: refetchRegular,
     isError: regularError,
   } = useProductFeed(regularFilters, true);
+
+  // ── 🧹 Reset the infinite query when filters change ──
+  const previousFilters = useRef({ sort: sortBy, category, search: searchQuery });
+
+  useEffect(() => {
+    const current = { sort: sortBy, category, search: searchQuery };
+    const prev = previousFilters.current;
+
+    // If any filter changed, reset the infinite query to page 1
+    if (current.sort !== prev.sort || current.category !== prev.category || current.search !== prev.search) {
+      // This clears all cached pages and refetches from page 1
+      queryClient.resetQueries({ queryKey: ['productFeed', regularFilters], exact: true });
+      previousFilters.current = current;
+    }
+  }, [sortBy, category, searchQuery, queryClient, regularFilters]);
+
+  const featuredProducts = featuredData?.pages?.[0]?.products || [];
+  const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
 
   const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
   const regularProducts = useMemo(() => {
