@@ -229,10 +229,9 @@ export default function ProductTrendFeed() {
   const featuredProducts = featuredData?.pages?.[0]?.products || [];
   const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
 
+  // ── 🔥 THE FIX: remove useMemo so the list is computed fresh on every render ──
   const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
-  const regularProducts = useMemo(() => {
-    return regularProductsAll.filter(p => !featuredIds.has(p.id));
-  }, [regularProductsAll, featuredIds]);
+  const regularProducts = regularProductsAll.filter(p => !featuredIds.has(p.id));
 
   const hasMore = hasNextPage;
   const isLoading = featuredLoading && regularLoading && !regularProductsAll.length && !featuredProducts.length;
@@ -273,7 +272,6 @@ export default function ProductTrendFeed() {
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
-      // ── Force refetch ──
       refetchRegular();
       scrollToTop();
     }
@@ -288,7 +286,6 @@ export default function ProductTrendFeed() {
 
   const handleCategoryChange = (val) => {
     setCategory(val);
-    // ── Force refetch ──
     refetchRegular();
     refetchFeatured();
     scrollToTop();
@@ -296,7 +293,6 @@ export default function ProductTrendFeed() {
 
   const handleSortChange = (val) => {
     setSortBy(val);
-    // ── Force refetch ──
     refetchRegular();
     scrollToTop();
   };
@@ -639,7 +635,6 @@ export default function ProductTrendFeed() {
                   <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
                 </div>
               )}
-              {/* ✅ THE SIMPLE FIX: just use filterKey to force re-render */}
               <div key={filterKey} className="space-y-4">
                 {regularProducts.map((product, index) => (
                   <ProductCard
