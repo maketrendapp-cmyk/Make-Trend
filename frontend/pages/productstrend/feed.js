@@ -200,22 +200,26 @@ export default function ProductTrendFeed() {
     return filters;
   }, [searchQuery, category, sortBy]);
 
+  // ── Only fetch featured when sorting by most-upvoted and no search ──
+  const shouldFetchFeatured = sortBy === 'most-upvoted' && !searchQuery;
+
   const featuredFilters = useMemo(() => {
-    const filters = {};
+    const filters = {
+      sort: 'most-upvoted',
+      limit: 100,
+    };
     if (category !== 'All') filters.category = category;
-    filters.sort = 'most-upvoted';
-    filters.limit = 100;
     return filters;
   }, [category]);
 
-  // ── Featured feed ──
+  // ── Featured feed – enabled only when it makes sense ──
   const {
     data: featuredData,
     isLoading: featuredLoading,
     refetch: refetchFeatured,
-  } = useProductFeed(featuredFilters, true);
+  } = useProductFeed(featuredFilters, shouldFetchFeatured);
 
-  // ── Regular feed ──
+  // ── Regular feed – always enabled ──
   const {
     data: regularData,
     fetchNextPage,
@@ -229,12 +233,12 @@ export default function ProductTrendFeed() {
   const featuredProducts = featuredData?.pages?.[0]?.products || [];
   const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
 
-  // ── 🔥 THE FIX: remove useMemo so the list is computed fresh on every render ──
+  // ── Compute regular products – filter out featured ones ──
   const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
   const regularProducts = regularProductsAll.filter(p => !featuredIds.has(p.id));
 
   const hasMore = hasNextPage;
-  const isLoading = featuredLoading && regularLoading && !regularProductsAll.length && !featuredProducts.length;
+  const isLoading = regularLoading && !regularProductsAll.length;
   const isError = regularError && !regularProducts.length;
 
   const upvoteMutation = useUpvoteProduct();
@@ -272,7 +276,9 @@ export default function ProductTrendFeed() {
   const triggerSearch = () => {
     if (searchInput.trim() !== searchQuery.trim()) {
       setSearchQuery(searchInput);
+      // Refetch both
       refetchRegular();
+      if (shouldFetchFeatured) refetchFeatured();
       scrollToTop();
     }
   };
@@ -287,7 +293,7 @@ export default function ProductTrendFeed() {
   const handleCategoryChange = (val) => {
     setCategory(val);
     refetchRegular();
-    refetchFeatured();
+    if (shouldFetchFeatured) refetchFeatured();
     scrollToTop();
   };
 
@@ -437,7 +443,7 @@ export default function ProductTrendFeed() {
   };
 
   // ── Loading state ──
-  if (isLoading && !featuredProducts.length && !regularProducts.length) {
+  if (isLoading && !regularProducts.length && !shouldFetchFeatured) {
     return (
       <>
         <Meta title="Product Feed – ProductTrend" />
@@ -458,12 +464,12 @@ export default function ProductTrendFeed() {
     );
   }
 
-  if (isError && !regularProducts.length && !featuredProducts.length) {
+  if (isError && !regularProducts.length) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <p className="text-red-600 font-medium">Failed to load products.</p>
-          <button onClick={() => { refetchFeatured(); refetchRegular(); }} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
+          <button onClick={() => refetchRegular()} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
             <FiRefreshCw className="w-4 h-4" /> Retry
           </button>
         </div>
@@ -471,7 +477,7 @@ export default function ProductTrendFeed() {
     );
   }
 
-  const showFeatured = sortBy === 'most-upvoted' && !searchQuery;
+  const showFeatured = shouldFetchFeatured && featuredProducts.length > 0;
   const filterKey = `${sortBy}-${category}-${searchQuery}`;
 
   return (
@@ -583,7 +589,7 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {showFeatured && featuredProducts.length > 0 && (
+        {showFeatured && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
               <FiTrendingUp className="text-purple-600 text-xl" />
