@@ -5,7 +5,10 @@ import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
-import { useProductFeed, useUpvoteProduct } from '../../lib/queries';
+import {
+  useProductFeed,
+  useUpvoteProduct,
+} from '../../lib/queries';
 import toast from 'react-hot-toast';
 import {
   FiTrendingUp,
@@ -15,14 +18,11 @@ import {
   FiSearch,
   FiX,
   FiLoader,
+  FiRefreshCw,
   FiClock,
   FiMessageCircle,
   FiBox,
-  FiPlus,
-  FiFilter,
-  FiRefreshCw,
 } from 'react-icons/fi';
-import { FaFire } from 'react-icons/fa';
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
 
@@ -77,32 +77,32 @@ const ProductCard = React.forwardRef(({
   const upvotes = product.upvotes || 0;
   const hasImage = !!(product.logo || product.imageUrl) && !imgFailed;
 
-  let cardClasses = 'bg-white rounded-3xl border p-5 sm:p-6 hover:shadow-lg transition-all duration-300 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 group';
+  let cardClasses = 'bg-white rounded-2xl border p-4 hover:shadow-md transition flex items-center gap-4';
   let badge = null;
 
   if (isFeatured && rank) {
     if (rank === 1) {
-      cardClasses += ' border-amber-300 bg-gradient-to-br from-amber-50/50 to-white shadow-md';
-      badge = <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-sm">👑 #1</span>;
+      cardClasses += ' border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-md';
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">👑 #1</span>;
     } else if (rank === 2) {
-      cardClasses += ' border-slate-300 bg-gradient-to-br from-slate-50 to-white shadow-sm';
-      badge = <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700">🥈 #2</span>;
+      cardClasses += ' border-slate-400 bg-gradient-to-br from-slate-50 to-gray-100 shadow-md';
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-300 text-slate-700">🥈 #2</span>;
     } else if (rank === 3) {
-      cardClasses += ' border-orange-300 bg-gradient-to-br from-orange-50 to-white shadow-sm';
-      badge = <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-orange-200 text-orange-800">🥉 #3</span>;
+      cardClasses += ' border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-md';
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">🥉 #3</span>;
     } else {
-      cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/30 to-white';
-      badge = <span className="text-xs font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">#{rank}</span>;
+      cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
+      badge = <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">#{rank}</span>;
     }
   } else {
-    cardClasses += ' border-slate-200/80';
+    cardClasses += ' border-slate-200';
   }
 
   return (
     <div ref={ref} className={cardClasses}>
-      <Link href={`/productstrend/${product.id}`} className="flex-shrink-0 flex sm:block justify-between items-center">
+      <Link href={`/productstrend/${product.id}`} className="flex-shrink-0">
         {hasImage ? (
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-50 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
             <img
               src={product.logo || product.imageUrl}
               alt={product.name}
@@ -112,62 +112,60 @@ const ProductCard = React.forwardRef(({
             />
           </div>
         ) : (
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-3xl text-slate-400 border border-slate-200 shadow-sm group-hover:scale-105 transition-transform">
-            <FiBox className="w-8 h-8" />
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-3xl text-slate-400 border border-slate-200 shadow-sm">
+            <FiBox className="w-7 h-7" />
           </div>
         )}
       </Link>
 
-      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <Link href={`/productstrend/${product.id}`} className="block min-w-0">
-              <h3 className="font-extrabold text-slate-900 text-lg hover:text-purple-600 transition truncate">
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <Link href={`/productstrend/${product.id}`} className="block">
+              <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition truncate">
                 {product.name}
               </h3>
             </Link>
             {isFeatured && badge && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mt-0.5">
                 {badge}
-                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-500">Featured</span>
+                <span className="text-xs text-purple-400">🔥 Featured</span>
               </div>
             )}
           </div>
-
-          <p className="text-sm font-medium text-slate-500 line-clamp-2 leading-relaxed mb-3">
-            {product.tagline}
-          </p>
-
-          <div className="flex items-center gap-3 text-[11px] sm:text-xs font-semibold text-slate-400 flex-wrap">
-            <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
-              <span className="w-4 h-4 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                {product.maker?.avatar ? (
-                  <img src={product.maker.avatar} alt="User" className="w-full h-full object-cover" />
-                ) : (
-                  <FiUser className="w-2.5 h-2.5 text-slate-500" />
-                )}
-              </span>
-              <span className="text-slate-600 truncate max-w-[100px]">{product.maker?.username || 'Anonymous'}</span>
-            </span>
-            <span className="flex items-center gap-1.5"><FiMessageCircle className="w-3.5 h-3.5" />{product.commentsCount || 0}</span>
-            {product.category && (
-              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200/60">{product.category}</span>
-            )}
-          </div>
+          <button
+            onClick={() => onUpvote(product.id)}
+            disabled={!isAuthenticated || isUpvoting}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition text-xs font-medium flex-shrink-0 ${
+              isLiked
+                ? 'bg-purple-100 border-purple-300 text-purple-700'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-purple-50 hover:border-purple-200'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <FiHeart className={`w-3.5 h-3.5 ${isLiked ? 'fill-purple-600 text-purple-600' : ''}`} />
+            <span>{upvotes}</span>
+          </button>
         </div>
 
-        <button
-          onClick={() => onUpvote(product.id)}
-          disabled={!isAuthenticated || isUpvoting}
-          className={`flex sm:flex-col items-center justify-center gap-2 sm:gap-1 px-5 py-2.5 sm:px-4 sm:py-3 rounded-2xl border-2 transition-all font-bold flex-shrink-0 active:scale-95 shadow-sm ${
-            isLiked
-              ? 'bg-purple-50 border-purple-500 text-purple-700'
-              : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300 hover:bg-purple-50/50'
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
-        >
-          <FiHeart className={`w-4 h-4 sm:w-5 sm:h-5 ${isLiked ? 'fill-purple-600 text-purple-600' : 'text-slate-400'}`} />
-          <span className="text-sm sm:text-base leading-none">{upvotes}</span>
-        </button>
+        <p className="text-sm text-slate-500 line-clamp-2 mt-1">{product.tagline}</p>
+
+        <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
+          <span className="flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+              {product.maker?.avatar ? (
+                <img src={product.maker.avatar} alt={product.maker.username || 'User'} className="w-full h-full object-cover" />
+              ) : (
+                <FiUser className="w-3 h-3 text-slate-500" />
+              )}
+            </span>
+            <span className="font-medium text-slate-600">{product.maker?.username || 'Anonymous'}</span>
+          </span>
+          <span className="flex items-center gap-1"><FiClock className="w-3 h-3" />{formatDate(product.createdAt)}</span>
+          <span className="flex items-center gap-1"><FiMessageCircle className="w-3 h-3" />{product.commentsCount || 0}</span>
+          {product.category && (
+            <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{product.category}</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -184,6 +182,7 @@ export default function ProductTrendFeed() {
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('most-upvoted');
 
+  // Build filters
   const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
@@ -200,12 +199,14 @@ export default function ProductTrendFeed() {
     return filters;
   }, [category]);
 
+  // Featured feed
   const {
     data: featuredData,
     isLoading: featuredLoading,
     refetch: refetchFeatured,
-  } = useProductFeed(featuredFilters, true);
+  } = useProductFeed(featuredFilters, sortBy === 'most-upvoted' && !searchQuery);
 
+  // Regular feed
   const {
     data: regularData,
     fetchNextPage,
@@ -216,13 +217,22 @@ export default function ProductTrendFeed() {
     isError: regularError,
   } = useProductFeed(regularFilters, true);
 
-  const featuredProducts = featuredData?.pages?.[0]?.products || [];
+  const featuredProducts = useMemo(() => {
+    return (sortBy === 'most-upvoted' && !searchQuery) ? (featuredData?.pages?.[0]?.products || []) : [];
+  }, [featuredData, sortBy, searchQuery]);
+
   const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
 
-  const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
+  const regularProductsAll = useMemo(() => {
+    return regularData?.pages?.flatMap((page) => page.products) || [];
+  }, [regularData]);
+
   const regularProducts = useMemo(() => {
-    return regularProductsAll.filter(p => !featuredIds.has(p.id));
-  }, [regularProductsAll, featuredIds]);
+    if (sortBy === 'most-upvoted' && !searchQuery) {
+      return regularProductsAll.filter(p => !featuredIds.has(p.id));
+    }
+    return regularProductsAll;
+  }, [regularProductsAll, featuredIds, sortBy, searchQuery]);
 
   const hasMore = hasNextPage;
   const isLoading = (featuredLoading || regularLoading) && !regularProductsAll.length && !featuredProducts.length;
@@ -279,8 +289,8 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  const handleSortChange = (e) => {
-    setSortBy(e.target.value);
+  const handleSortChange = (val) => {
+    setSortBy(val);
     scrollToTop();
   };
 
@@ -291,7 +301,6 @@ export default function ProductTrendFeed() {
     }
 
     let currentProduct = null;
-    let currentPage = null;
     let pageIndex = -1;
     let productIndex = -1;
 
@@ -301,7 +310,6 @@ export default function ProductTrendFeed() {
         const idx = page.products.findIndex(p => p.id === productId);
         if (idx !== -1) {
           currentProduct = page.products[idx];
-          currentPage = page;
           pageIndex = i;
           productIndex = idx;
           break;
@@ -315,7 +323,6 @@ export default function ProductTrendFeed() {
       const idx = page.products.findIndex(p => p.id === productId);
       if (idx !== -1) {
         currentProduct = page.products[idx];
-        currentPage = page;
         pageIndex = 0;
         productIndex = idx;
         isFeaturedCache = true;
@@ -423,238 +430,238 @@ export default function ProductTrendFeed() {
     });
   };
 
+  // Loading state
+  if (isLoading && !featuredProducts.length && !regularProducts.length) {
+    return (
+      <>
+        <Meta title="Product Feed – ProductTrend" />
+        <div className="max-w-6xl mx-auto px-4 py-8 animate-pulse">
+          <div className="h-8 w-48 bg-slate-200 rounded-lg mb-6" />
+          <div className="flex flex-wrap gap-3 mb-6">
+            <div className="h-10 w-48 bg-slate-200 rounded-xl" />
+            <div className="h-10 w-32 bg-slate-200 rounded-xl" />
+            <div className="h-10 w-32 bg-slate-200 rounded-xl" />
+          </div>
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-4 h-24" />
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (isError && !regularProducts.length && !featuredProducts.length) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8 text-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <p className="text-red-600 font-medium">Failed to load products.</p>
+          <button onClick={() => { refetchFeatured(); refetchRegular(); }} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
+            <FiRefreshCw className="w-4 h-4" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Only show featured when sorting by most-upvoted and no search
   const showFeatured = sortBy === 'most-upvoted' && !searchQuery;
   const filterKey = `${sortBy}-${category}-${searchQuery}`;
 
   return (
     <>
-      <Meta title="Product Feed – Make Trend" description="Discover and upvote the latest tech products, tools, and startups." />
-      <div className="min-h-screen bg-slate-50/50 pb-16">
-        
-        {/* ── Header Banner ── */}
-        <div className="bg-white border-b border-slate-200 pt-8 pb-6 px-4">
-          <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-2.5">
-                <FiTrendingUp className="text-purple-600" />
-                Product Directory
-              </h1>
-              <p className="text-sm font-medium text-slate-500 mt-1">Discover, upvote, and launch the best new products.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {isAuthenticated ? (
-                <>
-                  <button onClick={() => router.push('/productstrend/my-products')} className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition text-sm shadow-sm">
-                    My Products
-                  </button>
-                  <button onClick={() => router.push('/productstrend/launch')} className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg transition shadow-sm text-sm flex items-center gap-1.5">
-                    <FiPlus className="w-4 h-4" /> Launch Product
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => router.push('/login?redirect=/productstrend/feed')} className="px-6 py-2.5 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition text-sm shadow-sm">
-                  Sign In to Upvote
+      <Meta title="Product Feed – ProductTrend" description="Discover and upvote the latest products." />
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <FiTrendingUp className="text-purple-600" />
+            Product Feed
+          </h1>
+          <div className="flex items-center gap-2">
+            {isAuthenticated ? (
+              <>
+                <button onClick={() => router.push('/productstrend/launch')} className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition shadow-sm text-sm">
+                  Launch Product
                 </button>
-              )}
-            </div>
+                <button onClick={() => router.push('/productstrend/my-products')} className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition text-sm">
+                  My Products
+                </button>
+              </>
+            ) : (
+              <button onClick={() => router.push('/login?redirect=/productstrend/feed')} className="px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium">
+                Sign In to Upvote
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-4 mt-8">
-          
-          {/* ── Search & Filters Bar ── */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-4 shadow-sm mb-8">
-            <div className="flex flex-col md:flex-row gap-4">
-              
-              {/* Search Box */}
-              <div className="flex flex-1 gap-2">
-                <div className="relative flex-1">
-                  <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Search by name, tagline, or description..."
-                    className="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:bg-white focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition"
-                  />
-                  {searchInput && (
-                    <button onClick={() => setSearchInput('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-200 rounded-full p-0.5">
-                      <FiX className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-                <button onClick={triggerSearch} className="px-6 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition text-sm font-bold shadow-sm whitespace-nowrap">
-                  Search
-                </button>
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex flex-1 gap-2">
+              <div className="relative flex-1">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Search products..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                />
+                {searchInput && (
+                  <button onClick={() => setSearchInput('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <FiX className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-
-              {/* Sort Dropdown */}
-              <div className="relative min-w-[180px]">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                  <FiFilter className="w-4 h-4" />
-                </div>
-                <select
-                  value={sortBy}
-                  onChange={handleSortChange}
-                  className="w-full appearance-none bg-white border border-slate-200 rounded-2xl pl-10 pr-10 py-3 text-sm font-bold text-slate-700 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 transition cursor-pointer"
-                >
-                  <option value="most-upvoted">🔥 Most Upvoted</option>
-                  <option value="newest">✨ Newest Releases</option>
-                  <option value="oldest">🕰️ Oldest First</option>
-                  <option value="most-commented">💬 Most Discussed</option>
-                </select>
-                <FiChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
+              <button onClick={triggerSearch} className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                <FiSearch className="w-4 h-4" /> Search
+              </button>
             </div>
 
-            {/* Category Pills */}
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <div className="flex overflow-x-auto gap-2.5 pb-2 scrollbar-hide snap-x">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => handleCategoryChange(cat)}
-                    className={`snap-start px-5 py-2 rounded-xl whitespace-nowrap text-sm font-bold transition shadow-sm border ${
-                      category === cat
-                        ? 'bg-purple-600 text-white border-purple-600'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300 hover:bg-purple-50'
-                    }`}
-                  >
-                    {cat}
-                  </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <select
+                  value={category}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => handleSortChange(e.target.value)}
+                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                >
+                  <option value="most-upvoted">Most Upvoted</option>
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="most-commented">Most Comments</option>
+                </select>
+                <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          {(searchQuery || category !== 'All' || sortBy !== 'most-upvoted') && (
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+              <div className="flex flex-wrap gap-2">
+                {searchQuery && (
+                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
+                    Search: {searchQuery}
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSearchInput(''); setSearchQuery(''); }} />
+                  </span>
+                )}
+                {category !== 'All' && (
+                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
+                    {category}
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setCategory('All')} />
+                  </span>
+                )}
+                {sortBy !== 'most-upvoted' && (
+                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
+                    {sortBy.replace('-', ' ')}
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setSortBy('most-upvoted')} />
+                  </span>
+                )}
+              </div>
+              <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 font-medium">
+                Clear All
+              </button>
+            </div>
+          )}
+        </div>
+
+        {showFeatured && featuredProducts.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center gap-2 mb-4">
+              <FiTrendingUp className="text-purple-600 text-xl" />
+              <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
+              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                Top {featuredProducts.length} {category !== 'All' ? `in ${category}` : ''}
+              </span>
+            </div>
+            <div className="space-y-4">
+              {featuredProducts.map((product, idx) => (
+                <ProductCard
+                  key={`featured-${product.id}`}
+                  product={product}
+                  isFeatured
+                  rank={idx + 1}
+                  onUpvote={handleUpvote}
+                  isAuthenticated={isAuthenticated}
+                  isUpvoting={upvoteMutation.isLoading}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
+            <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
+              <div className="text-5xl mb-4">📭</div>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {showFeatured ? 'No more products' : 'No products found'}
+              </h3>
+              <p className="text-slate-500 text-sm">
+                {searchQuery
+                  ? 'No results match your search. Try adjusting your query.'
+                  : isAuthenticated
+                  ? 'Be the first to launch a product!'
+                  : 'Sign in to join the community.'}
+              </p>
+              {isAuthenticated && !searchQuery && (
+                <button onClick={() => router.push('/productstrend/launch')} className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition">
+                  Launch Product
+                </button>
+              )}
+            </div>
+          ) : (
+            <div>
+              {showFeatured && regularProducts.length > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-bold text-slate-900">📰 Recent</h2>
+                </div>
+              )}
+              <div key={filterKey} className="space-y-4">
+                {regularProducts.map((product, index) => (
+                  <ProductCard
+                    key={`${product.id}-${filterKey}`}
+                    product={product}
+                    isFeatured={false}
+                    onUpvote={handleUpvote}
+                    isAuthenticated={isAuthenticated}
+                    isUpvoting={upvoteMutation.isLoading}
+                    ref={index === regularProducts.length - 1 ? lastElementRef : undefined}
+                  />
                 ))}
               </div>
             </div>
-
-            {/* Active Filters Clear Bar */}
-            {(searchQuery || category !== 'All' || sortBy !== 'most-upvoted') && (
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100/50">
-                <p className="text-xs font-semibold text-slate-400">Active filters applied</p>
-                <button onClick={clearFilters} className="text-xs font-bold text-red-500 hover:text-red-700 transition">
-                  Clear All Filters
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ── Content Area ── */}
-          {isLoading ? (
-            <div className="space-y-4 animate-pulse">
-              <div className="h-6 w-32 bg-slate-200 rounded-lg mb-6" />
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-white rounded-3xl border border-slate-200 p-6 flex gap-6">
-                  <div className="w-20 h-20 bg-slate-200 rounded-2xl flex-shrink-0" />
-                  <div className="flex-1 space-y-3 pt-2">
-                    <div className="h-5 w-48 bg-slate-200 rounded" />
-                    <div className="h-4 w-full bg-slate-200 rounded" />
-                    <div className="h-4 w-32 bg-slate-200 rounded" />
-                  </div>
-                  <div className="w-16 h-16 bg-slate-200 rounded-2xl flex-shrink-0" />
-                </div>
-              ))}
-            </div>
-          ) : isError && !regularProducts.length && !featuredProducts.length ? (
-            <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 shadow-sm">
-              <div className="text-5xl mb-4">⚠️</div>
-              <p className="text-slate-800 font-bold text-lg mb-2">Failed to load products.</p>
-              <button onClick={() => { refetchFeatured(); refetchRegular(); }} className="mt-2 inline-flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-sm">
-                <FiRefreshCw className="w-4 h-4" /> Try Again
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Featured Section */}
-              {showFeatured && featuredProducts.length > 0 && (
-                <div className="mb-10">
-                  <div className="flex items-center gap-2 mb-5 px-1">
-                    <div className="p-1.5 bg-amber-100 rounded-lg"><FaFire className="text-amber-500 w-4 h-4" /></div>
-                    <h2 className="text-lg font-black text-slate-900 tracking-tight">Featured Highlights</h2>
-                  </div>
-                  <div className="space-y-4">
-                    {featuredProducts.map((product, idx) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        isFeatured
-                        rank={idx + 1}
-                        onUpvote={handleUpvote}
-                        isAuthenticated={isAuthenticated}
-                        isUpvoting={upvoteMutation.isLoading}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Regular Section */}
-              <div>
-                {regularProducts.length === 0 ? (
-                  <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
-                    <div className="text-6xl mb-4 opacity-50">📭</div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">
-                      {showFeatured ? 'No more products' : 'No products found'}
-                    </h3>
-                    <p className="text-slate-500 text-sm font-medium max-w-sm mx-auto">
-                      {searchQuery
-                        ? 'No results match your search filters. Try adjusting your query.'
-                        : 'Be the first to launch a product in this category!'}
-                    </p>
-                    {isAuthenticated && !searchQuery && (
-                      <button onClick={() => router.push('/productstrend/launch')} className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-sm">
-                        <FiPlus className="w-4 h-4" /> Launch Product
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    {showFeatured && regularProducts.length > 0 && (
-                      <div className="flex items-center gap-2 mb-5 px-1 mt-10 border-t border-slate-200 pt-8">
-                        <div className="p-1.5 bg-purple-100 rounded-lg"><FiClock className="text-purple-600 w-4 h-4" /></div>
-                        <h2 className="text-lg font-black text-slate-900 tracking-tight">Recent Launches</h2>
-                      </div>
-                    )}
-                    <div key={filterKey} className="space-y-4">
-                      {regularProducts.map((product, index) => (
-                        <ProductCard
-                          key={`${product.id}-${index}-${filterKey}`}
-                          product={product}
-                          isFeatured={false}
-                          onUpvote={handleUpvote}
-                          isAuthenticated={isAuthenticated}
-                          isUpvoting={upvoteMutation.isLoading}
-                          ref={index === regularProducts.length - 1 ? lastElementRef : undefined}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {/* Infinite Scroll Sentinel */}
-                {hasMore && (
-                  <div className="py-10 flex justify-center">
-                    {isFetchingNextPage ? (
-                      <div className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-full shadow-sm text-sm font-bold text-purple-600">
-                        <FiLoader className="w-4 h-4 animate-spin" />
-                        Loading more products...
-                      </div>
-                    ) : (
-                      <div className="h-4" />
-                    )}
-                  </div>
-                )}
-
-                {!hasMore && regularProducts.length > 0 && (
-                  <div className="text-center py-10">
-                    <p className="text-sm font-bold text-slate-400 bg-slate-100 inline-block px-6 py-2 rounded-full">
-                      You've reached the end of the list 🎉
-                    </p>
-                  </div>
-                )}
-              </div>
-            </>
           )}
 
+          {hasMore && (
+            <div className="py-6 flex justify-center">
+              {isFetchingNextPage ? (
+                <div className="flex items-center gap-2 text-slate-400">
+                  <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
+                  Loading more...
+                </div>
+              ) : (
+                <div className="h-4" />
+              )}
+            </div>
+          )}
+
+          {!hasMore && regularProducts.length > 0 && (
+            <p className="text-center text-xs text-slate-400 py-6">You've reached the end 🎉</p>
+          )}
         </div>
       </div>
     </>
