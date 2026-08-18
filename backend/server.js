@@ -5848,8 +5848,8 @@ function getProductFeedKey(category = null, sort = 'newest') {
   return `products:feed:category:${cat}:sort:${sort}`;
 }
 
-async function addProductToFeedSets(productId, category, sort, timestamp) {
-  const sorts = ['newest', 'most-upvoted', 'most-commented'];
+async function addProductToFeedSets(productId, category, timestamp) {
+  const sorts = ['newest', 'oldest', 'most-upvoted', 'most-commented'];   // ✅ 'oldest' added
   const keys = [];
   for (const s of sorts) {
     keys.push(getProductFeedKey(null, s));
@@ -5899,8 +5899,9 @@ async function updateProductCommentsInFeed(productId, category, comments) {
   }
   await pipeline.exec();
 }
+
 async function removeProductFromFeedSets(productId, category) {
-  const sorts = ['newest', 'most-upvoted', 'most-commented'];
+  const sorts = ['newest', 'oldest', 'most-upvoted', 'most-commented'];   // ✅ 'oldest' added
   const keys = [];
   for (const s of sorts) {
     keys.push(getProductFeedKey(null, s));
