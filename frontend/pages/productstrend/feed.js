@@ -1,5 +1,5 @@
 // pages/productstrend/feed.js
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
@@ -186,7 +186,6 @@ export default function ProductTrendFeed() {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
-  // ── Filter state ──
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
@@ -224,15 +223,10 @@ export default function ProductTrendFeed() {
     isFetchingNextPage,
     refetch: refetchRegular,
     isError: regularError,
+    isFetching: isRegularFetching, // ✅ for loading overlay
   } = useProductFeed(regularFilters, true);
 
-  // ── 🔍 DEBUG: Log when data changes ──
-  useEffect(() => {
-    console.log('📊 regularData changed:', regularData);
-  }, [regularData]);
-
   // ── Compute regular products ──
-  // Remove featured products from regular list only if featured is enabled
   const featuredIds = useMemo(() => {
     if (!shouldFetchFeatured) return new Set();
     return new Set((featuredData?.pages?.[0]?.products || []).map(p => p.id));
@@ -302,15 +296,144 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
+  // ── Upvote handler ──
   const handleUpvote = (productId) => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/productstrend/feed');
       return;
     }
 
-    // ... (keep existing upvote logic – same as before)
-    // I'll include it but you can keep your current one
-    // For brevity, I'll assume you have it; but the full code in the final answer will include it.
+    let currentProduct = null;
+    let currentPage = null;
+    let pageIndex = -1;
+    let productIndex = -1;
+
+    if (regularData?.pages) {
+      for (let i = 0; i < regularData.pages.length; i++) {
+        const page = regularData.pages[i];
+        const idx = page.products.findIndex(p => p.id === productId);
+        if (idx !== -1) {
+          currentProduct = page.products[idx];
+          currentPage = page;
+          pageIndex = i;
+          productIndex = idx;
+          break;
+        }
+      }
+    }
+
+    let isFeaturedCache = false;
+    if (!currentProduct && featuredData?.pages) {
+      const page = featuredData.pages[0];
+      const idx = page.products.findIndex(p => p.id === productId);
+      if (idx !== -1) {
+        currentProduct = page.products[idx];
+        currentPage = page;
+        pageIndex = 0;
+        productIndex = idx;
+        isFeaturedCache = true;
+      }
+    }
+
+    if (!currentProduct) {
+      toast.error('Product not found in cache');
+      return;
+    }
+
+    const prevUpvotes = currentProduct.upvotes || 0;
+    const prevUserVoted = currentProduct.userVoted || false;
+    const newUserVoted = !prevUserVoted;
+    const newUpvotes = newUserVoted ? prevUpvotes + 1 : prevUpvotes - 1;
+
+    const updatedProduct = {
+      ...currentProduct,
+      upvotes: newUpvotes,
+      userVoted: newUserVoted,
+    };
+
+    setLocalVote(productId, newUserVoted, newUpvotes);
+
+    const feedKey = isFeaturedCache ? ['productFeed', featuredFilters] : ['productFeed', regularFilters];
+    const feedData = queryClient.getQueryData(feedKey);
+    if (feedData) {
+      const newPages = feedData.pages.map((page, idx) => {
+        if (idx === pageIndex) {
+          return {
+            ...page,
+            products: page.products.map((p, pIdx) =>
+              pIdx === productIndex ? updatedProduct : p
+            ),
+          };
+        }
+        return page;
+      });
+      queryClient.setQueryData(feedKey, { ...feedData, pages: newPages });
+    }
+
+    const otherKey = isFeaturedCache ? ['productFeed', regularFilters] : ['productFeed', featuredFilters];
+    const otherData = queryClient.getQueryData(otherKey);
+    if (otherData) {
+      const otherPages = otherData.pages.map((page) => {
+        const idx = page.products.findIndex(p => p.id === productId);
+        if (idx !== -1) {
+          const newProducts = [...page.products];
+          newProducts[idx] = updatedProduct;
+          return { ...page, products: newProducts };
+        }
+        return page;
+      });
+      queryClient.setQueryData(otherKey, { ...otherData, pages: otherPages });
+    }
+
+    queryClient.setQueryData(['productDetail', productId], updatedProduct);
+
+    upvoteMutation.mutate(productId, {
+      onSuccess: (result) => {
+        const serverVoted = result.action === 'added';
+        const serverUpvotes = result.upvotes;
+        const finalProduct = { ...currentProduct, upvotes: serverUpvotes, userVoted: serverVoted };
+
+        [['productFeed', regularFilters], ['productFeed', featuredFilters]].forEach((key) => {
+          const cache = queryClient.getQueryData(key);
+          if (cache) {
+            const newPages = cache.pages.map((page) => {
+              const idx = page.products.findIndex(p => p.id === productId);
+              if (idx !== -1) {
+                const newProducts = [...page.products];
+                newProducts[idx] = finalProduct;
+                return { ...page, products: newProducts };
+              }
+              return page;
+            });
+            queryClient.setQueryData(key, { ...cache, pages: newPages });
+          }
+        });
+
+        queryClient.setQueryData(['productDetail', productId], finalProduct);
+        setLocalVote(productId, serverVoted, serverUpvotes);
+      },
+      onError: () => {
+        const revertProduct = { ...currentProduct, upvotes: prevUpvotes, userVoted: prevUserVoted };
+        [['productFeed', regularFilters], ['productFeed', featuredFilters]].forEach((key) => {
+          const cache = queryClient.getQueryData(key);
+          if (cache) {
+            const newPages = cache.pages.map((page) => {
+              const idx = page.products.findIndex(p => p.id === productId);
+              if (idx !== -1) {
+                const newProducts = [...page.products];
+                newProducts[idx] = revertProduct;
+                return { ...page, products: newProducts };
+              }
+              return page;
+            });
+            queryClient.setQueryData(key, { ...cache, pages: newPages });
+          }
+        });
+        queryClient.setQueryData(['productDetail', productId], revertProduct);
+        setLocalVote(productId, prevUserVoted, prevUpvotes);
+        toast.error('Failed to upvote');
+      },
+    });
   };
 
   // ── Loading state ──
@@ -355,7 +478,7 @@ export default function ProductTrendFeed() {
     <>
       <Meta title="Product Feed – ProductTrend" description="Discover and upvote the latest products." />
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header & buttons – same as before */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <FiTrendingUp className="text-purple-600" />
@@ -364,22 +487,31 @@ export default function ProductTrendFeed() {
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <>
-                <button onClick={() => router.push('/productstrend/launch')} className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition shadow-sm text-sm">
+                <button
+                  onClick={() => router.push('/productstrend/launch')}
+                  className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition shadow-sm text-sm"
+                >
                   Launch Product
                 </button>
-                <button onClick={() => router.push('/productstrend/my-products')} className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition text-sm">
+                <button
+                  onClick={() => router.push('/productstrend/my-products')}
+                  className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition text-sm"
+                >
                   My Products
                 </button>
               </>
             ) : (
-              <button onClick={() => router.push('/login?redirect=/productstrend/feed')} className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition text-sm">
+              <button
+                onClick={() => router.push('/login?redirect=/productstrend/feed')}
+                className="px-5 py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition text-sm"
+              >
                 Sign In to Upvote
               </button>
             )}
           </div>
         </div>
 
-        {/* Search & Filters – same as before */}
+        {/* ── Search & Filters ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex flex-1 gap-2">
@@ -394,22 +526,29 @@ export default function ProductTrendFeed() {
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                 />
                 {searchInput && (
-                  <button onClick={() => setSearchInput('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <button
+                    onClick={() => setSearchInput('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
                     <FiX className="w-4 h-4" />
                   </button>
                 )}
               </div>
-              <button onClick={triggerSearch} className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+              <button
+                onClick={triggerSearch}
+                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap"
+              >
                 <FiSearch className="w-4 h-4" /> Search
               </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* Category dropdown */}
               <div className="relative">
                 <select
                   value={category}
                   onChange={(e) => handleCategoryChange(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer hover:border-purple-300 min-w-[140px]"
                 >
                   {CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -417,11 +556,13 @@ export default function ProductTrendFeed() {
                 </select>
                 <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
+
+              {/* Sort dropdown */}
               <div className="relative">
                 <select
                   value={sortBy}
                   onChange={(e) => handleSortChange(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer hover:border-purple-300 min-w-[160px]"
                 >
                   <option value="most-upvoted">Most Upvoted</option>
                   <option value="newest">Newest</option>
@@ -433,6 +574,7 @@ export default function ProductTrendFeed() {
             </div>
           </div>
 
+          {/* Active filters chips */}
           {(searchQuery || category !== 'All' || sortBy !== 'most-upvoted') && (
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
               <div className="flex flex-wrap gap-2">
@@ -462,7 +604,7 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* Featured Section */}
+        {/* ── Featured Section (only when sorted by most-upvoted) ── */}
         {showFeatured && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
@@ -488,7 +630,7 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
-        {/* Regular Products – the main list */}
+        {/* ── Regular Products ── */}
         <div>
           {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
@@ -504,19 +646,21 @@ export default function ProductTrendFeed() {
                   : 'Sign in to join the community.'}
               </p>
               {isAuthenticated && !searchQuery && (
-                <button onClick={() => router.push('/productstrend/launch')} className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition">
+                <button
+                  onClick={() => router.push('/productstrend/launch')}
+                  className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+                >
                   Launch Product
                 </button>
               )}
             </div>
           ) : (
-            <div>
+            <>
               {showFeatured && regularProducts.length > 0 && (
                 <div className="flex items-center gap-2 mb-4">
                   <h2 className="text-lg font-bold text-slate-900">📰 More Products</h2>
                 </div>
               )}
-              {/* ✅ KEY FIX: key includes sortBy so React re-creates the list */}
               <div key={filterKey} className="space-y-4">
                 {regularProducts.map((product, index) => (
                   <ProductCard
@@ -529,6 +673,15 @@ export default function ProductTrendFeed() {
                     ref={index === regularProducts.length - 1 ? lastElementRef : undefined}
                   />
                 ))}
+              </div>
+            </>
+          )}
+
+          {isRegularFetching && regularProducts.length > 0 && (
+            <div className="py-4 flex justify-center">
+              <div className="flex items-center gap-2 text-slate-400">
+                <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
+                <span>Refreshing...</span>
               </div>
             </div>
           )}
