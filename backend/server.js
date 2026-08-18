@@ -5324,6 +5324,7 @@ app.get('/api/grow-feed', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const platform = req.query.platform || null;
     const taskType = req.query.taskType || null;
+    const search = req.query.search || null; // ✅ NEW: search parameter
     const ip = getClientIp(req);
 
     // Rate limit by IP (public)
@@ -5342,27 +5343,91 @@ app.get('/api/grow-feed', async (req, res) => {
       } catch (e) { /* ignore – treat as guest */ }
     }
 
-    const feedKey = getFeedKey(platform, taskType);
-    const start = (page - 1) * limit;
-    const end = start + limit - 1;
-
-    // 1. Get task IDs from sorted set (newest first)
-    const taskIds = await redis.zrevrange(feedKey, start, end);
-
-    // 2. Check if there are more tasks
-    let hasMore = false;
-    if (taskIds.length === limit) {
-      const nextId = await redis.zrevrange(feedKey, start + limit, start + limit);
-      if (nextId.length > 0) hasMore = true;
+    // ── ✅ NEW: Handle search by @username ──
+    let targetUserId = null;
+    if (search && search.startsWith('@')) {
+      const username = search.slice(1).toLowerCase().trim();
+      if (username) {
+        const userSnapshot = await db.collection('users')
+          .where('username', '==', username)
+          .limit(1)
+          .get();
+        if (!userSnapshot.empty) {
+          targetUserId = userSnapshot.docs[0].id;
+        } else {
+          // User not found – return empty results
+          return res.json({
+            success: true,
+            tasks: [],
+            hasMore: false,
+            page,
+            limit,
+          });
+        }
+      }
     }
 
-    // 3. Fetch task details in parallel
-    const tasks = [];
-    if (taskIds.length > 0) {
-      const taskDetails = await Promise.all(taskIds.map(id => getTaskDetails(id)));
-      // Filter out nulls (deleted tasks)
-      for (const task of taskDetails) {
-        if (task) tasks.push(task);
+    // ── Determine if we need to use Redis (no search) or Firestore (search) ──
+    let tasks = [];
+    let hasMore = false;
+
+    if (targetUserId) {
+      // ── SEARCH: Fetch tasks from Firestore by userId ──
+      console.log(`🔍 Searching tasks for user: ${targetUserId}`);
+      let query = db.collection('socialTasks')
+        .where('uid', '==', targetUserId)
+        .where('active', '==', true)
+        .orderBy('createdAt', 'desc');
+
+      if (platform) {
+        query = query.where('platform', '==', platform);
+      }
+      if (taskType) {
+        query = query.where('taskType', '==', taskType);
+      }
+
+      // Fetch one extra to check for more pages
+      const fetchLimit = limit + 1;
+      query = query.limit(fetchLimit);
+
+      const snapshot = await query.get();
+      const docs = snapshot.docs;
+
+      // Build tasks from Firestore
+      for (let i = 0; i < docs.length && i < limit; i++) {
+        const doc = docs[i];
+        const data = doc.data();
+        const owner = await getUserInfo(data.uid);
+        tasks.push({
+          id: doc.id,
+          ...data,
+          owner,
+        });
+      }
+
+      hasMore = docs.length > limit;
+    } else {
+      // ── NORMAL: Use Redis sorted sets ──
+      const feedKey = getFeedKey(platform, taskType);
+      const start = (page - 1) * limit;
+      const end = start + limit - 1;
+
+      // 1. Get task IDs from sorted set (newest first)
+      const taskIds = await redis.zrevrange(feedKey, start, end);
+
+      // 2. Check if there are more tasks
+      if (taskIds.length === limit) {
+        const nextId = await redis.zrevrange(feedKey, start + limit, start + limit);
+        if (nextId.length > 0) hasMore = true;
+      }
+
+      // 3. Fetch task details in parallel
+      if (taskIds.length > 0) {
+        const taskDetails = await Promise.all(taskIds.map(id => getTaskDetails(id)));
+        // Filter out nulls (deleted tasks)
+        for (const task of taskDetails) {
+          if (task) tasks.push(task);
+        }
       }
     }
 
