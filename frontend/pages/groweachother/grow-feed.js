@@ -1,5 +1,5 @@
 // pages/groweachother/grow-feed.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Meta from '../../components/Meta';
 import { useAuth } from '../../components/AuthScreen';
@@ -8,7 +8,7 @@ import {
   useGrowFeed,
   useAvailableTasks,
   useInvalidateQueries,
-  useMtCoins, // ✅ NEW
+  useMtCoins,
 } from '../../lib/queries';
 import {
   FiHeart,
@@ -23,8 +23,10 @@ import {
   FiRepeat,
   FiFilter,
   FiLogIn,
-  FiAlertCircle, // ✅ NEW
-  FiInfo, // ✅ NEW
+  FiAlertCircle,
+  FiInfo,
+  FiSearch,
+  FiChevronDown,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -69,14 +71,72 @@ const PLATFORM_ICONS = {
 };
 
 const PLATFORM_COLORS = {
-  youtube: 'text-red-600 bg-red-50',
-  instagram: 'text-pink-600 bg-pink-50',
-  twitter: 'text-blue-400 bg-blue-50',
-  facebook: 'text-blue-700 bg-blue-50',
-  tiktok: 'text-black bg-gray-100',
-  twitch: 'text-purple-600 bg-purple-50',
-  linkedin: 'text-blue-600 bg-blue-50',
-  github: 'text-gray-800 bg-gray-100',
+  youtube: 'text-red-600 bg-red-50 border-red-200',
+  instagram: 'text-pink-600 bg-pink-50 border-pink-200',
+  twitter: 'text-blue-400 bg-blue-50 border-blue-200',
+  facebook: 'text-blue-700 bg-blue-50 border-blue-200',
+  tiktok: 'text-black bg-gray-100 border-gray-200',
+  twitch: 'text-purple-600 bg-purple-50 border-purple-200',
+  linkedin: 'text-blue-600 bg-blue-50 border-blue-200',
+  github: 'text-gray-800 bg-gray-100 border-gray-200',
+};
+
+// ── Custom Dropdown Component ──
+const CustomSelect = ({ value, onChange, options, placeholder, icon: Icon }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option) => {
+    onChange(option);
+    setIsOpen(false);
+  };
+
+  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
+
+  return (
+    <div className="relative inline-block w-full sm:w-auto" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-4 py-2.5 w-full sm:w-auto bg-white border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:border-purple-300 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 min-w-[140px] shadow-sm"
+      >
+        {Icon && <Icon className="w-4 h-4 text-slate-400" />}
+        <span className="flex-1 text-left truncate">{selectedLabel}</span>
+        <FiChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 w-full min-w-[200px] bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 animate-fadeIn max-h-60 overflow-y-auto">
+          {options.map((option) => {
+            const isSelected = value === option.value;
+            return (
+              <button
+                key={option.value}
+                onClick={() => handleSelect(option.value)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors duration-150 ${
+                  isSelected
+                    ? 'bg-purple-50 text-purple-700 font-medium'
+                    : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span>{option.label}</span>
+                {isSelected && <FiCheckCircle className="w-4 h-4 text-purple-600" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default function GrowFeed() {
@@ -84,15 +144,20 @@ export default function GrowFeed() {
   const { user, isAuthenticated } = useAuth();
   const { invalidateGrowFeed } = useInvalidateQueries();
 
-  // ── Filter state ──
-  const [platformFilter, setPlatformFilter] = useState('');
-  const [taskTypeFilter, setTaskTypeFilter] = useState('');
+  // ── Filter state (selected = UI, applied = sent to backend) ──
+  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [selectedTaskType, setSelectedTaskType] = useState('');
+  const [appliedPlatform, setAppliedPlatform] = useState('');
+  const [appliedTaskType, setAppliedTaskType] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [availableTaskTypes, setAvailableTaskTypes] = useState(DEFAULT_TASK_TYPES);
 
-  // ── React Query: Grow Feed (infinite) with filters ──
+  // ── React Query: Grow Feed (infinite) with applied filters ──
   const filters = {
-    platform: platformFilter || undefined,
-    taskType: taskTypeFilter || undefined,
+    platform: appliedPlatform || undefined,
+    taskType: appliedTaskType || undefined,
+    search: searchQuery || undefined,
   };
   const {
     data,
@@ -122,7 +187,6 @@ export default function GrowFeed() {
   const [selectedMyTask, setSelectedMyTask] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
-  // ── NEW: Confirmation step ──
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   // ── Available tasks for modal ──
@@ -136,39 +200,10 @@ export default function GrowFeed() {
   const availableCoins = (mtCoinsData?.available ?? 0);
   const hasEnoughCoins = availableCoins >= 1;
 
-  // ── Intersection Observer ──
-  const observerRef = useRef(null);
-
-  useEffect(() => {
-    if (isFetchingNextPage || !hasMore || tasks.length === 0) return;
-
-    const lastElement = document.querySelector('#feed-end');
-    if (!lastElement) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(lastElement);
-    observerRef.current = observer;
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [isFetchingNextPage, hasMore, tasks.length, fetchNextPage]);
-
-  // ── Handle platform filter change ──
-  const handlePlatformChange = (e) => {
-    const val = e.target.value;
-    setPlatformFilter(val);
-    setTaskTypeFilter('');
+  // ── Platform change handler – updates task types ──
+  const handlePlatformChange = (val) => {
+    setSelectedPlatform(val);
+    setSelectedTaskType('');
     if (val && PLATFORMS.includes(val)) {
       setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[val] || DEFAULT_TASK_TYPES);
     } else {
@@ -176,11 +211,64 @@ export default function GrowFeed() {
     }
   };
 
-  const clearFilters = () => {
-    setPlatformFilter('');
-    setTaskTypeFilter('');
-    setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+  // ── Apply filters ──
+  const applyFilters = () => {
+    setAppliedPlatform(selectedPlatform);
+    setAppliedTaskType(selectedTaskType);
+    // Refetch the first page
+    refetch({ refetchPage: (page, index) => index === 0 });
   };
+
+  // ── Clear all filters ──
+  const clearFilters = () => {
+    setSelectedPlatform('');
+    setSelectedTaskType('');
+    setAppliedPlatform('');
+    setAppliedTaskType('');
+    setSearchInput('');
+    setSearchQuery('');
+    setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+    refetch({ refetchPage: (page, index) => index === 0 });
+  };
+
+  // ── Handle search ──
+  const handleSearch = () => {
+    if (searchInput.trim()) {
+      // If search starts with @, keep it; otherwise search by text
+      setSearchQuery(searchInput.trim());
+    } else {
+      setSearchQuery('');
+    }
+    // Refetch with search
+    refetch({ refetchPage: (page, index) => index === 0 });
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+
+  // ── Intersection Observer ──
+  const observerRef = useRef(null);
+
+  const lastElementRef = useCallback(
+    (node) => {
+      if (isFetchingNextPage) return;
+      if (observerRef.current) observerRef.current.disconnect();
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore) {
+            fetchNextPage();
+          }
+        },
+        { threshold: 0.1 }
+      );
+      if (node) observerRef.current.observe(node);
+    },
+    [isFetchingNextPage, hasMore, fetchNextPage]
+  );
 
   // ── Modal: open for exchange creation ──
   const handleHelpToGrow = async (task) => {
@@ -197,7 +285,6 @@ export default function GrowFeed() {
     setShowModal(true);
   };
 
-  // ── NEW: Handle "Create Exchange" click – opens confirmation ──
   const handleCreateExchangeClick = () => {
     if (!selectedMyTask) {
       setModalError('Please select a task to exchange.');
@@ -207,11 +294,9 @@ export default function GrowFeed() {
       setModalError(`Insufficient MT Coins. You need 1 coin to create an exchange. You have ${availableCoins} coins.`);
       return;
     }
-    // Open confirmation step
     setShowConfirmation(true);
   };
 
-  // ── NEW: Confirm and create exchange ──
   const handleConfirmExchange = async () => {
     setSubmitting(true);
     setModalError('');
@@ -253,7 +338,6 @@ export default function GrowFeed() {
     }
   };
 
-  // ── NEW: Go back from confirmation ──
   const handleBackFromConfirmation = () => {
     setShowConfirmation(false);
     setModalError('');
@@ -266,7 +350,7 @@ export default function GrowFeed() {
   };
 
   const getPlatformColor = (platform) => {
-    return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600 bg-purple-50';
+    return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600 bg-purple-50 border-purple-200';
   };
 
   const goToUserProfile = (uid) => {
@@ -274,6 +358,17 @@ export default function GrowFeed() {
       router.push(`/userinfo/${uid}`);
     }
   };
+
+  // ── Platform options ──
+  const platformOptions = [
+    { value: '', label: 'All Platforms' },
+    ...PLATFORMS.map(p => ({ value: p, label: p })),
+  ];
+
+  const taskTypeOptions = [
+    { value: '', label: 'All Tasks' },
+    ...availableTaskTypes.map(t => ({ value: t, label: t })),
+  ];
 
   // ── Render loading ──
   if (isLoading) {
@@ -321,6 +416,7 @@ export default function GrowFeed() {
   }
 
   const hasVisibleTasks = tasks.length > 0;
+  const hasActiveFilters = appliedPlatform || appliedTaskType || searchQuery;
 
   return (
     <>
@@ -374,63 +470,117 @@ export default function GrowFeed() {
             </div>
           </div>
 
-          {/* ── Filters ── */}
+          {/* ── Search & Filters ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search by @username or keyword..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                />
+                {searchInput && (
+                  <button
+                    onClick={() => setSearchInput('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleSearch}
+                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <FiSearch className="w-4 h-4" /> Search
+              </button>
+            </div>
+
+            {/* Filters Row */}
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <FiFilter className="text-purple-500 flex-shrink-0" />
                 <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Filters</span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                <div className="relative w-full sm:w-44">
-                  <select
-                    value={platformFilter}
-                    onChange={handlePlatformChange}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
-                  >
-                    <option value="">All Platforms</option>
-                    {PLATFORMS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <CustomSelect
+                  value={selectedPlatform}
+                  onChange={handlePlatformChange}
+                  options={platformOptions}
+                  placeholder="All Platforms"
+                />
 
-                <div className="relative w-full sm:w-44">
-                  <select
-                    value={taskTypeFilter}
-                    onChange={(e) => setTaskTypeFilter(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
-                    disabled={!platformFilter && availableTaskTypes === DEFAULT_TASK_TYPES}
-                  >
-                    <option value="">All Tasks</option>
-                    {availableTaskTypes.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
-                </div>
+                <CustomSelect
+                  value={selectedTaskType}
+                  onChange={setSelectedTaskType}
+                  options={taskTypeOptions}
+                  placeholder="All Tasks"
+                />
 
-                {(platformFilter || taskTypeFilter) && (
+                <button
+                  onClick={applyFilters}
+                  className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition text-sm font-medium"
+                >
+                  Apply Filters
+                </button>
+
+                {(hasActiveFilters) && (
                   <button
                     onClick={clearFilters}
                     className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition"
                   >
                     <FiX className="w-3.5 h-3.5" />
-                    Clear
+                    Clear All
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Active filters chips */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                <span className="text-xs text-gray-500 font-medium">Active:</span>
+                {appliedPlatform && (
+                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
+                    Platform: {appliedPlatform}
+                    <button
+                      onClick={() => { setSelectedPlatform(''); setAppliedPlatform(''); }}
+                      className="hover:text-red-500"
+                    >
+                      <FiX className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {appliedTaskType && (
+                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
+                    Task: {appliedTaskType}
+                    <button
+                      onClick={() => { setSelectedTaskType(''); setAppliedTaskType(''); }}
+                      className="hover:text-red-500"
+                    >
+                      <FiX className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {searchQuery && (
+                  <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full">
+                    Search: {searchQuery}
+                    <button
+                      onClick={() => { setSearchInput(''); setSearchQuery(''); }}
+                      className="hover:text-red-500"
+                    >
+                      <FiX className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── Feed ── */}
@@ -445,11 +595,11 @@ export default function GrowFeed() {
               <p className="text-sm text-gray-400 mb-6 font-medium">
                 {isAuthenticated && allTasks.length > 0
                   ? 'You have already exchanged all visible tasks. Check back later!'
-                  : platformFilter || taskTypeFilter
+                  : hasActiveFilters
                   ? 'Try adjusting your filters.'
                   : 'Check back later or create your own tasks!'}
               </p>
-              {isAuthenticated && !platformFilter && !taskTypeFilter && allTasks.length === 0 && (
+              {isAuthenticated && !hasActiveFilters && allTasks.length === 0 && (
                 <button
                   onClick={() => router.push('/groweachother/my-tasks')}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
@@ -462,21 +612,23 @@ export default function GrowFeed() {
           )}
 
           <div className="space-y-4">
-            {tasks.map((task) => {
+            {tasks.map((task, index) => {
               const Icon = getPlatformIcon(task.platform);
               const colorClass = getPlatformColor(task.platform);
+              const isLast = index === tasks.length - 1;
               return (
                 <div
                   key={task.id}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all"
+                  ref={isLast ? lastElementRef : null}
+                  className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 overflow-hidden"
                 >
-                  {/* Owner Header */}
-                  <div className="flex items-center justify-between mb-4">
+                  {/* ── Card Header: Owner Info ── */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-50 bg-gray-50/30">
                     <div
-                      className="flex items-center gap-3 cursor-pointer"
+                      className="flex items-center gap-3 cursor-pointer group"
                       onClick={() => goToUserProfile(task.owner?.uid)}
                     >
-                      <div className="w-10 h-10 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 border-2 border-purple-200 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
                         {task.owner?.avatar ? (
                           <img
                             src={task.owner.avatar}
@@ -488,26 +640,28 @@ export default function GrowFeed() {
                         )}
                       </div>
                       <div>
-                        <p className="font-bold text-gray-900 text-sm hover:text-purple-600 transition">
+                        <p className="font-bold text-gray-900 text-sm group-hover:text-purple-600 transition">
                           {task.owner?.fullname || task.owner?.username || 'Community Member'}
                         </p>
                         <p className="text-xs text-gray-400 font-medium">@{task.owner?.username || 'user'}</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full uppercase tracking-wider">
-                      {task.platform || 'Social'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${colorClass} uppercase tracking-wider`}>
+                        {task.platform || 'Social'}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Task Card */}
-                  <div className="bg-gray-50/70 border border-gray-200/60 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200/50 shadow-sm ${colorClass}`}>
+                  {/* ── Card Body: Task Details ── */}
+                  <div className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border ${colorClass} shadow-sm`}>
                         <Icon className="w-5 h-5" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                          <span className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
                             {task.taskType || 'Support'}
                           </span>
                           <span className="text-xs text-gray-400 font-medium">on {task.platform || 'Platform'}</span>
@@ -515,52 +669,56 @@ export default function GrowFeed() {
                         <h4 className="text-sm font-bold text-gray-900 truncate">
                           {task.title || `${task.taskType} my ${task.platform} profile`}
                         </h4>
+                        {task.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</p>
+                        )}
                       </div>
                     </div>
 
-                    <a
-                      href={task.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition shadow-sm flex-shrink-0"
-                    >
-                      <span>Visit Link</span>
-                      <FiExternalLink className="w-3.5 h-3.5 text-gray-400" />
-                    </a>
-                  </div>
-
-                  {/* Footer / Action */}
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-xs text-gray-400 font-medium">
-                      Mutual community exchange
-                    </span>
-
-                    {task.isOwn ? (
-                      <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-500 text-xs font-semibold rounded-xl">
-                        <FiUser className="w-3.5 h-3.5" /> Your Task
+                    {/* ── Action Links ── */}
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                      <span className="text-xs text-gray-400 font-medium">
+                        🤝 Mutual community exchange
                       </span>
-                    ) : task.hasExchange ? (
-                      <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 text-xs font-semibold rounded-xl">
-                        <FiCheckCircle className="w-3.5 h-3.5" /> Exchanged
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleHelpToGrow(task)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:shadow-md transition shadow-sm active:scale-95"
-                      >
-                        <FiHeart className="w-3.5 h-3.5" />
-                        Help To Grow
-                      </button>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={task.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition"
+                        >
+                          <span>Visit</span>
+                          <FiExternalLink className="w-3 h-3 text-gray-400" />
+                        </a>
+
+                        {task.isOwn ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-500 text-xs font-semibold rounded-lg">
+                            <FiUser className="w-3.5 h-3.5" /> Your Task
+                          </span>
+                        ) : task.hasExchange ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 text-xs font-semibold rounded-lg">
+                            <FiCheckCircle className="w-3.5 h-3.5" /> Exchanged
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleHelpToGrow(task)}
+                            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-lg hover:shadow-md transition shadow-sm active:scale-95"
+                          >
+                            <FiHeart className="w-3.5 h-3.5" />
+                            Help To Grow
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* ── Infinite scroll sentinel ── */}
+          {/* ── Infinite scroll loading ── */}
           {hasMore && (
-            <div id="feed-end" className="py-6 flex justify-center">
+            <div className="py-6 flex justify-center">
               {isFetchingNextPage ? (
                 <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
                   <FiLoader className="w-4 h-4 animate-spin text-purple-600" />
@@ -585,7 +743,6 @@ export default function GrowFeed() {
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
             {!showConfirmation ? (
-              // ── Step 1: Select Your Task ──
               <>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-gray-900">Help To Grow</h2>
@@ -610,7 +767,6 @@ export default function GrowFeed() {
                   </p>
                 </div>
 
-                {/* ── Coin Balance Display ── */}
                 <div className={`mb-4 p-3 rounded-2xl border ${hasEnoughCoins ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">Available MT Coins</span>
@@ -712,7 +868,6 @@ export default function GrowFeed() {
                 </button>
               </>
             ) : (
-              // ── Step 2: Confirmation ──
               <>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-gray-900">Confirm Exchange</h2>
