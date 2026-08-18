@@ -240,7 +240,7 @@ export default function ProductDetail() {
     });
   };
 
-  // ── Comment handler ──
+  // ── 🔥 UPDATED Comment handler – manual cache update, no extra refetch ──
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
@@ -263,6 +263,7 @@ export default function ProductDetail() {
       createdAt: new Date().toISOString(),
     };
 
+    // ── Optimistic update ──
     const currentComments = queryClient.getQueryData(['productComments', id]) || { pages: [{ comments: [] }] };
     const updatedPages = [...currentComments.pages];
     if (updatedPages.length > 0) {
@@ -282,6 +283,7 @@ export default function ProductDetail() {
       const result = await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
       const serverComment = result.comment;
 
+      // ── Replace optimistic comment with server comment (no refetch) ──
       const cache = queryClient.getQueryData(['productComments', id]);
       if (cache) {
         const pages = cache.pages.map((page, idx) => {
@@ -300,8 +302,7 @@ export default function ProductDetail() {
         queryClient.setQueryData(['productComments', id], { ...cache, pages });
       }
 
-      await refetchComments({ refetchPage: (page, index) => index === 0 });
-
+      // ── Update product comment count ──
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
         queryClient.setQueryData(['productDetail', id], {
@@ -309,7 +310,10 @@ export default function ProductDetail() {
           commentsCount: (currentProduct.commentsCount || 0) + 1,
         });
       }
+
+      toast.success('Comment posted!');
     } catch (error) {
+      // ── Revert optimistic comment ──
       const revertCache = queryClient.getQueryData(['productComments', id]);
       if (revertCache) {
         const revertedPages = revertCache.pages.map((page, idx) => {
