@@ -191,7 +191,7 @@ export default function ProductTrendFeed() {
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('most-upvoted');
 
-  // ── Build filters – changes immediately ──
+  // ── Build filters ──
   const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
@@ -211,7 +211,6 @@ export default function ProductTrendFeed() {
   // ── Featured feed ──
   const {
     data: featuredData,
-    isLoading: featuredLoading,
   } = useProductFeed(featuredFilters, shouldFetchFeatured);
 
   // ── Regular feed ──
@@ -223,10 +222,10 @@ export default function ProductTrendFeed() {
     isFetchingNextPage,
     refetch: refetchRegular,
     isError: regularError,
-    isFetching: isRegularFetching, // ✅ for loading overlay
+    isFetching: isRegularFetching,
   } = useProductFeed(regularFilters, true);
 
-  // ── Compute regular products ──
+  // ── Compute products ──
   const featuredIds = useMemo(() => {
     if (!shouldFetchFeatured) return new Set();
     return new Set((featuredData?.pages?.[0]?.products || []).map(p => p.id));
@@ -260,10 +259,12 @@ export default function ProductTrendFeed() {
     [isFetchingNextPage, hasMore, fetchNextPage]
   );
 
+  // ── Scroll to top helper ──
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // ── Handlers – with scroll to top ──
   const clearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -514,6 +515,7 @@ export default function ProductTrendFeed() {
         {/* ── Search & Filters ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row gap-3">
+            {/* Search */}
             <div className="flex flex-1 gap-2">
               <div className="relative flex-1">
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -542,13 +544,14 @@ export default function ProductTrendFeed() {
               </button>
             </div>
 
+            {/* Dropdowns */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Category dropdown */}
-              <div className="relative">
+              {/* Category */}
+              <div className="relative inline-block">
                 <select
                   value={category}
                   onChange={(e) => handleCategoryChange(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer hover:border-purple-300 min-w-[140px]"
+                  className="appearance-none bg-white border-2 border-slate-200 rounded-xl py-2.5 pl-4 pr-10 text-sm font-medium text-slate-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 cursor-pointer hover:border-purple-300 min-w-[140px] shadow-sm"
                 >
                   {CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -557,12 +560,12 @@ export default function ProductTrendFeed() {
                 <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
 
-              {/* Sort dropdown */}
-              <div className="relative">
+              {/* Sort */}
+              <div className="relative inline-block">
                 <select
                   value={sortBy}
                   onChange={(e) => handleSortChange(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer hover:border-purple-300 min-w-[160px]"
+                  className="appearance-none bg-white border-2 border-slate-200 rounded-xl py-2.5 pl-4 pr-10 text-sm font-medium text-slate-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 cursor-pointer hover:border-purple-300 min-w-[160px] shadow-sm"
                 >
                   <option value="most-upvoted">Most Upvoted</option>
                   <option value="newest">Newest</option>
@@ -604,7 +607,7 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* ── Featured Section (only when sorted by most-upvoted) ── */}
+        {/* ── Featured Section ── */}
         {showFeatured && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
