@@ -186,40 +186,41 @@ export default function ProductTrendFeed() {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
+  // ── "Selected" state (what the user sees in the UI) ──
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedSort, setSelectedSort] = useState('most-upvoted');
   const [searchInput, setSearchInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [category, setCategory] = useState('All');
-  const [sortBy, setSortBy] = useState('most-upvoted');
 
-  // ── Build filters ──
+  // ── "Applied" state (what actually gets sent to the backend) ──
+  const [appliedCategory, setAppliedCategory] = useState('All');
+  const [appliedSort, setAppliedSort] = useState('most-upvoted');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // ── Build filters from applied state (like community/feed.js) ──
   const regularFilters = useMemo(() => {
     const filters = {};
     if (searchQuery.trim()) filters.search = searchQuery.trim();
-    if (category !== 'All') filters.category = category;
-    filters.sort = sortBy;
+    if (appliedCategory !== 'All') filters.category = appliedCategory;
+    filters.sort = appliedSort;
     return filters;
-  }, [searchQuery, category, sortBy]);
+  }, [searchQuery, appliedCategory, appliedSort]);
 
-  // ── Only fetch featured when sorting by most-upvoted and no search ──
-  const shouldFetchFeatured = sortBy === 'most-upvoted' && !searchQuery;
-
+  // ── Featured filters ──
+  const shouldFetchFeatured = appliedSort === 'most-upvoted' && !searchQuery;
   const featuredFilters = useMemo(() => {
-    const filters = {
-      sort: 'most-upvoted',
-      limit: 100,
-    };
-    if (category !== 'All') filters.category = category;
+    const filters = { sort: 'most-upvoted', limit: 100 };
+    if (appliedCategory !== 'All') filters.category = appliedCategory;
     return filters;
-  }, [category]);
+  }, [appliedCategory]);
 
-  // ── Featured feed – enabled only when it makes sense ──
+  // ── Featured feed ──
   const {
     data: featuredData,
     isLoading: featuredLoading,
     refetch: refetchFeatured,
   } = useProductFeed(featuredFilters, shouldFetchFeatured);
 
-  // ── Regular feed – always enabled ──
+  // ── Regular feed ──
   const {
     data: regularData,
     fetchNextPage,
@@ -233,7 +234,6 @@ export default function ProductTrendFeed() {
   const featuredProducts = featuredData?.pages?.[0]?.products || [];
   const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
 
-  // ── Compute regular products – filter out featured ones ──
   const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
   const regularProducts = regularProductsAll.filter(p => !featuredIds.has(p.id));
 
@@ -265,42 +265,44 @@ export default function ProductTrendFeed() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const clearFilters = () => {
-    setSearchInput('');
-    setSearchQuery('');
-    setCategory('All');
-    setSortBy('most-upvoted');
+  // ── Apply filters (like community/feed.js) ──
+  const applyFilters = () => {
+    setAppliedCategory(selectedCategory);
+    setAppliedSort(selectedSort);
     scrollToTop();
   };
 
-  const triggerSearch = () => {
-    if (searchInput.trim() !== searchQuery.trim()) {
-      setSearchQuery(searchInput);
-      // Refetch both
-      refetchRegular();
-      if (shouldFetchFeatured) refetchFeatured();
-      scrollToTop();
-    }
+  // ── Clear all filters ──
+  const clearFilters = () => {
+    setSelectedCategory('All');
+    setSelectedSort('most-upvoted');
+    setAppliedCategory('All');
+    setAppliedSort('most-upvoted');
+    setSearchInput('');
+    setSearchQuery('');
+    scrollToTop();
+  };
+
+  // ── Handle search ──
+  const handleSearch = () => {
+    setSearchQuery(searchInput);
+    scrollToTop();
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      triggerSearch();
+      handleSearch();
     }
   };
 
+  // ── Handlers ──
   const handleCategoryChange = (val) => {
-    setCategory(val);
-    refetchRegular();
-    if (shouldFetchFeatured) refetchFeatured();
-    scrollToTop();
+    setSelectedCategory(val);
   };
 
   const handleSortChange = (val) => {
-    setSortBy(val);
-    refetchRegular();
-    scrollToTop();
+    setSelectedSort(val);
   };
 
   const handleUpvote = (productId) => {
@@ -443,7 +445,7 @@ export default function ProductTrendFeed() {
   };
 
   // ── Loading state ──
-  if (isLoading && !regularProducts.length && !shouldFetchFeatured) {
+  if (isLoading && !regularProducts.length) {
     return (
       <>
         <Meta title="Product Feed – ProductTrend" />
@@ -478,7 +480,7 @@ export default function ProductTrendFeed() {
   }
 
   const showFeatured = shouldFetchFeatured && featuredProducts.length > 0;
-  const filterKey = `${sortBy}-${category}-${searchQuery}`;
+  const filterKey = `${appliedSort}-${appliedCategory}-${searchQuery}`;
 
   return (
     <>
@@ -507,6 +509,7 @@ export default function ProductTrendFeed() {
           </div>
         </div>
 
+        {/* ── Search & Filters ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex flex-1 gap-2">
@@ -526,7 +529,10 @@ export default function ProductTrendFeed() {
                   </button>
                 )}
               </div>
-              <button onClick={triggerSearch} className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+              <button
+                onClick={handleSearch}
+                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap"
+              >
                 <FiSearch className="w-4 h-4" /> Search
               </button>
             </div>
@@ -534,7 +540,7 @@ export default function ProductTrendFeed() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <select
-                  value={category}
+                  value={selectedCategory}
                   onChange={(e) => handleCategoryChange(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
                 >
@@ -546,7 +552,7 @@ export default function ProductTrendFeed() {
               </div>
               <div className="relative">
                 <select
-                  value={sortBy}
+                  value={selectedSort}
                   onChange={(e) => handleSortChange(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
                 >
@@ -557,10 +563,17 @@ export default function ProductTrendFeed() {
                 </select>
                 <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
+              <button
+                onClick={applyFilters}
+                className="px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition text-sm font-medium whitespace-nowrap"
+              >
+                Apply Filters
+              </button>
             </div>
           </div>
 
-          {(searchQuery || category !== 'All' || sortBy !== 'most-upvoted') && (
+          {/* Active filters chips */}
+          {(searchQuery || appliedCategory !== 'All' || appliedSort !== 'most-upvoted') && (
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
               <div className="flex flex-wrap gap-2">
                 {searchQuery && (
@@ -569,16 +582,16 @@ export default function ProductTrendFeed() {
                     <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSearchInput(''); setSearchQuery(''); }} />
                   </span>
                 )}
-                {category !== 'All' && (
+                {appliedCategory !== 'All' && (
                   <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                    {category}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setCategory('All')} />
+                    {appliedCategory}
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSelectedCategory('All'); setAppliedCategory('All'); }} />
                   </span>
                 )}
-                {sortBy !== 'most-upvoted' && (
+                {appliedSort !== 'most-upvoted' && (
                   <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full">
-                    {sortBy.replace('-', ' ')}
-                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => setSortBy('most-upvoted')} />
+                    {appliedSort.replace('-', ' ')}
+                    <FiX className="w-3 h-3 cursor-pointer" onClick={() => { setSelectedSort('most-upvoted'); setAppliedSort('most-upvoted'); }} />
                   </span>
                 )}
               </div>
@@ -589,13 +602,14 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
+        {/* ── Featured Section ── */}
         {showFeatured && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
               <FiTrendingUp className="text-purple-600 text-xl" />
               <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
               <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                Top {featuredProducts.length} {category !== 'All' ? `in ${category}` : ''}
+                Top {featuredProducts.length} {appliedCategory !== 'All' ? `in ${appliedCategory}` : ''}
               </span>
             </div>
             <div className="space-y-4">
@@ -614,6 +628,7 @@ export default function ProductTrendFeed() {
           </div>
         )}
 
+        {/* ── Regular Products ── */}
         <div>
           {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
@@ -644,7 +659,7 @@ export default function ProductTrendFeed() {
               <div key={filterKey} className="space-y-4">
                 {regularProducts.map((product, index) => (
                   <ProductCard
-                    key={product.id}
+                    key={`${product.id}-${appliedSort}`}
                     product={product}
                     isFeatured={false}
                     onUpvote={handleUpvote}
