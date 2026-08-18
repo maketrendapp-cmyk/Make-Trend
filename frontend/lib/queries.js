@@ -325,14 +325,15 @@ export function useReferrals(enabled = false) {
 
 // ── Grow Feed (infinite scroll with filters) – PUBLIC ──
 export function useGrowFeed(filters = {}, enabled = true) {
-  const { platform, taskType } = filters;
-  const queryKey = ['growFeed', { platform, taskType }];
+  const { platform, taskType, search } = filters; // ✅ Added 'search'
+  const queryKey = ['growFeed', { platform, taskType, search }]; // ✅ Added 'search' to queryKey
   return useInfiniteQuery({
     queryKey,
     queryFn: async ({ pageParam = null }) => {
       const params = new URLSearchParams({ limit: 20 });
       if (platform) params.append('platform', platform);
       if (taskType) params.append('taskType', taskType);
+      if (search) params.append('search', search); // ✅ Added search param
       if (pageParam) params.append('lastTaskId', pageParam);
       const url = `/grow-feed?${params.toString()}`;
       // Get token if logged in, otherwise null
