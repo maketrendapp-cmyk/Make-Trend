@@ -667,6 +667,7 @@ async function grantProFor24Hours(uid) {
   const userData = userDoc.data();
   
   let expiry;
+  let isNewGrant = false;
   
   // Check if user already has a valid PRO expiry
   if (userData?.plan === 'pro' && userData?.proExpiry) {
@@ -681,11 +682,13 @@ async function grantProFor24Hours(uid) {
       // PRO has expired → start from now
       expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
       console.log(`⏰ PRO expired, granting fresh 24h to ${uid}`);
+      isNewGrant = true;
     }
   } else {
     // No PRO or free plan → start from now
     expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
     console.log(`👑 PRO granted for 24h to ${uid}`);
+    isNewGrant = true;
   }
   
   // Update the user
@@ -694,6 +697,32 @@ async function grantProFor24Hours(uid) {
     proExpiry: admin.firestore.Timestamp.fromDate(expiry),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  
+  // ── 🆕 Send notification when PRO is granted or extended ──
+  if (isNewGrant) {
+    try {
+      // Get user info for the notification
+      const userInfo = await getUserInfo(uid);
+      const expiryDate = expiry.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      await createNotification({
+        userId: uid,
+        type: 'personal',
+        title: '🎉 You\'ve claimed PRO for 24 hours!',
+        description: `Congratulations! You've earned 24 hours of PRO access. Your PRO status will expire on ${expiryDate}. Enjoy the exclusive features!`,
+        fromUserId: uid,
+      });
+      console.log(`📬 PRO notification sent to ${uid}`);
+    } catch (notifError) {
+      console.error('Failed to send PRO notification:', notifError);
+    }
+  }
   
   // Invalidate cache
   await invalidateKey(`user:profile:${uid}`);
@@ -1138,6 +1167,36 @@ app.post('/api/auth/register', async (req, res) => {
               if (newReferrals % 5 === 0) {
                 await grantProFor24Hours(referrerUid);
                 console.log(`🎉 User ${referrerUid} got PRO for 24h (${newReferrals} referrals)`);
+              }
+
+              // ── 🆕 Send notification to referrer ──
+              try {
+                const newUserInfo = await getUserInfo(uid);
+                await createNotification({
+                  userId: referrerUid,
+                  type: 'personal',
+                  title: 'Someone used your referral code! 🎉',
+                  description: `@${newUserInfo?.username || 'A new user'} signed up using your referral code. You now have ${newReferrals} referral${newReferrals > 1 ? 's' : ''}!`,
+                  fromUserId: uid,
+                });
+                console.log(`📬 Referral notification sent to ${referrerUid}`);
+              } catch (notifError) {
+                console.error('Failed to send referral notification to referrer:', notifError);
+              }
+
+              // ── 🆕 Send notification to new user (welcome + coins) ──
+              try {
+                const referrerInfo = await getUserInfo(referrerUid);
+                await createNotification({
+                  userId: uid,
+                  type: 'personal',
+                  title: 'Welcome! You claimed 100 MT Coins 🎉',
+                  description: `You used @${referrerInfo?.username || 'a user'}'s referral code and received 100 MT Coins as a welcome bonus! Start exploring the platform.`,
+                  fromUserId: referrerUid,
+                });
+                console.log(`📬 Welcome notification sent to ${uid}`);
+              } catch (notifError) {
+                console.error('Failed to send welcome notification to new user:', notifError);
               }
 
               // ── Invalidate caches ──
@@ -3377,7 +3436,29 @@ app.post('/api/campaigns/:id/view', async (req, res) => {
       }
     }
 
-    // 9. Return success
+    // ── 🆕 9. Milestone notification for views (every multiple of 9) ──
+    if (newViews > 0 && newViews % 9 === 0) {
+      try {
+        const campaignTitle = campaignData.title || 'Untitled Campaign';
+        let viewerName = 'Someone';
+        if (userId) {
+          const viewerInfo = await getUserInfo(userId);
+          if (viewerInfo) viewerName = viewerInfo.username || 'Someone';
+        }
+        await createNotification({
+          userId: ownerId,
+          type: 'personal',
+          title: `👀 Your campaign got ${newViews} views!`,
+          description: `"${campaignTitle}" has reached ${newViews} views! ${viewerName} was the ${newViews}th viewer.`,
+          fromUserId: userId || null,
+        });
+        console.log(`📬 Milestone view notification sent for campaign ${id} (${newViews} views)`);
+      } catch (notifError) {
+        console.error('Failed to send milestone view notification:', notifError);
+      }
+    }
+
+    // 10. Return success
     res.json({
       success: true,
       views: newViews,
@@ -5743,14 +5824,18 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
     let newUserBStatus = data.userBStatus;
     let newOverallStatus = data.overallStatus;
     let willBeCompleted = false;
+    let isUserADone = false;
+    let isUserBDone = false;
 
     if (status === 'done') {
       if (side === 'A') {
         if (data.userAStatus === 'done') return res.status(400).json({ success: false, error: 'Already done' });
         newUserAStatus = 'done';
+        isUserADone = true;
       } else {
         if (data.userBStatus === 'done') return res.status(400).json({ success: false, error: 'Already done' });
         newUserBStatus = 'done';
+        isUserBDone = true;
       }
       // Check if both are now done
       willBeCompleted = (newUserAStatus === 'done' && newUserBStatus === 'done');
@@ -5827,6 +5912,75 @@ app.put('/api/exchanges/:id/status', verifyToken, checkBanned, async (req, res) 
     // ── Populate for response ──
     const updatedDoc = await docRef.get();
     const populated = await populateExchange({ id: doc.id, ...updatedDoc.data() });
+
+    // ── 🆕 Send notifications based on exchange status ──
+    try {
+      const userAInfo = populated.userA;
+      const userBInfo = populated.userB;
+      const userAStatus = populated.userAStatus;
+      const userBStatus = populated.userBStatus;
+      const overallStatus = populated.overallStatus;
+
+      // Case 1: Both users completed the exchange
+      if (overallStatus === 'completed' && populated.rewardGiven) {
+        // Notify User A
+        await createNotification({
+          userId: populated.userAUid,
+          type: 'personal',
+          title: '🎉 Exchange Completed! +2 MT Coins',
+          description: `Your exchange with @${userBInfo?.username || 'the other user'} is complete! You both earned 2 MT Coins each. 🎉`,
+          fromUserId: populated.userBUid,
+        });
+        // Notify User B
+        await createNotification({
+          userId: populated.userBUid,
+          type: 'personal',
+          title: '🎉 Exchange Completed! +2 MT Coins',
+          description: `Your exchange with @${userAInfo?.username || 'the other user'} is complete! You both earned 2 MT Coins each. 🎉`,
+          fromUserId: populated.userAUid,
+        });
+        console.log(`📬 Exchange completion notifications sent for ${id}`);
+      }
+      // Case 2: User A marked done, User B is waiting
+      else if (userAStatus === 'done' && userBStatus === 'waiting') {
+        await createNotification({
+          userId: populated.userBUid,
+          type: 'personal',
+          title: '✅ Your turn to complete the exchange!',
+          description: `@${userAInfo?.username || 'The other user'} has completed their task. Please complete your task to finish the exchange and earn 2 MT Coins!`,
+          fromUserId: populated.userAUid,
+        });
+        console.log(`📬 Reminder notification sent to user B for exchange ${id}`);
+      }
+      // Case 3: User B marked done, User A is waiting
+      else if (userBStatus === 'done' && userAStatus === 'waiting') {
+        await createNotification({
+          userId: populated.userAUid,
+          type: 'personal',
+          title: '✅ Your turn to complete the exchange!',
+          description: `@${userBInfo?.username || 'The other user'} has completed their task. Please complete your task to finish the exchange and earn 2 MT Coins!`,
+          fromUserId: populated.userBUid,
+        });
+        console.log(`📬 Reminder notification sent to user A for exchange ${id}`);
+      }
+      // Case 4: Cancelled
+      else if (overallStatus === 'cancelled') {
+        const canceller = side === 'A' ? userAInfo : userBInfo;
+        const otherUser = side === 'A' ? userBInfo : userAInfo;
+        const otherUserId = side === 'A' ? populated.userBUid : populated.userAUid;
+        
+        await createNotification({
+          userId: otherUserId,
+          type: 'personal',
+          title: '⚠️ Exchange Cancelled',
+          description: `@${canceller?.username || 'The other user'} has cancelled the exchange.`,
+          fromUserId: uid,
+        });
+        console.log(`📬 Cancellation notification sent for exchange ${id}`);
+      }
+    } catch (notifError) {
+      console.error('Failed to send exchange notifications:', notifError);
+    }
 
     // ── Invalidate exchange caches in‑place ──
     await updateUserExchangeCache(data.userAUid, (cacheData) => {
@@ -6610,6 +6764,34 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
     // ── Invalidate all user's own products list caches ──
     await invalidatePattern(`productstrend:my-products:${uid}:*`);
 
+    // ── 🆕 Send notification to the product creator ──
+    try {
+      const userInfo = await getUserInfo(uid);
+      const categoryEmojiMap = {
+        'Tech': '💻',
+        'Design': '🎨',
+        'AI': '🤖',
+        'Productivity': '⚡',
+        'Education': '📚',
+        'Health': '💪',
+        'Fitness': '🏋️',
+        'Gaming': '🎮',
+        'Other': '📌',
+      };
+      const emoji = categoryEmojiMap[productData.category] || '🚀';
+      
+      await createNotification({
+        userId: uid,
+        type: 'personal',
+        title: `${emoji} Product Launched!`,
+        description: `Your product "${productData.name}" has been successfully launched and is now live on Product Trend!`,
+        fromUserId: uid,
+      });
+      console.log(`📬 Product launch notification sent to ${uid}`);
+    } catch (notifError) {
+      console.error('Failed to send product launch notification:', notifError);
+    }
+
     res.status(201).json({ success: true, product: newProduct });
   } catch (error) {
     console.error('❌ Create product error:', error);
@@ -6880,7 +7062,7 @@ app.delete('/api/productstrend/products/:id', verifyToken, checkBanned, async (r
 // ─────────────────────────────────────────────
 // 7. UPVOTE PRODUCT (toggle)
 // ─────────────────────────────────────────────
-// ── 7. UPVOTE PRODUCT (toggle) with daily limit ──
+// ── 7. UPVOTE PRODUCT (toggle) ──
 app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, async (req, res) => {
   try {
     const { id } = req.params;
@@ -6909,22 +7091,27 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
     const voteDocRef = db.collection('productVotes').doc(`${id}_${voteId}`);
 
     let result;
+    let productOwnerId, productName, newUpvotes;
     await db.runTransaction(async (transaction) => {
       const productDoc = await transaction.get(docRef);
       if (!productDoc.exists) {
         throw new Error('Product not found');
       }
       const productData = productDoc.data();
+      productOwnerId = productData.makerUid;
+      productName = productData.name || 'Untitled';
+
       const voteDoc = await transaction.get(voteDocRef);
       const isVoted = voteDoc.exists;
 
       if (isVoted) {
         transaction.delete(voteDocRef);
+        newUpvotes = productData.upvotes - 1;
         transaction.update(docRef, {
-          upvotes: productData.upvotes - 1,
+          upvotes: newUpvotes,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        result = { action: 'removed', upvotes: productData.upvotes - 1 };
+        result = { action: 'removed', upvotes: newUpvotes };
       } else {
         transaction.set(voteDocRef, {
           productId: id,
@@ -6932,11 +7119,12 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
           deviceId: deviceId || null,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        newUpvotes = productData.upvotes + 1;
         transaction.update(docRef, {
-          upvotes: productData.upvotes + 1,
+          upvotes: newUpvotes,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        result = { action: 'added', upvotes: productData.upvotes + 1 };
+        result = { action: 'added', upvotes: newUpvotes };
       }
     });
 
@@ -6954,6 +7142,23 @@ app.post('/api/productstrend/products/:id/upvote', verifyToken, checkBanned, asy
     // ── Invalidate user's vote cache ──
     if (uid) {
       await invalidateKey(`user:votes:${uid}`);
+    }
+
+    // ── 🆕 Milestone notification for upvotes (every multiple of 9) ──
+    if (result.action === 'added' && newUpvotes > 0 && newUpvotes % 9 === 0) {
+      try {
+        const upvoterInfo = await getUserInfo(uid);
+        await createNotification({
+          userId: productOwnerId,
+          type: 'personal',
+          title: `⬆️ Your product got ${newUpvotes} upvotes!`,
+          description: `"${productName}" has reached ${newUpvotes} upvotes! ${upvoterInfo?.username || 'Someone'} was the ${newUpvotes}th person to upvote it.`,
+          fromUserId: uid,
+        });
+        console.log(`📬 Milestone upvote notification sent for product ${id} (${newUpvotes} upvotes)`);
+      } catch (notifError) {
+        console.error('Failed to send milestone upvote notification:', notifError);
+      }
     }
 
     res.json({
@@ -7079,8 +7284,12 @@ app.post('/api/productstrend/products/:id/comments', verifyToken, checkBanned, a
 
     // ── Update product details cache ──
     const productDoc = await productRef.get();
+    let productOwnerId, productName, newCommentsCount;
     if (productDoc.exists) {
       const data = productDoc.data();
+      productOwnerId = data.makerUid;
+      productName = data.name || 'Untitled';
+      newCommentsCount = data.commentsCount || 0;
       const maker = await getProductMakerInfo(data.makerUid);
       const product = { id: productDoc.id, ...data, maker };
       await cacheProductDetails(id, product);
@@ -7088,6 +7297,23 @@ app.post('/api/productstrend/products/:id/comments', verifyToken, checkBanned, a
 
     const comment = { id: docRef.id, ...commentData };
     comment.user = await getProductMakerInfo(uid);
+
+    // ── 🆕 Milestone notification for comments (every multiple of 9) ──
+    if (newCommentsCount > 0 && newCommentsCount % 9 === 0) {
+      try {
+        const commenterInfo = await getUserInfo(uid);
+        await createNotification({
+          userId: productOwnerId,
+          type: 'personal',
+          title: `💬 Your product got ${newCommentsCount} comments!`,
+          description: `"${productName}" has reached ${newCommentsCount} comments! ${commenterInfo?.username || 'Someone'} left the ${newCommentsCount}th comment.`,
+          fromUserId: uid,
+        });
+        console.log(`📬 Milestone comment notification sent for product ${id} (${newCommentsCount} comments)`);
+      } catch (notifError) {
+        console.error('Failed to send milestone comment notification:', notifError);
+      }
+    }
 
     res.status(201).json({ success: true, comment });
   } catch (error) {
@@ -7479,6 +7705,105 @@ app.post('/api/admin/system-notifications', verifyToken, checkBanned, async (req
     });
   } catch (error) {
     console.error('❌ Create system notification error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Admin: Send Custom Notification to Users (with redirectUrl) ──
+app.post('/api/admin/send-notification', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    // ── Check admin ──
+    if (!(await isAdmin(uid))) {
+      return res.status(403).json({ success: false, error: 'Admin only' });
+    }
+
+    // ── Rate limit: 10 requests per hour ──
+    if (!(await checkRateLimit(uid, 'admin-send-notification', 10, 3600))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const { title, description, userIds, type = 'personal', sendToAll = false, redirectUrl } = req.body;
+
+    // ── Validate required fields ──
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Title is required' });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({ success: false, error: 'Description is required' });
+    }
+    if (redirectUrl && typeof redirectUrl !== 'string') {
+      return res.status(400).json({ success: false, error: 'Redirect URL must be a string' });
+    }
+
+    let targetUsers = [];
+
+    if (sendToAll) {
+      // ── Send to all active users (logged in within last 30 days) ──
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const snapshot = await db.collection('users')
+        .where('lastLogin', '>=', admin.firestore.Timestamp.fromDate(thirtyDaysAgo))
+        .select('uid')
+        .get();
+
+      snapshot.forEach(doc => targetUsers.push(doc.id));
+    } else if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+      // ── Send to specific users ──
+      targetUsers = userIds;
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide either userIds array or set sendToAll to true'
+      });
+    }
+
+    if (targetUsers.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No users found to send notification.',
+        sent: 0
+      });
+    }
+
+    // ── Send notification to each user ──
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const userId of targetUsers) {
+      try {
+        await createNotification({
+          userId: userId,
+          type: type,
+          title: title.trim(),
+          description: description.trim(),
+          redirectUrl: redirectUrl || null, // ✅ Added redirectUrl
+          fromUserId: uid,
+        });
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to send notification to ${userId}:`, err);
+        failCount++;
+      }
+
+      // ── Small delay to avoid rate limiting ──
+      if (targetUsers.length > 100) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Notification sent to ${successCount} users. Failed: ${failCount}`,
+      total: targetUsers.length,
+      successCount,
+      failCount,
+    });
+
+  } catch (error) {
+    console.error('❌ Admin send notification error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -7921,8 +8246,34 @@ app.post('/api/posts', verifyToken, checkBanned, async (req, res) => {
     // ── Cache details ──
     await cachePostDetails(newPost.id, newPost);
 
-   // ── Invalidate all user's own posts cache ──
-await invalidatePattern(`my-posts:${uid}:*`);
+    // ── Invalidate all user's own posts cache ──
+    await invalidatePattern(`my-posts:${uid}:*`);
+
+    // ── 🆕 Send notification to the post creator ──
+    try {
+      const userInfo = await getUserInfo(uid);
+      const postTypeMap = {
+        'general': '📌',
+        'launch': '🚀',
+        'update': '📢',
+        'job': '💼',
+        'question': '❓',
+        'event': '📅',
+        'promotional': '💎',
+      };
+      const emoji = postTypeMap[type] || '📝';
+      
+      await createNotification({
+        userId: uid,
+        type: 'personal',
+        title: `${emoji} Post Published!`,
+        description: `Your post "${title}" has been published successfully. It's now live in the community feed.`,
+        fromUserId: uid,
+      });
+      console.log(`📬 Post notification sent to ${uid}`);
+    } catch (notifError) {
+      console.error('Failed to send post notification:', notifError);
+    }
 
     res.status(201).json({
       success: true,
@@ -8096,7 +8447,7 @@ app.post('/api/posts/:id/like', verifyToken, checkBanned, async (req, res) => {
     const likeRef = db.collection('postLikes').doc(`${id}_user_${uid}`);
 
     let result;
-    let category, type, newLikes;
+    let category, type, newLikes, postOwnerId, postTitle;
     await db.runTransaction(async (transaction) => {
       const postDoc = await transaction.get(postRef);
       if (!postDoc.exists) throw new Error('Post not found');
@@ -8104,6 +8455,8 @@ app.post('/api/posts/:id/like', verifyToken, checkBanned, async (req, res) => {
       const postData = postDoc.data();
       category = postData.category || 'general';
       type = postData.type || 'general';
+      postOwnerId = postData.userId;
+      postTitle = postData.title || 'Untitled';
 
       const likeDoc = await transaction.get(likeRef);
       const isLiked = likeDoc.exists;
@@ -8141,6 +8494,24 @@ app.post('/api/posts/:id/like', verifyToken, checkBanned, async (req, res) => {
       const user = await getUserInfo(data.userId);
       const post = { id: updatedDoc.id, ...data, user };
       await redis.set(`post:${id}`, JSON.stringify(post), 'EX', 3600);
+    }
+
+    // ── 🆕 Milestone notification for likes (every multiple of 9) ──
+    if (result.action === 'added' && newLikes > 0 && newLikes % 9 === 0) {
+      try {
+        // Get liker info
+        const likerInfo = await getUserInfo(uid);
+        await createNotification({
+          userId: postOwnerId,
+          type: 'personal',
+          title: `❤️ Your post got ${newLikes} likes!`,
+          description: `"${postTitle}" has reached ${newLikes} likes! ${likerInfo?.username || 'Someone'} was the ${newLikes}th person to like it.`,
+          fromUserId: uid,
+        });
+        console.log(`📬 Milestone like notification sent for post ${id} (${newLikes} likes)`);
+      } catch (notifError) {
+        console.error('Failed to send milestone like notification:', notifError);
+      }
     }
 
     res.json({ success: true, action: result.action, likes: result.likes });
@@ -8196,8 +8567,12 @@ app.post('/api/posts/:id/comments', verifyToken, checkBanned, async (req, res) =
 
     // ── Update post detail cache ──
     const postDoc = await postRef.get();
+    let postOwnerId, postTitle, newCommentsCount;
     if (postDoc.exists) {
       const data = postDoc.data();
+      postOwnerId = data.userId;
+      postTitle = data.title || 'Untitled';
+      newCommentsCount = data.commentsCount || 0;
       const user = await getUserInfo(data.userId);
       const post = { id: postDoc.id, ...data, user };
       await redis.set(`post:${id}`, JSON.stringify(post), 'EX', 3600);
@@ -8209,6 +8584,23 @@ app.post('/api/posts/:id/comments', verifyToken, checkBanned, async (req, res) =
       ...commentData,
       user,
     };
+
+    // ── 🆕 Milestone notification for comments (every multiple of 9) ──
+    if (newCommentsCount > 0 && newCommentsCount % 9 === 0) {
+      try {
+        const commenterInfo = await getUserInfo(uid);
+        await createNotification({
+          userId: postOwnerId,
+          type: 'personal',
+          title: `💬 Your post got ${newCommentsCount} comments!`,
+          description: `"${postTitle}" has reached ${newCommentsCount} comments! ${commenterInfo?.username || 'Someone'} left the ${newCommentsCount}th comment.`,
+          fromUserId: uid,
+        });
+        console.log(`📬 Milestone comment notification sent for post ${id} (${newCommentsCount} comments)`);
+      } catch (notifError) {
+        console.error('Failed to send milestone comment notification:', notifError);
+      }
+    }
 
     res.status(201).json({ success: true, comment });
   } catch (error) {
