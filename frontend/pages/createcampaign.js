@@ -1,5 +1,5 @@
 // pages/createcampaign.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useAuth } from '../components/AuthScreen';
@@ -8,18 +8,16 @@ import { useTemplates, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 import toast from 'react-hot-toast';
+import { FiChevronDown, FiCheck } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
-// ── Predefined Task Types ──
+// ── Updated Task Types (removed specified items) ──
 const TASK_TYPES = [
-  { value: 'sub2unlock', label: 'Sub 2 Unlock' },
-  { value: 'add2ndchannel', label: 'Add 2nd Channel' },
   { value: 'sub_like_video', label: 'Subscribe & Like video' },
   { value: 'sub_turnonbell', label: 'Subscribe & Turn on Bell' },
-  { value: 'add_youtube_channel', label: 'Add YouTube Channel' },
   { value: 'youtube_like', label: 'YouTube Like' },
   { value: 'instagram_followers', label: 'Instagram Followers' },
   { value: 'instagram_post_like', label: 'Instagram Post Like' },
@@ -32,8 +30,66 @@ const TASK_TYPES = [
   { value: 'join_discord', label: 'Join Discord' },
   { value: 'like_facebook_post', label: 'Like Facebook Post' },
   { value: 'follow_twitter', label: 'Follow on Twitter' },
-  { value: 'custom', label: 'Add Custom Link' },
 ];
+
+// ── Custom Dropdown Component ──
+const CustomSelect = ({ value, onChange, options, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option) => {
+    onChange(option);
+    setIsOpen(false);
+  };
+
+  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 hover:border-purple-300"
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <FiChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
+          {options.map((option) => {
+            const isSelected = value === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors duration-150 ${
+                  isSelected
+                    ? 'bg-purple-50 text-purple-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span className="truncate pr-2">{option.label}</span>
+                {isSelected && <FiCheck className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function CreateCampaign() {
   const router = useRouter();
@@ -50,13 +106,13 @@ export default function CreateCampaign() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null); // for local preview before upload
+  const [previewImage, setPreviewImage] = useState(null);
 
   // ── Form State ──
   const [campaignTitle, setCampaignTitle] = useState('');
   const [campaignDescription, setCampaignDescription] = useState('');
   const [campaignReward, setCampaignReward] = useState('');
-  const [campaignImage, setCampaignImage] = useState(''); // final URL after upload
+  const [campaignImage, setCampaignImage] = useState('');
 
   const [shareCountEnabled, setShareCountEnabled] = useState(false);
   const [shareCount, setShareCount] = useState(10);
@@ -116,7 +172,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ── Save form to localStorage on any change ──
+  // ── Save form to localStorage ──
   useEffect(() => {
     if (!template) return;
     const formData = {
@@ -133,9 +189,7 @@ export default function CreateCampaign() {
     };
     try {
       localStorage.setItem(storageKey, JSON.stringify(formData));
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }, [
     campaignTitle,
     campaignDescription,
@@ -156,11 +210,9 @@ export default function CreateCampaign() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Show preview immediately
     const objectUrl = URL.createObjectURL(file);
     setPreviewImage(objectUrl);
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image must be smaller than 5MB');
       e.target.value = '';
@@ -168,7 +220,6 @@ export default function CreateCampaign() {
       return;
     }
 
-    // Validate file type
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
       toast.error('Only JPEG, PNG, WEBP, and GIF are allowed');
       e.target.value = '';
@@ -201,7 +252,7 @@ export default function CreateCampaign() {
       setPreviewImage(null);
     } finally {
       setUploadingImage(false);
-      e.target.value = ''; // reset input
+      e.target.value = '';
     }
   };
 
@@ -210,7 +261,7 @@ export default function CreateCampaign() {
     setPreviewImage(null);
   };
 
-  // ── Task Type Helper ──
+  // ── Task Helpers ──
   const getTaskTextFromType = (type) => {
     const found = TASK_TYPES.find(t => t.value === type);
     return found ? found.label : '';
@@ -223,7 +274,6 @@ export default function CreateCampaign() {
     setTasks(updated);
   };
 
-  // ── Task Handlers ──
   const addTask = () => {
     if (tasks.length >= 100) {
       setMessage('Maximum 100 tasks allowed');
@@ -378,7 +428,7 @@ export default function CreateCampaign() {
     }
   }, [authLoading, isAuthenticated, slug]);
 
-  // ── If no slug, show template selection prompt ──
+  // ── No slug page ──
   if (!slug && !authLoading) {
     return (
       <>
@@ -402,12 +452,8 @@ export default function CreateCampaign() {
     );
   }
 
-  // ── Return null while checking auth ──
-  if (!authLoading && !isAuthenticated && slug) {
-    return null;
-  }
+  if (!authLoading && !isAuthenticated && slug) return null;
 
-  // ── Error state ──
   if (error) {
     return (
       <>
@@ -427,12 +473,12 @@ export default function CreateCampaign() {
     );
   }
 
-  // ── Skeleton Loading ──
   if (loading || templatesLoading) {
     return (
       <>
         <Meta title="Create Campaign" />
         <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
+          {/* skeleton – same as before */}
           <div className="w-20 h-8 bg-gray-200 rounded-lg mb-4" />
           <div className="flex items-center gap-2 mb-2">
             <div className="w-20 h-5 bg-gray-200 rounded" />
@@ -440,7 +486,6 @@ export default function CreateCampaign() {
           </div>
           <div className="w-64 h-9 bg-gray-200 rounded mb-2" />
           <div className="w-80 h-5 bg-gray-200 rounded mb-6" />
-
           <div className="bg-white p-6 rounded-2xl border border-border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -450,7 +495,6 @@ export default function CreateCampaign() {
               <div className="w-11 h-6 bg-gray-200 rounded-full" />
             </div>
           </div>
-
           <div className="bg-white p-6 rounded-2xl border border-border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -460,7 +504,6 @@ export default function CreateCampaign() {
               <div className="w-11 h-6 bg-gray-200 rounded-full" />
             </div>
           </div>
-
           <div className="bg-white p-6 rounded-2xl border border-border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -470,7 +513,6 @@ export default function CreateCampaign() {
               <div className="w-11 h-6 bg-gray-200 rounded-full" />
             </div>
           </div>
-
           <div className="w-full h-14 bg-gray-200 rounded-xl" />
         </main>
       </>
@@ -485,7 +527,6 @@ export default function CreateCampaign() {
         description={`Start your ${template?.title || 'campaign'} using this template. Customize and launch your campaign in minutes.`}
       />
       <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Back Button */}
         <button
           onClick={() => router.back()}
           className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-all duration-200 mb-4 px-3 py-1.5 rounded-lg hover:bg-gray-100"
@@ -496,7 +537,6 @@ export default function CreateCampaign() {
           Back
         </button>
 
-        {/* Template Info */}
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-2">
           <span>Template:</span>
           <span className="font-mono font-medium text-gray-800 bg-gray-100 px-2.5 py-0.5 rounded-md">{slug}</span>
@@ -508,7 +548,6 @@ export default function CreateCampaign() {
         <h1 className="text-3xl font-bold text-gray-900 mt-1">Create Campaign</h1>
         <p className="text-gray-500 mt-1 text-sm">Enable the features you want and customize your campaign</p>
 
-        {/* Messages */}
         {message && (
           <div className={`mt-6 p-4 rounded-xl ${
             message.includes('✅')
@@ -519,12 +558,10 @@ export default function CreateCampaign() {
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="mt-6 space-y-6">
           {/* ── Campaign Details ── */}
           <div className="bg-white p-6 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all duration-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">📝 Campaign Details</h2>
-
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
@@ -564,7 +601,7 @@ export default function CreateCampaign() {
                 <p className="text-xs text-gray-400 mt-1">What users get after completing the campaign</p>
               </div>
 
-              {/* ── Image Upload with 16:9 Preview ── */}
+              {/* Image Upload with 16:9 Preview */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">🖼️ Campaign Image</label>
                 <div className="flex items-center gap-3">
@@ -594,7 +631,6 @@ export default function CreateCampaign() {
                     Uploading...
                   </p>
                 )}
-                {/* 16:9 Preview */}
                 {(previewImage || campaignImage) && (
                   <div className="mt-2 relative w-full max-w-md aspect-[16/9] rounded-xl overflow-hidden border border-border bg-gray-100">
                     <Image
@@ -628,7 +664,6 @@ export default function CreateCampaign() {
                 <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 peer-checked:translate-x-5 peer-checked:bg-white"></span>
               </label>
             </div>
-
             {shareCountEnabled && (
               <div className="mt-4 animate-slideDown">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Number of Shares Required</label>
@@ -664,26 +699,23 @@ export default function CreateCampaign() {
                 <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 peer-checked:translate-x-5"></span>
               </label>
             </div>
-
             {tasksEnabled && (
               <div className="mt-4 space-y-4 animate-slideDown">
                 <p className="text-sm text-gray-500">Add up to 100 tasks</p>
                 {tasks.map((task, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl border border-border">
-                    <div className="md:col-span-1">
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl border border-border">
+                    {/* Task Type */}
+                    <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Task Type</label>
-                      <select
+                      <CustomSelect
                         value={task.type || ''}
-                        onChange={(e) => handleTaskTypeChange(index, e.target.value)}
-                        className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
-                      >
-                        <option value="">Select type</option>
-                        {TASK_TYPES.map((type) => (
-                          <option key={type.value} value={type.value}>{type.label}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => handleTaskTypeChange(index, val)}
+                        options={TASK_TYPES}
+                        placeholder="Select type"
+                      />
                     </div>
-                    <div className="md:col-span-1">
+                    {/* Task Text */}
+                    <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Task Text</label>
                       <input
                         value={task.text}
@@ -694,7 +726,8 @@ export default function CreateCampaign() {
                       />
                       <p className="text-xs text-gray-400 mt-1">{task.text.length}/250</p>
                     </div>
-                    <div className="md:col-span-1">
+                    {/* Task URL */}
+                    <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Task URL</label>
                       <input
                         value={task.url}
@@ -703,7 +736,8 @@ export default function CreateCampaign() {
                         className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                       />
                     </div>
-                    <div className="flex items-end justify-end">
+                    {/* Remove button */}
+                    <div className="flex items-end justify-end lg:justify-center">
                       <button
                         type="button"
                         onClick={() => removeTask(index)}
@@ -745,7 +779,6 @@ export default function CreateCampaign() {
                 <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 peer-checked:translate-x-5"></span>
               </label>
             </div>
-
             {finalUrlEnabled && (
               <div className="mt-4 animate-slideDown">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Redirect URL</label>
@@ -761,7 +794,6 @@ export default function CreateCampaign() {
             )}
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={isSubmitting}
