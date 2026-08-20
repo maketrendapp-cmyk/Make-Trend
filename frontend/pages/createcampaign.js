@@ -1,27 +1,44 @@
 // pages/createcampaign.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { useAuth } from '../components/AuthScreen';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTemplates, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
+import toast from 'react-hot-toast';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
+// ── Predefined Task Types ──
+const TASK_TYPES = [
+  { value: 'sub2unlock', label: 'Sub 2 Unlock' },
+  { value: 'add2ndchannel', label: 'Add 2nd Channel' },
+  { value: 'sub_like_video', label: 'Subscribe & Like video' },
+  { value: 'sub_turnonbell', label: 'Subscribe & Turn on Bell' },
+  { value: 'add_youtube_channel', label: 'Add YouTube Channel' },
+  { value: 'youtube_like', label: 'YouTube Like' },
+  { value: 'instagram_followers', label: 'Instagram Followers' },
+  { value: 'instagram_post_like', label: 'Instagram Post Like' },
+  { value: 'facebook_followers', label: 'Facebook Followers' },
+  { value: 'telegram_member', label: 'Telegram Member' },
+  { value: 'youtube_like_comment', label: 'YouTube Video Like & Comment' },
+  { value: 'whatsapp_channel_join', label: 'WhatsApp Channel Join' },
+  { value: 'tiktok_follow', label: 'TikTok Follow' },
+  { value: 'tiktok_like_video', label: 'TikTok Like Video' },
+  { value: 'join_discord', label: 'Join Discord' },
+  { value: 'like_facebook_post', label: 'Like Facebook Post' },
+  { value: 'follow_twitter', label: 'Follow on Twitter' },
+  { value: 'custom', label: 'Add Custom Link' },
+];
+
 export default function CreateCampaign() {
   const router = useRouter();
   const { slug } = router.query;
-  const { 
-    user, 
-    isAuthenticated, 
-    loading: authLoading, 
-    refreshUser
-  } = useAuth();
-  
-  // ── React Query ──
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const { data: templates = [], isLoading: templatesLoading } = useTemplates();
   const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
@@ -32,17 +49,20 @@ export default function CreateCampaign() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null); // for local preview before upload
 
   // ── Form State ──
   const [campaignTitle, setCampaignTitle] = useState('');
   const [campaignDescription, setCampaignDescription] = useState('');
   const [campaignReward, setCampaignReward] = useState('');
+  const [campaignImage, setCampaignImage] = useState(''); // final URL after upload
 
   const [shareCountEnabled, setShareCountEnabled] = useState(false);
   const [shareCount, setShareCount] = useState(10);
 
   const [tasksEnabled, setTasksEnabled] = useState(false);
-  const [tasks, setTasks] = useState([{ text: '', url: '' }]);
+  const [tasks, setTasks] = useState([{ text: '', url: '', type: '' }]);
 
   const [finalUrlEnabled, setFinalUrlEnabled] = useState(false);
   const [finalUrl, setFinalUrl] = useState('');
@@ -52,17 +72,15 @@ export default function CreateCampaign() {
 
   // ── Load template from React Query cache ──
   useEffect(() => {
-    // Only attempt to load if slug exists and user is authenticated
     if (slug && isAuthenticated && templates.length > 0) {
       const found = templates.find(t => t.slug === slug);
       if (found) {
         setTemplate(found);
-        // Pre‑fill from template
         setCampaignTitle(found.title || '');
         setCampaignDescription(found.description || '');
         setCampaignReward(found.reward || 'Exclusive Reward');
+        setCampaignImage(found.image || '');
         setError('');
-        // Load saved form from localStorage
         loadSavedForm();
         setLoading(false);
       } else {
@@ -70,7 +88,6 @@ export default function CreateCampaign() {
         setLoading(false);
       }
     } else if (!slug) {
-      // No slug → not loading, we'll render a different UI
       setLoading(false);
     } else if (!isAuthenticated) {
       setLoading(false);
@@ -86,6 +103,7 @@ export default function CreateCampaign() {
         if (parsed.title !== undefined) setCampaignTitle(parsed.title);
         if (parsed.description !== undefined) setCampaignDescription(parsed.description);
         if (parsed.reward !== undefined) setCampaignReward(parsed.reward);
+        if (parsed.image !== undefined) setCampaignImage(parsed.image);
         if (parsed.shareCountEnabled !== undefined) setShareCountEnabled(parsed.shareCountEnabled);
         if (parsed.shareCount !== undefined) setShareCount(parsed.shareCount);
         if (parsed.tasksEnabled !== undefined) setTasksEnabled(parsed.tasksEnabled);
@@ -105,6 +123,7 @@ export default function CreateCampaign() {
       title: campaignTitle,
       description: campaignDescription,
       reward: campaignReward,
+      image: campaignImage,
       shareCountEnabled,
       shareCount,
       tasksEnabled,
@@ -121,6 +140,7 @@ export default function CreateCampaign() {
     campaignTitle,
     campaignDescription,
     campaignReward,
+    campaignImage,
     shareCountEnabled,
     shareCount,
     tasksEnabled,
@@ -131,13 +151,85 @@ export default function CreateCampaign() {
     storageKey,
   ]);
 
+  // ── Image Upload Handler ──
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Show preview immediately
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewImage(objectUrl);
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be smaller than 5MB');
+      e.target.value = '';
+      setPreviewImage(null);
+      return;
+    }
+
+    // Validate file type
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      toast.error('Only JPEG, PNG, WEBP, and GIF are allowed');
+      e.target.value = '';
+      setPreviewImage(null);
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetch(`${API_BASE}/upload?folder=campaigns`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCampaignImage(data.url);
+        toast.success('Image uploaded successfully');
+      } else {
+        toast.error(data.error || 'Upload failed');
+        setPreviewImage(null);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Failed to upload image');
+      setPreviewImage(null);
+    } finally {
+      setUploadingImage(false);
+      e.target.value = ''; // reset input
+    }
+  };
+
+  const removeImage = () => {
+    setCampaignImage('');
+    setPreviewImage(null);
+  };
+
+  // ── Task Type Helper ──
+  const getTaskTextFromType = (type) => {
+    const found = TASK_TYPES.find(t => t.value === type);
+    return found ? found.label : '';
+  };
+
+  const handleTaskTypeChange = (index, value) => {
+    const updated = [...tasks];
+    updated[index].type = value;
+    updated[index].text = getTaskTextFromType(value);
+    setTasks(updated);
+  };
+
   // ── Task Handlers ──
   const addTask = () => {
     if (tasks.length >= 100) {
       setMessage('Maximum 100 tasks allowed');
       return;
     }
-    setTasks([...tasks, { text: '', url: '' }]);
+    setTasks([...tasks, { text: '', url: '', type: '' }]);
   };
 
   const removeTask = (index) => {
@@ -239,6 +331,7 @@ export default function CreateCampaign() {
         title: campaignTitle.trim(),
         description: campaignDescription.trim(),
         reward: campaignReward.trim(),
+        image: campaignImage || undefined,
         shareCount: shareCountEnabled ? Number(shareCount) : 0,
         tasks: tasksEnabled ? tasks : [],
         finalUrl: finalUrlEnabled ? finalUrl : '',
@@ -261,14 +354,10 @@ export default function CreateCampaign() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Clear saved form after success
         localStorage.removeItem(storageKey);
-// Invalidate and reset campaigns cache
-invalidateCampaigns().catch(() => {});
-invalidateStats().catch(() => {});
-// ── Reset the infinite query cache to force a fresh fetch on next mount ──
-queryClient.resetQueries({ queryKey: ['campaigns'] });
-        // Redirect immediately to the success page
+        invalidateCampaigns().catch(() => {});
+        invalidateStats().catch(() => {});
+        queryClient.resetQueries({ queryKey: ['campaigns'] });
         router.push(`/campaign-created?id=${data.campaignId}`);
       } else {
         setMessage(data.error || 'Failed to create campaign');
@@ -281,7 +370,7 @@ queryClient.resetQueries({ queryKey: ['campaigns'] });
     }
   };
 
-  // ── Redirect unauthenticated users to login ──
+  // ── Redirect unauthenticated users ──
   useEffect(() => {
     if (!authLoading && !isAuthenticated && slug) {
       const redirect = `/createcampaign?slug=${slug}`;
@@ -289,14 +378,11 @@ queryClient.resetQueries({ queryKey: ['campaigns'] });
     }
   }, [authLoading, isAuthenticated, slug]);
 
-  // ── If no slug, show the "Select a Template" page ──
+  // ── If no slug, show template selection prompt ──
   if (!slug && !authLoading) {
     return (
       <>
-        <Meta
-          title="Create a Campaign – Select a Template"
-          description="Choose a template to start building your viral campaign with Make Trend."
-        />
+        <Meta title="Create a Campaign – Select a Template" />
         <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-white to-purple-50/20">
           <div className="max-w-md w-full text-center">
             <div className="text-6xl mb-6">📋</div>
@@ -316,7 +402,7 @@ queryClient.resetQueries({ queryKey: ['campaigns'] });
     );
   }
 
-  // ── Return null while checking auth (but only if slug exists) ──
+  // ── Return null while checking auth ──
   if (!authLoading && !isAuthenticated && slug) {
     return null;
   }
@@ -477,6 +563,50 @@ queryClient.resetQueries({ queryKey: ['campaigns'] });
                 />
                 <p className="text-xs text-gray-400 mt-1">What users get after completing the campaign</p>
               </div>
+
+              {/* ── Image Upload with 16:9 Preview ── */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">🖼️ Campaign Image</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="flex-1 border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition disabled:opacity-50"
+                  />
+                  {campaignImage && (
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {uploadingImage && (
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                    <svg className="animate-spin h-3 w-3 text-primary" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Uploading...
+                  </p>
+                )}
+                {/* 16:9 Preview */}
+                {(previewImage || campaignImage) && (
+                  <div className="mt-2 relative w-full max-w-md aspect-[16/9] rounded-xl overflow-hidden border border-border bg-gray-100">
+                    <Image
+                      src={previewImage || campaignImage}
+                      alt="Campaign preview"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-1">Upload a custom image (max 5MB, 16:9 recommended). Leave empty to use the template image.</p>
+              </div>
             </div>
           </div>
 
@@ -539,13 +669,26 @@ queryClient.resetQueries({ queryKey: ['campaigns'] });
               <div className="mt-4 space-y-4 animate-slideDown">
                 <p className="text-sm text-gray-500">Add up to 100 tasks</p>
                 {tasks.map((task, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-border">
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl border border-border">
                     <div className="md:col-span-1">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Task {index + 1} Text</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Task Type</label>
+                      <select
+                        value={task.type || ''}
+                        onChange={(e) => handleTaskTypeChange(index, e.target.value)}
+                        className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                      >
+                        <option value="">Select type</option>
+                        {TASK_TYPES.map((type) => (
+                          <option key={type.value} value={type.value}>{type.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Task Text</label>
                       <input
                         value={task.text}
                         onChange={(e) => updateTask(index, 'text', e.target.value)}
-                        placeholder="e.g., Follow @username"
+                        placeholder="Task description"
                         className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                         maxLength="250"
                       />
@@ -556,7 +699,7 @@ queryClient.resetQueries({ queryKey: ['campaigns'] });
                       <input
                         value={task.url}
                         onChange={(e) => updateTask(index, 'url', e.target.value)}
-                        placeholder="https://instagram.com/..."
+                        placeholder="https://..."
                         className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
                       />
                     </div>
