@@ -8,13 +8,13 @@ import { useTemplates, useInvalidateQueries } from '../lib/queries';
 import { auth } from '../services/firebase';
 import Meta from '../components/Meta';
 import toast from 'react-hot-toast';
-import { FiChevronDown, FiCheck } from 'react-icons/fi';
+import { FiChevronDown, FiCheck, FiX } from 'react-icons/fi';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
 
-// ── Updated Task Types (removed specified items) ──
+// ── Updated Task Types ──
 const TASK_TYPES = [
   { value: 'sub_like_video', label: 'Subscribe & Like video' },
   { value: 'sub_turnonbell', label: 'Subscribe & Turn on Bell' },
@@ -66,7 +66,7 @@ const CustomSelect = ({ value, onChange, options, placeholder }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
+        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
           {options.map((option) => {
             const isSelected = value === option.value;
             return (
@@ -123,10 +123,10 @@ export default function CreateCampaign() {
   const [finalUrlEnabled, setFinalUrlEnabled] = useState(false);
   const [finalUrl, setFinalUrl] = useState('');
 
-  // ── Storage key per template slug ──
+  // ── Storage key ──
   const storageKey = `createCampaign_${slug || 'new'}`;
 
-  // ── Load template from React Query cache ──
+  // ── Load template ──
   useEffect(() => {
     if (slug && isAuthenticated && templates.length > 0) {
       const found = templates.find(t => t.slug === slug);
@@ -150,7 +150,7 @@ export default function CreateCampaign() {
     }
   }, [slug, isAuthenticated, templates]);
 
-  // ── Load saved form from localStorage ──
+  // ── Load saved form ──
   const loadSavedForm = () => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -172,7 +172,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ── Save form to localStorage ──
+  // ── Save form ──
   useEffect(() => {
     if (!template) return;
     const formData = {
@@ -205,7 +205,7 @@ export default function CreateCampaign() {
     storageKey,
   ]);
 
-  // ── Image Upload Handler ──
+  // ── Image Upload ──
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -420,7 +420,7 @@ export default function CreateCampaign() {
     }
   };
 
-  // ── Redirect unauthenticated users ──
+  // ── Redirect unauthenticated ──
   useEffect(() => {
     if (!authLoading && !isAuthenticated && slug) {
       const redirect = `/createcampaign?slug=${slug}`;
@@ -428,7 +428,7 @@ export default function CreateCampaign() {
     }
   }, [authLoading, isAuthenticated, slug]);
 
-  // ── No slug page ──
+  // ── No slug ──
   if (!slug && !authLoading) {
     return (
       <>
@@ -478,7 +478,6 @@ export default function CreateCampaign() {
       <>
         <Meta title="Create Campaign" />
         <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-pulse">
-          {/* skeleton – same as before */}
           <div className="w-20 h-8 bg-gray-200 rounded-lg mb-4" />
           <div className="flex items-center gap-2 mb-2">
             <div className="w-20 h-5 bg-gray-200 rounded" />
@@ -601,24 +600,26 @@ export default function CreateCampaign() {
                 <p className="text-xs text-gray-400 mt-1">What users get after completing the campaign</p>
               </div>
 
-              {/* Image Upload with 16:9 Preview */}
+              {/* ── Image Upload ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">🖼️ Campaign Image</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploadingImage}
-                    className="flex-1 border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition disabled:opacity-50"
-                  />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex-1 w-full">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                      className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition disabled:opacity-50"
+                    />
+                  </div>
                   {campaignImage && (
                     <button
                       type="button"
                       onClick={removeImage}
-                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition"
+                      className="flex items-center gap-1 px-4 py-2.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-xl transition whitespace-nowrap"
                     >
-                      Remove
+                      <FiX className="w-4 h-4" /> Remove
                     </button>
                   )}
                 </div>
@@ -631,6 +632,7 @@ export default function CreateCampaign() {
                     Uploading...
                   </p>
                 )}
+                {/* 16:9 Preview */}
                 {(previewImage || campaignImage) && (
                   <div className="mt-2 relative w-full max-w-md aspect-[16/9] rounded-xl overflow-hidden border border-border bg-gray-100">
                     <Image
@@ -703,7 +705,10 @@ export default function CreateCampaign() {
               <div className="mt-4 space-y-4 animate-slideDown">
                 <p className="text-sm text-gray-500">Add up to 100 tasks</p>
                 {tasks.map((task, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl border border-border">
+                  <div
+                    key={index}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl border border-border"
+                  >
                     {/* Task Type */}
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Task Type</label>
@@ -737,7 +742,7 @@ export default function CreateCampaign() {
                       />
                     </div>
                     {/* Remove button */}
-                    <div className="flex items-end justify-end lg:justify-center">
+                    <div className="flex items-end justify-start lg:justify-center">
                       <button
                         type="button"
                         onClick={() => removeTask(index)}
