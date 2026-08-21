@@ -2405,7 +2405,7 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
   features: { shareCount: scEnabled, tasks: tasksEnabled, finalUrl: fuEnabled },
   title: finalTitle,
   description: finalDescription,
-  image: templateData.image || '',
+  image: image || templateData.image || '',
   reward: finalReward,
   templateSlug: templateData.slug || 'campaign',
   status: 'active',
