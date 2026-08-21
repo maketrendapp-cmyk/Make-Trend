@@ -2320,7 +2320,7 @@ app.post('/api/campaigns', verifyToken, checkBanned, async (req, res) => {
         error: 'Rate limit exceeded. You can create up to 3 campaigns per minute. Please wait a moment.',
       });
     }
-    const { templateId, shareCount, tasks, finalUrl, features, title, description, reward } = req.body;
+    const { templateId, shareCount, tasks, finalUrl, features, title, description, reward, image } = req.body;
 
     if (!templateId) {
       return res.status(400).json({ success: false, error: 'Template ID is required' });
