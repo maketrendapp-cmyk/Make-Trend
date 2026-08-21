@@ -24,12 +24,9 @@ export default function GrowTogetherLanding() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
 
+  // ── Always go to the feed, regardless of login status ──
   const handleGetStarted = () => {
-    if (isAuthenticated) {
-      router.push('/groweachother/grow-feed');
-    } else {
-      router.push('/login?redirect=/groweachother/grow-feed');
-    }
+    router.push('/groweachother/grow-feed');
   };
 
   return (
@@ -62,7 +59,7 @@ export default function GrowTogetherLanding() {
                 onClick={handleGetStarted}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm sm:text-base rounded-xl shadow-md hover:shadow-lg transition active:scale-95"
               >
-                {isAuthenticated ? 'Go to Feed' : 'Get Started – Free'}
+                Get Started – Free
                 <FiArrowRight className="w-4 h-4" />
               </button>
               {!isAuthenticated && (
@@ -104,7 +101,7 @@ export default function GrowTogetherLanding() {
                 See public tasks from other users – subscribers, followers, likes, or comments.
               </p>
               <Link
-                href={isAuthenticated ? '/groweachother/grow-feed' : '/login?redirect=/groweachother/grow-feed'}
+                href="/groweachother/grow-feed"
                 className="inline-flex items-center gap-1 mt-3 text-purple-600 font-medium hover:underline text-xs sm:text-sm"
               >
                 View Feed <FiArrowRight className="w-3.5 h-3.5" />
@@ -218,7 +215,7 @@ export default function GrowTogetherLanding() {
               onClick={handleGetStarted}
               className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-purple-700 font-bold text-sm sm:text-base rounded-xl shadow-md hover:shadow-lg transition active:scale-95"
             >
-              {isAuthenticated ? 'Go to Feed' : 'Get Started – Free'}
+              Get Started – Free
               <FiArrowRight className="w-4 h-4" />
             </button>
             {!isAuthenticated && (
@@ -235,4 +232,3 @@ export default function GrowTogetherLanding() {
     </>
   );
 }
-
