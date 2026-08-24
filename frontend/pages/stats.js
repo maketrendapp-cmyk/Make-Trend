@@ -1,6 +1,7 @@
 // pages/stats.js
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { useAuth } from '../components/AuthScreen';
 import { useStats, useCampaigns, useInvalidateQueries } from '../lib/queries';
 import AuthScreen from '../components/AuthScreen';
@@ -10,12 +11,90 @@ import {
   FiBarChart2, FiEye, FiUnlock, FiShare2, FiCheckCircle,
   FiAward, FiPlusCircle, FiEdit2, FiTrash2, FiClock,
   FiLogIn, FiSearch, FiFilter,
-  FiX, FiChevronDown, FiCopy, FiCheck
+  FiX, FiChevronDown, FiCopy, FiCheck, FiAlertTriangle
 } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
 const API_BASE = `${BACKEND_URL}/api`;
+
+// ── Task Types (same as createcampaign.js) ──
+const TASK_TYPES = [
+  { value: 'sub_like_video', label: 'Subscribe & Like video' },
+  { value: 'sub_turnonbell', label: 'Subscribe & Turn on Bell' },
+  { value: 'youtube_like', label: 'YouTube Like' },
+  { value: 'instagram_followers', label: 'Instagram Followers' },
+  { value: 'instagram_post_like', label: 'Instagram Post Like' },
+  { value: 'facebook_followers', label: 'Facebook Followers' },
+  { value: 'telegram_member', label: 'Telegram Member' },
+  { value: 'youtube_like_comment', label: 'YouTube Video Like & Comment' },
+  { value: 'whatsapp_channel_join', label: 'WhatsApp Channel Join' },
+  { value: 'tiktok_follow', label: 'TikTok Follow' },
+  { value: 'tiktok_like_video', label: 'TikTok Like Video' },
+  { value: 'join_discord', label: 'Join Discord' },
+  { value: 'like_facebook_post', label: 'Like Facebook Post' },
+  { value: 'follow_twitter', label: 'Follow on Twitter' },
+];
+
+// ── Custom Dropdown Component (reused from createcampaign) ──
+const CustomSelect = ({ value, onChange, options, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option) => {
+    onChange(option);
+    setIsOpen(false);
+  };
+
+  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 hover:border-purple-300"
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <FiChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
+          {options.map((option) => {
+            const isSelected = value === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors duration-150 ${
+                  isSelected
+                    ? 'bg-purple-50 text-purple-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span className="truncate pr-2">{option.label}</span>
+                {isSelected && <FiCheck className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function Stats() {
   const router = useRouter();
@@ -23,8 +102,8 @@ export default function Stats() {
   const { invalidateCampaigns, invalidateStats } = useInvalidateQueries();
 
   // ── Filter & Search state ──
-  const [searchInput, setSearchInput] = useState('');      // what user types
-  const [searchQuery, setSearchQuery] = useState('');      // what is actually sent to backend
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [featureFilter, setFeatureFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
@@ -33,7 +112,7 @@ export default function Stats() {
   // ── React Query: Stats ──
   const { data: stats, isLoading: statsLoading } = useStats(isAuthenticated);
 
-  // ── React Query: Campaigns with backend filters ──
+  // ── React Query: Campaigns ──
   const {
     data: campaignPages,
     isLoading: campaignsLoading,
@@ -85,10 +164,8 @@ export default function Stats() {
     return result;
   }, [allCampaigns, sortBy]);
 
-  // ── Count active filters ──
   const activeFilterCount = [statusFilter, featureFilter].filter(f => f !== 'all').length + (searchQuery.trim() ? 1 : 0);
 
-  // ── Clear all filters ──
   const clearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -97,7 +174,6 @@ export default function Stats() {
     setSortBy('newest');
   };
 
-  // ── Trigger search ──
   const triggerSearch = () => {
     setSearchQuery(searchInput.trim());
   };
@@ -140,47 +216,6 @@ export default function Stats() {
   // ── Handlers ──
   const handleCreateCampaign = () => router.push('/create');
 
-  const handleEditCampaign = (campaign) => {
-    setEditingCampaign(campaign);
-    setEditForm({
-      title: campaign.title || '',
-      description: campaign.description || '',
-      reward: campaign.reward || 'Exclusive Reward',
-      shareCount: campaign.shareCount || 0,
-      tasks: campaign.tasks || [],
-      finalUrl: campaign.finalUrl || '',
-      features: campaign.features || { shareCount: false, tasks: false, finalUrl: false },
-    });
-    setShowEditModal(true);
-    setMessage('');
-    document.body.style.overflow = 'hidden';
-  };
-
-  const handleDeleteCampaign = async (campaignId) => {
-    if (!confirm('Delete this campaign? This action cannot be undone.')) return;
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) { alert('You must be logged in'); return; }
-      const token = await firebaseUser.getIdToken();
-      const res = await fetch(`${API_BASE}/campaigns/${campaignId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setMessage('✅ Campaign deleted successfully!');
-        setTimeout(() => setMessage(''), 3000);
-        await invalidateCampaigns();
-        await invalidateStats();
-      } else {
-        alert(data.error || 'Failed to delete campaign');
-      }
-    } catch (err) {
-      console.error('Delete error:', err);
-      alert('Network error. Please try again.');
-    }
-  };
-
   // ── Edit Modal State ──
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -188,6 +223,7 @@ export default function Stats() {
     title: '',
     description: '',
     reward: '',
+    image: '',
     shareCount: 0,
     tasks: [],
     finalUrl: '',
@@ -195,9 +231,111 @@ export default function Stats() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // ── Delete Modal State ──
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
+
+  // ── Copy state ──
   const [copiedCampaignId, setCopiedCampaignId] = useState(null);
 
   // ── Edit Modal Functions ──
+  const handleEditCampaign = (campaign) => {
+    setEditingCampaign(campaign);
+    setEditForm({
+      title: campaign.title || '',
+      description: campaign.description || '',
+      reward: campaign.reward || 'Exclusive Reward',
+      image: campaign.image || '',
+      shareCount: campaign.shareCount || 0,
+      tasks: campaign.tasks?.length ? campaign.tasks.map(t => ({ ...t, type: '' })) : [{ text: '', url: '', type: '' }],
+      finalUrl: campaign.finalUrl || '',
+      features: campaign.features || { shareCount: false, tasks: false, finalUrl: false },
+    });
+    setPreviewImage(campaign.image || null);
+    setShowEditModal(true);
+    setMessage('');
+    document.body.style.overflow = 'hidden';
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    document.body.style.overflow = 'unset';
+    setMessage('');
+    setPreviewImage(null);
+  };
+
+  // ── Image Upload in Edit Modal ──
+  const handleEditImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewImage(objectUrl);
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be smaller than 5MB');
+      e.target.value = '';
+      setPreviewImage(null);
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      toast.error('Only JPEG, PNG, WEBP, and GIF are allowed');
+      e.target.value = '';
+      setPreviewImage(null);
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetch(`${API_BASE}/upload?folder=campaigns`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditForm(prev => ({ ...prev, image: data.url }));
+        toast.success('Image uploaded successfully');
+      } else {
+        toast.error(data.error || 'Upload failed');
+        setPreviewImage(editForm.image || null);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Failed to upload image');
+      setPreviewImage(editForm.image || null);
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeEditImage = () => {
+    setEditForm(prev => ({ ...prev, image: '' }));
+    setPreviewImage(null);
+  };
+
+  // ── Task Helpers ──
+  const getTaskTextFromType = (type) => {
+    const found = TASK_TYPES.find(t => t.value === type);
+    return found ? found.label : '';
+  };
+
+  const handleTaskTypeChange = (index, value) => {
+    const updated = [...editForm.tasks];
+    updated[index].type = value;
+    updated[index].text = getTaskTextFromType(value);
+    setEditForm(prev => ({ ...prev, tasks: updated }));
+  };
+
   const addTaskInEdit = () => {
     if (editForm.tasks.length >= 100) {
       setMessage('Maximum 100 tasks allowed');
@@ -205,7 +343,7 @@ export default function Stats() {
     }
     setEditForm(prev => ({
       ...prev,
-      tasks: [...prev.tasks, { text: '', url: '' }],
+      tasks: [...prev.tasks, { text: '', url: '', type: '' }],
     }));
   };
 
@@ -289,8 +427,9 @@ export default function Stats() {
         title: editForm.title.trim(),
         description: editForm.description.trim(),
         reward: editForm.reward.trim(),
-        shareCount: editForm.features.shareCount ? editForm.shareCount : 0,
-        tasks: editForm.features.tasks ? editForm.tasks : [],
+        image: editForm.image || undefined,
+        shareCount: editForm.features.shareCount ? Number(editForm.shareCount) : 0,
+        tasks: editForm.features.tasks ? editForm.tasks.map(({ text, url }) => ({ text, url })) : [],
         finalUrl: editForm.features.finalUrl ? editForm.finalUrl : '',
         features: editForm.features,
       };
@@ -308,9 +447,7 @@ export default function Stats() {
         await invalidateCampaigns();
         await invalidateStats();
         setTimeout(() => {
-          setShowEditModal(false);
-          document.body.style.overflow = 'unset';
-          setMessage('');
+          closeEditModal();
         }, 1500);
       } else {
         setMessage(data.error || 'Failed to update campaign');
@@ -322,10 +459,42 @@ export default function Stats() {
     setIsSubmitting(false);
   };
 
-  const closeModal = () => {
-    setShowEditModal(false);
-    document.body.style.overflow = 'unset';
-    setMessage('');
+  // ── Delete Modal Functions ──
+  const handleDeleteCampaign = (campaignId) => {
+    setDeleteTargetId(campaignId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) { toast.error('You must be logged in'); return; }
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${API_BASE}/campaigns/${deleteTargetId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Campaign deleted successfully!');
+        await invalidateCampaigns();
+        await invalidateStats();
+      } else {
+        toast.error(data.error || 'Failed to delete campaign');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error('Network error. Please try again.');
+    } finally {
+      setShowDeleteModal(false);
+      setDeleteTargetId(null);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeleteTargetId(null);
   };
 
   // ── Copy URL ──
@@ -408,50 +577,15 @@ export default function Stats() {
           </button>
         </div>
 
-        {/* ── Stats Cards – 2 columns, 2 rows ── */}
+        {/* ── Stats Cards ── */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           {[
-            { 
-              label: 'Total Unlocks', 
-              value: stats?.totalUnlocks ?? 0, 
-              icon: FiUnlock, 
-              color: 'purple',
-              bg: 'bg-purple-50',
-              text: 'text-purple-700',
-              border: 'border-purple-100'
-            },
-            { 
-              label: 'Total Views', 
-              value: stats?.totalViews ?? 0, 
-              icon: FiEye, 
-              color: 'blue',
-              bg: 'bg-blue-50',
-              text: 'text-blue-700',
-              border: 'border-blue-100'
-            },
-            { 
-              label: 'Total Shares', 
-              value: stats?.totalShares ?? 0, 
-              icon: FiShare2, 
-              color: 'green',
-              bg: 'bg-green-50',
-              text: 'text-green-700',
-              border: 'border-green-100'
-            },
-            { 
-              label: 'Total Completions', 
-              value: stats?.totalCompletions ?? 0, 
-              icon: FiCheckCircle, 
-              color: 'orange',
-              bg: 'bg-orange-50',
-              text: 'text-orange-700',
-              border: 'border-orange-100'
-            },
+            { label: 'Total Unlocks', value: stats?.totalUnlocks ?? 0, icon: FiUnlock, color: 'purple', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-100' },
+            { label: 'Total Views', value: stats?.totalViews ?? 0, icon: FiEye, color: 'blue', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-100' },
+            { label: 'Total Shares', value: stats?.totalShares ?? 0, icon: FiShare2, color: 'green', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100' },
+            { label: 'Total Completions', value: stats?.totalCompletions ?? 0, icon: FiCheckCircle, color: 'orange', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-100' },
           ].map((stat, idx) => (
-            <div
-              key={idx}
-              className={`${stat.bg} rounded-2xl p-5 border ${stat.border} shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group`}
-            >
+            <div key={idx} className={`${stat.bg} rounded-2xl p-5 border ${stat.border} shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group`}>
               <div className="flex items-center gap-4">
                 <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white ${stat.text} group-hover:scale-110 transition`}>
                   <stat.icon className="w-6 h-6" />
@@ -465,9 +599,8 @@ export default function Stats() {
           ))}
         </div>
 
-        {/* ── Filter & Search Bar ── */}
+        {/* ── Filter & Search ── */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          {/* Search input with button inside */}
           <div className="relative flex-1">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -588,7 +721,6 @@ export default function Stats() {
                     className="bg-white rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-xl transition-all duration-300 p-5 relative overflow-hidden animate-fadeInUp"
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
-                    {/* Status Bar */}
                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${isSuccessful ? 'bg-gradient-to-b from-green-400 to-emerald-500' : cStatus === 'active' ? 'bg-gradient-to-b from-blue-400 to-indigo-500' : 'bg-gray-300'}`} />
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-4">
@@ -615,7 +747,6 @@ export default function Stats() {
                           <span className="flex items-center gap-1 text-gray-400"><FiClock className="w-3 h-3" /> {formatDate(camp.createdAt)}</span>
                         </div>
 
-                        {/* Feature badges */}
                         {camp.features && Object.values(camp.features).some(Boolean) && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {camp.features.shareCount && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Shares</span>}
@@ -651,7 +782,6 @@ export default function Stats() {
                 );
               })}
 
-              {/* Infinite Scroll Loader */}
               {hasNextPage && (
                 <div ref={loaderRef} className="py-6 text-center">
                   {isFetchingNextPage ? (
@@ -676,9 +806,9 @@ export default function Stats() {
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-3xl z-10">
               <h2 className="text-xl font-bold text-gray-900">Edit Campaign</h2>
-              <button onClick={closeModal} className="p-2 rounded-full hover:bg-gray-100 transition">
+              <button onClick={closeEditModal} className="p-2 rounded-full hover:bg-gray-100 transition">
                 <FiX className="w-5 h-5 text-gray-500" />
               </button>
             </div>
@@ -727,6 +857,50 @@ export default function Stats() {
                       className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                       placeholder="e.g., Exclusive Gift Card"
                     />
+                  </div>
+                  {/* Image Upload */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">🖼️ Campaign Image</label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="flex-1 w-full">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleEditImageUpload}
+                          disabled={uploadingImage}
+                          className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition disabled:opacity-50"
+                        />
+                      </div>
+                      {editForm.image && (
+                        <button
+                          type="button"
+                          onClick={removeEditImage}
+                          className="flex items-center gap-1 px-4 py-2.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-xl transition whitespace-nowrap"
+                        >
+                          <FiX className="w-4 h-4" /> Remove
+                        </button>
+                      )}
+                    </div>
+                    {uploadingImage && (
+                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                        <svg className="animate-spin h-3 w-3 text-purple-600" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Uploading...
+                      </p>
+                    )}
+                    {(previewImage || editForm.image) && (
+                      <div className="mt-2 relative w-full max-w-md aspect-[16/9] rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                        <Image
+                          src={previewImage || editForm.image}
+                          alt="Campaign preview"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">Upload a custom image (max 5MB, 16:9 recommended).</p>
                   </div>
                 </div>
               </div>
@@ -791,16 +965,26 @@ export default function Stats() {
                 {editForm.features.tasks && (
                   <div className="mt-3 space-y-3 animate-slideDown">
                     {editForm.tasks.map((task, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-white rounded-xl border border-gray-200">
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 bg-white rounded-xl border border-gray-200">
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Task {index+1} Text</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Task Type</label>
+                          <CustomSelect
+                            value={task.type || ''}
+                            onChange={(val) => handleTaskTypeChange(index, val)}
+                            options={TASK_TYPES}
+                            placeholder="Select type"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Task Text</label>
                           <input
                             value={task.text}
                             onChange={(e) => updateTaskInEdit(index, 'text', e.target.value)}
-                            placeholder="e.g., Follow @username"
+                            placeholder="Task description"
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                             maxLength="250"
                           />
+                          <p className="text-xs text-gray-400 mt-1">{task.text.length}/250</p>
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">Task URL</label>
@@ -895,7 +1079,6 @@ export default function Stats() {
                 </p>
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="submit"
@@ -906,13 +1089,47 @@ export default function Stats() {
                 </button>
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={closeEditModal}
                   className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition"
                 >
                   Cancel
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE CONFIRMATION MODAL ── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl animate-[slideUp_0.3s_ease-out]">
+            <div className="flex items-center gap-4 text-red-600 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <FiAlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Delete Campaign?</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-gray-600 text-sm mb-6">
+              Are you sure you want to permanently delete this campaign? All associated data will be lost.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition"
+              >
+                Yes, Delete
+              </button>
+              <button
+                onClick={closeDeleteModal}
+                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
