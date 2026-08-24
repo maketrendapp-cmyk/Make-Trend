@@ -141,7 +141,7 @@ export default function Profile() {
       {
         icon: FiGrid,
         label: 'Community Feed',
-        href: '/community/feed',
+        href: '/community',
         highlight: false,
       },
       {
