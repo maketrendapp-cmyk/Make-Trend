@@ -512,10 +512,10 @@ export function useProductDetail(id, enabled = true) {
   });
 }
 
-// 3. My Products (infinite scroll with filters)
+// 3. My Products (infinite scroll with filters, including search)
 export function useMyProducts(filters = {}, enabled = true) {
-  const { status, category } = filters;
-  const queryKey = ['myProducts', { status, category }];
+  const { status, category, search } = filters;
+  const queryKey = ['myProducts', { status, category, search }];
 
   return useInfiniteQuery({
     queryKey,
@@ -526,8 +526,9 @@ export function useMyProducts(filters = {}, enabled = true) {
       const params = new URLSearchParams({
         limit: 20,
       });
-      if (status) params.append('status', status);
+      if (status && status !== 'all') params.append('status', status);
       if (category) params.append('category', category);
+      if (search) params.append('search', search);
       if (pageParam) params.append('lastId', pageParam);
 
       const data = await apiRequest(`/productstrend/my-products?${params.toString()}`, {}, token);
