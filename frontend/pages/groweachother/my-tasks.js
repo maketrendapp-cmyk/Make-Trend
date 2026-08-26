@@ -17,6 +17,7 @@ import {
   FiRepeat,
   FiExternalLink,
   FiFilter,
+  FiChevronDown,
 } from 'react-icons/fi';
 import {
   FaYoutube,
@@ -72,6 +73,69 @@ const TASK_TYPES_BY_PLATFORM = {
 };
 
 const DEFAULT_TASK_TYPES = ['Follow', 'Like', 'Comment', 'Share'];
+
+// ─── CUSTOM SELECT COMPONENT ──────────────────────────────────
+const CustomSelect = ({ value, onChange, options, placeholder, disabled = false }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option) => {
+    onChange(option);
+    setIsOpen(false);
+  };
+
+  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`flex items-center justify-between w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 hover:border-purple-300 ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+        }`}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <FiChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
+          {options.map((option) => {
+            const isSelected = value === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors duration-150 ${
+                  isSelected
+                    ? 'bg-purple-50 text-purple-700 font-medium'
+                    : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className="truncate pr-2">{option.label}</span>
+                {isSelected && <FiCheck className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+// ─── END CUSTOM SELECT ────────────────────────────────────────
 
 export default function MyTasks() {
   const router = useRouter();
@@ -157,12 +221,11 @@ export default function MyTasks() {
   const [deleting, setDeleting] = useState(false);
 
   // ── Handle platform filter change ──
-  const handlePlatformFilterChange = (e) => {
-    const val = e.target.value;
-    setPlatformFilter(val);
+  const handlePlatformFilterChange = (value) => {
+    setPlatformFilter(value);
     setTaskTypeFilter('');
-    if (val && PLATFORMS.includes(val)) {
-      setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[val] || DEFAULT_TASK_TYPES);
+    if (value && PLATFORMS.includes(value)) {
+      setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[value] || DEFAULT_TASK_TYPES);
     } else {
       setAvailableTaskTypes(DEFAULT_TASK_TYPES);
     }
@@ -216,17 +279,16 @@ export default function MyTasks() {
   };
 
   // ── Handle platform change in modal ──
-  const handlePlatformChange = (e) => {
-    const val = e.target.value;
-    setFormData({ ...formData, platform: val });
-    if (val === 'custom') {
+  const handlePlatformChange = (value) => {
+    setFormData({ ...formData, platform: value });
+    if (value === 'custom') {
       setShowCustomPlatformInput(true);
       setAvailableTaskTypes(DEFAULT_TASK_TYPES);
     } else {
       setShowCustomPlatformInput(false);
       setCustomPlatform('');
-      if (PLATFORMS.includes(val)) {
-        setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[val] || DEFAULT_TASK_TYPES);
+      if (PLATFORMS.includes(value)) {
+        setAvailableTaskTypes(TASK_TYPES_BY_PLATFORM[value] || DEFAULT_TASK_TYPES);
       } else {
         setAvailableTaskTypes(DEFAULT_TASK_TYPES);
       }
@@ -238,10 +300,9 @@ export default function MyTasks() {
   };
 
   // ── Handle task type change in modal ──
-  const handleTaskTypeChange = (e) => {
-    const val = e.target.value;
-    setFormData({ ...formData, taskType: val });
-    if (val === 'custom') {
+  const handleTaskTypeChange = (value) => {
+    setFormData({ ...formData, taskType: value });
+    if (value === 'custom') {
       setShowCustomTaskTypeInput(true);
     } else {
       setShowCustomTaskTypeInput(false);
@@ -402,6 +463,23 @@ export default function MyTasks() {
     return PLATFORM_COLORS[platform?.toLowerCase()] || 'text-purple-600';
   };
 
+  // ── Options for custom selects ──
+  const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ];
+
+  const platformOptions = [
+    { value: '', label: 'All Platforms' },
+    ...PLATFORMS.map(p => ({ value: p, label: p })),
+  ];
+
+  const taskTypeOptions = [
+    { value: '', label: 'All Task Types' },
+    ...availableTaskTypes.map(t => ({ value: t, label: t })),
+  ];
+
   if (!isAuthenticated) {
     return (
       <>
@@ -520,7 +598,7 @@ export default function MyTasks() {
 
           {/* ── Filters ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <FiFilter className="text-purple-500 flex-shrink-0" />
                 <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Filters</span>
@@ -528,60 +606,34 @@ export default function MyTasks() {
 
               <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 {/* Status filter */}
-                <div className="relative w-full sm:w-36">
-                  <select
+                <div className="w-full sm:w-36">
+                  <CustomSelect
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
+                    onChange={(val) => setStatusFilter(val)}
+                    options={statusOptions}
+                    placeholder="All Status"
+                  />
                 </div>
 
                 {/* Platform filter */}
-                <div className="relative w-full sm:w-40">
-                  <select
+                <div className="w-full sm:w-40">
+                  <CustomSelect
                     value={platformFilter}
                     onChange={handlePlatformFilterChange}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
-                  >
-                    <option value="">All Platforms</option>
-                    {PLATFORMS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
+                    options={platformOptions}
+                    placeholder="All Platforms"
+                  />
                 </div>
 
                 {/* Task Type filter */}
-                <div className="relative w-full sm:w-40">
-                  <select
+                <div className="w-full sm:w-40">
+                  <CustomSelect
                     value={taskTypeFilter}
-                    onChange={(e) => setTaskTypeFilter(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-2 pr-8 text-sm font-medium focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer"
+                    onChange={(val) => setTaskTypeFilter(val)}
+                    options={taskTypeOptions}
+                    placeholder="All Task Types"
                     disabled={!platformFilter && availableTaskTypes === DEFAULT_TASK_TYPES}
-                  >
-                    <option value="">All Task Types</option>
-                    {availableTaskTypes.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
+                  />
                 </div>
 
                 {/* Clear filters */}
@@ -752,18 +804,16 @@ export default function MyTasks() {
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
                   Platform <span className="text-red-500">*</span>
                 </label>
-                <select
+                <CustomSelect
                   value={formData.platform}
                   onChange={handlePlatformChange}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E')] bg-[length:16px] bg-[right:1rem_center] bg-no-repeat pr-10"
-                  required
-                >
-                  <option value="">Select platform</option>
-                  {PLATFORMS.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                  <option value="custom">✏️ Custom</option>
-                </select>
+                  options={[
+                    { value: '', label: 'Select platform' },
+                    ...PLATFORMS.map(p => ({ value: p, label: p })),
+                    { value: 'custom', label: '✏️ Custom' },
+                  ]}
+                  placeholder="Select platform"
+                />
                 {showCustomPlatformInput && (
                   <div className="mt-2">
                     <input
@@ -798,18 +848,16 @@ export default function MyTasks() {
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
                   Task Type <span className="text-red-500">*</span>
                 </label>
-                <select
+                <CustomSelect
                   value={formData.taskType}
                   onChange={handleTaskTypeChange}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm font-medium focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E')] bg-[length:16px] bg-[right:1rem_center] bg-no-repeat pr-10"
-                  required
-                >
-                  <option value="">Select task type</option>
-                  {availableTaskTypes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                  <option value="custom">✏️ Custom</option>
-                </select>
+                  options={[
+                    { value: '', label: 'Select task type' },
+                    ...availableTaskTypes.map(t => ({ value: t, label: t })),
+                    { value: 'custom', label: '✏️ Custom' },
+                  ]}
+                  placeholder="Select task type"
+                />
                 {showCustomTaskTypeInput && (
                   <div className="mt-2">
                     <input
