@@ -1,5 +1,5 @@
 // pages/community/myposts.js
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -37,7 +37,7 @@ import {
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// ─── CONSTANTS (unchanged) ──────────────────────────────────────
+// ─── CONSTANTS ────────────────────────────────────────────────
 const POST_TYPE_ICONS = {
   general: '📌',
   launch: '🚀',
@@ -83,7 +83,66 @@ const POST_TYPES = [
   { value: 'event', label: '📅 Event' },
   { value: 'promotional', label: '💎 Promotional' },
 ];
-// ─── END CONSTANTS ──────────────────────────────────────────────
+
+// ─── CUSTOM SELECT COMPONENT ──────────────────────────────────
+const CustomSelect = ({ value, onChange, options, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option) => {
+    onChange(option);
+    setIsOpen(false);
+  };
+
+  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 hover:border-purple-300"
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <FiChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
+          {options.map((option) => {
+            const isSelected = value === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors duration-150 ${
+                  isSelected
+                    ? 'bg-purple-50 text-purple-700 font-medium'
+                    : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className="truncate pr-2">{option.label}</span>
+                {isSelected && <FiCheck className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+// ─── END CUSTOM SELECT ────────────────────────────────────────
 
 export default function MyPosts() {
   const router = useRouter();
@@ -369,10 +428,10 @@ export default function MyPosts() {
         </div>
 
         {/* ─── Profile & Earnings ─── */}
-        {profile && (
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden border-2 border-purple-100">
-              {profile.avatar ? (
+        <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden border-2 border-purple-100 flex-shrink-0">
+              {profile?.avatar ? (
                 <Image
                   src={profile.avatar}
                   alt={profile.fullname || 'User'}
@@ -382,27 +441,25 @@ export default function MyPosts() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-600 text-lg font-bold">
-                  {profile.fullname?.[0] || profile.username?.[0] || 'U'}
+                  {profile?.fullname?.[0] || profile?.username?.[0] || 'U'}
                 </div>
               )}
             </div>
             <div>
-              <p className="font-semibold text-slate-900">{profile.fullname || profile.username}</p>
-              <p className="text-xs text-slate-400">@{profile.username || 'user'}</p>
+              <p className="font-semibold text-slate-900">{profile?.fullname || profile?.username}</p>
+              <p className="text-xs text-slate-400">@{profile?.username || 'user'}</p>
             </div>
           </div>
-        )}
-
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg text-center">
-          <div className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 mb-1">
-            <FiAward className="w-4 h-4" />
-            <span>Total earnings from likes</span>
+          <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-2 rounded-xl border border-purple-100">
+            <FiAward className="w-5 h-5 text-purple-600" />
+            <div className="text-right">
+              <p className="text-xs text-slate-500 font-medium">Earned from likes</p>
+              <p className="text-lg font-bold text-purple-700">
+                {mtCoinsLoading ? '...' : earnedFromPosts}
+                <span className="text-xs font-normal text-slate-400 ml-1">MT Coins</span>
+              </p>
+            </div>
           </div>
-          <p className="text-5xl font-bold tracking-tight">
-            {mtCoinsLoading ? '...' : earnedFromPosts}
-          </p>
-          <p className="text-sm text-white/70 mt-1">MT Coins</p>
-          <p className="text-xs text-white/50 mt-2">1 like = 1 MT Coin</p>
         </div>
 
         {/* ─── Filters ─── */}
@@ -419,24 +476,22 @@ export default function MyPosts() {
                 onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
               />
             </div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full md:w-44 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat.value} value={cat.value}>{cat.label}</option>
-              ))}
-            </select>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="w-full md:w-44 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition cursor-pointer appearance-none"
-            >
-              {POST_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+            <div className="w-full md:w-48">
+              <CustomSelect
+                value={categoryFilter}
+                onChange={(val) => setCategoryFilter(val)}
+                options={CATEGORIES}
+                placeholder="All Categories"
+              />
+            </div>
+            <div className="w-full md:w-44">
+              <CustomSelect
+                value={typeFilter}
+                onChange={(val) => setTypeFilter(val)}
+                options={POST_TYPES}
+                placeholder="All Types"
+              />
+            </div>
             <button
               onClick={applyFilters}
               className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium whitespace-nowrap"
@@ -590,9 +645,8 @@ export default function MyPosts() {
                     </div>
                   )}
 
-                  {/* ─── ACTION BAR ─── (fixed layout) */}
+                  {/* ─── ACTION BAR ─── */}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100 text-sm">
-                    {/* Like */}
                     <button
                       onClick={() => handleLike(post.id)}
                       disabled={!isAuthenticated}
@@ -610,7 +664,6 @@ export default function MyPosts() {
                       <span>{post.likes || 0}</span>
                     </button>
 
-                    {/* Comments */}
                     <Link
                       href={`/community/post/${post.id}`}
                       className="flex items-center gap-1.5 text-slate-500 hover:text-purple-600 transition"
@@ -619,7 +672,6 @@ export default function MyPosts() {
                       <span>{post.commentsCount || 0}</span>
                     </Link>
 
-                    {/* Edit */}
                     <Link
                       href={`/community/edit/${post.id}`}
                       className="flex items-center gap-1.5 text-slate-500 hover:text-purple-600 transition"
@@ -628,7 +680,6 @@ export default function MyPosts() {
                       <span>Edit</span>
                     </Link>
 
-                    {/* Boost */}
                     <button
                       onClick={() => handleBoostClick(post.id, post.title)}
                       className="flex items-center gap-1.5 text-purple-500 hover:text-purple-700 transition"
@@ -637,7 +688,6 @@ export default function MyPosts() {
                       <span>Boost</span>
                     </button>
 
-                    {/* Delete */}
                     <button
                       onClick={() => handleDeleteClick(post.id)}
                       disabled={deletePostMutation.isLoading || isDeletingThisPost}
@@ -651,7 +701,6 @@ export default function MyPosts() {
                       <span>Delete</span>
                     </button>
 
-                    {/* Share – no longer pushed out */}
                     <button
                       onClick={() => handleShare(post.id)}
                       className="flex items-center gap-1.5 text-slate-500 hover:text-purple-600 transition"
