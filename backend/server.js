@@ -6894,11 +6894,14 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       updateData.url = url.trim();
     }
     if (imageUrl !== undefined) {
-      if (!validateImageUrl(imageUrl)) {
-        return res.status(400).json({ success: false, error: 'Invalid image URL' });
-      }
-      updateData.imageUrl = imageUrl;
+  // Skip validation if the URL hasn't changed
+  if (imageUrl !== data.imageUrl) {
+    if (!validateImageUrl(imageUrl)) {
+      return res.status(400).json({ success: false, error: 'Invalid image URL' });
     }
+  }
+  updateData.imageUrl = imageUrl;
+}
     if (category !== undefined) {
       updateData.category = category;
     }
