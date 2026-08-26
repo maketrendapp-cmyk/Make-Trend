@@ -33,6 +33,7 @@ import {
   FiChevronDown,
   FiAward,
   FiTrendingUp,
+  FiCheck, // <-- ✅ ADDED THIS
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
