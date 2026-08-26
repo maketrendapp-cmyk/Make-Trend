@@ -147,13 +147,13 @@ const ProductCard = React.forwardRef(({
   let badge = null;
   if (isFeatured && rank) {
     if (rank === 1) {
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-yellow-100 text-yellow-800">🥇 #1</span>;
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-yellow-100 text-yellow-800 border border-yellow-200/60">🥇 #1</span>;
     } else if (rank === 2) {
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-200 text-slate-700">🥈 #2</span>;
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-200 text-slate-700 border border-slate-300">🥈 #2</span>;
     } else if (rank === 3) {
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-orange-100 text-orange-800">🥉 #3</span>;
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-orange-100 text-orange-800 border border-orange-200">🥉 #3</span>;
     } else {
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold text-purple-600 bg-purple-100">🔥 #{rank}</span>;
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold text-purple-600 bg-purple-100 border border-purple-200">🔥 #{rank}</span>;
     }
   }
 
@@ -198,7 +198,7 @@ const ProductCard = React.forwardRef(({
               )}
             </div>
 
-            <p className="text-xs sm:text-sm text-slate-500 line-clamp-1 sm:line-clamp-2 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 line-clamp-1 sm:line-clamp-2 leading-relaxed pr-2">
               {product.tagline || 'Discover this amazing product.'}
             </p>
           </div>
@@ -210,8 +210,8 @@ const ProductCard = React.forwardRef(({
             disabled={!isAuthenticated || isUpvoting}
             className={`shrink-0 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 shadow-sm active:scale-95 ${
               isLiked
-                ? 'bg-purple-100 border-purple-200 text-purple-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700'
+                ? 'bg-purple-100 border-purple-300 text-purple-700'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
             title={isAuthenticated ? 'Upvote' : 'Sign in to upvote'}
           >
@@ -330,18 +330,93 @@ const FeaturedCarousel = ({ products, onUpvote, isAuthenticated, isUpvoting }) =
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {products.map((product, idx) => (
-            <div key={product.id} className="w-full shrink-0 px-1 sm:px-2">
-              <ProductCard
-                product={product}
-                isFeatured
-                rank={idx + 1}
-                onUpvote={onUpvote}
-                isAuthenticated={isAuthenticated}
-                isUpvoting={isUpvoting}
-              />
-            </div>
-          ))}
+          {products.map((product, idx) => {
+            const rank = idx + 1;
+            const isLiked = product.userVoted || false;
+            const upvotes = product.upvotes || 0;
+            const hasImage = !!(product.logo || product.imageUrl);
+
+            let rankBadge = null;
+            if (rank === 1) rankBadge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-yellow-100 text-yellow-800 border border-yellow-200/60">🥇 #1</span>;
+            else if (rank === 2) rankBadge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-200 text-slate-700 border border-slate-300">🥈 #2</span>;
+            else if (rank === 3) rankBadge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-orange-100 text-orange-800 border border-orange-200">🥉 #3</span>;
+
+            return (
+              <div key={product.id} className="w-full shrink-0 px-1 sm:px-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-sm">
+                  {/* Left: Product Media & Info */}
+                  <div className="flex items-start gap-4 min-w-0 flex-1">
+                    <Link href={`/productstrend/${product.id}`} className="shrink-0">
+                      {hasImage ? (
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-50 border border-slate-200/60 overflow-hidden shadow-sm flex items-center justify-center">
+                          <img
+                            src={product.logo || product.imageUrl}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50 border border-slate-200/60 flex items-center justify-center text-purple-400 shadow-sm">
+                          <FiBox className="w-8 h-8" />
+                        </div>
+                      )}
+                    </Link>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        {rankBadge}
+                        <span className="text-[11px] font-semibold text-purple-500">Featured</span>
+                      </div>
+                      
+                      <Link href={`/productstrend/${product.id}`} className="block">
+                        <h3 className="text-lg sm:text-2xl font-black text-slate-900 hover:text-purple-600 transition truncate">
+                          {product.name}
+                        </h3>
+                      </Link>
+
+                      <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                        {product.tagline || 'Discover this trending product on ProductTrend.'}
+                      </p>
+
+                      <div className="flex items-center gap-3 text-xs text-slate-400 mt-3 flex-wrap">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center">
+                            {product.maker?.avatar ? (
+                              <img src={product.maker.avatar} alt={product.maker.username || 'User'} className="w-full h-full object-cover" />
+                            ) : (
+                              <FiUser className="w-2.5 h-2.5 text-slate-500" />
+                            )}
+                          </span>
+                          <span className="font-semibold text-slate-600">{product.maker?.username || 'Anonymous'}</span>
+                        </span>
+                        <span>•</span>
+                        <span>{formatDate(product.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Upvote Callout Action - Heart Style */}
+                  <div className="shrink-0 flex sm:flex-col items-center justify-between sm:justify-center gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => onUpvote(product.id)}
+                      disabled={!isAuthenticated || isUpvoting}
+                      className={`w-full sm:w-auto flex sm:flex-col items-center justify-center gap-1.5 px-6 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-bold transition-all duration-200 shadow-sm ${
+                        isLiked
+                          ? 'bg-purple-100 border border-purple-300 text-purple-700'
+                          : 'bg-white border border-slate-200 hover:border-purple-300 hover:bg-purple-50 text-slate-700 hover:text-purple-700'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <FiHeart className={`w-5 h-5 transition-colors ${isLiked ? 'fill-purple-600 text-purple-600' : 'text-slate-400'}`} />
+                      <span className="text-xs uppercase tracking-wider hidden sm:block">Upvote</span>
+                      <span className="text-sm sm:text-base">{upvotes}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -358,7 +433,8 @@ const FeaturedCarousel = ({ products, onUpvote, isAuthenticated, isUpvoting }) =
                 }`}
                 aria-label={`Go to slide ${idx + 1}`}
               />
-            </div>
+            ))}
+          </div>
           <span className="text-[10px] font-semibold text-slate-400 mt-2">Slide {currentIndex + 1} of {total}</span>
         </div>
       )}
@@ -488,7 +564,6 @@ export default function ProductTrendFeed() {
     scrollToTop();
   };
 
-  // ── Dropdown options ──
   const categoryOptions = CATEGORIES.map(cat => ({ value: cat, label: cat }));
   const sortOptions = [
     { value: 'most-upvoted', label: 'Most Upvoted' },
@@ -713,7 +788,7 @@ export default function ProductTrendFeed() {
             </div>
             
             {/* Filter Dropdowns */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <CustomSelect
                 value={category}
                 onChange={handleCategoryChange}
@@ -819,17 +894,17 @@ export default function ProductTrendFeed() {
                 ) : (
                   <>
                     {showFeatured && displayedProducts.length > 0 && (
-                      <div className="flex items-center gap-2 mb-4 mt-2">
-                        <div className="p-1.5 bg-slate-200 text-slate-600 rounded-md">
-                          <FiClock className="w-4 h-4" />
-                        </div>
-                        <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                      <div className="flex items-center justify-between mb-4 mt-2">
+                        <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                           More Products
                         </h2>
+                        <span className="text-xs text-slate-400 font-medium">
+                          Showing {displayedProducts.length} items
+                        </span>
                       </div>
                     )}
 
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                       {displayedProducts.map((product, index) => {
                         const rank = featuredRankMap.get(product.id) || null;
                         return (
@@ -872,7 +947,7 @@ export default function ProductTrendFeed() {
 
                 {!hasMore && displayedProducts.length > 0 && (
                   <p className="text-center text-xs font-semibold text-slate-400 py-8">
-                    You've reached the end 🎉
+                    You've reached the end of the feed 🎉
                   </p>
                 )}
               </div>
