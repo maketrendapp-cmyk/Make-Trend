@@ -1,4 +1,4 @@
-```react
+
 // pages/productstrend/feed.js
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
@@ -894,4 +894,3 @@ export default function ProductTrendFeed() {
     </>
   );
 }
-```
