@@ -16,7 +16,6 @@ import {
   FiFilter,
   FiX,
   FiExternalLink,
-  FiPlay,
   FiChevronUp,
   FiUser,
   FiSearch,
@@ -487,7 +486,7 @@ export default function CommunityFeed() {
         title="Community Feed – Make Trend"
         description="Discover posts from the Make Trend community – product launches, updates, questions, and more."
       />
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+      <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
         {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
@@ -590,7 +589,7 @@ export default function CommunityFeed() {
           )}
         </div>
 
-        {/* ── Filter Panel (slide down) ── */}
+        {/* ── Filter Panel ── */}
         {isFilterOpen && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-sm animate-slideDown">
             <div className="flex items-center justify-between mb-4">
@@ -704,7 +703,7 @@ export default function CommunityFeed() {
 
         {/* ── FEATURED POSTS (Top Liked) ── */}
         {hasFeatured && (
-          <div className="mb-8">
+          <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
               <FiTrendingUp className="text-purple-600 text-xl" />
               <h2 className="text-lg font-bold text-slate-900">🔥 Top Liked</h2>
@@ -715,7 +714,6 @@ export default function CommunityFeed() {
             <div className="space-y-4">
               {featuredPosts.map((post, idx) => {
                 const rank = idx + 1;
-                const isTop3 = rank <= 3;
                 return (
                   <PostCard
                     key={post.id}
@@ -727,9 +725,8 @@ export default function CommunityFeed() {
                     formatDate={formatDate}
                     toggleExpand={toggleExpand}
                     expandedPosts={expandedPosts}
-                    isFeatured={!isTop3}
+                    isFeatured={true}
                     rank={rank}
-                    isTop3={isTop3}
                   />
                 );
               })}
@@ -780,6 +777,7 @@ export default function CommunityFeed() {
                     formatDate={formatDate}
                     toggleExpand={toggleExpand}
                     expandedPosts={expandedPosts}
+                    isFeatured={false}
                     ref={index === regularPosts.length - 1 ? lastElementRef : undefined}
                   />
                 ))}
@@ -839,7 +837,6 @@ const PostCard = React.forwardRef(({
   expandedPosts,
   isFeatured = false,
   rank = null,
-  isTop3 = false,
 }, ref) => {
   const postTypeIcon = POST_TYPE_ICONS[post.type] || '📌';
   const postTypeLabel = POST_TYPE_LABELS[post.type] || 'General';
@@ -855,51 +852,51 @@ const PostCard = React.forwardRef(({
   const truncateTitle = titleLength > 150;
   const truncateDesc = descLength > 400;
 
-  // ── Determine styling based on rank ──
+  // ── Unified card styling ──
   let cardClasses = 'bg-white rounded-2xl border p-5 hover:shadow-lg transition-shadow duration-200';
   let rankBadge = null;
 
-  if (isTop3 && rank) {
+  if (isFeatured && rank) {
+    // All featured cards get a consistent subtle gradient
+    cardClasses += ' bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 shadow-sm';
+    
+    // Rank badges with distinct colors
     if (rank === 1) {
-      cardClasses += ' border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-md';
       rankBadge = (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">
-          👑 #1
+        <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">
+          🥇 #1
         </span>
       );
     } else if (rank === 2) {
-      cardClasses += ' border-slate-400 bg-gradient-to-br from-slate-50 to-gray-100 shadow-md';
       rankBadge = (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-300 text-slate-700">
+        <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300">
           🥈 #2
         </span>
       );
     } else if (rank === 3) {
-      cardClasses += ' border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-md';
       rankBadge = (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">
+        <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
           🥉 #3
         </span>
       );
+    } else {
+      rankBadge = (
+        <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-bold text-purple-600 bg-purple-100 border border-purple-200">
+          🔥 #{rank}
+        </span>
+      );
     }
-  } else if (isFeatured) {
-    cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
-    rankBadge = (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-purple-600 bg-purple-100">
-        🔥 #{rank}
-      </span>
-    );
   } else {
     cardClasses += ' border-slate-200';
   }
 
   return (
     <div ref={ref} className={cardClasses}>
-      {/* Rank badge */}
+      {/* Badge row */}
       {rankBadge && (
         <div className="flex items-center justify-between mb-3">
           {rankBadge}
-          {isTop3 && <span className="text-xs text-slate-400">🔥 Featured</span>}
+          <span className="text-xs text-slate-400">🔥 Featured</span>
         </div>
       )}
 
