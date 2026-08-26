@@ -6067,16 +6067,21 @@ function getProductFeedKey(category = null, sort = 'newest') {
   return `products:feed:category:${cat}:sort:${sort}`;
 }
 
-async function addProductToFeedSets(productId, category, timestamp) {
-  const sorts = ['newest', 'oldest', 'most-upvoted', 'most-commented'];   // ✅ 'oldest' added
+async function addProductToFeedSets(productId, category, timestamp, upvotes = 0, commentsCount = 0) {
+  const sortConfigs = [
+    { sort: 'newest', score: timestamp },
+    { sort: 'oldest', score: timestamp },
+    { sort: 'most-upvoted', score: upvotes },
+    { sort: 'most-commented', score: commentsCount },
+  ];
   const keys = [];
-  for (const s of sorts) {
-    keys.push(getProductFeedKey(null, s));
-    keys.push(getProductFeedKey(category, s));
+  for (const config of sortConfigs) {
+    keys.push({ key: getProductFeedKey(null, config.sort), score: config.score });
+    keys.push({ key: getProductFeedKey(category, config.sort), score: config.score });
   }
   const pipeline = redis.pipeline();
-  for (const key of keys) {
-    pipeline.zadd(key, timestamp, productId);
+  for (const entry of keys) {
+    pipeline.zadd(entry.key, entry.score, productId);
   }
   await pipeline.exec();
 }
@@ -6791,16 +6796,9 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
     const newProduct = { id: docRef.id, ...productData };
     newProduct.maker = await getProductMakerInfo(uid);
 
-    // ── Add to feed sorted sets ──
-    const timestamp = Date.now();
-    // 1. 'newest' feed: use timestamp as score
-    await addProductToFeedSets(newProduct.id, newProduct.category, 'newest', timestamp);
-    
-    // 2. 'most-upvoted' feed: use 0 (product starts with 0 upvotes)
-    await updateProductUpvotesInFeed(newProduct.id, newProduct.category, 0);
-    
-    // 3. 'most-commented' feed: use 0 (product starts with 0 comments)
-    await updateProductCommentsInFeed(newProduct.id, newProduct.category, 0);
+// ── Add to feed sorted sets with correct scores ──
+const timestamp = Date.now();
+await addProductToFeedSets(newProduct.id, newProduct.category, timestamp, 0, 0);
 
     // ── Cache details ──
     await cacheProductDetails(newProduct.id, newProduct);
@@ -7050,12 +7048,13 @@ await docRef.update(updateData);
     const oldCategory = data.category || 'Other';
     const newCategory = category || oldCategory;
     if (newCategory !== oldCategory) {
-      await removeProductFromFeedSets(id, oldCategory);
-      const timestamp = data.createdAt ? (data.createdAt.seconds || 0) * 1000 : Date.now();
-      await addProductToFeedSets(id, newCategory, 'newest', timestamp);
-      await addProductToFeedSets(id, newCategory, 'most-upvoted', timestamp);
-      await addProductToFeedSets(id, newCategory, 'most-commented', timestamp);
-    }
+  await removeProductFromFeedSets(id, oldCategory);
+  const timestamp = data.createdAt ? (data.createdAt.seconds || 0) * 1000 : Date.now();
+  // Fetch updated product to get current upvotes and commentsCount
+  const updatedDoc = await docRef.get();
+  const updatedData = updatedDoc.data();
+  await addProductToFeedSets(id, newCategory, timestamp, updatedData.upvotes || 0, updatedData.commentsCount || 0);
+}
 
     // ── Update details cache ──
     const updatedDoc = await docRef.get();
