@@ -34,6 +34,7 @@ import {
   FiTag,
   FiAward,
   FiTrendingUp,
+  FiCheck,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -49,7 +50,6 @@ const STATUS_LABELS = {
   rejected: '❌ Rejected',
 };
 
-// ✅ Updated STATUS_OPTIONS with 'all' value
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'pending', label: 'Pending' },
@@ -77,6 +77,66 @@ const CATEGORY_OPTIONS = [
 const UPVOTE_COST = 5;
 const MAX_UPVOTES = 1000;
 
+// ─── CUSTOM SELECT COMPONENT ──────────────────────────────────
+const CustomSelect = ({ value, onChange, options, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option) => {
+    onChange(option);
+    setIsOpen(false);
+  };
+
+  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all duration-200 hover:border-purple-300"
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <FiChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
+          {options.map((option) => {
+            const isSelected = value === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors duration-150 ${
+                  isSelected
+                    ? 'bg-purple-50 text-purple-700 font-medium'
+                    : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className="truncate pr-2">{option.label}</span>
+                {isSelected && <FiCheck className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+// ─── END CUSTOM SELECT ────────────────────────────────────────
+
 export default function MyProducts() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
@@ -86,12 +146,10 @@ export default function MyProducts() {
   const buyUpvotesMutation = useBuyUpvotes();
 
   // ── Filter state ──
-  // ✅ Default statusFilter to 'all'
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // ✅ Filters always include status (no undefined)
   const filters = {
     status: statusFilter,
     category: categoryFilter || undefined,
@@ -143,7 +201,6 @@ export default function MyProducts() {
     setIsDeleting(true);
 
     const productId = deleteModal.id;
-    // ✅ queryKey uses statusFilter directly
     const queryKey = ['myProducts', { status: statusFilter, category: categoryFilter || undefined }];
 
     // Optimistically remove from cache
@@ -159,7 +216,6 @@ export default function MyProducts() {
     try {
       await deleteMutation.mutateAsync(productId);
       await invalidateMyProducts();
-      // Reset the query data to clear all cached pages
       queryClient.setQueryData(
         ['myProducts', { status: statusFilter, category: categoryFilter || undefined }],
         (oldData) => {
@@ -261,7 +317,6 @@ export default function MyProducts() {
     }
   };
 
-  // ✅ clearFilters resets statusFilter to 'all'
   const clearFilters = () => {
     setStatusFilter('all');
     setCategoryFilter('');
@@ -353,7 +408,7 @@ export default function MyProducts() {
     <>
       <Meta title="My Products – ProductTrend" />
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* ── Header ── */}
+        {/* ── Header & Earnings ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <Link
@@ -374,25 +429,25 @@ export default function MyProducts() {
               <p className="text-sm text-slate-400">Manage your launched products</p>
             </div>
           </div>
-          <button
-            onClick={() => router.push('/productstrend/launch')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition shadow-sm text-sm font-medium hover:scale-105 active:scale-95"
-          >
-            <FiPlus className="w-4 h-4" /> Launch New
-          </button>
-        </div>
-
-        {/* ── Earnings from Products Card ── */}
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg text-center">
-          <div className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 mb-1">
-            <FiAward className="w-4 h-4" />
-            <span>Total earnings from product likes (upvotes)</span>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Compact earnings card */}
+            <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-2 rounded-xl border border-purple-100 shadow-sm">
+              <FiAward className="w-5 h-5 text-purple-600" />
+              <div className="text-right">
+                <p className="text-xs text-slate-500 font-medium">Earned from upvotes</p>
+                <p className="text-lg font-bold text-purple-700">
+                  {mtCoinsLoading ? '...' : earnedFromProducts}
+                  <span className="text-xs font-normal text-slate-400 ml-1">MT Coins</span>
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/productstrend/launch')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition shadow-sm text-sm font-medium hover:scale-105 active:scale-95"
+            >
+              <FiPlus className="w-4 h-4" /> Launch New
+            </button>
           </div>
-          <p className="text-5xl font-bold tracking-tight">
-            {mtCoinsLoading ? '...' : earnedFromProducts}
-          </p>
-          <p className="text-sm text-white/70 mt-1">MT Coins</p>
-          <p className="text-xs text-white/50 mt-2">1 like = 1 MT Coin</p>
         </div>
 
         {/* ── Filters & Search ── */}
@@ -421,33 +476,23 @@ export default function MyProducts() {
             </div>
 
             {/* Status Filter */}
-            <div className="relative w-full md:w-44">
-              <FiFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <select
+            <div className="w-full md:w-44">
+              <CustomSelect
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full appearance-none border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-slate-50 cursor-pointer"
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                onChange={(val) => setStatusFilter(val)}
+                options={STATUS_OPTIONS}
+                placeholder="All Statuses"
+              />
             </div>
 
             {/* Category Filter */}
-            <div className="relative w-full md:w-44">
-              <FiTag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <select
+            <div className="w-full md:w-48">
+              <CustomSelect
                 value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full appearance-none border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition bg-slate-50 cursor-pointer"
-              >
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                onChange={(val) => setCategoryFilter(val)}
+                options={CATEGORY_OPTIONS}
+                placeholder="All Categories"
+              />
             </div>
 
             {/* Clear Filters */}
