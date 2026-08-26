@@ -144,18 +144,34 @@ const ProductCard = React.forwardRef(({
   let badge = null;
 
   if (isFeatured && rank) {
+    // Unified gradient for all featured cards – clean and professional
+    cardClasses += ' bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 shadow-md';
+    
+    // Rank badges – clean and modern
     if (rank === 1) {
-      cardClasses += ' border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-md';
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">👑 #1</span>;
+      badge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">
+          🥇 #1
+        </span>
+      );
     } else if (rank === 2) {
-      cardClasses += ' border-slate-400 bg-gradient-to-br from-slate-50 to-gray-100 shadow-md';
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-300 text-slate-700">🥈 #2</span>;
+      badge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300">
+          🥈 #2
+        </span>
+      );
     } else if (rank === 3) {
-      cardClasses += ' border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-md';
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">🥉 #3</span>;
+      badge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+          🥉 #3
+        </span>
+      );
     } else {
-      cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
-      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-purple-600 bg-purple-100">🔥 #{rank}</span>;
+      badge = (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-purple-600 bg-purple-100 border border-purple-200">
+          🔥 #{rank}
+        </span>
+      );
     }
   } else {
     cardClasses += ' border-slate-200';
@@ -290,17 +306,21 @@ const FeaturedCarousel = ({ products, onUpvote, isAuthenticated, isUpvoting }) =
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-white/80 backdrop-blur-sm rounded-full shadow-sm border border-purple-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 bg-white/80 backdrop-blur-sm rounded-full shadow-sm border border-purple-100 flex-shrink-0">
               <FiTrendingUp className="w-6 h-6 text-purple-600" />
             </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-extrabold text-slate-900">🔥 Featured Products</h2>
-              <p className="text-sm text-slate-500">The top 3 most upvoted products {total > 1 && `– #${currentIndex+1}`}</p>
+            <div className="min-w-0">
+              <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 whitespace-nowrap">
+                🔥 Featured Products
+              </h2>
+              <p className="text-sm text-slate-500 hidden sm:block">
+                The top 3 most upvoted products {total > 1 && `– #${currentIndex+1}`}
+              </p>
             </div>
           </div>
           {total > 1 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={prev}
                 className="p-2 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200 hover:bg-purple-50 hover:border-purple-300 transition shadow-sm"
@@ -431,14 +451,10 @@ export default function ProductTrendFeed() {
   const filteredRegular = regularProductsAll.filter(p => !carouselIds.has(p.id));
 
   // ── Combine: remaining featured (4+) at the top, then the rest ──
-  // We'll mark them as featured with their rank.
-  const combinedRegular = [
+  const displayedProducts = [
     ...remainingFeatured,
-    ...filteredRegular.filter(p => !featuredRankMap.has(p.id)) // exclude any featured that might still be in regular (should not happen)
+    ...filteredRegular.filter(p => !featuredRankMap.has(p.id))
   ];
-
-  // But we also want to show remainingFeatured with their rank, so we need to pass rank when rendering.
-  // We'll keep them as is and during rendering we check if product.id is in featuredRankMap.
 
   const hasMore = hasNextPage;
   const isLoading = regularLoading && !regularProductsAll.length;
@@ -690,15 +706,6 @@ export default function ProductTrendFeed() {
   const showFeatured = shouldFetchFeatured && carouselProducts.length > 0;
   const filterKey = `${sortBy}-${category}-${searchQuery}`;
 
-  // ── Combine remaining featured + regular products for display ──
-  // We need to order them: remainingFeatured first (they are already sorted by rank), then filteredRegular.
-  // But we should also preserve the regular sort order for the rest.
-  // We'll use a Set to avoid duplicates.
-  const displayedProducts = [
-    ...remainingFeatured,
-    ...filteredRegular.filter(p => !featuredRankMap.has(p.id))
-  ];
-
   return (
     <>
       <Meta title="Product Feed – ProductTrend" description="Discover and upvote the latest products." />
@@ -859,7 +866,7 @@ export default function ProductTrendFeed() {
               <div key={filterKey} className="space-y-4">
                 {displayedProducts.map((product, index) => {
                   const rank = featuredRankMap.get(product.id) || null;
-                  const isFeatured = rank !== null && rank > 3; // only for remaining featured
+                  const isFeatured = rank !== null && rank > 3;
                   return (
                     <ProductCard
                       key={`${product.id}-${sortBy}`}
