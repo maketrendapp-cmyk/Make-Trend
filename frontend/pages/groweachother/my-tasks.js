@@ -480,6 +480,9 @@ export default function MyTasks() {
     ...availableTaskTypes.map(t => ({ value: t, label: t })),
   ];
 
+  // ── Check if any filter is active ──
+  const hasActiveFilters = statusFilter !== 'all' || platformFilter || taskTypeFilter;
+
   if (!isAuthenticated) {
     return (
       <>
@@ -597,7 +600,7 @@ export default function MyTasks() {
           </div>
 
           {/* ── Filters ── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <FiFilter className="text-purple-500 flex-shrink-0" />
@@ -605,7 +608,6 @@ export default function MyTasks() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                {/* Status filter */}
                 <div className="w-full sm:w-36">
                   <CustomSelect
                     value={statusFilter}
@@ -614,8 +616,6 @@ export default function MyTasks() {
                     placeholder="All Status"
                   />
                 </div>
-
-                {/* Platform filter */}
                 <div className="w-full sm:w-40">
                   <CustomSelect
                     value={platformFilter}
@@ -624,8 +624,6 @@ export default function MyTasks() {
                     placeholder="All Platforms"
                   />
                 </div>
-
-                {/* Task Type filter */}
                 <div className="w-full sm:w-40">
                   <CustomSelect
                     value={taskTypeFilter}
@@ -635,20 +633,68 @@ export default function MyTasks() {
                     disabled={!platformFilter && availableTaskTypes === DEFAULT_TASK_TYPES}
                   />
                 </div>
-
-                {/* Clear filters */}
-                {(statusFilter !== 'all' || platformFilter || taskTypeFilter) && (
+                {hasActiveFilters && (
                   <button
                     onClick={clearFilters}
                     className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition"
                   >
                     <FiX className="w-3.5 h-3.5" />
-                    Clear
+                    Clear All
                   </button>
                 )}
               </div>
             </div>
           </div>
+
+          {/* ── Active Filter Chips ── */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-xs text-gray-500 font-medium">Active filters:</span>
+              {statusFilter !== 'all' && (
+                <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full border border-purple-100">
+                  Status: {statusFilter === 'active' ? 'Active' : 'Inactive'}
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className="hover:text-red-500 transition"
+                  >
+                    <FiX className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {platformFilter && (
+                <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full border border-purple-100">
+                  Platform: {platformFilter}
+                  <button
+                    onClick={() => {
+                      setPlatformFilter('');
+                      setTaskTypeFilter('');
+                      setAvailableTaskTypes(DEFAULT_TASK_TYPES);
+                    }}
+                    className="hover:text-red-500 transition"
+                  >
+                    <FiX className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {taskTypeFilter && (
+                <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full border border-purple-100">
+                  Task Type: {taskTypeFilter}
+                  <button
+                    onClick={() => setTaskTypeFilter('')}
+                    className="hover:text-red-500 transition"
+                  >
+                    <FiX className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              <button
+                onClick={clearFilters}
+                className="text-xs text-red-500 hover:text-red-700 font-medium"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
 
           {isError && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
@@ -661,14 +707,14 @@ export default function MyTasks() {
             <div className="text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100 px-4">
               <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">📋</div>
               <h3 className="text-base font-bold text-gray-900 mb-1">
-                {statusFilter !== 'all' || platformFilter || taskTypeFilter ? 'No matching tasks' : 'No tasks yet'}
+                {hasActiveFilters ? 'No matching tasks' : 'No tasks yet'}
               </h3>
               <p className="text-sm text-gray-400 mb-6 font-medium">
-                {statusFilter !== 'all' || platformFilter || taskTypeFilter
+                {hasActiveFilters
                   ? 'Try adjusting your filters.'
                   : 'Create your first social task to get started!'}
               </p>
-              {statusFilter === 'all' && !platformFilter && !taskTypeFilter && (
+              {!hasActiveFilters && (
                 <button
                   onClick={openCreateModal}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium shadow-sm"
