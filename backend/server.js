@@ -6269,26 +6269,57 @@ app.get('/api/productstrend/feed', async (req, res) => {
       } catch (e) { /* ignore */ }
     }
 
-    // ── If search provided (unchanged) ──
+    // ── If search provided ──
     if (search) {
       const cacheKey = `productstrend:feed:search:${search}:category:${category || 'all'}:sort:${sort}:limit:${limit}:lastId:${lastId || 'null'}`;
       const result = await getOrSetCache(cacheKey, async () => {
         console.log(`📡 Fetching product feed with search="${search}"`);
-        let query = db.collection('products')
-          .where('status', '==', 'approved');
+
+        // ── ✅ NEW: Check if search is @username ──
+        let targetUserId = null;
+        let searchTerm = search;
+        if (search.startsWith('@')) {
+          const username = search.slice(1).toLowerCase().trim();
+          if (username) {
+            const userSnapshot = await db.collection('users')
+              .where('username', '==', username)
+              .limit(1)
+              .get();
+            if (!userSnapshot.empty) {
+              targetUserId = userSnapshot.docs[0].id;
+            } else {
+              return { products: [], hasMore: false, lastId: null };
+            }
+          }
+        }
+
+        // ── Build query ──
+        let query = db.collection('products').where('status', '==', 'approved');
         if (category) query = query.where('category', '==', category);
+
+        // ── 🔥 NEW: Filter by makerUid if username search ──
+        if (targetUserId) {
+          query = query.where('makerUid', '==', targetUserId);
+        } else if (searchTerm) {
+          const term = searchTerm.toLowerCase().trim();
+          query = query.where('searchable', '>=', term)
+                       .where('searchable', '<=', term + '\uf8ff');
+        }
+
         const fetchLimit = Math.min(limit + 10, 100);
         query = query.orderBy('createdAt', 'desc').limit(fetchLimit);
         if (lastId) {
           const lastDoc = await db.collection('products').doc(lastId).get();
           if (lastDoc.exists) query = query.startAfter(lastDoc);
         }
+
         const snapshot = await query.get();
         const products = [];
         let hasMore = false;
         let lastProductId = null;
         const docs = snapshot.docs;
         let count = 0;
+
         for (const doc of docs) {
           if (count >= limit) {
             hasMore = true;
@@ -6296,20 +6327,25 @@ app.get('/api/productstrend/feed', async (req, res) => {
           }
           const data = doc.data();
           if (data.status === 'rejected') continue;
-          const name = (data.name || '').toLowerCase();
-          const tagline = (data.tagline || '').toLowerCase();
-          const desc = (data.description || '').toLowerCase();
-          const term = search.toLowerCase();
-          if (!name.includes(term) && !tagline.includes(term) && !desc.includes(term)) continue;
+
+          // In‑memory filter for safety (already filtered via query)
+          if (!targetUserId && searchTerm) {
+            const term = searchTerm.toLowerCase();
+            const searchable = (data.searchable || '').toLowerCase();
+            if (!searchable.includes(term)) continue;
+          }
+
           const maker = await getProductMakerInfo(data.makerUid);
           products.push({ id: doc.id, ...data, maker });
           lastProductId = doc.id;
           count++;
         }
+
         hasMore = snapshot.docs.length >= fetchLimit;
         return { products, hasMore, lastId: lastProductId };
       }, 120);
 
+      // ── Compute user voted status ──
       let userVotedSet = new Set();
       if (uid) {
         const voteCacheKey = `user:votes:${uid}`;
@@ -6337,27 +6373,25 @@ app.get('/api/productstrend/feed', async (req, res) => {
         const votedIds = voteSnapshot.docs.map(d => d.data().productId);
         userVotedSet = new Set(votedIds);
       }
+
       const productsWithVote = result.products.map(product => ({
         ...product,
         userVoted: userVotedSet.has(product.id),
       }));
+
       return res.json({ success: true, products: productsWithVote, hasMore: result.hasMore, lastId: result.lastId });
     }
 
-    // ── 🔥 FIXED: Non‑search with proper sort handling ──
+    // ── Non‑search feed (Redis sorted sets) ──
     const feedKey = getProductFeedKey(category || null, sort);
-
-    // Determine if we need ascending order (oldest) or descending (everything else)
     const isAscending = sort === 'oldest';
 
     let offset = 0;
     if (lastId) {
       if (isAscending) {
-        // For ascending, we use zrank
         const rank = await redis.zrank(feedKey, lastId);
         if (rank !== null) offset = rank + 1;
       } else {
-        // For descending, we use zrevrank
         const rank = await redis.zrevrank(feedKey, lastId);
         if (rank !== null) offset = rank + 1;
       }
@@ -6743,6 +6777,16 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
+    // ── ✅ ADD: compute searchable field ──
+    const makerInfo = await getUserInfo(uid);
+    const makerUsername = makerInfo?.username || '';
+    productData.searchable = (
+      productData.name + ' ' +
+      productData.tagline + ' ' +
+      productData.description + ' ' +
+      makerUsername
+    ).toLowerCase();
+
     const docRef = await db.collection('products').add(productData);
     const newProduct = { id: docRef.id, ...productData };
     newProduct.maker = await getProductMakerInfo(uid);
@@ -6982,12 +7026,25 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       updateData.socialLinks = socialLinks;
     }
 
-    if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({ success: false, error: 'No fields to update' });
-    }
-    updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+if (Object.keys(updateData).length === 0) {
+  return res.status(400).json({ success: false, error: 'No fields to update' });
+}
+updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
-    await docRef.update(updateData);
+// ── Ensure searchable is updated ──
+const makerInfo = await getUserInfo(data.makerUid);
+const makerUsername = makerInfo?.username || '';
+const finalName = name !== undefined ? name.trim() : data.name;
+const finalTagline = tagline !== undefined ? tagline.trim() : data.tagline;
+const finalDescription = description !== undefined ? description.trim() : data.description;
+updateData.searchable = (
+  finalName + ' ' +
+  finalTagline + ' ' +
+  finalDescription + ' ' +
+  makerUsername
+).toLowerCase();
+
+await docRef.update(updateData);
 
     // ── If category changed, move between sorted sets ──
     const oldCategory = data.category || 'Other';
