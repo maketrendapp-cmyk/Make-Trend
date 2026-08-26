@@ -6563,6 +6563,7 @@ app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, 
 
     const status = req.query.status || null;
     const category = req.query.category || null;
+    const search = req.query.search || null;
     const lastId = req.query.lastId || null;
 
     if (!(await checkRateLimit(uid, 'my-products', 20, 60))) {
@@ -6570,10 +6571,10 @@ app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, 
     }
 
     // ── Build cache key ──
-    const cacheKey = `productstrend:my-products:${uid}:status:${status || 'all'}:category:${category || 'all'}:limit:${limit}:lastId:${lastId || 'null'}`;
+    const cacheKey = `productstrend:my-products:${uid}:status:${status || 'all'}:category:${category || 'all'}:search:${search || 'none'}:limit:${limit}:lastId:${lastId || 'null'}`;
 
     const result = await getOrSetCache(cacheKey, async () => {
-      console.log(`📡 Fetching my products for user ${uid} (status=${status}, category=${category})...`);
+      console.log(`📡 Fetching my products for user ${uid} (status=${status}, category=${category}, search=${search})...`);
 
       let query = db.collection('products').where('makerUid', '==', uid);
 
@@ -6581,12 +6582,18 @@ app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, 
       if (status && status !== 'all') {
         query = query.where('status', '==', status);
       } else {
-        // Default: exclude 'deleted'
         query = query.where('status', '!=', 'deleted');
       }
 
       if (category) {
         query = query.where('category', '==', category);
+      }
+
+      // ── Search filter (text search on searchable field) ──
+      if (search) {
+        const term = search.toLowerCase().trim();
+        query = query.where('searchable', '>=', term)
+                     .where('searchable', '<=', term + '\uf8ff');
       }
 
       query = query.orderBy('createdAt', 'desc').limit(limit + 1);
@@ -6617,7 +6624,7 @@ app.get('/api/productstrend/my-products', verifyToken, checkBanned, async (req, 
       }
 
       return { products, hasMore, lastId: lastProductId };
-    }, 300); // 5 min TTL
+    }, 300);
 
     res.json({ success: true, ...result });
   } catch (error) {
