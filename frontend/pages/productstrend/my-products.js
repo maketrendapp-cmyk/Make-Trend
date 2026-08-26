@@ -150,15 +150,17 @@ export default function MyProducts() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // ✅ Now sending search to backend
   const filters = {
     status: statusFilter,
     category: categoryFilter || undefined,
+    search: searchTerm.trim() || undefined,
   };
 
   // ── Fetch MT Coins ──
   const { data: mtCoinsData, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
-  // ── React Query: My Products (infinite) ──
+  // ── React Query: My Products (infinite) with backend filters ──
   const {
     data,
     fetchNextPage,
@@ -169,19 +171,9 @@ export default function MyProducts() {
     isError,
   } = useMyProducts(filters, isAuthenticated);
 
+  // All products are already filtered by the backend
   const allProducts = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
-
-  // ── Local search ──
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm.trim()) return allProducts;
-    const term = searchTerm.trim().toLowerCase();
-    return allProducts.filter((p) =>
-      p.name?.toLowerCase().includes(term) ||
-      p.tagline?.toLowerCase().includes(term) ||
-      p.category?.toLowerCase().includes(term)
-    );
-  }, [allProducts, searchTerm]);
 
   // ── Delete modal state ──
   const [deleteModal, setDeleteModal] = useState(null);
@@ -201,7 +193,7 @@ export default function MyProducts() {
     setIsDeleting(true);
 
     const productId = deleteModal.id;
-    const queryKey = ['myProducts', { status: statusFilter, category: categoryFilter || undefined }];
+    const queryKey = ['myProducts', { status: statusFilter, category: categoryFilter || undefined, search: searchTerm.trim() || undefined }];
 
     // Optimistically remove from cache
     queryClient.setQueryData(queryKey, (oldData) => {
@@ -217,7 +209,7 @@ export default function MyProducts() {
       await deleteMutation.mutateAsync(productId);
       await invalidateMyProducts();
       queryClient.setQueryData(
-        ['myProducts', { status: statusFilter, category: categoryFilter || undefined }],
+        queryKey,
         (oldData) => {
           if (!oldData) return oldData;
           return { ...oldData, pages: oldData.pages.slice(0, 1) };
@@ -270,7 +262,7 @@ export default function MyProducts() {
   const observerRef = useRef(null);
 
   useEffect(() => {
-    if (isFetchingNextPage || !hasMore || filteredProducts.length === 0) return;
+    if (isFetchingNextPage || !hasMore || allProducts.length === 0) return;
 
     const lastElement = document.querySelector('#my-products-end');
     if (!lastElement) return;
@@ -290,7 +282,7 @@ export default function MyProducts() {
     return () => {
       if (observerRef.current) observerRef.current.disconnect();
     };
-  }, [isFetchingNextPage, hasMore, filteredProducts.length, fetchNextPage]);
+  }, [isFetchingNextPage, hasMore, allProducts.length, fetchNextPage]);
 
   // ── Format date ──
   const formatDate = (timestamp) => {
@@ -423,14 +415,13 @@ export default function MyProducts() {
                 <FiGrid className="text-purple-600" />
                 My Products
                 <span className="text-sm font-normal text-slate-400 ml-2">
-                  ({filteredProducts.length})
+                  ({allProducts.length})
                 </span>
               </h1>
               <p className="text-sm text-slate-400">Manage your launched products</p>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Compact earnings card */}
             <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-2 rounded-xl border border-purple-100 shadow-sm">
               <FiAward className="w-5 h-5 text-purple-600" />
               <div className="text-right">
@@ -510,7 +501,7 @@ export default function MyProducts() {
           {hasFilters && (
             <div className="mt-3 pt-3 border-t border-slate-100">
               <p className="text-xs text-slate-400">
-                Showing {filteredProducts.length} of {allProducts.length} products
+                Showing {allProducts.length} products
                 {statusFilter && statusFilter !== 'all' && <span className="ml-2">• Status: {statusFilter}</span>}
                 {categoryFilter && <span className="ml-2">• Category: {categoryFilter}</span>}
                 {searchTerm && <span className="ml-2">• Search: "{searchTerm}"</span>}
@@ -523,31 +514,27 @@ export default function MyProducts() {
         {allProducts.length === 0 && !isLoading && !isFetchingNextPage ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
             <div className="text-6xl mb-4">🚀</div>
-            <h3 className="text-xl font-semibold text-slate-900">No products launched yet</h3>
-            <p className="text-slate-500 text-sm mt-1">Share your creation with the community</p>
-            <button
-              onClick={() => router.push('/productstrend/launch')}
-              className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition shadow-sm"
-            >
-              <FiPlus className="w-4 h-4" /> Launch Your First Product
-            </button>
-          </div>
-        ) : filteredProducts.length === 0 && allProducts.length > 0 ? (
-          <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
-            <div className="text-5xl mb-4">🔍</div>
-            <h3 className="text-lg font-semibold text-slate-900">No matches found</h3>
-            <p className="text-slate-500 text-sm">Try adjusting your search or filters.</p>
-            <button
-              onClick={clearFilters}
-              className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
-            >
-              Clear Filters
-            </button>
+            <h3 className="text-xl font-semibold text-slate-900">
+              {hasFilters ? 'No matching products' : 'No products launched yet'}
+            </h3>
+            <p className="text-slate-500 text-sm mt-1">
+              {hasFilters
+                ? 'Try adjusting your filters or search term.'
+                : 'Share your creation with the community'}
+            </p>
+            {!hasFilters && (
+              <button
+                onClick={() => router.push('/productstrend/launch')}
+                className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition shadow-sm"
+              >
+                <FiPlus className="w-4 h-4" /> Launch Your First Product
+              </button>
+            )}
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
+              {allProducts.map((product) => (
                 <div
                   key={product.id}
                   className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
@@ -671,7 +658,7 @@ export default function MyProducts() {
               </div>
             )}
 
-            {!hasMore && filteredProducts.length > 0 && (
+            {!hasMore && allProducts.length > 0 && (
               <p className="text-center text-xs text-slate-400 py-6">
                 You've reached the end of your products 🎉
               </p>
