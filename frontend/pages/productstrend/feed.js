@@ -24,6 +24,8 @@ import {
   FiMessageCircle,
   FiBox,
   FiCheck,
+  FiChevronLeft,
+  FiChevronRight,
 } from 'react-icons/fi';
 
 const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
@@ -124,6 +126,7 @@ const CustomSelect = ({ value, onChange, options, placeholder, icon: Icon }) => 
   );
 };
 
+// ── Product Card (used in list and carousel) ──
 const ProductCard = React.forwardRef(({
   product,
   isFeatured = false,
@@ -131,6 +134,7 @@ const ProductCard = React.forwardRef(({
   onUpvote,
   isAuthenticated,
   isUpvoting,
+  compact = false,
 }, ref) => {
   const isLiked = product.userVoted || false;
   const upvotes = product.upvotes || 0;
@@ -157,11 +161,15 @@ const ProductCard = React.forwardRef(({
     cardClasses += ' border-slate-200';
   }
 
+  if (compact) {
+    cardClasses = cardClasses.replace('p-4', 'p-3');
+  }
+
   return (
     <div ref={ref} className={cardClasses}>
       <Link href={`/productstrend/${product.id}`} className="flex-shrink-0">
         {hasImage ? (
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
+          <div className={`${compact ? 'w-10 h-10 md:w-12 md:h-12' : 'w-14 h-14 md:w-16 md:h-16'} rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center`}>
             <Image
               src={product.logo || product.imageUrl}
               alt={product.name}
@@ -180,8 +188,8 @@ const ProductCard = React.forwardRef(({
             />
           </div>
         ) : (
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-3xl text-slate-400 border border-slate-200 shadow-sm">
-            <FiBox className="w-7 h-7" />
+          <div className={`${compact ? 'w-10 h-10 md:w-12 md:h-12' : 'w-14 h-14 md:w-16 md:h-16'} rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-3xl text-slate-400 border border-slate-200 shadow-sm`}>
+            <FiBox className={`${compact ? 'w-5 h-5' : 'w-7 h-7'}`} />
           </div>
         )}
       </Link>
@@ -190,14 +198,14 @@ const ProductCard = React.forwardRef(({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <Link href={`/productstrend/${product.id}`} className="block">
-              <h3 className="font-semibold text-slate-900 text-base hover:text-purple-600 transition truncate">
+              <h3 className={`font-semibold text-slate-900 hover:text-purple-600 transition ${compact ? 'text-sm' : 'text-base'} truncate`}>
                 {product.name}
               </h3>
             </Link>
             {isFeatured && badge && (
               <div className="flex items-center gap-2 mt-0.5">
                 {badge}
-                <span className="text-xs text-purple-400">🔥 Featured</span>
+                {!compact && <span className="text-xs text-purple-400">🔥 Featured</span>}
               </div>
             )}
           </div>
@@ -215,30 +223,137 @@ const ProductCard = React.forwardRef(({
           </button>
         </div>
 
-        <p className="text-sm text-slate-500 line-clamp-2 mt-1">{product.tagline}</p>
-
-        <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-              {product.maker?.avatar ? (
-                <Image src={product.maker.avatar} alt={product.maker.username || 'User'} width={20} height={20} className="w-full h-full object-cover" />
-              ) : (
-                <FiUser className="w-3 h-3 text-slate-500" />
+        {!compact && (
+          <>
+            <p className="text-sm text-slate-500 line-clamp-2 mt-1">{product.tagline}</p>
+            <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
+              <span className="flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  {product.maker?.avatar ? (
+                    <Image src={product.maker.avatar} alt={product.maker.username || 'User'} width={20} height={20} className="w-full h-full object-cover" />
+                  ) : (
+                    <FiUser className="w-3 h-3 text-slate-500" />
+                  )}
+                </span>
+                <span className="font-medium text-slate-600">{product.maker?.username || 'Anonymous'}</span>
+              </span>
+              <span className="flex items-center gap-1"><FiClock className="w-3 h-3" />{formatDate(product.createdAt)}</span>
+              <span className="flex items-center gap-1"><FiMessageCircle className="w-3 h-3" />{product.commentsCount || 0}</span>
+              {product.category && (
+                <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{product.category}</span>
               )}
-            </span>
-            <span className="font-medium text-slate-600">{product.maker?.username || 'Anonymous'}</span>
-          </span>
-          <span className="flex items-center gap-1"><FiClock className="w-3 h-3" />{formatDate(product.createdAt)}</span>
-          <span className="flex items-center gap-1"><FiMessageCircle className="w-3 h-3" />{product.commentsCount || 0}</span>
-          {product.category && (
-            <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{product.category}</span>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 });
 ProductCard.displayName = 'ProductCard';
+
+// ── Featured Carousel Component ──
+const FeaturedCarousel = ({ products, onUpvote, isAuthenticated, isUpvoting }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const timerRef = useRef(null);
+
+  const total = products.length;
+  const isSingle = total === 1;
+
+  const goTo = (index) => {
+    if (index < 0) index = total - 1;
+    if (index >= total) index = 0;
+    setCurrentIndex(index);
+  };
+
+  const next = () => goTo(currentIndex + 1);
+  const prev = () => goTo(currentIndex - 1);
+
+  useEffect(() => {
+    if (isSingle || !isAutoPlaying) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+    timerRef.current = setInterval(next, 5000);
+    return () => clearInterval(timerRef.current);
+  }, [currentIndex, isAutoPlaying, isSingle]);
+
+  const handleMouseEnter = () => setIsAutoPlaying(false);
+  const handleMouseLeave = () => setIsAutoPlaying(true);
+
+  if (!products.length) return null;
+
+  return (
+    <div className="relative bg-gradient-to-r from-purple-50/80 to-indigo-50/80 rounded-3xl p-4 md:p-6 border border-purple-100/50 shadow-sm mb-8 overflow-hidden">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <FiTrendingUp className="text-purple-600 text-xl" />
+          <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
+          <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            Top {products.length}
+          </span>
+        </div>
+        {total > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={prev}
+              className="p-1.5 rounded-full bg-white border border-slate-200 hover:bg-purple-50 hover:border-purple-300 transition shadow-sm"
+              aria-label="Previous"
+            >
+              <FiChevronLeft className="w-4 h-4 text-slate-600" />
+            </button>
+            <button
+              onClick={next}
+              className="p-1.5 rounded-full bg-white border border-slate-200 hover:bg-purple-50 hover:border-purple-300 transition shadow-sm"
+              aria-label="Next"
+            >
+              <FiChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div
+        className="relative transition-all duration-500 ease-in-out"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <div
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+        >
+          {products.map((product, idx) => (
+            <div key={product.id} className="w-full flex-shrink-0 px-1">
+              <ProductCard
+                product={product}
+                isFeatured
+                rank={idx + 1}
+                onUpvote={onUpvote}
+                isAuthenticated={isAuthenticated}
+                isUpvoting={isUpvoting}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {total > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {products.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goTo(idx)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                idx === currentIndex ? 'w-6 bg-purple-600' : 'bg-purple-200 hover:bg-purple-300'
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function ProductTrendFeed() {
   const router = useRouter();
@@ -270,6 +385,7 @@ export default function ProductTrendFeed() {
   // ── Featured feed ──
   const {
     data: featuredData,
+    refetch: refetchFeatured,
   } = useProductFeed(featuredFilters, shouldFetchFeatured);
 
   // ── Regular feed ──
@@ -285,10 +401,8 @@ export default function ProductTrendFeed() {
   } = useProductFeed(regularFilters, true);
 
   // ── Compute products ──
-  const featuredIds = useMemo(() => {
-    if (!shouldFetchFeatured) return new Set();
-    return new Set((featuredData?.pages?.[0]?.products || []).map(p => p.id));
-  }, [featuredData, shouldFetchFeatured]);
+  const featuredProducts = shouldFetchFeatured ? (featuredData?.pages?.[0]?.products || []) : [];
+  const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
 
   const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
   const regularProducts = regularProductsAll.filter(p => !featuredIds.has(p.id));
@@ -540,7 +654,7 @@ export default function ProductTrendFeed() {
     );
   }
 
-  const showFeatured = shouldFetchFeatured && featuredData?.pages?.[0]?.products?.length > 0;
+  const showFeatured = shouldFetchFeatured && featuredProducts.length > 0;
   const filterKey = `${sortBy}-${category}-${searchQuery}`;
 
   return (
@@ -592,7 +706,7 @@ export default function ProductTrendFeed() {
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Search products..."
+                  placeholder="Search products or @username..."
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                 />
                 {searchInput && (
@@ -659,30 +773,14 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* ── Featured Section ── */}
+        {/* ── Featured Carousel ── */}
         {showFeatured && (
-          <div className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
-              <FiTrendingUp className="text-purple-600 text-xl" />
-              <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
-              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                Top {featuredData.pages[0].products.length} {category !== 'All' ? `in ${category}` : ''}
-              </span>
-            </div>
-            <div className="space-y-4">
-              {featuredData.pages[0].products.map((product, idx) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isFeatured
-                  rank={idx + 1}
-                  onUpvote={handleUpvote}
-                  isAuthenticated={isAuthenticated}
-                  isUpvoting={upvoteMutation.isLoading}
-                />
-              ))}
-            </div>
-          </div>
+          <FeaturedCarousel
+            products={featuredProducts}
+            onUpvote={handleUpvote}
+            isAuthenticated={isAuthenticated}
+            isUpvoting={upvoteMutation.isLoading}
+          />
         )}
 
         {/* ── Regular Products ── */}
@@ -759,6 +857,16 @@ export default function ProductTrendFeed() {
           )}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-5px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </>
   );
 }
