@@ -6667,8 +6667,16 @@ app.post('/api/productstrend/products', verifyToken, checkBanned, async (req, re
       return res.status(400).json({ success: false, error: 'Invalid image URL' });
     }
     if (category && typeof category !== 'string') {
-      return res.status(400).json({ success: false, error: 'Category must be a string' });
-    }
+  return res.status(400).json({ success: false, error: 'Category must be a string' });
+}
+const ALLOWED_CATEGORIES = [
+  'Tech', 'Design', 'AI', 'Productivity', 'Education',
+  'Health', 'Fitness', 'Gaming', 'Social', 'Marketing',
+  'SaaS', 'Developer Tools', 'Other'
+];
+if (category && !ALLOWED_CATEGORIES.includes(category)) {
+  return res.status(400).json({ success: false, error: 'Invalid category' });
+}
     if (features !== undefined) {
       if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
         return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
@@ -6868,43 +6876,94 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
 
     const updateData = {};
 
-    // ── Existing validation for each field (copied from your original PUT) ──
+    // ── Helper: skip validation if unchanged or empty ──
+    const validateAndSetUrl = (field, value, existingValue, validator, errorMsg) => {
+      if (value === undefined) return null;
+      const trimmed = value.trim();
+      if (trimmed !== existingValue) {
+        if (trimmed !== '' && !validator(trimmed)) {
+          return errorMsg;
+        }
+      }
+      updateData[field] = trimmed;
+      return null;
+    };
+
+    const validateAndSetImage = (field, value, existingValue, validator, errorMsg) => {
+      if (value === undefined) return null;
+      const trimmed = value.trim();
+      if (trimmed !== existingValue) {
+        if (trimmed !== '' && !validator(trimmed)) {
+          return errorMsg;
+        }
+      }
+      updateData[field] = trimmed;
+      return null;
+    };
+
+    let error = null;
+
+    // ── Validate simple fields ──
     if (name !== undefined) {
       if (name.trim().length < 1 || name.trim().length > 100) {
-        return res.status(400).json({ success: false, error: 'Name must be 1-100 characters' });
+        error = 'Name must be 1-100 characters';
+      } else {
+        updateData.name = name.trim();
       }
-      updateData.name = name.trim();
     }
+    if (error) return res.status(400).json({ success: false, error });
+
     if (tagline !== undefined) {
       if (tagline.trim().length < 1 || tagline.trim().length > 200) {
-        return res.status(400).json({ success: false, error: 'Tagline must be 1-200 characters' });
+        error = 'Tagline must be 1-200 characters';
+      } else {
+        updateData.tagline = tagline.trim();
       }
-      updateData.tagline = tagline.trim();
     }
+    if (error) return res.status(400).json({ success: false, error });
+
     if (description !== undefined) {
       if (description.length > 2000) {
-        return res.status(400).json({ success: false, error: 'Description must be less than 2000 characters' });
+        error = 'Description must be less than 2000 characters';
+      } else {
+        updateData.description = description.trim();
       }
-      updateData.description = description.trim();
     }
-    if (url !== undefined) {
-      if (!isValidUrl(url.trim())) {
-        return res.status(400).json({ success: false, error: 'Invalid URL' });
-      }
-      updateData.url = url.trim();
-    }
-    if (imageUrl !== undefined) {
-  // Skip validation if the URL hasn't changed
-  if (imageUrl !== data.imageUrl) {
-    if (!validateImageUrl(imageUrl)) {
-      return res.status(400).json({ success: false, error: 'Invalid image URL' });
-    }
-  }
-  updateData.imageUrl = imageUrl;
-}
+    if (error) return res.status(400).json({ success: false, error });
+
+    // ── URL fields (skip validation if unchanged or empty) ──
+    const urlResult = validateAndSetUrl('url', url, data.url || '', isValidUrl, 'Invalid URL');
+    if (urlResult) return res.status(400).json({ success: false, error: urlResult });
+
+    const imageResult = validateAndSetImage('imageUrl', imageUrl, data.imageUrl || '', validateImageUrl, 'Invalid image URL');
+    if (imageResult) return res.status(400).json({ success: false, error: imageResult });
+
+    const logoResult = validateAndSetImage('logo', logo, data.logo || '', validateImageUrl, 'Invalid logo URL');
+    if (logoResult) return res.status(400).json({ success: false, error: logoResult });
+
+    const thumbnailResult = validateAndSetImage('thumbnail', thumbnail, data.thumbnail || '', validateImageUrl, 'Invalid thumbnail URL');
+    if (thumbnailResult) return res.status(400).json({ success: false, error: thumbnailResult });
+
+    const demoResult = validateAndSetUrl('demoUrl', demoUrl, data.demoUrl || '', isValidUrl, 'Invalid demo URL');
+    if (demoResult) return res.status(400).json({ success: false, error: demoResult });
+
+    const websiteImageResult = validateAndSetImage('websiteImage', websiteImage, data.websiteImage || '', validateImageUrl, 'Invalid website image URL');
+    if (websiteImageResult) return res.status(400).json({ success: false, error: websiteImageResult });
+
+    // ── Category with validation ──
+    const ALLOWED_CATEGORIES = [
+      'Tech', 'Design', 'AI', 'Productivity', 'Education',
+      'Health', 'Fitness', 'Gaming', 'Social', 'Marketing',
+      'SaaS', 'Developer Tools', 'Other'
+    ];
     if (category !== undefined) {
+      if (!ALLOWED_CATEGORIES.includes(category)) {
+        return res.status(400).json({ success: false, error: 'Invalid category' });
+      }
       updateData.category = category;
     }
+
+    // ── Status (admin only) ──
     if (userIsAdmin && status !== undefined) {
       const validStatuses = ['pending', 'approved', 'rejected'];
       if (!validStatuses.includes(status)) {
@@ -6912,6 +6971,8 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       }
       updateData.status = status;
     }
+
+    // ── Other fields (unchanged) ──
     if (features !== undefined) {
       if (!Array.isArray(features) || features.some(f => typeof f !== 'string')) {
         return res.status(400).json({ success: false, error: 'Features must be an array of strings' });
@@ -6919,33 +6980,19 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       updateData.features = features.map(f => f.trim()).filter(Boolean);
     }
     if (pricing !== undefined) {
-      if (typeof pricing !== 'string') {
-        return res.status(400).json({ success: false, error: 'Pricing must be a string' });
-      }
+      if (typeof pricing !== 'string') return res.status(400).json({ success: false, error: 'Pricing must be a string' });
       updateData.pricing = pricing;
     }
     if (productStatus !== undefined) {
-      if (typeof productStatus !== 'string') {
-        return res.status(400).json({ success: false, error: 'Product status must be a string' });
-      }
+      if (typeof productStatus !== 'string') return res.status(400).json({ success: false, error: 'Product status must be a string' });
       updateData.productStatus = productStatus;
     }
     if (targetAudience !== undefined) {
-      if (typeof targetAudience !== 'string') {
-        return res.status(400).json({ success: false, error: 'Target audience must be a string' });
-      }
+      if (typeof targetAudience !== 'string') return res.status(400).json({ success: false, error: 'Target audience must be a string' });
       updateData.targetAudience = targetAudience;
     }
-    if (demoUrl !== undefined) {
-      if (demoUrl && !isValidUrl(demoUrl.trim())) {
-        return res.status(400).json({ success: false, error: 'Invalid demo URL' });
-      }
-      updateData.demoUrl = demoUrl.trim();
-    }
     if (twitter !== undefined) {
-      if (typeof twitter !== 'string') {
-        return res.status(400).json({ success: false, error: 'Twitter handle must be a string' });
-      }
+      if (typeof twitter !== 'string') return res.status(400).json({ success: false, error: 'Twitter handle must be a string' });
       updateData.twitter = twitter.trim();
     }
     if (techStack !== undefined) {
@@ -6955,54 +7002,22 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       updateData.techStack = techStack.map(t => t.trim()).filter(Boolean);
     }
     if (releaseDate !== undefined) {
-      if (typeof releaseDate !== 'string') {
-        return res.status(400).json({ success: false, error: 'Release date must be a string' });
-      }
+      if (typeof releaseDate !== 'string') return res.status(400).json({ success: false, error: 'Release date must be a string' });
       updateData.releaseDate = releaseDate;
     }
-    if (logo !== undefined) {
-      if (logo && !validateImageUrl(logo)) {
-        return res.status(400).json({ success: false, error: 'Invalid logo URL' });
-      }
-      updateData.logo = logo || '';
-    }
-    if (thumbnail !== undefined) {
-      if (thumbnail && !validateImageUrl(thumbnail)) {
-        return res.status(400).json({ success: false, error: 'Invalid thumbnail URL' });
-      }
-      updateData.thumbnail = thumbnail || '';
-    }
     if (websiteTitle !== undefined) {
-      if (typeof websiteTitle !== 'string') {
-        return res.status(400).json({ success: false, error: 'Website title must be a string' });
-      }
-      if (websiteTitle.length > 200) {
-        return res.status(400).json({ success: false, error: 'Website title must be less than 200 characters' });
-      }
+      if (typeof websiteTitle !== 'string') return res.status(400).json({ success: false, error: 'Website title must be a string' });
+      if (websiteTitle.length > 200) return res.status(400).json({ success: false, error: 'Website title must be less than 200 characters' });
       updateData.websiteTitle = websiteTitle || '';
     }
     if (websiteDescription !== undefined) {
-      if (typeof websiteDescription !== 'string') {
-        return res.status(400).json({ success: false, error: 'Website description must be a string' });
-      }
-      if (websiteDescription.length > 500) {
-        return res.status(400).json({ success: false, error: 'Website description must be less than 500 characters' });
-      }
+      if (typeof websiteDescription !== 'string') return res.status(400).json({ success: false, error: 'Website description must be a string' });
+      if (websiteDescription.length > 500) return res.status(400).json({ success: false, error: 'Website description must be less than 500 characters' });
       updateData.websiteDescription = websiteDescription || '';
     }
-    if (websiteImage !== undefined) {
-      if (websiteImage && !validateImageUrl(websiteImage)) {
-        return res.status(400).json({ success: false, error: 'Invalid website image URL' });
-      }
-      updateData.websiteImage = websiteImage || '';
-    }
     if (referralCode !== undefined) {
-      if (typeof referralCode !== 'string') {
-        return res.status(400).json({ success: false, error: 'Referral code must be a string' });
-      }
-      if (referralCode.length > 50) {
-        return res.status(400).json({ success: false, error: 'Referral code must be less than 50 characters' });
-      }
+      if (typeof referralCode !== 'string') return res.status(400).json({ success: false, error: 'Referral code must be a string' });
+      if (referralCode.length > 50) return res.status(400).json({ success: false, error: 'Referral code must be less than 50 characters' });
       updateData.referralCode = referralCode || '';
     }
     if (socialLinks !== undefined) {
@@ -7027,37 +7042,37 @@ app.put('/api/productstrend/products/:id', verifyToken, checkBanned, async (req,
       updateData.socialLinks = socialLinks;
     }
 
-if (Object.keys(updateData).length === 0) {
-  return res.status(400).json({ success: false, error: 'No fields to update' });
-}
-updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
 
-// ── Ensure searchable is updated ──
-const makerInfo = await getUserInfo(data.makerUid);
-const makerUsername = makerInfo?.username || '';
-const finalName = name !== undefined ? name.trim() : data.name;
-const finalTagline = tagline !== undefined ? tagline.trim() : data.tagline;
-const finalDescription = description !== undefined ? description.trim() : data.description;
-updateData.searchable = (
-  finalName + ' ' +
-  finalTagline + ' ' +
-  finalDescription + ' ' +
-  makerUsername
-).toLowerCase();
+    updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
-await docRef.update(updateData);
+    // ── Ensure searchable is updated ──
+    const makerInfo = await getUserInfo(data.makerUid);
+    const makerUsername = makerInfo?.username || '';
+    const finalName = name !== undefined ? name.trim() : data.name;
+    const finalTagline = tagline !== undefined ? tagline.trim() : data.tagline;
+    const finalDescription = description !== undefined ? description.trim() : data.description;
+    updateData.searchable = (
+      finalName + ' ' +
+      finalTagline + ' ' +
+      finalDescription + ' ' +
+      makerUsername
+    ).toLowerCase();
+
+    await docRef.update(updateData);
 
     // ── If category changed, move between sorted sets ──
     const oldCategory = data.category || 'Other';
     const newCategory = category || oldCategory;
     if (newCategory !== oldCategory) {
-  await removeProductFromFeedSets(id, oldCategory);
-  const timestamp = data.createdAt ? (data.createdAt.seconds || 0) * 1000 : Date.now();
-  // Fetch updated product to get current upvotes and commentsCount
-  const updatedDoc = await docRef.get();
-  const updatedData = updatedDoc.data();
-  await addProductToFeedSets(id, newCategory, timestamp, updatedData.upvotes || 0, updatedData.commentsCount || 0);
-}
+      await removeProductFromFeedSets(id, oldCategory);
+      const timestamp = data.createdAt ? (data.createdAt.seconds || 0) * 1000 : Date.now();
+      const updatedDoc = await docRef.get();
+      const updatedData = updatedDoc.data();
+      await addProductToFeedSets(id, newCategory, timestamp, updatedData.upvotes || 0, updatedData.commentsCount || 0);
+    }
 
     // ── Update details cache ──
     const updatedDoc = await docRef.get();
