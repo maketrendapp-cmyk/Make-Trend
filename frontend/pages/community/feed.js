@@ -1,3 +1,4 @@
+// pages/community/feed.js
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -20,6 +21,7 @@ import {
   FiUser,
   FiSearch,
   FiTrendingUp,
+  FiChevronDown,
 } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -65,29 +67,29 @@ const setLocalVote = (postId, voted, likes) => {
 
 // ── Constants ──
 const CATEGORIES = [
-  { value: 'all', label: '📌 All' },
-  { value: 'general', label: '📌 General' },
-  { value: 'web-dev', label: '💻 Web Dev' },
-  { value: 'design', label: '🎨 Design' },
-  { value: 'ai', label: '🤖 AI' },
-  { value: 'gaming', label: '🎮 Gaming' },
-  { value: 'content', label: '👑 Content' },
-  { value: 'startup', label: '🚀 Startup' },
-  { value: 'social', label: '📱 Social' },
-  { value: 'coding', label: '💻 Coding' },
-  { value: 'marketing', label: '📊 Marketing' },
-  { value: 'other', label: '📌 Other' },
+  { value: 'all', label: 'All' },
+  { value: 'general', label: 'General' },
+  { value: 'web-dev', label: 'Web Dev' },
+  { value: 'design', label: 'Design' },
+  { value: 'ai', label: 'AI' },
+  { value: 'gaming', label: 'Gaming' },
+  { value: 'content', label: 'Content' },
+  { value: 'startup', label: 'Startup' },
+  { value: 'social', label: 'Social' },
+  { value: 'coding', label: 'Coding' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'other', label: 'Other' },
 ];
 
 const POST_TYPES = [
   { value: 'all', label: 'All Types' },
   { value: 'general', label: 'General' },
-  { value: 'launch', label: '🚀 Launch' },
-  { value: 'update', label: '📢 Update' },
-  { value: 'job', label: '💼 Job' },
-  { value: 'question', label: '❓ Question' },
-  { value: 'event', label: '📅 Event' },
-  { value: 'promotional', label: '💎 Promotional' },
+  { value: 'launch', label: 'Launch' },
+  { value: 'update', label: 'Update' },
+  { value: 'job', label: 'Job' },
+  { value: 'question', label: 'Question' },
+  { value: 'event', label: 'Event' },
+  { value: 'promotional', label: 'Promotional' },
 ];
 
 const POST_TYPE_ICONS = {
@@ -108,6 +110,20 @@ const POST_TYPE_LABELS = {
   question: 'Question',
   event: 'Event',
   promotional: 'Promotional',
+};
+
+const CATEGORY_EMOJIS = {
+  general: '📌',
+  'web-dev': '💻',
+  design: '🎨',
+  ai: '🤖',
+  gaming: '🎮',
+  content: '👑',
+  startup: '🚀',
+  social: '📱',
+  coding: '💻',
+  marketing: '📊',
+  other: '📌',
 };
 
 export default function CommunityFeed() {
@@ -176,6 +192,9 @@ export default function CommunityFeed() {
   // ── Combined loading/error states ──
   const isLoading = featuredLoading && regularLoading && !regularPostsAll.length && !featuredPosts.length;
   const isError = featuredError && regularError;
+
+  // ── Count active filters ──
+  const activeFilterCount = (appliedCategory !== 'all' ? 1 : 0) + (appliedType !== 'all' ? 1 : 0) + (searchQuery.trim() ? 1 : 0);
 
   // ── Apply filters ──
   const applyFilters = () => {
@@ -459,7 +478,7 @@ export default function CommunityFeed() {
     );
   }
 
-  const hasActiveFilters = appliedCategory !== 'all' || appliedType !== 'all' || searchQuery;
+  const hasActiveFilters = activeFilterCount > 0;
   const hasFeatured = featuredPosts.length > 0;
 
   return (
@@ -468,7 +487,7 @@ export default function CommunityFeed() {
         title="Community Feed – Make Trend"
         description="Discover posts from the Make Trend community – product launches, updates, questions, and more."
       />
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
         {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
@@ -494,48 +513,70 @@ export default function CommunityFeed() {
                 </Link>
               </>
             )}
-            <button
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition text-sm font-medium"
-            >
-              <FiFilter className="w-4 h-4" />
-              Filters
-              {hasActiveFilters && (
-                <span className="w-2 h-2 bg-purple-600 rounded-full" />
-              )}
-            </button>
           </div>
         </div>
 
-        {/* ── Search Bar ── */}
+        {/* ── Search & Filter Bar ── */}
         <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mb-4">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Search posts or @username..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
-              />
-              {searchInput && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-1 gap-2">
+              <div className="relative flex-1">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search posts or @username..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
+                />
+                {searchInput && (
+                  <button
+                    onClick={() => setSearchInput('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleSearch}
+                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <FiSearch className="w-4 h-4" /> Search
+              </button>
+            </div>
+
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                  isFilterOpen
+                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-transparent'
+                }`}
+              >
+                <FiFilter className="w-4 h-4" />
+                <span>Filters</span>
+                {hasActiveFilters && (
+                  <span className="ml-1 bg-purple-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+                <FiChevronDown className={`w-4 h-4 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {hasActiveFilters && (
                 <button
-                  onClick={() => setSearchInput('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1 px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition"
                 >
-                  <FiX className="w-4 h-4" />
+                  <FiX className="w-4 h-4" /> Clear All
                 </button>
               )}
             </div>
-            <button
-              onClick={handleSearch}
-              className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5"
-            >
-              <FiSearch className="w-4 h-4" /> Search
-            </button>
           </div>
+
           {searchQuery && (
             <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
               <span>Searching for: <strong className="text-slate-600">{searchQuery}</strong></span>
@@ -549,7 +590,7 @@ export default function CommunityFeed() {
           )}
         </div>
 
-        {/* ── Filter Panel ── */}
+        {/* ── Filter Panel (slide down) ── */}
         {isFilterOpen && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-sm animate-slideDown">
             <div className="flex items-center justify-between mb-4">
@@ -575,7 +616,7 @@ export default function CommunityFeed() {
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    {cat.label}
+                    {CATEGORY_EMOJIS[cat.value] || '📌'} {cat.label}
                   </button>
                 ))}
               </div>
@@ -609,7 +650,7 @@ export default function CommunityFeed() {
           </div>
         )}
 
-        {/* ── Active filters indicator ── */}
+        {/* ── Active filters chips ── */}
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <span className="text-xs text-slate-500 font-medium">Active filters:</span>
@@ -674,7 +715,7 @@ export default function CommunityFeed() {
             <div className="space-y-4">
               {featuredPosts.map((post, idx) => {
                 const rank = idx + 1;
-                let isTop3 = rank <= 3;
+                const isTop3 = rank <= 3;
                 return (
                   <PostCard
                     key={post.id}
@@ -686,7 +727,7 @@ export default function CommunityFeed() {
                     formatDate={formatDate}
                     toggleExpand={toggleExpand}
                     expandedPosts={expandedPosts}
-                    isFeatured={!isTop3} // only apply featured style for ranks 4+
+                    isFeatured={!isTop3}
                     rank={rank}
                     isTop3={isTop3}
                   />
@@ -786,7 +827,7 @@ export default function CommunityFeed() {
   );
 }
 
-// ── Post Card Component (Enhanced for Top 3) ──
+// ── Post Card Component ──
 const PostCard = React.forwardRef(({
   post,
   isLiked,
@@ -815,16 +856,12 @@ const PostCard = React.forwardRef(({
   const truncateDesc = descLength > 400;
 
   // ── Determine styling based on rank ──
-  let cardClasses = 'bg-white rounded-2xl border p-5 hover:shadow-md transition';
-  let badgeClasses = '';
-  let badgeIcon = null;
+  let cardClasses = 'bg-white rounded-2xl border p-5 hover:shadow-lg transition-shadow duration-200';
   let rankBadge = null;
 
   if (isTop3 && rank) {
     if (rank === 1) {
       cardClasses += ' border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-md';
-      badgeClasses = 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      badgeIcon = '👑';
       rankBadge = (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">
           👑 #1
@@ -832,8 +869,6 @@ const PostCard = React.forwardRef(({
       );
     } else if (rank === 2) {
       cardClasses += ' border-slate-400 bg-gradient-to-br from-slate-50 to-gray-100 shadow-md';
-      badgeClasses = 'bg-slate-200 text-slate-700 border-slate-300';
-      badgeIcon = '🥈';
       rankBadge = (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-300 text-slate-700">
           🥈 #2
@@ -841,8 +876,6 @@ const PostCard = React.forwardRef(({
       );
     } else if (rank === 3) {
       cardClasses += ' border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-md';
-      badgeClasses = 'bg-orange-100 text-orange-800 border-orange-300';
-      badgeIcon = '🥉';
       rankBadge = (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">
           🥉 #3
@@ -851,26 +884,22 @@ const PostCard = React.forwardRef(({
     }
   } else if (isFeatured) {
     cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
+    rankBadge = (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-purple-600 bg-purple-100">
+        🔥 #{rank}
+      </span>
+    );
   } else {
     cardClasses += ' border-slate-200';
   }
 
   return (
     <div ref={ref} className={cardClasses}>
-      {/* Top rank badge (only for top 3) */}
+      {/* Rank badge */}
       {rankBadge && (
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-3">
           {rankBadge}
-          <span className="text-xs text-slate-400">🔥 Featured</span>
-        </div>
-      )}
-
-      {isFeatured && !isTop3 && (
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-            #{rank}
-          </span>
-          <span className="text-xs text-purple-400">🔥 Featured</span>
+          {isTop3 && <span className="text-xs text-slate-400">🔥 Featured</span>}
         </div>
       )}
 
@@ -1013,7 +1042,7 @@ const PostCard = React.forwardRef(({
       )}
 
       {/* ── Actions ── */}
-      <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
+      <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t border-slate-100">
         <button
           onClick={() => onLike(post.id)}
           disabled={!isAuthenticated}
