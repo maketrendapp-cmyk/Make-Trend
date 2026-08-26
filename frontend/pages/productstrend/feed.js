@@ -126,7 +126,7 @@ const CustomSelect = ({ value, onChange, options, placeholder, icon: Icon }) => 
   );
 };
 
-// ── Product Card (used in list and carousel) ──
+// ── Product Card ──
 const ProductCard = React.forwardRef(({
   product,
   isFeatured = false,
@@ -155,7 +155,7 @@ const ProductCard = React.forwardRef(({
       badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-300 text-orange-800">🥉 #3</span>;
     } else {
       cardClasses += ' border-purple-200 bg-gradient-to-br from-purple-50/50 to-white';
-      badge = <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">#{rank}</span>;
+      badge = <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-purple-600 bg-purple-100">🔥 #{rank}</span>;
     }
   } else {
     cardClasses += ' border-slate-200';
@@ -205,7 +205,7 @@ const ProductCard = React.forwardRef(({
             {isFeatured && badge && (
               <div className="flex items-center gap-2 mt-0.5">
                 {badge}
-                {!compact && <span className="text-xs text-purple-400">🔥 Featured</span>}
+                {!compact && <span className="text-xs text-purple-400">Featured</span>}
               </div>
             )}
           </div>
@@ -251,7 +251,7 @@ const ProductCard = React.forwardRef(({
 });
 ProductCard.displayName = 'ProductCard';
 
-// ── Featured Carousel Component ──
+// ── Featured Carousel (only top 3) ──
 const FeaturedCarousel = ({ products, onUpvote, isAuthenticated, isUpvoting }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -284,73 +284,89 @@ const FeaturedCarousel = ({ products, onUpvote, isAuthenticated, isUpvoting }) =
   if (!products.length) return null;
 
   return (
-    <div className="relative bg-gradient-to-r from-purple-50/80 to-indigo-50/80 rounded-3xl p-4 md:p-6 border border-purple-100/50 shadow-sm mb-8 overflow-hidden">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <FiTrendingUp className="text-purple-600 text-xl" />
-          <h2 className="text-lg font-bold text-slate-900">🔥 Featured</h2>
-          <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-            Top {products.length}
-          </span>
+    <div className="relative bg-gradient-to-r from-purple-100/60 via-indigo-50/80 to-purple-100/60 rounded-3xl p-6 md:p-8 border border-purple-100 shadow-lg mb-10 overflow-hidden">
+      <div className="absolute -top-20 -right-20 w-64 h-64 bg-purple-200/30 rounded-full blur-3xl" />
+      <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-200/30 rounded-full blur-3xl" />
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-white/80 backdrop-blur-sm rounded-full shadow-sm border border-purple-100">
+              <FiTrendingUp className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-extrabold text-slate-900">🔥 Featured Products</h2>
+              <p className="text-sm text-slate-500">The top 3 most upvoted products {total > 1 && `– #${currentIndex+1}`}</p>
+            </div>
+          </div>
+          {total > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={prev}
+                className="p-2 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200 hover:bg-purple-50 hover:border-purple-300 transition shadow-sm"
+                aria-label="Previous"
+              >
+                <FiChevronLeft className="w-5 h-5 text-slate-600" />
+              </button>
+              <button
+                onClick={next}
+                className="p-2 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200 hover:bg-purple-50 hover:border-purple-300 transition shadow-sm"
+                aria-label="Next"
+              >
+                <FiChevronRight className="w-5 h-5 text-slate-600" />
+              </button>
+            </div>
+          )}
         </div>
+
+        <div
+          className="relative transition-all duration-500 ease-in-out"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <div
+            className="flex transition-transform duration-500 ease-in-out"
+            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+          >
+            {products.map((product, idx) => (
+              <div key={product.id} className="w-full flex-shrink-0 px-2">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 md:p-8">
+                  <ProductCard
+                    product={product}
+                    isFeatured
+                    rank={idx + 1}
+                    onUpvote={onUpvote}
+                    isAuthenticated={isAuthenticated}
+                    isUpvoting={isUpvoting}
+                    compact={false}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {total > 1 && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={prev}
-              className="p-1.5 rounded-full bg-white border border-slate-200 hover:bg-purple-50 hover:border-purple-300 transition shadow-sm"
-              aria-label="Previous"
-            >
-              <FiChevronLeft className="w-4 h-4 text-slate-600" />
-            </button>
-            <button
-              onClick={next}
-              className="p-1.5 rounded-full bg-white border border-slate-200 hover:bg-purple-50 hover:border-purple-300 transition shadow-sm"
-              aria-label="Next"
-            >
-              <FiChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
+          <div className="flex justify-center gap-2 mt-6">
+            {products.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => goTo(idx)}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  idx === currentIndex ? 'w-8 bg-purple-600' : 'bg-purple-200 hover:bg-purple-300'
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {total > 1 && (
+          <div className="text-center mt-3 text-xs text-slate-400">
+            <span>Slide {currentIndex+1} of {total}</span>
           </div>
         )}
       </div>
-
-      <div
-        className="relative transition-all duration-500 ease-in-out"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div
-          className="flex transition-transform duration-500 ease-in-out"
-          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-        >
-          {products.map((product, idx) => (
-            <div key={product.id} className="w-full flex-shrink-0 px-1">
-              <ProductCard
-                product={product}
-                isFeatured
-                rank={idx + 1}
-                onUpvote={onUpvote}
-                isAuthenticated={isAuthenticated}
-                isUpvoting={isUpvoting}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {total > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          {products.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => goTo(idx)}
-              className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                idx === currentIndex ? 'w-6 bg-purple-600' : 'bg-purple-200 hover:bg-purple-300'
-              }`}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -400,12 +416,29 @@ export default function ProductTrendFeed() {
     isFetching: isRegularFetching,
   } = useProductFeed(regularFilters, true);
 
-  // ── Compute products ──
-  const featuredProducts = shouldFetchFeatured ? (featuredData?.pages?.[0]?.products || []) : [];
-  const featuredIds = useMemo(() => new Set(featuredProducts.map(p => p.id)), [featuredProducts]);
+  // ── Compute featured products ──
+  const featuredProductsAll = shouldFetchFeatured ? (featuredData?.pages?.[0]?.products || []) : [];
+  const carouselProducts = featuredProductsAll.slice(0, 3);        // only top 3 in carousel
+  const remainingFeatured = featuredProductsAll.slice(3);          // ranks 4+ go to regular list
+  const carouselIds = new Set(carouselProducts.map(p => p.id));
 
+  // ── Build rank map for all featured products ──
+  const featuredRankMap = new Map(featuredProductsAll.map((p, idx) => [p.id, idx + 1]));
+
+  // ── Regular products from regular query ──
   const regularProductsAll = regularData?.pages?.flatMap((page) => page.products) || [];
-  const regularProducts = regularProductsAll.filter(p => !featuredIds.has(p.id));
+  // Exclude carousel products (top 3) to avoid duplicates
+  const filteredRegular = regularProductsAll.filter(p => !carouselIds.has(p.id));
+
+  // ── Combine: remaining featured (4+) at the top, then the rest ──
+  // We'll mark them as featured with their rank.
+  const combinedRegular = [
+    ...remainingFeatured,
+    ...filteredRegular.filter(p => !featuredRankMap.has(p.id)) // exclude any featured that might still be in regular (should not happen)
+  ];
+
+  // But we also want to show remainingFeatured with their rank, so we need to pass rank when rendering.
+  // We'll keep them as is and during rendering we check if product.id is in featuredRankMap.
 
   const hasMore = hasNextPage;
   const isLoading = regularLoading && !regularProductsAll.length;
@@ -620,7 +653,7 @@ export default function ProductTrendFeed() {
   };
 
   // ── Loading state ──
-  if (isLoading && !regularProducts.length) {
+  if (isLoading && !regularProductsAll.length) {
     return (
       <>
         <Meta title="Product Feed – ProductTrend" />
@@ -641,7 +674,7 @@ export default function ProductTrendFeed() {
     );
   }
 
-  if (isError && !regularProducts.length) {
+  if (isError && !regularProductsAll.length) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
@@ -654,8 +687,17 @@ export default function ProductTrendFeed() {
     );
   }
 
-  const showFeatured = shouldFetchFeatured && featuredProducts.length > 0;
+  const showFeatured = shouldFetchFeatured && carouselProducts.length > 0;
   const filterKey = `${sortBy}-${category}-${searchQuery}`;
+
+  // ── Combine remaining featured + regular products for display ──
+  // We need to order them: remainingFeatured first (they are already sorted by rank), then filteredRegular.
+  // But we should also preserve the regular sort order for the rest.
+  // We'll use a Set to avoid duplicates.
+  const displayedProducts = [
+    ...remainingFeatured,
+    ...filteredRegular.filter(p => !featuredRankMap.has(p.id))
+  ];
 
   return (
     <>
@@ -773,19 +815,19 @@ export default function ProductTrendFeed() {
           )}
         </div>
 
-        {/* ── Featured Carousel ── */}
+        {/* ── Featured Carousel (top 3 only) ── */}
         {showFeatured && (
           <FeaturedCarousel
-            products={featuredProducts}
+            products={carouselProducts}
             onUpvote={handleUpvote}
             isAuthenticated={isAuthenticated}
             isUpvoting={upvoteMutation.isLoading}
           />
         )}
 
-        {/* ── Regular Products ── */}
+        {/* ── Regular Products (including remaining featured 4+) ── */}
         <div>
-          {regularProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
+          {displayedProducts.length === 0 && !regularLoading && !isFetchingNextPage ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
               <div className="text-5xl mb-4">📭</div>
               <h3 className="text-lg font-semibold text-slate-900">
@@ -809,28 +851,33 @@ export default function ProductTrendFeed() {
             </div>
           ) : (
             <>
-              {showFeatured && regularProducts.length > 0 && (
+              {showFeatured && displayedProducts.length > 0 && (
                 <div className="flex items-center gap-2 mb-4">
                   <h2 className="text-lg font-bold text-slate-900">📰 More Products</h2>
                 </div>
               )}
               <div key={filterKey} className="space-y-4">
-                {regularProducts.map((product, index) => (
-                  <ProductCard
-                    key={`${product.id}-${sortBy}`}
-                    product={product}
-                    isFeatured={false}
-                    onUpvote={handleUpvote}
-                    isAuthenticated={isAuthenticated}
-                    isUpvoting={upvoteMutation.isLoading}
-                    ref={index === regularProducts.length - 1 ? lastElementRef : undefined}
-                  />
-                ))}
+                {displayedProducts.map((product, index) => {
+                  const rank = featuredRankMap.get(product.id) || null;
+                  const isFeatured = rank !== null && rank > 3; // only for remaining featured
+                  return (
+                    <ProductCard
+                      key={`${product.id}-${sortBy}`}
+                      product={product}
+                      isFeatured={isFeatured}
+                      rank={rank}
+                      onUpvote={handleUpvote}
+                      isAuthenticated={isAuthenticated}
+                      isUpvoting={upvoteMutation.isLoading}
+                      ref={index === displayedProducts.length - 1 ? lastElementRef : undefined}
+                    />
+                  );
+                })}
               </div>
             </>
           )}
 
-          {isRegularFetching && regularProducts.length > 0 && (
+          {isRegularFetching && displayedProducts.length > 0 && (
             <div className="py-4 flex justify-center">
               <div className="flex items-center gap-2 text-slate-400">
                 <FiLoader className="w-5 h-5 animate-spin text-purple-600" />
@@ -852,7 +899,7 @@ export default function ProductTrendFeed() {
             </div>
           )}
 
-          {!hasMore && regularProducts.length > 0 && (
+          {!hasMore && displayedProducts.length > 0 && (
             <p className="text-center text-xs text-slate-400 py-6">You've reached the end 🎉</p>
           )}
         </div>
