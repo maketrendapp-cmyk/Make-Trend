@@ -28,7 +28,7 @@ import {
   FiChevronRight,
 } from 'react-icons/fi';
 
-const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Other'];
+const CATEGORIES = ['All', 'Tech', 'Design', 'AI', 'Productivity', 'Education', 'Health', 'Fitness', 'Gaming', 'Social', 'Marketing', 'SaaS', 'Developer Tools', 'Other'];
 
 const formatDate = (timestamp) => {
   if (!timestamp) return 'Recently';
