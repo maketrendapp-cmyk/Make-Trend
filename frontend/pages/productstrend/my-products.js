@@ -148,19 +148,20 @@ export default function MyProducts() {
   // ── Filter state ──
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');      // what user types
+  const [searchQuery, setSearchQuery] = useState('');      // what is actually sent to backend
 
-  // ✅ Now sending search to backend
+  // ── Applied filters (search only changes when user clicks button or Enter) ──
   const filters = {
     status: statusFilter,
     category: categoryFilter || undefined,
-    search: searchTerm.trim() || undefined,
+    search: searchQuery.trim() || undefined,
   };
 
   // ── Fetch MT Coins ──
   const { data: mtCoinsData, isLoading: mtCoinsLoading, refetch: refetchMtCoins } = useMtCoins(isAuthenticated);
 
-  // ── React Query: My Products (infinite) with backend filters ──
+  // ── React Query: My Products (infinite) ──
   const {
     data,
     fetchNextPage,
@@ -171,7 +172,6 @@ export default function MyProducts() {
     isError,
   } = useMyProducts(filters, isAuthenticated);
 
-  // All products are already filtered by the backend
   const allProducts = data?.pages?.flatMap((page) => page.products) || [];
   const hasMore = hasNextPage;
 
@@ -193,7 +193,7 @@ export default function MyProducts() {
     setIsDeleting(true);
 
     const productId = deleteModal.id;
-    const queryKey = ['myProducts', { status: statusFilter, category: categoryFilter || undefined, search: searchTerm.trim() || undefined }];
+    const queryKey = ['myProducts', filters];
 
     // Optimistically remove from cache
     queryClient.setQueryData(queryKey, (oldData) => {
@@ -309,11 +309,26 @@ export default function MyProducts() {
     }
   };
 
+  // ── Apply search ──
+  const applySearch = () => {
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applySearch();
+    }
+  };
+
   const clearFilters = () => {
     setStatusFilter('all');
     setCategoryFilter('');
-    setSearchTerm('');
+    setSearchInput('');
+    setSearchQuery('');
   };
+
+  const hasFilters = statusFilter !== 'all' || categoryFilter || searchQuery;
 
   // ── Loading state ──
   if (isLoading) {
@@ -392,7 +407,6 @@ export default function MyProducts() {
     );
   }
 
-  const hasFilters = statusFilter !== 'all' || categoryFilter || searchTerm;
   const earnedFromProducts = mtCoinsData?.earnedFromProducts ?? 0;
   const availableCoins = mtCoinsData?.available ?? 0;
 
@@ -445,25 +459,32 @@ export default function MyProducts() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-6">
           <div className="flex flex-col md:flex-row gap-3">
             {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
+            <div className="flex-1 flex gap-2">
+              <div className="relative flex-1">
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
                   placeholder="Search your products..."
                   className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition"
                 />
-                {searchTerm && (
+                {searchInput && (
                   <button
-                    onClick={() => setSearchTerm('')}
+                    onClick={() => setSearchInput('')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
                   >
                     <FiX className="w-4 h-4" />
                   </button>
                 )}
               </div>
+              <button
+                onClick={applySearch}
+                className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <FiSearch className="w-4 h-4" /> Search
+              </button>
             </div>
 
             {/* Status Filter */}
@@ -504,7 +525,7 @@ export default function MyProducts() {
                 Showing {allProducts.length} products
                 {statusFilter && statusFilter !== 'all' && <span className="ml-2">• Status: {statusFilter}</span>}
                 {categoryFilter && <span className="ml-2">• Category: {categoryFilter}</span>}
-                {searchTerm && <span className="ml-2">• Search: "{searchTerm}"</span>}
+                {searchQuery && <span className="ml-2">• Search: "{searchQuery}"</span>}
               </p>
             </div>
           )}
