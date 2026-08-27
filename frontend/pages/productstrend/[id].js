@@ -12,7 +12,6 @@ import {
   useUpvoteProduct,
   useAddProductComment,
   useInvalidateQueries,
-  useProductRating,
   useRateProduct,
 } from '../../lib/queries';
 import { getToken } from '../../lib/api';
@@ -49,6 +48,7 @@ import {
   FiLinkedin,
   FiAlertTriangle,
   FiStar,
+  FiCheck,
 } from 'react-icons/fi';
 import { FaRocket, FaDiscord, FaTelegram, FaTiktok, FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa';
 
@@ -156,9 +156,6 @@ export default function ProductDetail() {
 
   const upvoteMutation = useUpvoteProduct();
   const addCommentMutation = useAddProductComment();
-
-  // ── Rating hooks ──
-  const { data: ratingData, refetch: refetchRating } = useProductRating(id, !!id);
   const rateProductMutation = useRateProduct();
 
   const [commentText, setCommentText] = useState('');
@@ -176,17 +173,20 @@ export default function ProductDetail() {
   const [avgRating, setAvgRating] = useState(0);
   const [totalRatings, setTotalRatings] = useState(0);
   const [userRating, setUserRating] = useState(null);
+  const [selectedRating, setSelectedRating] = useState(null); // what user has selected but not yet submitted
   const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
   const [ratingHover, setRatingHover] = useState(0);
 
-  // ── Update rating state when data arrives ──
+  // ── Set rating from product data ──
   useEffect(() => {
-    if (ratingData) {
-      setAvgRating(ratingData.avgRating || 0);
-      setTotalRatings(ratingData.totalRatings || 0);
-      setUserRating(ratingData.userRating || null);
+    if (product) {
+      setAvgRating(product.avgRating || 0);
+      setTotalRatings(product.totalRatings || 0);
+      setUserRating(product.userRating || null);
+      // Reset selected rating when product changes
+      setSelectedRating(null);
     }
-  }, [ratingData]);
+  }, [product]);
 
   // ── Local upvote state ──
   const [localUpvote, setLocalUpvote] = useState(null);
@@ -261,25 +261,60 @@ export default function ProductDetail() {
   };
 
   // ── Rating handler ──
-  const handleRate = async (rating) => {
+  const handleSubmitRating = async () => {
     if (!isAuthenticated) {
       toast.error('Please sign in to rate this product');
       return;
     }
-    if (rating === userRating) return;
+    if (!selectedRating) {
+      toast.error('Please select a rating first');
+      return;
+    }
+    if (selectedRating === userRating) {
+      toast.info('You already rated this product with this rating');
+      return;
+    }
 
     setIsRatingSubmitting(true);
     try {
-      const result = await rateProductMutation.mutateAsync({ productId: id, rating });
-      setAvgRating(result.avgRating || 0);
-      setTotalRatings(result.totalRatings || 0);
-      setUserRating(result.userRating || null);
-      toast.success('Rating updated!');
+      const result = await rateProductMutation.mutateAsync({ productId: id, rating: selectedRating });
+      const newAvg = result.avgRating || 0;
+      const newTotal = result.totalRatings || 0;
+      const newUserRating = result.userRating || null;
+
+      // Update local state
+      setAvgRating(newAvg);
+      setTotalRatings(newTotal);
+      setUserRating(newUserRating);
+      setSelectedRating(null); // Reset selection after successful submit
+
+      // Update product detail cache directly
+      const currentProduct = queryClient.getQueryData(['productDetail', id]);
+      if (currentProduct) {
+        queryClient.setQueryData(['productDetail', id], {
+          ...currentProduct,
+          avgRating: newAvg,
+          totalRatings: newTotal,
+          userRating: newUserRating,
+        });
+      }
+
+      toast.success('Rating submitted!');
     } catch (err) {
       toast.error(err.message || 'Failed to rate product');
     } finally {
       setIsRatingSubmitting(false);
     }
+  };
+
+  // ── Handle star click (select rating) ──
+  const handleStarClick = (rating) => {
+    if (rating === selectedRating) {
+      setSelectedRating(null); // deselect if same star clicked
+    } else {
+      setSelectedRating(rating);
+    }
+    setRatingHover(rating);
   };
 
   // ── Comment handler ──
@@ -463,32 +498,56 @@ export default function ProductDetail() {
   const renderInteractiveStars = () => {
     if (!isAuthenticated) return null;
 
-    const displayRating = ratingHover || userRating || 0;
+    const displayRating = ratingHover || selectedRating || userRating || 0;
 
     return (
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
+      <div className="flex flex-col items-start gap-2">
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              onClick={() => handleStarClick(star)}
+              onMouseEnter={() => setRatingHover(star)}
+              onMouseLeave={() => setRatingHover(0)}
+              disabled={isRatingSubmitting}
+              className={`focus:outline-none transition-transform hover:scale-110 ${
+                isRatingSubmitting ? 'opacity-50 cursor-wait' : ''
+              }`}
+            >
+              <FaStar
+                size={28}
+                className={`${
+                  displayRating >= star ? 'text-yellow-400' : 'text-gray-300'
+                } transition-colors duration-150`}
+              />
+            </button>
+          ))}
+          <span className="text-xs text-slate-400 ml-2">
+            {selectedRating ? `Selected: ${selectedRating}★` : userRating ? `Your rating: ${userRating}★` : 'Click a star to rate'}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
           <button
-            key={star}
-            type="button"
-            onClick={() => handleRate(star)}
-            onMouseEnter={() => setRatingHover(star)}
-            onMouseLeave={() => setRatingHover(0)}
-            disabled={isRatingSubmitting}
-            className={`focus:outline-none ${isRatingSubmitting ? 'opacity-50 cursor-wait' : ''}`}
+            onClick={handleSubmitRating}
+            disabled={!selectedRating || selectedRating === userRating || isRatingSubmitting}
+            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+              selectedRating && selectedRating !== userRating && !isRatingSubmitting
+                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+            }`}
           >
-            <FaStar
-              size={24}
-              className={`${
-                displayRating >= star ? 'text-yellow-400' : 'text-gray-300'
-              } transition-colors duration-150 hover:scale-110`}
-            />
+            {isRatingSubmitting ? (
+              <FiLoader className="w-4 h-4 animate-spin" />
+            ) : (
+              <FiCheck className="w-4 h-4" />
+            )}
+            {userRating ? 'Update Rating' : 'Submit Rating'}
           </button>
-        ))}
-        {userRating && (
-          <span className="text-xs text-gray-400 ml-2">You rated {userRating}★</span>
-        )}
-        {isRatingSubmitting && <FiLoader className="w-4 h-4 animate-spin text-purple-600 ml-2" />}
+          {selectedRating && selectedRating === userRating && (
+            <span className="text-xs text-slate-400">Same as your current rating</span>
+          )}
+        </div>
       </div>
     );
   };
@@ -629,9 +688,9 @@ export default function ProductDetail() {
 
             {/* ── Interactive Rating Section ── */}
             {isAuthenticated && (
-              <div className="flex flex-wrap items-center gap-4 mt-3 mb-3 p-3 bg-purple-50/50 rounded-xl border border-purple-100">
-                <div className="flex items-center gap-2">
-                  <FiStar className="text-purple-600 w-4 h-4" />
+              <div className="mt-3 mb-4 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
+                <div className="flex flex-wrap items-center gap-3">
+                  <FiStar className="text-purple-600 w-5 h-5" />
                   <span className="text-sm font-medium text-slate-700">Rate this product:</span>
                 </div>
                 {renderInteractiveStars()}
