@@ -6711,16 +6711,16 @@ app.post('/api/productstrend/products/:id/rate', verifyToken, checkBanned, async
       });
 
       // Build the rating document – only include createdAt for new ratings
-      const ratingDoc = {
+      const newRatingData = {
         productId: id,
         userId: uid,
         rating,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
       if (oldRating === null) {
-        ratingDoc.createdAt = admin.firestore.FieldValue.serverTimestamp();
+        newRatingData.createdAt = admin.firestore.FieldValue.serverTimestamp();
       }
-      transaction.set(ratingRef, ratingDoc, { merge: true });
+      transaction.set(ratingRef, newRatingData, { merge: true });
 
       result = { totalRatings, sumRatings };
     });
