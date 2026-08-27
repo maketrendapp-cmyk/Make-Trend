@@ -6710,13 +6710,17 @@ app.post('/api/productstrend/products/:id/rate', verifyToken, checkBanned, async
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      transaction.set(ratingRef, {
+      // Build the rating document – only include createdAt for new ratings
+      const ratingDoc = {
         productId: id,
         userId: uid,
         rating,
-        createdAt: oldRating === null ? admin.firestore.FieldValue.serverTimestamp() : undefined,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      };
+      if (oldRating === null) {
+        ratingDoc.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+      transaction.set(ratingRef, ratingDoc, { merge: true });
 
       result = { totalRatings, sumRatings };
     });
