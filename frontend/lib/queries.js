@@ -670,6 +670,45 @@ export function useBuyUpvotes() {
   });
 }
 
+// ── Get product rating (includes user's own rating if authenticated) ──
+export function useProductRating(productId, enabled = true) {
+  return useQuery({
+    queryKey: ['productRating', productId],
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const data = await apiRequest(`/productstrend/products/${productId}/rating`, {}, token);
+      return data; // { avgRating, totalRatings, userRating }
+    },
+    enabled: !!productId && enabled,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ── Rate a product (set/update rating) – NO FEED INVALIDATION ──
+export function useRateProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ productId, rating }) => {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const data = await apiRequest(`/productstrend/products/${productId}/rate`, {
+        method: 'POST',
+        body: { rating },
+      }, token);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries(['productRating', variables.productId]);
+      queryClient.invalidateQueries(['productDetail', variables.productId]);
+      // ❌ No productFeed invalidation – saves reads
+    },
+    onError: (error) => {
+      console.error('Rate product error:', error);
+    },
+  });
+}
+
 // ── 🌍 COMMUNITY POSTS QUERIES ──
 
 // 1. Fetch posts feed (infinite scroll, public, with category & type filters)
