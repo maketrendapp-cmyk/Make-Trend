@@ -12,6 +12,8 @@ import {
   useUpvoteProduct,
   useAddProductComment,
   useInvalidateQueries,
+  useProductRating,
+  useRateProduct,
 } from '../../lib/queries';
 import { getToken } from '../../lib/api';
 import toast from 'react-hot-toast';
@@ -46,10 +48,9 @@ import {
   FiTwitch,
   FiLinkedin,
   FiAlertTriangle,
-  FiCheckCircle,
-  FiMapPin,
+  FiStar,
 } from 'react-icons/fi';
-import { FaRocket, FaDiscord, FaTelegram, FaTiktok } from 'react-icons/fa';
+import { FaRocket, FaDiscord, FaTelegram, FaTiktok, FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 if (!BACKEND_URL) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
@@ -151,11 +152,14 @@ export default function ProductDetail() {
     fetchNextPage: fetchMoreComments,
     hasNextPage: hasMoreComments,
     isFetchingNextPage: isFetchingMoreComments,
-    refetch: refetchComments,
   } = useProductComments(id, true);
 
   const upvoteMutation = useUpvoteProduct();
   const addCommentMutation = useAddProductComment();
+
+  // ── Rating hooks ──
+  const { data: ratingData, refetch: refetchRating } = useProductRating(id, !!id);
+  const rateProductMutation = useRateProduct();
 
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -167,6 +171,22 @@ export default function ProductDetail() {
 
   const comments = commentsData?.pages?.flatMap((page) => page.comments) || [];
   const hasMore = hasMoreComments;
+
+  // ── Rating state ──
+  const [avgRating, setAvgRating] = useState(0);
+  const [totalRatings, setTotalRatings] = useState(0);
+  const [userRating, setUserRating] = useState(null);
+  const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
+  const [ratingHover, setRatingHover] = useState(0);
+
+  // ── Update rating state when data arrives ──
+  useEffect(() => {
+    if (ratingData) {
+      setAvgRating(ratingData.avgRating || 0);
+      setTotalRatings(ratingData.totalRatings || 0);
+      setUserRating(ratingData.userRating || null);
+    }
+  }, [ratingData]);
 
   // ── Local upvote state ──
   const [localUpvote, setLocalUpvote] = useState(null);
@@ -240,7 +260,29 @@ export default function ProductDetail() {
     });
   };
 
-  // ── 🔥 UPDATED Comment handler – manual cache update, no extra refetch ──
+  // ── Rating handler ──
+  const handleRate = async (rating) => {
+    if (!isAuthenticated) {
+      toast.error('Please sign in to rate this product');
+      return;
+    }
+    if (rating === userRating) return;
+
+    setIsRatingSubmitting(true);
+    try {
+      const result = await rateProductMutation.mutateAsync({ productId: id, rating });
+      setAvgRating(result.avgRating || 0);
+      setTotalRatings(result.totalRatings || 0);
+      setUserRating(result.userRating || null);
+      toast.success('Rating updated!');
+    } catch (err) {
+      toast.error(err.message || 'Failed to rate product');
+    } finally {
+      setIsRatingSubmitting(false);
+    }
+  };
+
+  // ── Comment handler ──
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
@@ -263,7 +305,6 @@ export default function ProductDetail() {
       createdAt: new Date().toISOString(),
     };
 
-    // ── Optimistic update ──
     const currentComments = queryClient.getQueryData(['productComments', id]) || { pages: [{ comments: [] }] };
     const updatedPages = [...currentComments.pages];
     if (updatedPages.length > 0) {
@@ -283,7 +324,6 @@ export default function ProductDetail() {
       const result = await addCommentMutation.mutateAsync({ productId: id, text: textToSend });
       const serverComment = result.comment;
 
-      // ── Replace optimistic comment with server comment (no refetch) ──
       const cache = queryClient.getQueryData(['productComments', id]);
       if (cache) {
         const pages = cache.pages.map((page, idx) => {
@@ -302,7 +342,6 @@ export default function ProductDetail() {
         queryClient.setQueryData(['productComments', id], { ...cache, pages });
       }
 
-      // ── Update product comment count ──
       const currentProduct = queryClient.getQueryData(['productDetail', id]);
       if (currentProduct) {
         queryClient.setQueryData(['productDetail', id], {
@@ -313,7 +352,6 @@ export default function ProductDetail() {
 
       toast.success('Comment posted!');
     } catch (error) {
-      // ── Revert optimistic comment ──
       const revertCache = queryClient.getQueryData(['productComments', id]);
       if (revertCache) {
         const revertedPages = revertCache.pages.map((page, idx) => {
@@ -397,6 +435,62 @@ export default function ProductDetail() {
 
   const goToUserProfile = (uid) => {
     if (uid) router.push(`/userinfo/${uid}`);
+  };
+
+  // ── Render stars helper ──
+  const renderStars = (rating, size = 18, showCount = true, count = 0) => {
+    const fullStars = Math.floor(rating);
+    const halfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+
+    return (
+      <div className="flex items-center gap-0.5">
+        {[...Array(fullStars)].map((_, i) => (
+          <FaStar key={`full-${i}`} size={size} className="text-yellow-400" />
+        ))}
+        {halfStar && <FaStarHalfAlt size={size} className="text-yellow-400" />}
+        {[...Array(emptyStars)].map((_, i) => (
+          <FaRegStar key={`empty-${i}`} size={size} className="text-gray-300" />
+        ))}
+        {showCount && count > 0 && (
+          <span className="text-xs text-gray-500 ml-1.5">({count})</span>
+        )}
+      </div>
+    );
+  };
+
+  // ── Interactive stars ──
+  const renderInteractiveStars = () => {
+    if (!isAuthenticated) return null;
+
+    const displayRating = ratingHover || userRating || 0;
+
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => handleRate(star)}
+            onMouseEnter={() => setRatingHover(star)}
+            onMouseLeave={() => setRatingHover(0)}
+            disabled={isRatingSubmitting}
+            className={`focus:outline-none ${isRatingSubmitting ? 'opacity-50 cursor-wait' : ''}`}
+          >
+            <FaStar
+              size={24}
+              className={`${
+                displayRating >= star ? 'text-yellow-400' : 'text-gray-300'
+              } transition-colors duration-150 hover:scale-110`}
+            />
+          </button>
+        ))}
+        {userRating && (
+          <span className="text-xs text-gray-400 ml-2">You rated {userRating}★</span>
+        )}
+        {isRatingSubmitting && <FiLoader className="w-4 h-4 animate-spin text-purple-600 ml-2" />}
+      </div>
+    );
   };
 
   // ── Loading ──
@@ -503,7 +597,16 @@ export default function ProductDetail() {
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{product.name}</h1>
                 <p className="text-base text-slate-500 mt-1">{product.tagline}</p>
-                <div className="flex flex-wrap gap-2 mt-3">
+
+                {/* ── Rating display ── */}
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {renderStars(avgRating, 18, true, totalRatings)}
+                  {totalRatings === 0 && (
+                    <span className="text-xs text-slate-400">No ratings yet</span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-2">
                   {product.category && (
                     <span className="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">{product.category}</span>
                   )}
@@ -523,6 +626,17 @@ export default function ProductDetail() {
                 </div>
               </div>
             </div>
+
+            {/* ── Interactive Rating Section ── */}
+            {isAuthenticated && (
+              <div className="flex flex-wrap items-center gap-4 mt-3 mb-3 p-3 bg-purple-50/50 rounded-xl border border-purple-100">
+                <div className="flex items-center gap-2">
+                  <FiStar className="text-purple-600 w-4 h-4" />
+                  <span className="text-sm font-medium text-slate-700">Rate this product:</span>
+                </div>
+                {renderInteractiveStars()}
+              </div>
+            )}
 
             {/* ── Upvote & share row ── */}
             <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-t border-b border-slate-100">
