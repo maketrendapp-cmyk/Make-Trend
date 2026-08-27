@@ -6341,7 +6341,10 @@ app.get('/api/productstrend/feed', async (req, res) => {
           }
 
           const maker = await getProductMakerInfo(data.makerUid);
-          products.push({ id: doc.id, ...data, maker });
+          const totalRatings = data.totalRatings || 0;
+          const sumRatings = data.sumRatings || 0;
+          const avgRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+          products.push({ id: doc.id, ...data, maker, avgRating: parseFloat(avgRating.toFixed(2)) });
           lastProductId = doc.id;
           count++;
         }
@@ -6424,7 +6427,15 @@ app.get('/api/productstrend/feed', async (req, res) => {
     const products = [];
     if (productIds.length > 0) {
       const details = await Promise.all(productIds.map(id => getProductDetails(id)));
-      for (const product of details) if (product) products.push(product);
+      for (const product of details) {
+        if (product) {
+          const totalRatings = product.totalRatings || 0;
+          const sumRatings = product.sumRatings || 0;
+          const avgRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+          product.avgRating = parseFloat(avgRating.toFixed(2));
+          products.push(product);
+        }
+      }
     }
 
     let userVotedSet = new Set();
@@ -6489,7 +6500,6 @@ app.get('/api/productstrend/products/:id', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
     }
 
-    // ── Optional auth ──
     let uid = null;
     let deviceId = req.headers['x-device-id'] || null;
     const authHeader = req.headers.authorization;
@@ -6503,23 +6513,73 @@ app.get('/api/productstrend/products/:id', async (req, res) => {
 
     const cacheKey = `productstrend:product:${id}`;
     let product = null;
+    let userRating = null;
+
+    // Try cache first
     try {
       const cached = await redisGet(cacheKey);
-      if (cached) product = JSON.parse(cached);
+      if (cached) {
+        product = JSON.parse(cached);
+        // If cached, fetch user rating if authenticated (it changes per user)
+        if (uid) {
+          const ratingDoc = await db.collection('productRatings').doc(`${id}_${uid}`).get();
+          if (ratingDoc.exists) {
+            userRating = ratingDoc.data().rating;
+          }
+        }
+        // Compute user vote status
+        let userVoted = false;
+        if (uid) {
+          const voteCacheKey = `user:votes:${uid}`;
+          try {
+            const cachedVotes = await redisGet(voteCacheKey);
+            if (cachedVotes) {
+              const votedIds = JSON.parse(cachedVotes);
+              userVoted = votedIds.includes(id);
+            } else {
+              const voteDoc = await db.collection('productVotes').doc(`${id}_user_${uid}`).get();
+              userVoted = voteDoc.exists;
+            }
+          } catch (e) {
+            console.warn('Vote check error:', e);
+          }
+        } else if (deviceId) {
+          const voteDoc = await db.collection('productVotes').doc(`${id}_device_${deviceId}`).get();
+          userVoted = voteDoc.exists;
+        }
+        return res.json({ success: true, product: { ...product, userVoted, userRating } });
+      }
     } catch (e) { /* ignore */ }
 
-    if (!product) {
-      const doc = await db.collection('products').doc(id).get();
-      if (!doc.exists) {
-        return res.status(404).json({ success: false, error: 'Product not found' });
+    // Cache miss – fetch from Firestore
+    const doc = await db.collection('products').doc(id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    const data = doc.data();
+    const maker = await getProductMakerInfo(data.makerUid);
+
+    const totalRatings = data.totalRatings || 0;
+    const sumRatings = data.sumRatings || 0;
+    const avgRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+    product = {
+      id: doc.id,
+      ...data,
+      maker,
+      avgRating: parseFloat(avgRating.toFixed(2)),
+      totalRatings,
+    };
+
+    // Fetch user rating if authenticated
+    if (uid) {
+      const ratingDoc = await db.collection('productRatings').doc(`${id}_${uid}`).get();
+      if (ratingDoc.exists) {
+        userRating = ratingDoc.data().rating;
       }
-      const data = doc.data();
-      const maker = await getProductMakerInfo(data.makerUid);
-      product = { id: doc.id, ...data, maker };
-      await redis.set(cacheKey, JSON.stringify(product), 'EX', 300);
     }
 
-    // ── Compute user vote status ──
+    // Compute user vote status
     let userVoted = false;
     if (uid) {
       const voteCacheKey = `user:votes:${uid}`;
@@ -6539,11 +6599,144 @@ app.get('/api/productstrend/products/:id', async (req, res) => {
       const voteDoc = await db.collection('productVotes').doc(`${id}_device_${deviceId}`).get();
       userVoted = voteDoc.exists;
     }
-    product.userVoted = userVoted;
 
-    res.json({ success: true, product });
+    // Cache product details (without userRating, as it's user-specific)
+    const productToCache = { ...product };
+    await redis.set(cacheKey, JSON.stringify(productToCache), 'EX', 300);
+
+    res.json({ success: true, product: { ...product, userVoted, userRating } });
   } catch (error) {
     console.error('❌ Product detail error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Get product rating (average, total, user's own) ──
+app.get('/api/productstrend/products/:id/rating', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ip = getClientIp(req);
+
+    if (!(await checkRateLimit(ip, 'product-rating-get', 30, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
+    }
+
+    const productDoc = await db.collection('products').doc(id).get();
+    if (!productDoc.exists) {
+      return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    const productData = productDoc.data();
+
+    let userRating = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        const userId = decoded.uid;
+        const ratingDoc = await db.collection('productRatings').doc(`${id}_${userId}`).get();
+        if (ratingDoc.exists) {
+          userRating = ratingDoc.data().rating;
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    const totalRatings = productData.totalRatings || 0;
+    const sumRatings = productData.sumRatings || 0;
+    const avgRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+    res.json({
+      success: true,
+      avgRating: parseFloat(avgRating.toFixed(2)),
+      totalRatings,
+      userRating,
+    });
+  } catch (error) {
+    console.error('❌ Get rating error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Rate a product (set/update rating) ──
+app.post('/api/productstrend/products/:id/rate', verifyToken, checkBanned, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uid = req.user.uid;
+    const { rating } = req.body;
+
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, error: 'Rating must be an integer between 1 and 5' });
+    }
+
+    if (!(await checkRateLimit(uid, 'rate-product', 5, 60))) {
+      return res.status(429).json({ success: false, error: 'Too many rating attempts. Please wait.' });
+    }
+
+    const productRef = db.collection('products').doc(id);
+    const ratingDocId = `${id}_${uid}`;
+    const ratingRef = db.collection('productRatings').doc(ratingDocId);
+
+    let result;
+    await db.runTransaction(async (transaction) => {
+      const productDoc = await transaction.get(productRef);
+      if (!productDoc.exists) {
+        throw new Error('Product not found');
+      }
+      const productData = productDoc.data();
+      if (productData.status === 'deleted') {
+        throw new Error('Product is not available');
+      }
+
+      const ratingDoc = await transaction.get(ratingRef);
+      let oldRating = null;
+      if (ratingDoc.exists) {
+        oldRating = ratingDoc.data().rating;
+      }
+
+      let totalRatings = productData.totalRatings || 0;
+      let sumRatings = productData.sumRatings || 0;
+
+      if (oldRating !== null) {
+        sumRatings = sumRatings - oldRating + rating;
+        // totalRatings stays the same
+      } else {
+        totalRatings += 1;
+        sumRatings += rating;
+      }
+
+      transaction.update(productRef, {
+        totalRatings,
+        sumRatings,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(ratingRef, {
+        productId: id,
+        userId: uid,
+        rating,
+        createdAt: oldRating === null ? admin.firestore.FieldValue.serverTimestamp() : undefined,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      result = { totalRatings, sumRatings };
+    });
+
+    const avgRating = result.totalRatings > 0 ? result.sumRatings / result.totalRatings : 0;
+
+    // Invalidate product detail cache
+    await invalidateKey(`productstrend:product:${id}`);
+
+    res.json({
+      success: true,
+      avgRating: parseFloat(avgRating.toFixed(2)),
+      totalRatings: result.totalRatings,
+      userRating: rating,
+    });
+  } catch (error) {
+    console.error('❌ Rate product error:', error);
+    if (error.message === 'Product not found' || error.message === 'Product is not available') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -6778,6 +6971,8 @@ if (category && !ALLOWED_CATEGORIES.includes(category)) {
       status: 'approved',
       upvotes: 0,
       commentsCount: 0,
+      totalRatings: 0,
+      sumRatings: 0,
       features: features || [],
       pricing: pricing || 'Free',
       productStatus: productStatus || 'Live',
