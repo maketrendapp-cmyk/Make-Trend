@@ -670,22 +670,7 @@ export function useBuyUpvotes() {
   });
 }
 
-// ── Get product rating (includes user's own rating if authenticated) ──
-export function useProductRating(productId, enabled = true) {
-  return useQuery({
-    queryKey: ['productRating', productId],
-    queryFn: async () => {
-      const token = await getToken().catch(() => null);
-      const data = await apiRequest(`/productstrend/products/${productId}/rating`, {}, token);
-      return data; // { avgRating, totalRatings, userRating }
-    },
-    enabled: !!productId && enabled,
-    staleTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-}
-
-// ── Rate a product (set/update rating) – NO FEED INVALIDATION ──
+// ── Rate a product (set/update rating) ──
 export function useRateProduct() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -699,12 +684,13 @@ export function useRateProduct() {
       return data;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['productRating', variables.productId]);
+      // Only invalidate the product detail cache (rating is already updated in the response)
       queryClient.invalidateQueries(['productDetail', variables.productId]);
-      // ❌ No productFeed invalidation – saves reads
+      // Optionally, you can update the cache directly to avoid a refetch
     },
     onError: (error) => {
       console.error('Rate product error:', error);
+      // Toast is handled in the component
     },
   });
 }
