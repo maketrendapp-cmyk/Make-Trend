@@ -6611,52 +6611,6 @@ app.get('/api/productstrend/products/:id', async (req, res) => {
   }
 });
 
-// ── Get product rating (average, total, user's own) ──
-app.get('/api/productstrend/products/:id/rating', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const ip = getClientIp(req);
-
-    if (!(await checkRateLimit(ip, 'product-rating-get', 30, 60))) {
-      return res.status(429).json({ success: false, error: 'Too many requests. Please wait.' });
-    }
-
-    const productDoc = await db.collection('products').doc(id).get();
-    if (!productDoc.exists) {
-      return res.status(404).json({ success: false, error: 'Product not found' });
-    }
-    const productData = productDoc.data();
-
-    let userRating = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.split(' ')[1];
-        const decoded = await admin.auth().verifyIdToken(token);
-        const userId = decoded.uid;
-        const ratingDoc = await db.collection('productRatings').doc(`${id}_${userId}`).get();
-        if (ratingDoc.exists) {
-          userRating = ratingDoc.data().rating;
-        }
-      } catch (e) { /* ignore */ }
-    }
-
-    const totalRatings = productData.totalRatings || 0;
-    const sumRatings = productData.sumRatings || 0;
-    const avgRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
-
-    res.json({
-      success: true,
-      avgRating: parseFloat(avgRating.toFixed(2)),
-      totalRatings,
-      userRating,
-    });
-  } catch (error) {
-    console.error('❌ Get rating error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 // ── Rate a product (set/update rating) ──
 app.post('/api/productstrend/products/:id/rate', verifyToken, checkBanned, async (req, res) => {
   try {
